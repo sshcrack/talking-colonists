@@ -1,0 +1,12 @@
+{
+  "itemGroup.mc_talking": "Example Mod Tab",
+  "block.mc_talking.example_block": "Example Block",
+  "item.mc_talking.example_item": "Example Item",
+  "mc_talking.configuration.gemini_key": "Gemini Key",
+  "mc_talking.configuration.respond_in_group": "Reply when in group",
+  "mc_talking.configuration.max_concurrent_agents": "Maximum concurrent agents",
+  "mc_talking.configuration.look_duration_ticks": "Look duration (ticks)",
+  "mc_talking.configuration.look_tolerance_ms": "Look tolerance (ms)",
+    "mc_talking.configuration.activation_distance": "Activation distance",
+  "mc_talking.configuration.title": "Minecolonies Talking Configuration"
+}
