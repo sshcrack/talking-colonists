@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import com.minecolonies.core.entity.citizen.EntityCitizen;
 import me.sshcrack.mc_talking.Config;
 import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
 import net.minecraft.ChatFormatting;
@@ -99,16 +100,6 @@ public class CitizenTalkingDevice extends Item {
             return true; // Still prevent attack
         }
 
-        // Check distance before allowing interaction
-        double distance = player.distanceToSqr(citizen);
-        if (distance > (Config.activationDistance * Config.activationDistance)) {
-            serverPlayer.sendSystemMessage(
-                    Component.literal("This citizen is too far away to talk to.")
-                            .withStyle(ChatFormatting.RED)
-            );
-            return true; // Still prevent attack
-        }
-
         // If there was a previously focused entity, remove its glowing effect
         LivingEntity previousEntity = MinecoloniesTalkingCitizens.activeEntity.get(playerId);
         if (previousEntity != null && previousEntity.isAlive()) {
@@ -132,6 +123,9 @@ public class CitizenTalkingDevice extends Item {
                 Component.literal("Started conversation with " + citizen.getName().getString())
                         .withStyle(ChatFormatting.GREEN)
         );
+
+        citizen.getNavigation().stop();
+        citizen.getLookControl().setLookAt(player);
 
         return true; // Prevent normal attack behavior
     }

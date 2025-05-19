@@ -121,15 +121,15 @@ dependencies {
     localRuntime "curse.maven:domum-ornamentum-527361:6335398"
 
     implementation "curse.maven:minecolonies-245506:6543415"
-    jarJar(implementation('org.java-websocket:Java-WebSocket:1.6.0') {
+    jarJar(implementation('org.java-websocket:Java-WebSocket') {
         exclude group: 'org.slf4j', module: 'slf4j-api'
-    })
-    jarJar(implementation("com.google.code.gson:gson:2.10.1"))
-
-    additionalRuntimeClasspath "com.google.code.gson:gson:2.10.1"
+    }) {
+        version {
+            strictly '[1.5,)'
+        }
+    }
     additionalRuntimeClasspath "org.java-websocket:Java-WebSocket:1.6.0"
 }
-
 
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {

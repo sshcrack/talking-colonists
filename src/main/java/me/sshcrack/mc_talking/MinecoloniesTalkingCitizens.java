@@ -22,7 +22,6 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -182,6 +181,13 @@ public class MinecoloniesTalkingCitizens {
         }
 
         clients.clear();
+        activeEntity.clear();
+        playerLookingAt.clear();
+        lookDuration.clear();
+        previousEntityLookedAt.clear();
+        lastEntitySwitchTime.clear();
+        playerConversationPartners.clear();
+        addedEntities.clear();
     }
 
     int tick = 0;
