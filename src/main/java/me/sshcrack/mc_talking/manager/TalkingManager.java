@@ -1,11 +1,10 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
+import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 
 import java.util.UUID;
 
@@ -13,7 +12,7 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class TalkingManager {
     GeminiWsClient client;
-    LocationalAudioChannel channel;
+    EntityAudioChannel channel;
     AbstractEntityCitizen entity;
     OpusDecoder decoder;
 
@@ -23,20 +22,10 @@ public class TalkingManager {
             throw new IllegalStateException("Voicechat API is not initialized");
 
         this.entity = entity;
-        var vcLevel = vcApi.fromServerLevel(entity.level());
-        var pos = vcApi.createPosition(entity.getX(), entity.getY(), entity.getZ());
-        channel = vcApi.createLocationalAudioChannel(UUID.randomUUID(), vcLevel, pos);
+        channel = vcApi.createEntityAudioChannel(entity.getUUID(), vcApi.fromEntity(entity));
 
         client = new GeminiWsClient(this, initialPlayer);
         decoder = vcApi.createDecoder();
-    }
-
-    public void updatePos() {
-        if (client.isClosed() || client.stream.player == null || !client.stream.player.isPlaying())
-            return;
-
-        var pos = vcApi.createPosition(entity.getX(), entity.getY(), entity.getZ());
-        channel.updateLocation(pos);
     }
 
     public void promptAudioRaw(short[] raw) {

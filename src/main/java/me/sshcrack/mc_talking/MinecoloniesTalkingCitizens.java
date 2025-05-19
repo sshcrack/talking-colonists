@@ -198,15 +198,8 @@ public class MinecoloniesTalkingCitizens {
             return;
 
         if (tick++ % 5 != 0) {
-            if (tick % 5 == 3) {
-                for (var client : clients.values()) {
-                    client.updatePos();
-                }
-            }
-
             // Every tick check for players who moved too far away
             checkPlayerDistances(event.getServer().getPlayerList().getPlayers());
-
             return;
         }
 
