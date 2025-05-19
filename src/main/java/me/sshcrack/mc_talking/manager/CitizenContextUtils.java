@@ -155,6 +155,7 @@ public class CitizenContextUtils {
         // Final roleplay guidance
         prompt.append("\n## IMPORTANT\n\n");
         prompt.append("Stay in character at all times. If asked questions about game mechanics or topics outside your character's knowledge, respond as your character would - with confusion, simple observations, or changing the subject to colony matters. Your character doesn't know they're in a game.");
+        prompt.append("Respond in the language the player is using.");
 
         return prompt.toString();
     }

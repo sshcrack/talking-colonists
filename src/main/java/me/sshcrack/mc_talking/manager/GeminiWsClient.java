@@ -22,14 +22,13 @@ public class GeminiWsClient extends WebSocketClient {
     GeminiStream stream;
     ServerPlayer initialPlayer;
     TalkingManager manager;
-    private final List<short[]> pending_prompt = new ArrayList<>();
-
-    // Audio batching variables
-    private final List<short[]> audioBatch = new ArrayList<>();
+    private final List<short[]> pending_prompt = new ArrayList<>();    // Audio batching variables
+    private final List<short[]> audioBatch = Collections.synchronizedList(new ArrayList<>());
     private static final long BATCH_TIMEOUT = 100; // 100ms batch window
     private static final int MAX_BATCH_SIZE = 5; // Maximum number of audio packets in a batch
-    private Timer batchTimer;
-    private TimerTask currentBatchTask;
+    private volatile Timer batchTimer;
+    private volatile TimerTask currentBatchTask;
+    private final Object batchLock = new Object();
 
     private static String getUrl() {
         return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + Config.GEMINI_API_KEY.get();
@@ -47,6 +46,20 @@ public class GeminiWsClient extends WebSocketClient {
         isInitiatingConnection = false;
         var setup = new BidiGenerateContentSetup("models/gemini-2.0-flash-live-001");
         setup.generationConfig.responseModalities = List.of("AUDIO");
+        setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
+        setup.generationConfig.speechConfig.language_code = Config.language;
+
+        var female = this.manager.entity.getCitizenDataView().isFemale();
+        var availableVoices = female ? BidiGenerateContentSetup.FEMALE_VOICES : BidiGenerateContentSetup.MALE_VOICES;
+
+        var random = new Random();
+        random.setSeed(manager.entity.getUUID().getMostSignificantBits() ^ manager.entity.getUUID().getLeastSignificantBits());
+        var voice = availableVoices.get(random.nextInt(availableVoices.size()));
+
+        setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
+        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = voice;
+
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), initialPlayer));
@@ -176,28 +189,30 @@ public class GeminiWsClient extends WebSocketClient {
 
         stream.close();
         super.close();
-    }
-
-    /**
+    }    /**
      * Batches audio data and sends it when a batch is complete or times out
      *
      * @param audio The audio data to batch
      */
     public void batchAudio(short[] audio) {
-        // Add to batch
-        audioBatch.add(audio);
-
-        // Check if batch is full
-        boolean batchFull = audioBatch.size() >= MAX_BATCH_SIZE;
+        boolean batchFull;
+        boolean isFirstElement;
+        
+        synchronized (batchLock) {
+            // Add to batch
+            audioBatch.add(audio);
+            
+            // Check if batch is full
+            batchFull = audioBatch.size() >= MAX_BATCH_SIZE;
+            isFirstElement = audioBatch.size() == 1;
+        }
 
         if (batchFull) {
             // Process and send the batch immediately
             sendCurrentBatch();
-        } else {
+        } else if (isFirstElement) {
             // If this is the first element in the batch, start the timer
-            if (audioBatch.size() == 1) {
-                scheduleFlushTimer();
-            }
+            scheduleFlushTimer();
         }
     }
 
@@ -227,32 +242,36 @@ public class GeminiWsClient extends WebSocketClient {
 
         // Schedule the task
         batchTimer.schedule(currentBatchTask, BATCH_TIMEOUT);
-    }
-
-    /**
+    }    /**
      * Combines and sends the current batch of audio
      */
     private void sendCurrentBatch() {
-        if (audioBatch.isEmpty()) return;
+        List<short[]> batchCopy;
+        
+        synchronized (batchLock) {
+            if (audioBatch.isEmpty()) return;
+            
+            // Create a copy of the batch to work with
+            batchCopy = new ArrayList<>(audioBatch);
+            // Clear the original batch immediately to allow new additions
+            audioBatch.clear();
+        }
 
-        // Combine all audio data
+        // Process the copy outside the synchronized block
         int totalLength = 0;
-        for (short[] audioData : audioBatch) {
+        for (short[] audioData : batchCopy) {
             totalLength += audioData.length;
         }
 
         short[] combinedAudio = new short[totalLength];
         int position = 0;
 
-        for (short[] audioData : audioBatch) {
+        for (short[] audioData : batchCopy) {
             System.arraycopy(audioData, 0, combinedAudio, position, audioData.length);
             position += audioData.length;
         }
 
         // Send the combined audio
         addPromptAudio(combinedAudio);
-
-        // Clear the batch
-        audioBatch.clear();
     }
 }

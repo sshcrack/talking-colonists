@@ -35,10 +35,32 @@ public class BidiGenerateContentSetup {
         @Nullable
         public List<String> responseModalities;
         @Nullable
-        public Object speechConfig;
+        public SpeechConfig speechConfig;
         @Nullable
         public Object mediaResolution;
+
+        public static class SpeechConfig {
+            @Nullable
+            public String language_code;
+
+            @Nullable
+            public VoiceConfig voice_config;
+
+
+            public static class VoiceConfig {
+                @Nullable
+                public PrebuiltVoiceConfig prebuiltVoiceConfig;
+            }
+
+            public static class PrebuiltVoiceConfig {
+                @Nullable
+                public String voice_name;
+            }
+        }
     }
+
+    public static final List<String> MALE_VOICES = List.of("Puck", "Charon", "Fenir", "Orus");
+    public static final List<String> FEMALE_VOICES = List.of("Kore", "Aoede", "Leda", "Zephyr");
 
     public static class SystemInstruction {
         public List<Part> parts = new ArrayList<>();

@@ -24,6 +24,11 @@ public class Config
             .comment("This key is used to authenticate with the Gemini API. You can get one at https://aistudio.google.com/apikey")
             .define("gemini_key", "");
 
+    public static final ModConfigSpec.ConfigValue<String> LANGUAGE = BUILDER
+            .worldRestart()
+            .comment("The language the AI should use to speak")
+            .define("language", "en-US");
+
     public static final ModConfigSpec.ConfigValue<Boolean> RESPOND_IN_GROUPS = BUILDER
             .comment("Wheather the citizens should respond if the player is in a group or not.")
             .define("respond_in_group", false);
@@ -51,6 +56,7 @@ public class Config
             .build();
 
     public static String geminiApiKey;
+    public static String language;
     public static int maxConcurrentAgents;
     public static boolean respondInGroups;
     public static double activationDistance;
@@ -66,5 +72,6 @@ public class Config
         lookDurationTicks = LOOK_DURATION_TICKS.get();
         lookToleranceMs = LOOK_TOLERANCE_MS.get();
         maxConcurrentAgents = MAX_CONCURRENT_AGENTS.get();
+        language = LANGUAGE.get();
     }
 }
