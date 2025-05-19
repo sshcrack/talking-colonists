@@ -4,6 +4,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.TalkingManager;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -22,9 +24,13 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.DirectionalPayloadHandler;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -36,6 +42,7 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 public class MinecoloniesTalkingCitizens {
     public static boolean isDedicated;
 
+    public static HashMap<UUID, AiStatus> aiStatus = new HashMap<>();
     public static HashMap<UUID, TalkingManager> clients = new HashMap<>();
     public static HashMap<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
 
@@ -64,6 +71,7 @@ public class MinecoloniesTalkingCitizens {
 
         // Register items
         ModItems.register(modEventBus);
+        modEventBus.addListener(this::registerPayloadHandlers);
     }
 
     /**
@@ -136,8 +144,10 @@ public class MinecoloniesTalkingCitizens {
                     }
                 }
 
+                PacketDistributor.sendToPlayersTrackingEntity(entity, new AiStatusPayload(citizenId, AiStatus.NONE));
+                PacketDistributor.sendToPlayer(player, new AiStatusPayload(citizenId, AiStatus.NONE));
                 if (sendMessage) {
-                    player.sendSystemMessage(Component.literal("Conversation ended - too far away from citizen.")
+                    player.sendSystemMessage(Component.translatable("mc_talking.too_far")
                             .withStyle(ChatFormatting.YELLOW));
                 }
             }
@@ -172,6 +182,28 @@ public class MinecoloniesTalkingCitizens {
                             .withStyle(ChatFormatting.RED)
             );
         }
+    }
+
+    @SubscribeEvent
+    private void onPlayerLeave(EntityLeaveLevelEvent event) {
+        var entity = event.getEntity();
+        if (!(entity instanceof ServerPlayer player))
+            return;
+        var citizen = activeEntity.get(player.getUUID());
+        if (citizen != null) {
+            citizen.removeEffect(MobEffects.GLOWING);
+            if (clients.containsKey(citizen.getUUID()))
+                clients.get(citizen.getUUID()).close();
+
+            clients.remove(citizen.getUUID());
+        }
+
+        activeEntity.remove(player.getUUID());
+        playerLookingAt.remove(player.getUUID());
+        lookDuration.remove(player.getUUID());
+        previousEntityLookedAt.remove(player.getUUID());
+        lastEntitySwitchTime.remove(player.getUUID());
+        playerConversationPartners.remove(player.getUUID());
     }
 
     @SubscribeEvent
@@ -378,5 +410,18 @@ public class MinecoloniesTalkingCitizens {
         playerLookingAt.remove(playerId);
         lookDuration.remove(playerId);
         activeEntity.remove(playerId);
+    }
+
+    public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
+        final var registrar = event.registrar("1");
+        registrar.playToClient(AiStatusPayload.TYPE, AiStatusPayload.STREAM_CODEC, new DirectionalPayloadHandler<>(
+                (payload, ctx) -> {
+                    ctx.enqueueWork(() -> {
+                        aiStatus.put(payload.citizen(), payload.status());
+                    });
+                },
+                (a, b) -> {
+                }
+        ));
     }
 }

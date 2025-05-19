@@ -6,9 +6,10 @@ import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.ClientMessages;
 import me.sshcrack.mc_talking.gson.RealtimeInput;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -41,6 +42,7 @@ public class GeminiWsClient extends WebSocketClient {
         this.manager = manager;
         stream = new GeminiStream(manager.channel);
         this.initialPlayer = player;
+        PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
 
     @Override
@@ -97,7 +99,7 @@ public class GeminiWsClient extends WebSocketClient {
             return;
 
         var outer = p.getAsJsonObject();
-        if(outer.has("usageMetadata")) {
+        if (outer.has("usageMetadata")) {
             MinecoloniesTalkingCitizens.LOGGER.info("Gemini usage metadata: {}", outer.get("usageMetadata").toString());
         }
 
@@ -105,6 +107,7 @@ public class GeminiWsClient extends WebSocketClient {
             var obj = outer.getAsJsonObject("serverContent");
             if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
                 System.out.println("Turn done");
+                PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
                 return;
             }
 
@@ -134,7 +137,9 @@ public class GeminiWsClient extends WebSocketClient {
                         var sampleRate = Integer.parseInt(sampleRateStr);
 
                         var data = Base64.getDecoder().decode(inlineData.get("data").getAsString());
-                        stream.addGeminiPcm(data, sampleRate);
+                        var firstCall = stream.addGeminiPcm(data, sampleRate);
+                        if (firstCall)
+                            PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
                     }
                 }
             } else {
@@ -152,11 +157,13 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         isInitiatingConnection = false;
+        PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         MinecoloniesTalkingCitizens.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
     }
 
     @Override
     public void onError(Exception ex) {
+        PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         MinecoloniesTalkingCitizens.LOGGER.error("Error in GeminiWsClient", ex);
     }
 
@@ -198,6 +205,7 @@ public class GeminiWsClient extends WebSocketClient {
         stream.close();
         super.close();
     }
+
     /**
      * Batches audio data and sends it when a batch is complete or times out
      *
@@ -251,7 +259,9 @@ public class GeminiWsClient extends WebSocketClient {
 
         // Schedule the task
         batchTimer.schedule(currentBatchTask, BATCH_TIMEOUT);
-    }    /**
+    }
+
+    /**
      * Combines and sends the current batch of audio
      */
     private void sendCurrentBatch() {

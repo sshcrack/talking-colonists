@@ -102,6 +102,12 @@ public class CitizenTalkingDevice extends Item {
 
         // If there was a previously focused entity, remove its glowing effect
         LivingEntity previousEntity = MinecoloniesTalkingCitizens.activeEntity.get(playerId);
+        if(previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
+            citizen.getNavigation().stop();
+            citizen.getLookControl().setLookAt(player);
+            return true;
+        }
+
         if (previousEntity != null && previousEntity.isAlive()) {
             previousEntity.removeEffect(MobEffects.GLOWING);
         }

@@ -24,7 +24,8 @@ public class GeminiStream implements Supplier<short[]> {
         this.channel = channel;
     }
 
-    public void addGeminiPcm(byte[] data, int sampleRate) {
+    // Returns true if this was the first call to start the player
+    public boolean addGeminiPcm(byte[] data, int sampleRate) {
         // Convert byte[] to short[] (assuming signed 16-bit PCM)
         short[] samples = new short[data.length / 2];
         for (int i = 0; i < samples.length; i++) {
@@ -71,7 +72,11 @@ public class GeminiStream implements Supplier<short[]> {
 
             if (!audioFrames.isEmpty())
                 player.startPlaying();
+
+            return true;
         }
+
+        return false;
     }
 
     /**
