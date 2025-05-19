@@ -41,9 +41,9 @@ public class MinecoloniesTalkingCitizens {
     private final Map<UUID, UUID> previousEntityLookedAt = new HashMap<>();
     // Track when the last entity switch occurred
     private final Map<UUID, Long> lastEntitySwitchTime = new HashMap<>();
-    
+
     // Track player-entity conversation pairs for distance checking
-    private final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
+    static final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
 
     private static Queue<UUID> addedEntities = new LinkedList<>();
 
@@ -55,14 +55,14 @@ public class MinecoloniesTalkingCitizens {
     public MinecoloniesTalkingCitizens(IEventBus modEventBus, ModContainer modContainer) {
         NeoForge.EVENT_BUS.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
-        
+
         // Register items
         ModItems.register(modEventBus);
     }
-    
+
     /**
      * Add an entity to the managed entities queue
-     * 
+     *
      * @param entityId The UUID of the entity to add
      */
     public static void addEntity(UUID entityId) {
@@ -78,58 +78,50 @@ public class MinecoloniesTalkingCitizens {
             }
         }
     }
-    
+
     /**
      * Start a conversation between a player and a citizen
-     * 
-     * @param player The player
+     *
+     * @param player  The player
      * @param citizen The citizen entity
      */
     public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
-        
+
         // If there was a previously focused entity, remove its glowing effect
         LivingEntity previousEntity = activeEntity.get(playerId);
         if (previousEntity != null && previousEntity.isAlive()) {
             previousEntity.removeEffect(MobEffects.GLOWING);
         }
-        
+
         // Set citizen as active entity and add glowing effect
         activeEntity.put(playerId, citizen);
         citizen.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
-        
+
         // Create talking manager and add to clients
         clients.put(citizenId, new TalkingManager(citizen, player));
         addEntity(citizenId);
-        
+
         // Track this conversation pair
-        ((MinecoloniesTalkingCitizens)NeoForge.EVENT_BUS.getListeners().stream()
-                .filter(obj -> obj instanceof MinecoloniesTalkingCitizens)
-                .findFirst().orElse(null))
+        MinecoloniesTalkingCitizens
                 .playerConversationPartners.put(playerId, citizenId);
     }
-    
+
     /**
      * End a conversation for a specific player
-     * 
-     * @param playerId The player's UUID
+     *
+     * @param playerId    The player's UUID
      * @param sendMessage Whether to send a message to the player
      */
     public static void endConversation(UUID playerId, boolean sendMessage) {
-        MinecoloniesTalkingCitizens instance = (MinecoloniesTalkingCitizens)NeoForge.EVENT_BUS.getListeners().stream()
-                .filter(obj -> obj instanceof MinecoloniesTalkingCitizens)
-                .findFirst().orElse(null);
-                
-        if (instance == null) return;
-                
-        UUID citizenId = instance.playerConversationPartners.remove(playerId);
+        UUID citizenId = MinecoloniesTalkingCitizens.playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
-        
+
         LivingEntity entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
             entity.removeEffect(MobEffects.GLOWING);
-            
+
             if (sendMessage) {
                 ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
                 if (player != null) {
@@ -181,15 +173,15 @@ public class MinecoloniesTalkingCitizens {
             return;
 
         if (tick++ % 5 != 0) {
-            if(tick % 5 == 3) {
+            if (tick % 5 == 3) {
                 for (var client : clients.values()) {
                     client.updatePos();
                 }
             }
-            
+
             // Every tick check for players who moved too far away
             checkPlayerDistances(event.getServer().getPlayerList().getPlayers());
-            
+
             return;
         }
 
@@ -242,20 +234,20 @@ public class MinecoloniesTalkingCitizens {
             }
         }
     }
-    
+
     /**
      * Check distances between players and their conversation partners
      * End conversations that exceed the maximum allowed distance
-     * 
+     *
      * @param players List of server players to check
      */
     private void checkPlayerDistances(List<ServerPlayer> players) {
         // Make a copy to avoid concurrent modification
         Set<UUID> playerIds = new HashSet<>(playerConversationPartners.keySet());
-        
+
         for (UUID playerId : playerIds) {
             ServerPlayer player = null;
-            
+
             // Find the player in the server's player list
             for (ServerPlayer serverPlayer : players) {
                 if (serverPlayer.getUUID().equals(playerId)) {
@@ -263,23 +255,23 @@ public class MinecoloniesTalkingCitizens {
                     break;
                 }
             }
-            
+
             if (player == null) {
                 // Player not online anymore
                 endConversation(playerId, false);
                 continue;
             }
-            
+
             UUID citizenId = playerConversationPartners.get(playerId);
             if (citizenId == null) continue;
-            
+
             // Find the citizen entity
             AbstractEntityCitizen citizen = activeEntity.get(playerId);
             if (citizen == null || !citizen.isAlive()) {
                 endConversation(playerId, false);
                 continue;
             }
-            
+
             // Check distance
             double distanceSquared = player.distanceToSqr(citizen);
             if (distanceSquared > (Config.maxConversationDistance * Config.maxConversationDistance)) {
