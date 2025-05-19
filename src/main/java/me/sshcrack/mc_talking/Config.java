@@ -44,7 +44,7 @@ public class Config
 
     public static final ModConfigSpec.ConfigValue<Integer> MAX_CONCURRENT_AGENTS = BUILDER
             .comment("Maximum number of AI agents that can be activated at once")
-            .define("max_concurrent_agents", 30, e -> (int) e > 0);
+            .define("max_concurrent_agents", 30, e -> e == null || (int) e > 0);
 
 
     static final ModConfigSpec SPEC = BUILDER

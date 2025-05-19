@@ -111,6 +111,7 @@ public class GeminiStream implements Supplier<short[]> {
     }
 
     public void close() {
+
         if (player != null)
             player.stopPlaying();
     }

@@ -7,7 +7,7 @@ import javax.annotation.Nullable;
 
 public class ClientMessages {
     @Nullable public BidiGenerateContentSetup setup;
-    @Nullable public ClientContent client_content;
+    @Nullable public RealtimeInput realtime_input;
 
     public static String setup(BidiGenerateContentSetup set) {
         var gson = new Gson();
@@ -17,10 +17,10 @@ public class ClientMessages {
         return gson.toJson(e);
     }
 
-    public static String content(ClientContent content) {
+    public static String input(RealtimeInput content) {
         var gson = new Gson();
         var e = new ClientMessages();
-        e.client_content = content;
+        e.realtime_input = content;
 
         return gson.toJson(e);
     }

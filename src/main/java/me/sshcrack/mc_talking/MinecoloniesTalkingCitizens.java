@@ -30,7 +30,7 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 @Mod(MinecoloniesTalkingCitizens.MODID)
 public class MinecoloniesTalkingCitizens {
     public static HashMap<UUID, TalkingManager> clients = new HashMap<>();
-    public static HashMap<UUID, LivingEntity> activeEntity = new HashMap<>();
+    public static HashMap<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
 
     // Track which entity each player is looking at
     private final Map<UUID, UUID> playerLookingAt = new HashMap<>();
@@ -89,12 +89,21 @@ public class MinecoloniesTalkingCitizens {
     int tick = 0;
 
     @SubscribeEvent
-    private void onWorldTick(ServerTickEvent event) {
+    private void onWorldTick(ServerTickEvent.Post event) {
         if (vcApi == null || Config.geminiApiKey.isEmpty())
             return;
 
-        if (tick++ % 5 != 0)
+
+
+        if (tick++ % 5 != 0) {
+            if(tick % 5 == 3) {
+                for (var client : clients.values()) {
+                    client.updatePos();
+                }
+            }
             return;
+        }
+
 
         var server = event.getServer();
         var players = new ArrayList<>(server.getPlayerList().getPlayers());
@@ -106,7 +115,7 @@ public class MinecoloniesTalkingCitizens {
             UUID playerId = player.getUUID();
 
             // Find the entity the player is looking at
-            LivingEntity currentTargetEntity = findEntityPlayerLookingAt(player);
+            AbstractEntityCitizen currentTargetEntity = findEntityPlayerLookingAt(player);
             UUID currentTargetId = currentTargetEntity != null ? currentTargetEntity.getUUID() : null;
             UUID previousTargetId = playerLookingAt.get(playerId);
 
@@ -142,6 +151,7 @@ public class MinecoloniesTalkingCitizens {
                     currentTargetEntity.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
                     LOGGER.info("Player {} is now focusing on entity {}", player.getName().getString(), currentTargetEntity);
 
+
                     clients.put(currentTargetId, new TalkingManager(currentTargetEntity));
 
                     addedEntities.add(currentTargetId);
@@ -166,7 +176,7 @@ public class MinecoloniesTalkingCitizens {
      * @param player The player to check
      * @return The entity the player is looking at, or null if none
      */
-    private LivingEntity findEntityPlayerLookingAt(ServerPlayer player) {
+    private AbstractEntityCitizen findEntityPlayerLookingAt(ServerPlayer player) {
         var level = player.level();
         return level.getNearestEntity(
                 AbstractEntityCitizen.class,
@@ -210,7 +220,7 @@ public class MinecoloniesTalkingCitizens {
         lookDuration.put(playerId, 0);
 
         // If we were tracking an active entity, remove its glowing effect and clear it
-        LivingEntity previousActiveEntity = activeEntity.get(playerId);
+        AbstractEntityCitizen previousActiveEntity = activeEntity.get(playerId);
         if (previousActiveEntity != null && previousActiveEntity.isAlive()) {
             previousActiveEntity.removeEffect(MobEffects.GLOWING);
         }
