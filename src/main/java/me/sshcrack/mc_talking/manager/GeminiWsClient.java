@@ -64,7 +64,7 @@ public class GeminiWsClient extends WebSocketClient {
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
-        var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), initialPlayer);
+        var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), manager.entity.getCitizenData(), initialPlayer);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
 
         MinecoloniesTalkingCitizens.LOGGER.info("Using prompt: \n{}", prompt);

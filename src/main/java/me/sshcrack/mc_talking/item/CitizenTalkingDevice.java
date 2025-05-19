@@ -72,6 +72,16 @@ public class CitizenTalkingDevice extends Item {
             return InteractionResult.FAIL;
         }
 
+        // Check distance before allowing interaction
+        double distance = player.distanceToSqr(citizen);
+        if (distance > (Config.activationDistance * Config.activationDistance)) {
+            serverPlayer.sendSystemMessage(
+                    Component.literal("This citizen is too far away to talk to.")
+                            .withStyle(ChatFormatting.RED)
+            );
+            return InteractionResult.FAIL;
+        }
+
         // Handle interaction with citizen
         handleCitizenInteraction(serverPlayer, playerId, citizen, citizenId);
 
@@ -110,6 +120,16 @@ public class CitizenTalkingDevice extends Item {
             return true; // Still prevent attack
         }
 
+        // Check distance before allowing interaction
+        double distance = player.distanceToSqr(citizen);
+        if (distance > (Config.activationDistance * Config.activationDistance)) {
+            serverPlayer.sendSystemMessage(
+                    Component.literal("This citizen is too far away to talk to.")
+                            .withStyle(ChatFormatting.RED)
+            );
+            return true; // Still prevent attack
+        }
+
         // If there was a previously focused entity, remove its glowing effect
         LivingEntity previousEntity = MinecoloniesTalkingCitizens.activeEntity.get(playerId);
         if (previousEntity != null && previousEntity.isAlive()) {
@@ -120,10 +140,9 @@ public class CitizenTalkingDevice extends Item {
         MinecoloniesTalkingCitizens.activeEntity.put(playerId, citizen);
         citizen.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
 
-        // Create talking manager and add to clients
-        MinecoloniesTalkingCitizens.clients.put(citizenId, new TalkingManager(citizen, serverPlayer));
-        MinecoloniesTalkingCitizens.addEntity(citizenId);
-
+        // Use the centralized startConversation method
+        MinecoloniesTalkingCitizens.startConversation(serverPlayer, citizen);
+        
         serverPlayer.sendSystemMessage(
                 Component.literal("Started conversation with " + citizen.getName().getString())
                         .withStyle(ChatFormatting.GREEN)
@@ -141,18 +160,8 @@ public class CitizenTalkingDevice extends Item {
 
         // If it's a new citizen or a different one, set up a new talking manager
         if (previousEntity == null || !previousEntity.getUUID().equals(citizenId)) {
-            // Set new active entity and apply glowing
-            MinecoloniesTalkingCitizens.activeEntity.put(playerId, citizen);
-
-            // Apply glowing effect (infinite duration with showIcon=false)
-            citizen.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
-            MinecoloniesTalkingCitizens.LOGGER.info("Player {} is now focusing on entity {}", player.getName().getString(), citizen);
-
-            // Create new talking manager
-            MinecoloniesTalkingCitizens.clients.put(citizenId, new TalkingManager(citizen, player));
-
-            // Add to queue of managed entities
-            MinecoloniesTalkingCitizens.addEntity(citizenId);
+            // Use the centralized startConversation method
+            MinecoloniesTalkingCitizens.startConversation(player, citizen);
 
             // Send feedback to player
             player.sendSystemMessage(

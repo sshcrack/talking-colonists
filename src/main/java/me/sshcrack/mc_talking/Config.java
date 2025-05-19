@@ -55,6 +55,9 @@ public class Config
             .comment("Maximum number of AI agents that can be activated at once")
             .define("max_concurrent_agents", 3, e -> e == null || (int) e > 0);
 
+    public static final ModConfigSpec.ConfigValue<Double> MAX_CONVERSATION_DISTANCE = BUILDER
+            .comment("Maximum distance the player can be from a citizen before the conversation is ended")
+            .define("max_conversation_distance", 8.0);
 
     static final ModConfigSpec SPEC = BUILDER
             .build();
@@ -67,6 +70,7 @@ public class Config
     public static int lookDurationTicks;
     public static int lookToleranceMs;
     public static boolean useTalkingDevice;
+    public static double maxConversationDistance;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event)
@@ -79,5 +83,6 @@ public class Config
         maxConcurrentAgents = MAX_CONCURRENT_AGENTS.get();
         language = LANGUAGE.get();
         useTalkingDevice = USE_TALKING_DEVICE.get();
+        maxConversationDistance = MAX_CONVERSATION_DISTANCE.get();
     }
 }
