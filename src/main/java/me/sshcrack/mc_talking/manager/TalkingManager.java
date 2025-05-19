@@ -39,9 +39,6 @@ public class TalkingManager {
         channel.updateLocation(pos);
     }
 
-    public static final int OPUS_SAMPLE_RATE = 48000;
-
-
     public void promptAudioRaw(short[] raw) {
         client.batchAudio(raw);
     }

@@ -6,6 +6,8 @@ import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.ClientMessages;
 import me.sshcrack.mc_talking.gson.RealtimeInput;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
@@ -62,8 +64,10 @@ public class GeminiWsClient extends WebSocketClient {
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
-        var p = new BidiGenerateContentSetup.SystemInstruction.Part(CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), initialPlayer));
+        var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), initialPlayer);
+        var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
 
+        MinecoloniesTalkingCitizens.LOGGER.info("Using prompt: \n{}", prompt);
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
@@ -93,6 +97,10 @@ public class GeminiWsClient extends WebSocketClient {
             return;
 
         var outer = p.getAsJsonObject();
+        if(outer.has("usageMetadata")) {
+            MinecoloniesTalkingCitizens.LOGGER.info("Gemini usage metadata: {}", outer.get("usageMetadata").toString());
+        }
+
         if (outer.has("serverContent") && outer.get("serverContent").isJsonObject()) {
             var obj = outer.getAsJsonObject("serverContent");
             if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
@@ -189,7 +197,8 @@ public class GeminiWsClient extends WebSocketClient {
 
         stream.close();
         super.close();
-    }    /**
+    }
+    /**
      * Batches audio data and sends it when a batch is complete or times out
      *
      * @param audio The audio data to batch
@@ -197,11 +206,11 @@ public class GeminiWsClient extends WebSocketClient {
     public void batchAudio(short[] audio) {
         boolean batchFull;
         boolean isFirstElement;
-        
+
         synchronized (batchLock) {
             // Add to batch
             audioBatch.add(audio);
-            
+
             // Check if batch is full
             batchFull = audioBatch.size() >= MAX_BATCH_SIZE;
             isFirstElement = audioBatch.size() == 1;
@@ -247,10 +256,10 @@ public class GeminiWsClient extends WebSocketClient {
      */
     private void sendCurrentBatch() {
         List<short[]> batchCopy;
-        
+
         synchronized (batchLock) {
             if (audioBatch.isEmpty()) return;
-            
+
             // Create a copy of the batch to work with
             batchCopy = new ArrayList<>(audioBatch);
             // Clear the original batch immediately to allow new additions

@@ -45,11 +45,15 @@ public class Config
     public static final ModConfigSpec.ConfigValue<Double> ACTIVATION_DISTANCE = BUILDER
             .comment("Distance at which the player can talk to when looking at them the citizen")
             .define("activation_distance", 3.0);
+            
+    public static final ModConfigSpec.ConfigValue<Boolean> USE_TALKING_DEVICE = BUILDER
+            .comment("If true, citizens will only respond to the talking device item; if false, looking at them will work")
+            .define("use_talking_device", true);
 
 
     public static final ModConfigSpec.ConfigValue<Integer> MAX_CONCURRENT_AGENTS = BUILDER
             .comment("Maximum number of AI agents that can be activated at once")
-            .define("max_concurrent_agents", 30, e -> e == null || (int) e > 0);
+            .define("max_concurrent_agents", 3, e -> e == null || (int) e > 0);
 
 
     static final ModConfigSpec SPEC = BUILDER
@@ -62,6 +66,7 @@ public class Config
     public static double activationDistance;
     public static int lookDurationTicks;
     public static int lookToleranceMs;
+    public static boolean useTalkingDevice;
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event)
@@ -73,5 +78,6 @@ public class Config
         lookToleranceMs = LOOK_TOLERANCE_MS.get();
         maxConcurrentAgents = MAX_CONCURRENT_AGENTS.get();
         language = LANGUAGE.get();
+        useTalkingDevice = USE_TALKING_DEVICE.get();
     }
 }

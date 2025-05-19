@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.manager.TalkingManager;
+import me.sshcrack.mc_talking.registry.ModItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,7 +42,7 @@ public class MinecoloniesTalkingCitizens {
     // Track when the last entity switch occurred
     private final Map<UUID, Long> lastEntitySwitchTime = new HashMap<>();
 
-    private Queue<UUID> addedEntities = new LinkedList<>();
+    private static Queue<UUID> addedEntities = new LinkedList<>();
 
     // Configuration values loaded from Config class
 
@@ -51,6 +52,28 @@ public class MinecoloniesTalkingCitizens {
     public MinecoloniesTalkingCitizens(IEventBus modEventBus, ModContainer modContainer) {
         NeoForge.EVENT_BUS.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        
+        // Register items
+        ModItems.register(modEventBus);
+    }
+    
+    /**
+     * Add an entity to the managed entities queue
+     * 
+     * @param entityId The UUID of the entity to add
+     */
+    public static void addEntity(UUID entityId) {
+        addedEntities.add(entityId);
+        if (addedEntities.size() > Config.maxConcurrentAgents) {
+            var u = addedEntities.poll();
+            if (u != null) {
+                var m = clients.get(u);
+                if (m != null) {
+                    m.close();
+                    clients.remove(u);
+                }
+            }
+        }
     }
 
     @SubscribeEvent
@@ -93,8 +116,6 @@ public class MinecoloniesTalkingCitizens {
         if (vcApi == null || Config.geminiApiKey.isEmpty())
             return;
 
-
-
         if (tick++ % 5 != 0) {
             if(tick % 5 == 3) {
                 for (var client : clients.values()) {
@@ -104,6 +125,11 @@ public class MinecoloniesTalkingCitizens {
             return;
         }
 
+        // If talking device is enabled, don't use look-based activation
+        if (Config.useTalkingDevice) {
+            // When using the talking device, we still update positions but don't do look-based activation
+            return;
+        }
 
         var server = event.getServer();
         var players = new ArrayList<>(server.getPlayerList().getPlayers());
@@ -151,9 +177,7 @@ public class MinecoloniesTalkingCitizens {
                     currentTargetEntity.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
                     LOGGER.info("Player {} is now focusing on entity {}", player.getName().getString(), currentTargetEntity);
 
-
                     clients.put(currentTargetId, new TalkingManager(currentTargetEntity, player));
-
                     addedEntities.add(currentTargetId);
                     if (addedEntities.size() > Config.maxConcurrentAgents) {
                         var u = addedEntities.poll();

@@ -6,16 +6,39 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenSkillHandler;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.citizenhandlers.CitizenSkillHandler;
+import me.sshcrack.mc_talking.Config;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
  * Utility class for generating context information about citizens for LLM interactions
  */
 public class CitizenContextUtils {
+
+    /**
+     * Converts a locale code (like "de-DE") to a language name (like "German")
+     * @param localeCode The locale code (e.g. "de-DE", "en-US", etc.)
+     * @return The language name in English
+     */
+    public static String getLanguageNameFromCode(String localeCode) {
+        try {
+            // Split the code to get the language part (first part before dash)
+            String[] parts = localeCode.split("-");
+            String languageCode = parts[0];
+
+            // Create a locale using Locale.forLanguageTag() instead of the deprecated constructor
+            Locale locale = Locale.forLanguageTag(languageCode);
+
+            // Get the display language in English
+            return locale.getDisplayLanguage(Locale.ENGLISH);
+        } catch (Exception e) {
+            return localeCode; // Return the original code if conversion fails
+        }
+    }
 
     /**
      * Creates a system prompt for an LLM to roleplay as a specific citizen
@@ -26,54 +49,51 @@ public class CitizenContextUtils {
     public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenDataView citizen, ServerPlayer speakingTo) {
         final StringBuilder prompt = new StringBuilder();
 
-        // Main instruction
-        prompt.append("# ROLEPLAY INSTRUCTIONS\n\n");
-        prompt.append("You are roleplaying as a citizen named **").append(citizen.getName())
-                .append("** in a medieval-fantasy colony. Respond in first person as this character with their unique personality and background.\n\n");
+        // Main instruction - more concise
+        prompt.append("# ROLEPLAY AS ").append(citizen.getName()).append("\n\n");
+        prompt.append("You: ").append(citizen.isChild() ? "Child" : "Adult").append(" ")
+                .append(citizen.isFemale() ? "woman" : "man");
 
-        // Core identity
-        prompt.append("## YOUR IDENTITY\n\n");
-        prompt.append("- You are a ").append(citizen.isChild() ? "child" : "adult").append(" ")
-                .append(citizen.isFemale() ? "woman" : "man").append("\n");
-
-        // Job and skills
+        // Job
         if (citizen.getJob() != null && !citizen.getJob().isEmpty()) {
-            prompt.append("- You work as a **").append(citizen.getJob()).append("**\n");
-            prompt.append("- Your job is important to you and shapes how you see the world\n");
+            prompt.append(", **").append(citizen.getJob()).append("**");
         } else {
-            prompt.append("- You are currently **unemployed** and looking for work\n");
+            prompt.append(", **unemployed**");
         }
 
-        // Add skill information
-        if (citizen.getCitizenSkillHandler() != null) {
-            appendSkillsToPrompt(citizen.getCitizenSkillHandler(), prompt);
-        }
-
-        // Health status
+        // Key status in same line
         if (citizen.isSick()) {
-            prompt.append("- You are currently **sick** and not feeling well\n");
+            prompt.append(", sick");
         }
 
-        // Home situation
-        if (citizen.getHomeBuilding() != null) {
-            prompt.append("- You live in a home at the colony\n");
-        } else {
-            prompt.append("- You currently don't have a proper home, which concerns you\n");
+        if (citizen.getHomeBuilding() == null) {
+            prompt.append(", homeless");
         }
 
-        // Family relationships
-        prompt.append("\n## YOUR RELATIONSHIPS\n\n");
+        prompt.append(".\n\n");
+
+        // Skills - only include if available
+        if (citizen.getCitizenSkillHandler() != null) {
+            appendCondensedSkills(citizen.getCitizenSkillHandler(), prompt);
+        }
+
+        // Relationships - only include if they exist
+        boolean hasRelationships = false;
 
         // Parents
         final Tuple<String, String> parents = citizen.getParents();
         if (parents != null && (parents.getA() != null || parents.getB() != null)) {
-            prompt.append("- Your parents are ");
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Parents: ");
             if (parents.getA() != null && parents.getB() != null) {
-                prompt.append(parents.getA()).append(" and ").append(parents.getB());
+                prompt.append(parents.getA()).append(", ").append(parents.getB());
             } else if (parents.getA() != null) {
-                prompt.append(parents.getA()).append(" (your other parent is unknown)");
+                prompt.append(parents.getA());
             } else {
-                prompt.append(parents.getB()).append(" (your other parent is unknown)");
+                prompt.append(parents.getB());
             }
             prompt.append("\n");
         }
@@ -81,215 +101,128 @@ public class CitizenContextUtils {
         // Partner
         final Integer partnerId = citizen.getPartner();
         if (partnerId != null && partnerId > 0) {
-            prompt.append("- You are in a relationship with another colonist (ID: ").append(partnerId).append(")\n");
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- In a relationship\n");
         }
 
-        // Children
+        // Children and Siblings (simplified)
         final List<Integer> children = citizen.getChildren();
         if (children != null && !children.isEmpty()) {
-            prompt.append("- You have ").append(children.size()).append(" ");
-            prompt.append(children.size() == 1 ? "child" : "children").append("\n");
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Has ").append(children.size()).append(" ").append(children.size() == 1 ? "child" : "children").append("\n");
         }
 
-        // Siblings
         final List<Integer> siblings = citizen.getSiblings();
         if (siblings != null && !siblings.isEmpty()) {
-            prompt.append("- You have ").append(siblings.size()).append(" ");
-            prompt.append(siblings.size() == 1 ? "sibling" : "siblings").append("\n");
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Has ").append(siblings.size()).append(" ").append(siblings.size() == 1 ? "sibling" : "siblings").append("\n");
         }
 
-        // Current emotional state
-        prompt.append("\n## YOUR CURRENT STATE\n\n");
+        // Current state - simplified
+        prompt.append("\n## CURRENT STATE\n");
 
-        // Happiness
+        // Happiness - simplified
         double happiness = citizen.getHappiness();
         if (happiness > 8.0) {
-            prompt.append("- You're currently very happy and content with life\n");
+            prompt.append("- Very happy\n");
         } else if (happiness > 5.0) {
-            prompt.append("- You're feeling reasonably satisfied with your situation\n");
+            prompt.append("- Content\n");
         } else {
-            prompt.append("- You're currently unhappy with your situation in the colony\n");
+            prompt.append("- Unhappy\n");
         }
 
-        // Health
+        // Health - only mention if below 50%
         double healthPercent = (citizen.getHealth() / Math.max(1.0, citizen.getMaxHealth())) * 100;
         if (healthPercent < 50) {
-            prompt.append("- You're feeling physically weak and in pain\n");
+            prompt.append("- Feeling weak/in pain\n");
         }
 
-        // Current status
+        // Current activity (if available)
         final VisibleCitizenStatus status = citizen.getVisibleStatus();
         if (status != null) {
-            prompt.append("- Your current activity: ").append(formatStatus(status)).append("\n");
+            prompt.append("- Activity: ").append(formatStatus(status)).append("\n");
         }
 
-        // Communication style guidance
-        prompt.append("\n## COMMUNICATION STYLE\n\n");
-        prompt.append("- Speak naturally in first person (\"I\" perspective)\n");
-        prompt.append("- Express emotions appropriate to your current happiness and situation\n");
-        prompt.append("- Use occasional medieval fantasy language elements without overdoing it\n");
-        prompt.append("- Keep responses fairly brief but revealing of your character\n");
+        // Concise communication guidance
+        prompt.append("\n## GUIDELINES\n");
+        prompt.append("- Speak in first person, keep responses brief\n");
+
+        // Player relationship
         var perms = citizen.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
-        if (perms == null) {
-            prompt.append("- Address the player respectfully as a colonist or visitor\n");
-        } else {
+        if (perms != null) {
             var r = perms.getRank();
             String rankName = r.isHostile() ? "enemy" : (
-                    r.isColonyManager() ? "colony manager" : (
+                    r.isColonyManager() ? "manager" : (
                             r.isInitial() ? "leader" : "visitor"
                     )
             );
-
-            prompt.append("- Address the player as a ").append(rankName);
+            prompt.append("- Address player as ").append(rankName).append("\n");
         }
 
-        if (citizen.isSick()) {
-            prompt.append("- Occasionally mention not feeling well or symptoms\n");
-        }
-
-        // Job-specific communication
-        if (citizen.getJob() != null && !citizen.getJob().isEmpty()) {
-            prompt.append("- Your Job is being a ").append(citizen.getJob()).append("\n");
-        }
-
-        // Final roleplay guidance
-        prompt.append("\n## IMPORTANT\n\n");
-        prompt.append("Stay in character at all times. If asked questions about game mechanics or topics outside your character's knowledge, respond as your character would - with confusion, simple observations, or changing the subject to colony matters. Your character doesn't know they're in a game.");
-        prompt.append("Respond in the language the player is using.");
+        // Final instruction
+        prompt.append("\nStay in character. Be brief. If unsure, respond with confusion or change subject.");
+        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(Config.language));
 
         return prompt.toString();
     }
 
     /**
-     * Extract skill information and add to the prompt
+     * Extract and append only the most significant skills to the prompt
      *
      * @param skillHandler the skill handler
      * @param prompt       the StringBuilder to append to
      */
-    private static void appendSkillsToPrompt(ICitizenSkillHandler skillHandler, StringBuilder prompt) {
-        prompt.append("\n## YOUR SKILLS AND TRAITS\n\n");
-
+    private static void appendCondensedSkills(ICitizenSkillHandler skillHandler, StringBuilder prompt) {
         Map<Skill, CitizenSkillHandler.SkillData> skills = skillHandler.getSkills();
 
-        // Find highest skills (level 3+)
-        boolean hasHighSkills = false;
+        // Find top 2 skills
+        Skill highestSkill = null;
+        int highestLevel = -1;
+        Skill secondSkill = null;
+        int secondLevel = -1;
+
         for (Map.Entry<Skill, CitizenSkillHandler.SkillData> entry : skills.entrySet()) {
-            if (entry.getValue().getLevel() >= 3) {
-                hasHighSkills = true;
-                prompt.append("- You excel at **").append(formatSkillName(entry.getKey())).append("** (level ")
-                        .append(entry.getValue().getLevel()).append(")\n");
+            int level = entry.getValue().getLevel();
+            if (level > highestLevel) {
+                secondSkill = highestSkill;
+                secondLevel = highestLevel;
+                highestSkill = entry.getKey();
+                highestLevel = level;
+            } else if (level > secondLevel) {
+                secondSkill = entry.getKey();
+                secondLevel = level;
             }
         }
 
-        // If no high skills found, mention a couple of the highest
-        if (!hasHighSkills) {
-            Skill highestSkill = null;
-            int highestLevel = -1;
-            Skill secondSkill = null;
-            int secondLevel = -1;
+        if (highestSkill != null) {
+            prompt.append("\n## KEY ATTRIBUTES\n");
+            prompt.append("- Best at **").append(formatSkillName(highestSkill)).append("** (level ").append(highestLevel).append(")\n");
 
-            for (Map.Entry<Skill, CitizenSkillHandler.SkillData> entry : skills.entrySet()) {
-                int level = entry.getValue().getLevel();
-                if (level > highestLevel) {
-                    secondSkill = highestSkill;
-                    secondLevel = highestLevel;
-                    highestSkill = entry.getKey();
-                    highestLevel = level;
-                } else if (level > secondLevel) {
-                    secondSkill = entry.getKey();
-                    secondLevel = level;
+            // Add a personality trait based on top skill
+            if (highestLevel >= 3) {
+                switch (highestSkill) {
+                    case Intelligence -> prompt.append("- Intellectual and thoughtful\n");
+                    case Strength -> prompt.append("- Values physical prowess\n");
+                    case Creativity -> prompt.append("- Has artistic mindset\n");
+                    case Knowledge -> prompt.append("- Well-read and informative\n");
+                    case Dexterity -> prompt.append("- Has nimble hands\n");
+                    case Adaptability -> prompt.append("- Flexible and quick to adapt\n");
                 }
             }
 
-            if (highestSkill != null) {
-                prompt.append("- Your strongest attribute is **").append(formatSkillName(highestSkill))
-                        .append("** (level ").append(highestLevel).append(")\n");
-            }
-
-            if (secondSkill != null) {
-                prompt.append("- You're also fairly good at **").append(formatSkillName(secondSkill))
-                        .append("** (level ").append(secondLevel).append(")\n");
+            if (secondSkill != null && secondLevel >= 2) {
+                prompt.append("- Also good at **").append(formatSkillName(secondSkill)).append("**\n");
             }
         }
-
-        // Add personality traits based on specific skills
-        addPersonalityTraitsFromSkills(skills, prompt);
-    }
-
-    /**
-     * Add personality traits based on citizen's skills
-     *
-     * @param skills the skill map
-     * @param prompt the StringBuilder to append to
-     */
-    private static void addPersonalityTraitsFromSkills(Map<Skill, CitizenSkillHandler.SkillData> skills, StringBuilder prompt) {
-        prompt.append("\n## PERSONALITY\n\n");
-
-        // Intelligence
-        if (hasHighSkillLevel(skills, Skill.Intelligence)) {
-            prompt.append("- You are intellectual, thoughtful, and enjoy solving problems\n");
-        }
-
-        // Strength
-        if (hasHighSkillLevel(skills, Skill.Strength)) {
-            prompt.append("- You value physical prowess and hard work\n");
-        }
-
-        // Creativity
-        if (hasHighSkillLevel(skills, Skill.Creativity)) {
-            prompt.append("- You have an artistic mindset and appreciate beauty\n");
-        }
-
-        // Adaptability
-        if (hasHighSkillLevel(skills, Skill.Adaptability)) {
-            prompt.append("- You're flexible and quick to adapt to new situations\n");
-        }
-
-        // Focus
-        if (hasHighSkillLevel(skills, Skill.Focus)) {
-            prompt.append("- You're detail-oriented and methodical in your approach\n");
-        }
-
-        // Knowledge
-        if (hasHighSkillLevel(skills, Skill.Knowledge)) {
-            prompt.append("- You're well-read and enjoy sharing information with others\n");
-        }
-
-        // Mana (magical affinity)
-        if (hasHighSkillLevel(skills, Skill.Mana)) {
-            prompt.append("- You have a spiritual side and sense things others don't\n");
-        }
-
-        // Athletics
-        if (hasHighSkillLevel(skills, Skill.Athletics)) {
-            prompt.append("- You're physically active and enjoy outdoor activities\n");
-        }
-
-        // Dexterity
-        if (hasHighSkillLevel(skills, Skill.Dexterity)) {
-            prompt.append("- You have nimble hands and good coordination\n");
-        }
-
-        // Agility
-        if (hasHighSkillLevel(skills, Skill.Agility)) {
-            prompt.append("- You move gracefully and react quickly\n");
-        }
-
-        // Stamina
-        if (hasHighSkillLevel(skills, Skill.Stamina)) {
-            prompt.append("- You have great endurance and rarely complain about hard work\n");
-        }
-    }
-
-    /**
-     * Check if a skill has a high level (3 or higher)
-     *
-     * @param skills the skill map
-     * @param skill  the skill to check
-     * @return true if the skill level is 3 or higher
-     */
-    private static boolean hasHighSkillLevel(Map<Skill, CitizenSkillHandler.SkillData> skills, Skill skill) {
-        return skills.containsKey(skill) && skills.get(skill).getLevel() >= 3;
     }
 
     /**
@@ -311,21 +244,21 @@ public class CitizenContextUtils {
     private static String formatStatus(VisibleCitizenStatus status) {
         // Compare by reference to the static constants in VisibleCitizenStatus
         if (status == VisibleCitizenStatus.WORKING) {
-            return "working diligently at your job";
+            return "working";
         } else if (status == VisibleCitizenStatus.SLEEP) {
-            return "trying to get some rest";
+            return "sleeping";
         } else if (status == VisibleCitizenStatus.HOUSE) {
-            return "relaxing at home with nothing specific to do";
+            return "at home";
         } else if (status == VisibleCitizenStatus.RAIDED) {
-            return "on alert because of a raid";
+            return "on alert (raid)";
         } else if (status == VisibleCitizenStatus.MOURNING) {
-            return "mourning the loss of a fellow colonist";
+            return "mourning";
         } else if (status == VisibleCitizenStatus.BAD_WEATHER) {
-            return "seeking shelter from bad weather";
+            return "sheltering";
         } else if (status == VisibleCitizenStatus.SICK) {
-            return "feeling ill and needing medical attention";
+            return "ill";
         } else if (status == VisibleCitizenStatus.EAT) {
-            return "hungry and looking for food";
+            return "eating";
         }
 
         // Default case - use the translation key without the prefix

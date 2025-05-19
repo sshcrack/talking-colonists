@@ -85,10 +85,10 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         manager.promptAudioOpus(packet.getOpusEncodedData());
 
         // Cancel previous silence task if it exists
-        cancelSilenceTask(entity.getUUID());
+        //cancelSilenceTask(entity.getUUID());
 
         // Schedule silence to be sent after the voice packet
-        scheduleSilenceTask(entity.getUUID(), manager);
+        //scheduleSilenceTask(entity.getUUID(), manager);
     }
 
 
