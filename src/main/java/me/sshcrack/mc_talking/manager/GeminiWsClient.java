@@ -51,7 +51,7 @@ public class GeminiWsClient extends WebSocketClient {
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = Config.language;
 
-        var female = this.manager.entity.getCitizenDataView().isFemale();
+        var female = this.manager.entity.getCitizenData().isFemale();
         var availableVoices = female ? BidiGenerateContentSetup.FEMALE_VOICES : BidiGenerateContentSetup.MALE_VOICES;
 
         var random = new Random();
@@ -64,7 +64,7 @@ public class GeminiWsClient extends WebSocketClient {
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
-        var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), manager.entity.getCitizenData(), initialPlayer);
+        var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenData(), initialPlayer);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
 
         MinecoloniesTalkingCitizens.LOGGER.info("Using prompt: \n{}", prompt);

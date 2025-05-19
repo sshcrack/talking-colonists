@@ -2,15 +2,19 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.logging.LogUtils;
+import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import me.sshcrack.mc_talking.registry.ModItems;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomModelData;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -18,6 +22,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -30,6 +35,8 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(MinecoloniesTalkingCitizens.MODID)
 public class MinecoloniesTalkingCitizens {
+    public static boolean isDedicated;
+
     public static HashMap<UUID, TalkingManager> clients = new HashMap<>();
     public static HashMap<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
 
@@ -45,7 +52,7 @@ public class MinecoloniesTalkingCitizens {
     // Track player-entity conversation pairs for distance checking
     static final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
 
-    private static Queue<UUID> addedEntities = new LinkedList<>();
+    private static final Queue<UUID> addedEntities = new LinkedList<>();
 
     // Configuration values loaded from Config class
 
@@ -122,9 +129,15 @@ public class MinecoloniesTalkingCitizens {
         if (entity != null && entity.isAlive()) {
             entity.removeEffect(MobEffects.GLOWING);
 
-            if (sendMessage) {
-                ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
-                if (player != null) {
+            ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
+            if (player != null) {
+                for (ItemStack item : player.getInventory().items) {
+                    if (item.getItem() instanceof CitizenTalkingDevice) {
+                        item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                    }
+                }
+
+                if (sendMessage) {
                     player.sendSystemMessage(Component.literal("Conversation ended - too far away from citizen.")
                             .withStyle(ChatFormatting.YELLOW));
                 }
@@ -142,11 +155,17 @@ public class MinecoloniesTalkingCitizens {
         LOGGER.error("======================");
     }
 
-
     @SubscribeEvent
     private void onPlayerJoin(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player))
             return;
+
+
+        for (ItemStack item : player.getInventory().items) {
+            if (item.getItem() instanceof CitizenTalkingDevice) {
+                item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+            }
+        }
 
         if (Config.geminiApiKey.isEmpty()) {
             player.sendSystemMessage(

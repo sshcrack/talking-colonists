@@ -1,15 +1,16 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.colony.ICitizenData;
-import com.minecolonies.api.colony.ICitizenDataView;
+import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
-import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenHappinessHandler;
 import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenSkillHandler;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.citizenhandlers.CitizenSkillHandler;
 import me.sshcrack.mc_talking.Config;
+import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,6 +27,7 @@ public class CitizenContextUtils {
 
     /**
      * Converts a locale code (like "de-DE") to a language name (like "German")
+     *
      * @param localeCode The locale code (e.g. "de-DE", "en-US", etc.)
      * @return The language name in English
      */
@@ -48,45 +50,48 @@ public class CitizenContextUtils {
     /**
      * Creates a system prompt for an LLM to roleplay as a specific citizen
      *
-     * @param citizen the citizen data to generate roleplay context for
+     * @param data the citizen data to generate roleplay context for
      * @return a formatted system prompt for LLM roleplay
      */
-    public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenDataView citizen, @NotNull final ICitizenData data, ServerPlayer speakingTo) {
+    public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenData data, ServerPlayer speakingTo) {
         final StringBuilder prompt = new StringBuilder();
 
         // Main instruction - more concise
-        prompt.append("# ROLEPLAY AS ").append(citizen.getName()).append("\n\n");
-        prompt.append("You: ").append(citizen.isChild() ? "Child" : "Adult").append(" ")
-                .append(citizen.isFemale() ? "woman" : "man");
+        prompt.append("# ROLEPLAY AS ").append(data.getName()).append("\n\n");
+        prompt.append("You: ").append(data.isChild() ? "Child" : "Adult").append(" ")
+                .append(data.isFemale() ? "woman" : "man");
 
         // Job
-        if (citizen.getJob() != null && !citizen.getJob().isEmpty()) {
-            prompt.append(", **").append(citizen.getJob()).append("**");
+        var job = data.getJob();
+        if (job != null) {
+            var jobName = Component.translatable(job.getJobRegistryEntry().getTranslationKey()).getString();
+            prompt.append(", **").append(jobName).append("**");
         } else {
             prompt.append(", **unemployed**");
         }
 
         // Key status in same line
-        if (citizen.isSick()) {
+        var sick = data.getCitizenDiseaseHandler().isSick();
+        if (sick) {
             prompt.append(", sick");
         }
 
-        if (citizen.getHomeBuilding() == null) {
+        if (data.getHomeBuilding() == null) {
             prompt.append(", homeless");
         }
 
         prompt.append(".\n\n");
 
         // Skills - only include if available
-        if (citizen.getCitizenSkillHandler() != null) {
-            appendCondensedSkills(citizen.getCitizenSkillHandler(), prompt);
+        if (data.getCitizenSkillHandler() != null) {
+            appendCondensedSkills(data.getCitizenSkillHandler(), prompt);
         }
 
         // Relationships - only include if they exist
         boolean hasRelationships = false;
 
         // Parents
-        final Tuple<String, String> parents = citizen.getParents();
+        final Tuple<String, String> parents = data.getParents();
         if (parents != null && (parents.getA() != null || parents.getB() != null)) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
@@ -104,8 +109,8 @@ public class CitizenContextUtils {
         }
 
         // Partner
-        final Integer partnerId = citizen.getPartner();
-        if (partnerId != null && partnerId > 0) {
+        var partnerId = data.getPartner();
+        if (partnerId != null) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
                 hasRelationships = true;
@@ -114,7 +119,7 @@ public class CitizenContextUtils {
         }
 
         // Children and Siblings (simplified)
-        final List<Integer> children = citizen.getChildren();
+        final List<Integer> children = data.getChildren();
         if (children != null && !children.isEmpty()) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
@@ -123,7 +128,7 @@ public class CitizenContextUtils {
             prompt.append("- Has ").append(children.size()).append(" ").append(children.size() == 1 ? "child" : "children").append("\n");
         }
 
-        final List<Integer> siblings = citizen.getSiblings();
+        final List<Integer> siblings = data.getSiblings();
         if (siblings != null && !siblings.isEmpty()) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
@@ -136,10 +141,10 @@ public class CitizenContextUtils {
         prompt.append("\n## CURRENT STATE\n");
 
         // Detailed happiness with specific factors
-        appendDetailedHappinessState(citizen, data, prompt);
+        appendDetailedHappinessState(data, prompt);
 
         // Saturation/hunger
-        double saturation = citizen.getSaturation();
+        double saturation = data.getSaturation();
         if (saturation <= 1) {
             prompt.append("- Very hungry and weak from lack of food\n");
         } else if (saturation <= 3) {
@@ -149,39 +154,48 @@ public class CitizenContextUtils {
         }
 
         // Health - more detailed
-        double healthPercent = (citizen.getHealth() / Math.max(1.0, citizen.getMaxHealth())) * 100;
-        if (healthPercent < 20) {
-            prompt.append("- Severely injured, in intense pain\n");
-        } else if (healthPercent < 50) {
-            prompt.append("- Injured and in pain\n");
-        } else if (healthPercent < 75) {
-            prompt.append("- Slightly hurt\n");
+        var entityOpt = data.getEntity();
+        if (entityOpt.isPresent()) {
+            var entity = entityOpt.get();
+            var health = entity.getHealth();
+            var maxHealth = entity.getMaxHealth();
+
+            double healthPercent = (health / Math.max(1.0, maxHealth)) * 100;
+            if (healthPercent < 20) {
+                prompt.append("- Severely injured, in intense pain\n");
+            } else if (healthPercent < 50) {
+                prompt.append("- Injured and in pain\n");
+            } else if (healthPercent < 75) {
+                prompt.append("- Slightly hurt\n");
+            }
         }
 
         // Sick status with more emphasis if applicable
-        if (citizen.isSick()) {
+        if (sick) {
             prompt.append("- Sick and feeling terrible. Needs medical attention\n");
         }
 
         // Homeless/Jobless concerns
-        if (citizen.getHomeBuilding() == null) {
+        if (data.getHomeBuilding() == null) {
             prompt.append("- Very concerned about not having a home\n");
         }
 
-        if (!citizen.isChild() && (citizen.getJob() == null || citizen.getJob().isEmpty())) {
+        if (!data.isChild() && data.getJob() == null) {
             prompt.append("- Frustrated about not having a job\n");
         }
 
         // Current activity (if available)
-        final VisibleCitizenStatus status = citizen.getVisibleStatus();
+        final VisibleCitizenStatus status = data.getStatus();
         if (status != null) {
-            prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
+            prompt.append("- Currently: ").append(formatStatus(status, data)).append("\n");
         }
 
         // Emotional guidance based on state
         prompt.append("\n## EMOTIONAL PROFILE\n");
 
-        double happiness = citizen.getHappiness();
+        var handler = data.getCitizenHappinessHandler();
+        double happiness = handler.getHappiness(data.getColony(), data);
+
         if (happiness > 8.0) {
             prompt.append("- Generally cheerful and friendly\n");
             prompt.append("- Optimistic about the colony's future\n");
@@ -201,8 +215,22 @@ public class CitizenContextUtils {
         }
 
         // Personality traits based on skills and state
-        if (citizen.isSick()) {
+        if (sick) {
             prompt.append("- Occasionally mentions symptoms or discomfort\n");
+        }
+
+        var blockingInteractions = ((CitizenDataAccessor) data)
+                .getCitizenChatOptions()
+                .values()
+                .stream()
+                .filter(e -> e.getPriority().getPriority() >= ChatPriority.IMPORTANT.getPriority())
+                .toList();
+
+        if (!blockingInteractions.isEmpty()) {
+            prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
+            for (var interaction : blockingInteractions) {
+                prompt.append("- ").append(interaction.getInquiry().getString());
+            }
         }
 
         // Concise communication guidance
@@ -212,7 +240,7 @@ public class CitizenContextUtils {
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
 
         // Player relationship
-        var perms = citizen.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
+        var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
         if (perms != null) {
             var r = perms.getRank();
             String rankName = r.isHostile() ? "enemy" : (
@@ -239,12 +267,12 @@ public class CitizenContextUtils {
     /**
      * Adds detailed happiness information based on specific modifiers
      *
-     * @param citizen the citizen data
+     * @param data   the citizen data
      * @param prompt the StringBuilder to append to
      */
-    private static void appendDetailedHappinessState(ICitizenDataView citizen, ICitizenData data, StringBuilder prompt) {
-        double happiness = citizen.getHappiness();
-        ICitizenHappinessHandler happinessHandler = citizen.getHappinessHandler();
+    private static void appendDetailedHappinessState(ICitizenData data, StringBuilder prompt) {
+        var handler = data.getCitizenHappinessHandler();
+        double happiness = handler.getHappiness(data.getColony(), data);
 
         // Overall happiness level
         if (happiness > 8.0) {
@@ -258,45 +286,43 @@ public class CitizenContextUtils {
         }
 
         // Check for specific happiness modifiers
-        if (happinessHandler != null) {
-            List<String> modifiers = happinessHandler.getModifiers();
+        List<String> modifiers = handler.getModifiers();
 
-            for (String modifierId : modifiers) {
-                IHappinessModifier modifier = happinessHandler.getModifier(modifierId);
-                if (modifier != null) {
-                    double factor = modifier.getFactor(data);
+        for (String modifierId : modifiers) {
+            IHappinessModifier modifier = handler.getModifier(modifierId);
+            if (modifier != null) {
+                double factor = modifier.getFactor(data);
 
-                    // Only mention significantly negative or positive factors
-                    if (factor < 0.8 || factor > 1.2) {
-                        switch (modifierId) {
-                            case HEALTH:
-                                if (factor < 0.8) prompt.append("- Concerned about health issues\n");
-                                break;
-                            case FOOD:
-                                if (factor < 0.8) prompt.append("- Unhappy with food quality/variety\n");
-                                else if (factor > 1.2) prompt.append("- Very satisfied with food quality\n");
-                                break;
-                            case HOMELESSNESS:
-                                if (factor < 0.8) prompt.append("- Distressed about housing situation\n");
-                                break;
-                            case UNEMPLOYMENT:
-                                if (factor < 0.8) prompt.append("- Anxious about employment status\n");
-                                break;
-                            case SECURITY:
-                                if (factor < 0.8) prompt.append("- Feels unsafe in the colony\n");
-                                else if (factor > 1.2) prompt.append("- Feels very secure in the colony\n");
-                                break;
-                            case SOCIAL:
-                                if (factor < 0.8) prompt.append("- Feeling socially isolated\n");
-                                else if (factor > 1.2) prompt.append("- Enjoying colony social life\n");
-                                break;
-                            case SLEPTTONIGHT:
-                                if (factor < 0.8) prompt.append("- Tired from lack of sleep\n");
-                                break;
-                            case IDLEATJOB:
-                                if (factor < 0.8) prompt.append("- Frustrated by lack of work to do\n");
-                                break;
-                        }
+                // Only mention significantly negative or positive factors
+                if (factor < 0.8 || factor > 1.2) {
+                    switch (modifierId) {
+                        case HEALTH:
+                            if (factor < 0.8) prompt.append("- Concerned about health issues\n");
+                            break;
+                        case FOOD:
+                            if (factor < 0.8) prompt.append("- Unhappy with food quality/variety\n");
+                            else prompt.append("- Very satisfied with food quality\n");
+                            break;
+                        case HOMELESSNESS:
+                            if (factor < 0.8) prompt.append("- Distressed about housing situation\n");
+                            break;
+                        case UNEMPLOYMENT:
+                            if (factor < 0.8) prompt.append("- Anxious about employment status\n");
+                            break;
+                        case SECURITY:
+                            if (factor < 0.8) prompt.append("- Feels unsafe in the colony\n");
+                            else prompt.append("- Feels very secure in the colony\n");
+                            break;
+                        case SOCIAL:
+                            if (factor < 0.8) prompt.append("- Feeling socially isolated\n");
+                            else prompt.append("- Enjoying colony social life\n");
+                            break;
+                        case SLEPTTONIGHT:
+                            if (factor < 0.8) prompt.append("- Tired from lack of sleep\n");
+                            break;
+                        case IDLEATJOB:
+                            if (factor < 0.8) prompt.append("- Frustrated by lack of work to do\n");
+                            break;
                     }
                 }
             }
@@ -390,7 +416,7 @@ public class CitizenContextUtils {
      * @param status the status enum
      * @return human-readable description
      */
-    private static String formatStatus(VisibleCitizenStatus status) {
+    private static String formatStatus(VisibleCitizenStatus status, ICitizenData data) {
         // Compare by reference to the static constants in VisibleCitizenStatus
         if (status == VisibleCitizenStatus.WORKING) {
             return "working";
@@ -401,7 +427,8 @@ public class CitizenContextUtils {
         } else if (status == VisibleCitizenStatus.RAIDED) {
             return "on alert (raid)";
         } else if (status == VisibleCitizenStatus.MOURNING) {
-            return "mourning";
+            var deceased = String.join(",", data.getCitizenMournHandler().getDeceasedCitizens());
+            return "mourning " + deceased;
         } else if (status == VisibleCitizenStatus.BAD_WEATHER) {
             return "sheltering from bad weather";
         } else if (status == VisibleCitizenStatus.SICK) {

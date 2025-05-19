@@ -12,6 +12,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import static me.sshcrack.mc_talking.MinecoloniesTalkingCitizens.LOGGER;
+
 // An example config class. This is not required, but it's a good idea to have one to keep your config organized.
 // Demonstrates how to use Neo's config APIs
 @EventBusSubscriber(modid = MinecoloniesTalkingCitizens.MODID, bus = EventBusSubscriber.Bus.MOD)
@@ -84,5 +86,12 @@ public class Config
         language = LANGUAGE.get();
         useTalkingDevice = USE_TALKING_DEVICE.get();
         maxConversationDistance = MAX_CONVERSATION_DISTANCE.get();
+
+        if(geminiApiKey.isEmpty() && MinecoloniesTalkingCitizens.isDedicated) {
+            LOGGER.error("===================================");
+            LOGGER.error("No Gemini API key set. Please set one in the config file.");
+            LOGGER.error("===================================");
+            System.exit(-1);
+        }
     }
 }

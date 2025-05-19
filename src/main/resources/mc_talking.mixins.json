@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "me.sshcrack.mc_talking.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CitizenDataAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

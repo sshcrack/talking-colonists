@@ -3,12 +3,10 @@ package me.sshcrack.mc_talking.item;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.Config;
 import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
-import me.sshcrack.mc_talking.manager.TalkingManager;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -17,6 +15,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.CustomModelData;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -27,7 +28,20 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 public class CitizenTalkingDevice extends Item {
 
     public CitizenTalkingDevice() {
-        super(new Item.Properties().stacksTo(1));
+        super(new Item.Properties().stacksTo(1).component(DataComponents.CUSTOM_DATA, CustomData.EMPTY));
+    }
+
+    @Override
+    public boolean isFoil(ItemStack stack) {
+        if (stack.get(DataComponents.CUSTOM_DATA) == null)
+            return false;
+
+        var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        if (!comp.contains("talkingPlayer"))
+            return false;
+
+        var uuid = comp.getUUID("talkingPlayer");
+        return MinecoloniesTalkingCitizens.activeEntity.containsKey(uuid);
     }
 
     @Override
@@ -38,54 +52,20 @@ public class CitizenTalkingDevice extends Item {
     }
 
     @Override
-    public @NotNull InteractionResult interactLivingEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull LivingEntity entity, @NotNull InteractionHand hand) {
-        // Check if the entity is a citizen
-        if (!(entity instanceof AbstractEntityCitizen citizen)) {
-            return InteractionResult.PASS;
+    public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
+        super.inventoryTick(stack, level, entity, slotId, isSelected);
+
+        if (Math.random() <= 0.25) {
+            var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+            if (!comp.contains("talkingPlayer")) {
+                stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                return;
+            }
+
+            var uuid = comp.getUUID("talkingPlayer");
+            var isActive = MinecoloniesTalkingCitizens.activeEntity.containsKey(uuid);
+            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
         }
-
-        if (player.level().isClientSide()) {
-            // Client side - just show some visual feedback
-            return InteractionResult.SUCCESS;
-        }
-
-        // Server side logic
-        ServerPlayer serverPlayer = (ServerPlayer) player;
-        UUID playerId = serverPlayer.getUUID();
-        UUID citizenId = citizen.getUUID();
-
-        // Check if API key is set
-        if (Config.geminiApiKey.isEmpty()) {
-            serverPlayer.sendSystemMessage(
-                    Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
-                            .withStyle(ChatFormatting.RED)
-            );
-            return InteractionResult.FAIL;
-        }
-
-        // Check if voice chat API is initialized
-        if (vcApi == null) {
-            serverPlayer.sendSystemMessage(
-                    Component.literal("Voice chat API is not initialized.")
-                            .withStyle(ChatFormatting.RED)
-            );
-            return InteractionResult.FAIL;
-        }
-
-        // Check distance before allowing interaction
-        double distance = player.distanceToSqr(citizen);
-        if (distance > (Config.activationDistance * Config.activationDistance)) {
-            serverPlayer.sendSystemMessage(
-                    Component.literal("This citizen is too far away to talk to.")
-                            .withStyle(ChatFormatting.RED)
-            );
-            return InteractionResult.FAIL;
-        }
-
-        // Handle interaction with citizen
-        handleCitizenInteraction(serverPlayer, playerId, citizen, citizenId);
-
-        return InteractionResult.SUCCESS;
     }
 
     @Override
@@ -100,7 +80,6 @@ public class CitizenTalkingDevice extends Item {
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
         UUID playerId = serverPlayer.getUUID();
-        UUID citizenId = citizen.getUUID();
 
         // Check if API key is set
         if (Config.geminiApiKey.isEmpty()) {
@@ -142,32 +121,18 @@ public class CitizenTalkingDevice extends Item {
 
         // Use the centralized startConversation method
         MinecoloniesTalkingCitizens.startConversation(serverPlayer, citizen);
-        
+
+        var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        comp.putUUID("talkingPlayer", playerId);
+
+        stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(comp));
+
         serverPlayer.sendSystemMessage(
                 Component.literal("Started conversation with " + citizen.getName().getString())
                         .withStyle(ChatFormatting.GREEN)
         );
 
         return true; // Prevent normal attack behavior
-    }
-
-    private void handleCitizenInteraction(ServerPlayer player, UUID playerId, AbstractEntityCitizen citizen, UUID citizenId) {
-        // If there was a previously focused entity, remove its glowing effect
-        LivingEntity previousEntity = MinecoloniesTalkingCitizens.activeEntity.get(playerId);
-        if (previousEntity != null && previousEntity.isAlive() && !previousEntity.getUUID().equals(citizenId)) {
-            previousEntity.removeEffect(MobEffects.GLOWING);
-        }
-
-        // If it's a new citizen or a different one, set up a new talking manager
-        if (previousEntity == null || !previousEntity.getUUID().equals(citizenId)) {
-            // Use the centralized startConversation method
-            MinecoloniesTalkingCitizens.startConversation(player, citizen);
-
-            // Send feedback to player
-            player.sendSystemMessage(
-                    Component.literal("Now talking to " + citizen.getName().getString())
-                            .withStyle(ChatFormatting.GREEN)
-            );
-        }
     }
 }
