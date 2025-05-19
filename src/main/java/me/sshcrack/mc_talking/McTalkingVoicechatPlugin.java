@@ -91,7 +91,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         scheduleSilenceTask(entity.getUUID(), manager);
     }
 
-    private static final byte[] SILENCE = {-8, -41, -121, 69, 27, -124, -74, -50, 34, -63, -76, -35, 108, -74, -39, -125, 38, -77, 1, 110, 47, 58, -121, -35, -102, 126, -24, 111, 28, 78, -108, -120, -28, 79, 11, 62, 121, 27, -26, -108, -119, -128, -30, -2, 126, -32, -89, 51, 79, 65, 6, 82, 24, -60, -24, 47, -111, -46, 51, 52, -37, 0, -30, -127, 99, 27, -66, -105, 25, 80, -108, -92, 60, 98, -9, -120, 124, 117, 23, -124, -30, 73, 8, 2, 58, -56, -19, -67, 37, 80, 117, 19, -44, -60, -80, 34, -65, 85, 72, 78, 85, -90, 89, 107, -46, -110, 70, 59, 99, 122, 46, 5, 113};
 
     private void scheduleSilenceTask(UUID entityId, TalkingManager manager) {
         // Calculate how many silence packets to send over the duration
@@ -99,8 +98,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         // Schedule a task that will send silence packets
         ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
-            // Send silence frame
-            manager.promptAudioOpus(SILENCE);
+            manager.promptAudioRaw(new short[960]);
         }, 0, SILENCE_INTERVAL_MS, TimeUnit.MILLISECONDS);
 
         // Schedule a task to stop sending silence after the duration

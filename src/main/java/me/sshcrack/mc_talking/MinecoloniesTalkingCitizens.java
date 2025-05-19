@@ -152,7 +152,7 @@ public class MinecoloniesTalkingCitizens {
                     LOGGER.info("Player {} is now focusing on entity {}", player.getName().getString(), currentTargetEntity);
 
 
-                    clients.put(currentTargetId, new TalkingManager(currentTargetEntity));
+                    clients.put(currentTargetId, new TalkingManager(currentTargetEntity, player));
 
                     addedEntities.add(currentTargetId);
                     if (addedEntities.size() > Config.maxConcurrentAgents) {

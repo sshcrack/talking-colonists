@@ -1,12 +1,12 @@
 package me.sshcrack.mc_talking.manager;
 
-import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.ICitizenDataView;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenSkillHandler;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.citizenhandlers.CitizenSkillHandler;
+import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -23,7 +23,7 @@ public class CitizenContextUtils {
      * @param citizen the citizen data to generate roleplay context for
      * @return a formatted system prompt for LLM roleplay
      */
-    public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenDataView citizen) {
+    public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenDataView citizen, ServerPlayer speakingTo) {
         final StringBuilder prompt = new StringBuilder();
 
         // Main instruction
@@ -129,7 +129,19 @@ public class CitizenContextUtils {
         prompt.append("- Express emotions appropriate to your current happiness and situation\n");
         prompt.append("- Use occasional medieval fantasy language elements without overdoing it\n");
         prompt.append("- Keep responses fairly brief but revealing of your character\n");
-        prompt.append("- Address the player respectfully as a colonist or visitor\n");
+        var perms = citizen.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
+        if (perms == null) {
+            prompt.append("- Address the player respectfully as a colonist or visitor\n");
+        } else {
+            var r = perms.getRank();
+            String rankName = r.isHostile() ? "enemy" : (
+                    r.isColonyManager() ? "colony manager" : (
+                            r.isInitial() ? "leader" : "visitor"
+                    )
+            );
+
+            prompt.append("- Address the player as a ").append(rankName);
+        }
 
         if (citizen.isSick()) {
             prompt.append("- Occasionally mention not feeling well or symptoms\n");
@@ -137,7 +149,7 @@ public class CitizenContextUtils {
 
         // Job-specific communication
         if (citizen.getJob() != null && !citizen.getJob().isEmpty()) {
-            prompt.append("- Sometimes reference your job as a ").append(citizen.getJob()).append("\n");
+            prompt.append("- Your Job is being a ").append(citizen.getJob()).append("\n");
         }
 
         // Final roleplay guidance
@@ -323,32 +335,5 @@ public class CitizenContextUtils {
         }
 
         return translationKey;
-    }
-
-    /**
-     * Creates a system prompt for an LLM to roleplay as a specific citizen
-     * (Server-side variant)
-     *
-     * @param citizen the citizen data to generate roleplay context for
-     * @return a formatted system prompt for LLM roleplay
-     */
-    public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenData citizen) {
-        // Implementation would be similar but using ICitizenData methods
-        // This overload allows the function to be called from server code with ICitizenData objects
-
-        // A simplified implementation for this example
-
-        // Add basic identity information
-
-        // Full implementation would mirror the client-side method with server-appropriate data access
-
-        return "# ROLEPLAY INSTRUCTIONS\n\n" +
-                "You are roleplaying as a citizen named **" + citizen.getName() +
-                "** in a medieval-fantasy colony. Respond in first person as this character.\n\n" +
-
-                // Add basic identity information
-                "## YOUR IDENTITY\n\n" +
-                "- You are a " + (citizen.isChild() ? "child" : "adult") + " " +
-                (citizen.isFemale() ? "woman" : "man") + "\n";
     }
 }

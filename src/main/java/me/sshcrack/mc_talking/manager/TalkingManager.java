@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
 import java.util.UUID;
@@ -16,7 +17,7 @@ public class TalkingManager {
     AbstractEntityCitizen entity;
     OpusDecoder decoder;
 
-    public TalkingManager(AbstractEntityCitizen entity) {
+    public TalkingManager(AbstractEntityCitizen entity, ServerPlayer initialPlayer) {
         MinecoloniesTalkingCitizens.LOGGER.info("Creating TalkingManager for entity: {}", entity.getStringUUID());
         if (vcApi == null)
             throw new IllegalStateException("Voicechat API is not initialized");
@@ -26,7 +27,7 @@ public class TalkingManager {
         var pos = vcApi.createPosition(entity.getX(), entity.getY(), entity.getZ());
         channel = vcApi.createLocationalAudioChannel(UUID.randomUUID(), vcLevel, pos);
 
-        client = new GeminiWsClient(this);
+        client = new GeminiWsClient(this, initialPlayer);
         decoder = vcApi.createDecoder();
     }
 

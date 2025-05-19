@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.ClientMessages;
 import me.sshcrack.mc_talking.gson.RealtimeInput;
+import net.minecraft.server.level.ServerPlayer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -16,8 +17,10 @@ import java.util.*;
 
 public class GeminiWsClient extends WebSocketClient {
     boolean setupComplete;
+    boolean isInitiatingConnection = false;
     boolean wasConnectedOnce = false;
     GeminiStream stream;
+    ServerPlayer initialPlayer;
     TalkingManager manager;
     private final List<short[]> pending_prompt = new ArrayList<>();
 
@@ -32,18 +35,21 @@ public class GeminiWsClient extends WebSocketClient {
         return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + Config.GEMINI_API_KEY.get();
     }
 
-    public GeminiWsClient(TalkingManager manager) {
+    public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
         super(URI.create(getUrl()));
         this.manager = manager;
         stream = new GeminiStream(manager.channel);
+        this.initialPlayer = player;
     }
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
+        isInitiatingConnection = false;
         var setup = new BidiGenerateContentSetup("models/gemini-2.0-flash-live-001");
         setup.generationConfig.responseModalities = List.of("AUDIO");
         var sys = new BidiGenerateContentSetup.SystemInstruction();
-        var p = new BidiGenerateContentSetup.SystemInstruction.Part(CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView()));
+        //TODO change player when other player is talking to AI
+        var p = new BidiGenerateContentSetup.SystemInstruction.Part(CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenDataView(), initialPlayer));
 
         sys.parts.add(p);
 
@@ -124,6 +130,7 @@ public class GeminiWsClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
+        isInitiatingConnection = false;
         MinecoloniesTalkingCitizens.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
     }
 
@@ -138,20 +145,22 @@ public class GeminiWsClient extends WebSocketClient {
 
         if (!setupComplete || this.isClosed()) {
             pending_prompt.add(audio);
-            if (!this.isOpen()) {
+            if (!this.isOpen() && !isInitiatingConnection) {
                 if (wasConnectedOnce)
                     reconnect();
                 else {
                     connect();
                     wasConnectedOnce = true;
                 }
+
+                isInitiatingConnection = true;
             }
             return;
         }
 
-        System.out.println(ClientMessages.input(input));
         send(ClientMessages.input(input));
     }
+
 
     @Override
     public void close() {
