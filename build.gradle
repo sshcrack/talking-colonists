@@ -4,7 +4,20 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.88'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'idea'
+    id "com.modrinth.minotaur" version "2.+"
 }
+
+// Load properties from local.properties file
+def localProperties = new Properties()
+def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def modrinth_key = localProperties.getProperty('MODRINTH_API_KEY') ?: ""
+def curse_key = localProperties.getProperty('CURSEFORGE_API_KEY') ?: ""
 
 tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
@@ -70,6 +83,7 @@ neoForge {
 
         server {
             server()
+            getGameDirectory().convention(project.getLayout().getProjectDirectory().dir("run_server"));
             programArgument '--nogui'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
@@ -184,3 +198,19 @@ idea {
         downloadJavadoc = true
     }
 }
+
+// Move modrinth block to the very end to ensure plugin is loaded before use
+modrinth {
+    token = modrinth_key
+    projectId = 'QJvWFsra'
+    uploadFile = tasks.jar
+    versionType = "beta"
+    gameVersions = [minecraft_version]
+    loaders = ['neoforge']
+    syncBodyFrom = rootProject.file("README.md").text
+    dependencies {
+        required.project "simple-voice-chat"
+    }
+}
+
+tasks.modrinth.dependsOn(tasks.modrinthSyncBody)

@@ -98,11 +98,16 @@ public class MinecoloniesTalkingCitizens {
      * @param citizen The citizen entity
      */
     public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
+        if (Config.geminiApiKey.isEmpty()) {
+            player.sendSystemMessage(
+                    Component.translatable("mc_talking.no_key")
+                            .withStyle(ChatFormatting.RED)
+            );
+            return;
+        }
+
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
-
-        // If there was a previously focused entity, remove its glowing effect
-        LivingEntity previousEntity = activeEntity.get(playerId);
 
         // Set citizen as active entity and add glowing effect
         activeEntity.put(playerId, citizen);
@@ -166,13 +171,6 @@ public class MinecoloniesTalkingCitizens {
             if (item.getItem() instanceof CitizenTalkingDevice) {
                 item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
             }
-        }
-
-        if (Config.geminiApiKey.isEmpty()) {
-            player.sendSystemMessage(
-                    Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
-                            .withStyle(ChatFormatting.RED)
-            );
         }
     }
 

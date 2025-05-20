@@ -17,5 +17,6 @@
   "mc_talking.ai_status.listening": "Listening",
   "mc_talking.ai_status.thinking": "Thinking",
   "mc_talking.ai_status.talking": "Talking",
-  "mc_talking.ai_status.error": "Error"
+  "mc_talking.ai_status.error": "Error",
+  "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work."
 }

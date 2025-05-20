@@ -86,12 +86,5 @@ public class Config
         language = LANGUAGE.get();
         useTalkingDevice = USE_TALKING_DEVICE.get();
         maxConversationDistance = MAX_CONVERSATION_DISTANCE.get();
-
-        if(geminiApiKey.isEmpty() && MinecoloniesTalkingCitizens.isDedicated) {
-            LOGGER.error("===================================");
-            LOGGER.error("No Gemini API key set. Please set one in the config file.");
-            LOGGER.error("===================================");
-            System.exit(-1);
-        }
     }
 }
