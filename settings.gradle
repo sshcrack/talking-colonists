@@ -4,6 +4,9 @@ pluginManagement {
         gradlePluginPortal()
         maven { url = 'https://maven.neoforged.net/releases' }
     }
+    plugins {
+        id "com.modrinth.minotaur" version "2.+"
+    }
 }
 
 plugins {
