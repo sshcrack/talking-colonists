@@ -105,13 +105,9 @@ public class MinecoloniesTalkingCitizens {
 
         // If there was a previously focused entity, remove its glowing effect
         LivingEntity previousEntity = activeEntity.get(playerId);
-        if (previousEntity != null && previousEntity.isAlive()) {
-            previousEntity.removeEffect(MobEffects.GLOWING);
-        }
 
         // Set citizen as active entity and add glowing effect
         activeEntity.put(playerId, citizen);
-        citizen.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
 
         // Create talking manager and add to clients
         clients.put(citizenId, new TalkingManager(citizen, player));
@@ -134,8 +130,6 @@ public class MinecoloniesTalkingCitizens {
 
         LivingEntity entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
-            entity.removeEffect(MobEffects.GLOWING);
-
             ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
             if (player != null) {
                 for (ItemStack item : player.getInventory().items) {
@@ -191,7 +185,6 @@ public class MinecoloniesTalkingCitizens {
             return;
         var citizen = activeEntity.get(player.getUUID());
         if (citizen != null) {
-            citizen.removeEffect(MobEffects.GLOWING);
             if (clients.containsKey(citizen.getUUID()))
                 clients.get(citizen.getUUID()).close();
 
@@ -379,13 +372,6 @@ public class MinecoloniesTalkingCitizens {
         previousEntityLookedAt.put(playerId, previousTargetId);
         lastEntitySwitchTime.put(playerId, currentTime);
         lookDuration.put(playerId, 0);
-
-        // If we were tracking an active entity, remove its glowing effect and clear it
-        AbstractEntityCitizen previousActiveEntity = activeEntity.get(playerId);
-        if (previousActiveEntity != null && previousActiveEntity.isAlive()) {
-            previousActiveEntity.removeEffect(MobEffects.GLOWING);
-        }
-
         activeEntity.remove(playerId);
     }
 
@@ -399,12 +385,6 @@ public class MinecoloniesTalkingCitizens {
         if (previousTargetId != null) {
             previousEntityLookedAt.put(playerId, previousTargetId);
             lastEntitySwitchTime.put(playerId, System.currentTimeMillis());
-        }
-
-        // Remove glowing effect from any active entity
-        LivingEntity entity = activeEntity.get(playerId);
-        if (entity != null && entity.isAlive()) {
-            entity.removeEffect(MobEffects.GLOWING);
         }
 
         playerLookingAt.remove(playerId);

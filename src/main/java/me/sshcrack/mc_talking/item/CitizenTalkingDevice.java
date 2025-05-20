@@ -108,13 +108,8 @@ public class CitizenTalkingDevice extends Item {
             return true;
         }
 
-        if (previousEntity != null && previousEntity.isAlive()) {
-            previousEntity.removeEffect(MobEffects.GLOWING);
-        }
-
         // Set citizen as active entity and add glowing effect
         MinecoloniesTalkingCitizens.activeEntity.put(playerId, citizen);
-        citizen.addEffect(new MobEffectInstance(MobEffects.GLOWING, -1, 0, false, false));
 
         // Use the centralized startConversation method
         MinecoloniesTalkingCitizens.startConversation(serverPlayer, citizen);

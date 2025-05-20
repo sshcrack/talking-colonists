@@ -15,6 +15,7 @@
   "mc_talking.configuration.title": "Minecolonies Talking Configuration",
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
   "mc_talking.ai_status.listening": "Listening",
+  "mc_talking.ai_status.thinking": "Thinking",
   "mc_talking.ai_status.talking": "Talking",
   "mc_talking.ai_status.error": "Error"
 }

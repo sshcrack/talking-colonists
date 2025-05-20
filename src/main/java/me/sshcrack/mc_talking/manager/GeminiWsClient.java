@@ -37,12 +37,13 @@ public class GeminiWsClient extends WebSocketClient {
         return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + Config.GEMINI_API_KEY.get();
     }
 
+    //TODO: Don't send packets to all players
     public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
         super(URI.create(getUrl()));
         this.manager = manager;
         stream = new GeminiStream(manager.channel);
         this.initialPlayer = player;
-        PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+        PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
 
     @Override
@@ -68,8 +69,6 @@ public class GeminiWsClient extends WebSocketClient {
         //TODO change player when other player is talking to AI
         var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenData(), initialPlayer);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
-
-        MinecoloniesTalkingCitizens.LOGGER.info("Using prompt: \n{}", prompt);
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
@@ -106,8 +105,14 @@ public class GeminiWsClient extends WebSocketClient {
         if (outer.has("serverContent") && outer.get("serverContent").isJsonObject()) {
             var obj = outer.getAsJsonObject("serverContent");
             if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
-                System.out.println("Turn done");
-                PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+                MinecoloniesTalkingCitizens.LOGGER.info("Gemini turn complete");
+                PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+                return;
+            }
+
+            if (obj.has("generationComplete") && obj.get("generationComplete").getAsBoolean()) {
+                MinecoloniesTalkingCitizens.LOGGER.info("Gemini generation complete");
+                PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
                 return;
             }
 
@@ -137,9 +142,7 @@ public class GeminiWsClient extends WebSocketClient {
                         var sampleRate = Integer.parseInt(sampleRateStr);
 
                         var data = Base64.getDecoder().decode(inlineData.get("data").getAsString());
-                        var firstCall = stream.addGeminiPcm(data, sampleRate);
-                        if (firstCall)
-                            PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
+                        stream.addGeminiPcm(data, sampleRate);
                     }
                 }
             } else {
@@ -157,19 +160,24 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         isInitiatingConnection = false;
-        PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+        PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         MinecoloniesTalkingCitizens.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
     }
 
     @Override
     public void onError(Exception ex) {
-        PacketDistributor.sendToPlayersTrackingEntity(manager.entity, new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+        PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         MinecoloniesTalkingCitizens.LOGGER.error("Error in GeminiWsClient", ex);
     }
+
+    boolean sentGeneratingStatus = false;
 
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();
         input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", audio);
+        if (sentGeneratingStatus)
+            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+
 
         if (!setupComplete || this.isClosed()) {
             pending_prompt.add(audio);

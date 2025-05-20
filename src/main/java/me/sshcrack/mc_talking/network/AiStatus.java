@@ -6,6 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 
 public enum AiStatus {
     ERROR,
+    THINKING,
     TALKING,
     LISTENING,
     NONE;
