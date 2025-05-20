@@ -20,3 +20,5 @@ Then left click on a citizen you want to talk to and something similar to this w
 
 Now the citizen will complain if they are unhappy or missing some resources, just talk right away!
  
+## Can I include this in my modpack?
+Yup
