@@ -1,15 +1,12 @@
 package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import com.minecolonies.core.entity.citizen.EntityCitizen;
 import me.sshcrack.mc_talking.Config;
-import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
+import me.sshcrack.mc_talking.MineColoniesTalkingCitizens;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -42,7 +39,7 @@ public class CitizenTalkingDevice extends Item {
             return false;
 
         var uuid = comp.getUUID("talkingPlayer");
-        return MinecoloniesTalkingCitizens.activeEntity.containsKey(uuid);
+        return MineColoniesTalkingCitizens.activeEntity.containsKey(uuid);
     }
 
     @Override
@@ -64,7 +61,7 @@ public class CitizenTalkingDevice extends Item {
             }
 
             var uuid = comp.getUUID("talkingPlayer");
-            var isActive = MinecoloniesTalkingCitizens.activeEntity.containsKey(uuid);
+            var isActive = MineColoniesTalkingCitizens.activeEntity.containsKey(uuid);
             stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
         }
     }
@@ -101,7 +98,7 @@ public class CitizenTalkingDevice extends Item {
         }
 
         // If there was a previously focused entity, remove its glowing effect
-        LivingEntity previousEntity = MinecoloniesTalkingCitizens.activeEntity.get(playerId);
+        LivingEntity previousEntity = MineColoniesTalkingCitizens.activeEntity.get(playerId);
         if(previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
             citizen.getNavigation().stop();
             citizen.getLookControl().setLookAt(player);
@@ -109,10 +106,10 @@ public class CitizenTalkingDevice extends Item {
         }
 
         // Set citizen as active entity and add glowing effect
-        MinecoloniesTalkingCitizens.activeEntity.put(playerId, citizen);
+        MineColoniesTalkingCitizens.activeEntity.put(playerId, citizen);
 
         // Use the centralized startConversation method
-        MinecoloniesTalkingCitizens.startConversation(serverPlayer, citizen);
+        MineColoniesTalkingCitizens.startConversation(serverPlayer, citizen);
 
         var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
         comp.putUUID("talkingPlayer", playerId);

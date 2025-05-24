@@ -3,7 +3,7 @@ package me.sshcrack.mc_talking.manager;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import me.sshcrack.mc_talking.Config;
-import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
+import me.sshcrack.mc_talking.MineColoniesTalkingCitizens;
 import me.sshcrack.mc_talking.ModAttachmentTypes;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.ClientMessages;
@@ -24,6 +24,8 @@ public class GeminiWsClient extends WebSocketClient {
     boolean setupComplete;
     boolean isInitiatingConnection = false;
     boolean shouldReconnect = false;
+
+    public static boolean quotaExceeded = false;
 
     GeminiStream stream;
     ServerPlayer initialPlayer;
@@ -98,7 +100,7 @@ public class GeminiWsClient extends WebSocketClient {
             return;
         var outer = p.getAsJsonObject();
         if (outer.has("setupComplete")) {
-            MinecoloniesTalkingCitizens.LOGGER.info("Gemini setup complete");
+            MineColoniesTalkingCitizens.LOGGER.info("Gemini setup complete");
             setupComplete = true;
             if (!pending_prompt.isEmpty()) {
                 for (short[] data : pending_prompt) {
@@ -115,7 +117,7 @@ public class GeminiWsClient extends WebSocketClient {
 
 
         if (outer.has("usageMetadata")) {
-            MinecoloniesTalkingCitizens.LOGGER.info("Gemini usage metadata: {}", outer.get("usageMetadata").toString());
+            MineColoniesTalkingCitizens.LOGGER.info("Gemini usage metadata: {}", outer.get("usageMetadata").toString());
         }
 
         if (outer.has("sessionResumptionUpdate")) {
@@ -132,6 +134,7 @@ public class GeminiWsClient extends WebSocketClient {
         }
 
         if (outer.has("toolCall")) {
+            System.out.println("Tool call: " + message);
             var obj = outer.getAsJsonObject("toolCall");
             if (!obj.has("functionCalls") || !obj.get("functionCalls").isJsonArray())
                 return;
@@ -148,24 +151,26 @@ public class GeminiWsClient extends WebSocketClient {
                 var name = objFnCall.get("name").getAsString();
                 var action = AiTools.registeredFunctions.get(name);
                 if (action == null) {
-                    MinecoloniesTalkingCitizens.LOGGER.warn("Unknown function call: {}", name);
+                    MineColoniesTalkingCitizens.LOGGER.warn("Unknown function call: {}", name);
                     continue;
                 }
 
                 action.action().accept(this.manager.entity);
             }
+
+            return;
         }
 
         if (outer.has("serverContent") && outer.get("serverContent").isJsonObject()) {
             var obj = outer.getAsJsonObject("serverContent");
             if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
-                MinecoloniesTalkingCitizens.LOGGER.info("Gemini turn complete");
+                MineColoniesTalkingCitizens.LOGGER.info("Gemini turn complete");
                 PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
                 return;
             }
 
             if (obj.has("generationComplete") && obj.get("generationComplete").getAsBoolean()) {
-                MinecoloniesTalkingCitizens.LOGGER.info("Gemini generation complete");
+                MineColoniesTalkingCitizens.LOGGER.info("Gemini generation complete");
                 PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
                 return;
             }
@@ -188,7 +193,7 @@ public class GeminiWsClient extends WebSocketClient {
 
                         var mimeType = inlineData.get("mimeType").getAsString();
                         if (!mimeType.contains("audio/pcm")) {
-                            MinecoloniesTalkingCitizens.LOGGER.warn("Invalid mime type: {}", inlineData.get("mimeType").getAsString());
+                            MineColoniesTalkingCitizens.LOGGER.warn("Invalid mime type: {}", inlineData.get("mimeType").getAsString());
                             continue;
                         }
 
@@ -200,7 +205,7 @@ public class GeminiWsClient extends WebSocketClient {
                     }
                 }
             } else {
-                MinecoloniesTalkingCitizens.LOGGER.warn("Unknown message: {}", message);
+                MineColoniesTalkingCitizens.LOGGER.warn("Unknown message: {}", message);
             }
         }
     }
@@ -217,13 +222,19 @@ public class GeminiWsClient extends WebSocketClient {
         if (code != 1000 && code != 1001) {
             PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         }
-        MinecoloniesTalkingCitizens.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
+        if(reason.contains("You exceeded your current quota, please")) {
+            quotaExceeded = true;
+            MineColoniesTalkingCitizens.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
+            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
+        }
+
+        MineColoniesTalkingCitizens.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
     }
 
     @Override
     public void onError(Exception ex) {
         PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-        MinecoloniesTalkingCitizens.LOGGER.error("Error in GeminiWsClient", ex);
+        MineColoniesTalkingCitizens.LOGGER.error("Error in GeminiWsClient", ex);
     }
 
     boolean sentGeneratingStatus = false;
@@ -241,7 +252,7 @@ public class GeminiWsClient extends WebSocketClient {
             if (!this.isOpen() && !isInitiatingConnection) {
                 if (shouldReconnect) {
                     if (System.currentTimeMillis() - lastReconnectTime < 2500) {
-                        MinecoloniesTalkingCitizens.LOGGER.warn("Reconnecting too frequently, skipping this attempt");
+                        MineColoniesTalkingCitizens.LOGGER.warn("Reconnecting too frequently, skipping this attempt");
                         return;
                     }
                     lastReconnectTime = System.currentTimeMillis();

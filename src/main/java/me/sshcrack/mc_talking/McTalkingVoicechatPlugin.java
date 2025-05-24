@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
-import static me.sshcrack.mc_talking.manager.GeminiStream.FRAME_SIZE_SAMPLES;
-
 @SuppressWarnings("unused")
 @ForgeVoicechatPlugin
 public class McTalkingVoicechatPlugin implements VoicechatPlugin {
@@ -33,16 +31,16 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
     @Override
     public String getPluginId() {
-        return MinecoloniesTalkingCitizens.MODID;
+        return MineColoniesTalkingCitizens.MODID;
     }
 
     @Override
     public void initialize(VoicechatApi api) {
-        MinecoloniesTalkingCitizens.LOGGER.info("Initializing Voicechat Plugin");
+        MineColoniesTalkingCitizens.LOGGER.info("Initializing Voicechat Plugin");
     }
 
     public void onServerStart(VoicechatServerStartedEvent event) {
-        MinecoloniesTalkingCitizens.LOGGER.info("Voicechat Server Started");
+        MineColoniesTalkingCitizens.LOGGER.info("Voicechat Server Started");
         vcApi = event.getVoicechat();
     }
 
@@ -71,12 +69,12 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             return;
 
         var player = (ServerPlayer) vcPlayer.getPlayer();
-        LivingEntity entity = MinecoloniesTalkingCitizens.activeEntity.get(player.getUUID());
+        LivingEntity entity = MineColoniesTalkingCitizens.activeEntity.get(player.getUUID());
         if (entity == null) {
             return;
         }
 
-        var manager = MinecoloniesTalkingCitizens.clients.get(entity.getUUID());
+        var manager = MineColoniesTalkingCitizens.clients.get(entity.getUUID());
         if (manager == null) {
             return;
         }

@@ -73,7 +73,7 @@ public class BidiGenerateContentSetup {
     }
 
     public SystemInstruction systemInstruction;
-    public List<Tool> tools;
+    public List<Tool> tools = new ArrayList<>();
 
     public static class Tool {
         public List<FunctionDeclaration> functionDeclarations = new ArrayList<>();

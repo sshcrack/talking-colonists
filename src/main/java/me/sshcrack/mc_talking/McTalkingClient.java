@@ -2,7 +2,6 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractCivilianEntity;
 import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -15,14 +14,10 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.HashMap;
-import java.util.UUID;
+import static me.sshcrack.mc_talking.MineColoniesTalkingCitizens.aiStatus;
 
-import static me.sshcrack.mc_talking.MinecoloniesTalkingCitizens.aiStatus;
-
-@Mod(value = MinecoloniesTalkingCitizens.MODID, dist = Dist.CLIENT)
+@Mod(value = MineColoniesTalkingCitizens.MODID, dist = Dist.CLIENT)
 public class McTalkingClient {
 
     public McTalkingClient(ModContainer container) {

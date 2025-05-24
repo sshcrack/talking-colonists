@@ -37,8 +37,8 @@ import java.util.*;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
-@Mod(MinecoloniesTalkingCitizens.MODID)
-public class MinecoloniesTalkingCitizens {
+@Mod(MineColoniesTalkingCitizens.MODID)
+public class MineColoniesTalkingCitizens {
     public static boolean isDedicated;
 
     public static HashMap<UUID, AiStatus> aiStatus = new HashMap<>();
@@ -64,7 +64,7 @@ public class MinecoloniesTalkingCitizens {
     public static final String MODID = "mc_talking";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public MinecoloniesTalkingCitizens(IEventBus modEventBus, ModContainer modContainer) {
+    public MineColoniesTalkingCitizens(IEventBus modEventBus, ModContainer modContainer) {
         NeoForge.EVENT_BUS.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
@@ -120,7 +120,7 @@ public class MinecoloniesTalkingCitizens {
         addEntity(citizenId);
 
         // Track this conversation pair
-        MinecoloniesTalkingCitizens
+        MineColoniesTalkingCitizens
                 .playerConversationPartners.put(playerId, citizenId);
     }
 
@@ -131,7 +131,7 @@ public class MinecoloniesTalkingCitizens {
      * @param sendMessage Whether to send a message to the player
      */
     public static void endConversation(UUID playerId, boolean sendMessage) {
-        UUID citizenId = MinecoloniesTalkingCitizens.playerConversationPartners.remove(playerId);
+        UUID citizenId = MineColoniesTalkingCitizens.playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
 
         LivingEntity entity = activeEntity.remove(playerId);

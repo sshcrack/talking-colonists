@@ -12,7 +12,21 @@ import java.util.function.Consumer;
 public class AiTools {
     public static final HashMap<String, FunctionAction> registeredFunctions = new HashMap<>();
 
-    public record FunctionAction(FunctionDeclaration tool, Consumer<AbstractEntityCitizen> action) {}
+
+    public static void add(FunctionAction action) {
+        registeredFunctions.put(action.tool().name, action);
+    }
+
+    public record FunctionAction(FunctionDeclaration tool, Consumer<AbstractEntityCitizen> action) {
+        public FunctionAction(FunctionDeclaration tool, Consumer<AbstractEntityCitizen> action) {
+            this.tool = tool;
+            this.action = action;
+
+            add(this);
+        }
+    }
+
+    @SuppressWarnings("unused")
     public static FunctionAction LEAVE_ACTION = new FunctionAction(
             new FunctionDeclaration("leave_colony", "You leave the colony. Only leave the colony when you are REALLY upset and sure you NEVER want to come back."),
             citizen -> {
@@ -27,6 +41,12 @@ public class AiTools {
                 manager.unregisterCivilian(citizen);
                 visitor.spawnOrCreateCivilian(data, level, pos, true);
             }
+    );
+
+    @SuppressWarnings("unused")
+    public static FunctionAction HELLO_ACTION = new FunctionAction(
+            new FunctionDeclaration("say_hello", "You greet the manager."),
+            citizen -> {}
     );
 
     public static List<BidiGenerateContentSetup.Tool> getAllTools() {
@@ -45,11 +65,6 @@ public class AiTools {
         return list;
     }
 
-    public static void add(FunctionAction action) {
-        registeredFunctions.put(action.tool().name, action);
-    }
-
     public static void register() {
-        add(LEAVE_ACTION);
     }
 }
