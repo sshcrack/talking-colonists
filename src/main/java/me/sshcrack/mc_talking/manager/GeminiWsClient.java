@@ -1,8 +1,10 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import me.sshcrack.mc_talking.Config;
 import me.sshcrack.mc_talking.MinecoloniesTalkingCitizens;
+import me.sshcrack.mc_talking.ModAttachmentTypes;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.ClientMessages;
 import me.sshcrack.mc_talking.gson.RealtimeInput;
@@ -21,7 +23,8 @@ import java.util.*;
 public class GeminiWsClient extends WebSocketClient {
     boolean setupComplete;
     boolean isInitiatingConnection = false;
-    boolean wasConnectedOnce = false;
+    boolean shouldReconnect = false;
+
     GeminiStream stream;
     ServerPlayer initialPlayer;
     TalkingManager manager;
@@ -49,21 +52,32 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake handshakedata) {
         isInitiatingConnection = false;
-        var setup = new BidiGenerateContentSetup("models/gemini-2.0-flash-live-001");
+        var setup = new BidiGenerateContentSetup("models/" + Config.currentAIModel.getName());
         setup.generationConfig.responseModalities = List.of("AUDIO");
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = Config.language;
 
-        var female = this.manager.entity.getCitizenData().isFemale();
-        var availableVoices = female ? BidiGenerateContentSetup.FEMALE_VOICES : BidiGenerateContentSetup.MALE_VOICES;
+        var entity = this.manager.entity;
+        var female = entity.getCitizenData().isFemale();
+        var uuid = entity.getUUID();
 
-        var random = new Random();
-        random.setSeed(manager.entity.getUUID().getMostSignificantBits() ^ manager.entity.getUUID().getLeastSignificantBits());
-        var voice = availableVoices.get(random.nextInt(availableVoices.size()));
+        setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
+        if (entity.hasData(ModAttachmentTypes.SESSION_TOKEN)) {
+            var sessionToken = entity.getData(ModAttachmentTypes.SESSION_TOKEN);
+            if (!sessionToken.isBlank()) {
+                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+            }
+        }
 
         setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = voice;
+        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = Config.currentAIModel.getRandomVoice(uuid, female);
+
+        setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();
+
+
+        //TODO: Allow citizens to speak for themselves
+        //setup.realtimeInputConfig.turnCoverage = BidiGenerateContentSetup.RealtimeInputConfig.TurnCoverage.TURN_INCLUDES_ALL_INPUT;
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
@@ -72,13 +86,18 @@ public class GeminiWsClient extends WebSocketClient {
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
+        setup.tools.addAll(AiTools.getAllTools());
 
         send(ClientMessages.setup(setup));
     }
 
     @Override
     public void onMessage(String message) {
-        if (message.contains("\"setupComplete\"")) {
+        var p = JsonParser.parseString(message);
+        if (!p.isJsonObject())
+            return;
+        var outer = p.getAsJsonObject();
+        if (outer.has("setupComplete")) {
             MinecoloniesTalkingCitizens.LOGGER.info("Gemini setup complete");
             setupComplete = true;
             if (!pending_prompt.isEmpty()) {
@@ -90,16 +109,51 @@ public class GeminiWsClient extends WebSocketClient {
             return;
         }
 
+
         if (!setupComplete)
             return;
 
-        var p = JsonParser.parseString(message);
-        if (!p.isJsonObject())
-            return;
 
-        var outer = p.getAsJsonObject();
         if (outer.has("usageMetadata")) {
             MinecoloniesTalkingCitizens.LOGGER.info("Gemini usage metadata: {}", outer.get("usageMetadata").toString());
+        }
+
+        if (outer.has("sessionResumptionUpdate")) {
+            System.out.println(message);
+            var obj = outer.get("sessionResumptionUpdate").getAsJsonObject();
+            if (!obj.has("newHandle") || !obj.get("newHandle").isJsonPrimitive())
+                return;
+
+            if (!obj.has("resumable") || !obj.get("resumable").getAsBoolean())
+                return;
+
+            var handle = obj.get("newHandle").getAsString();
+            this.manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, handle);
+        }
+
+        if (outer.has("toolCall")) {
+            var obj = outer.getAsJsonObject("toolCall");
+            if (!obj.has("functionCalls") || !obj.get("functionCalls").isJsonArray())
+                return;
+
+            var functionCalls = obj.getAsJsonArray("functionCalls");
+            for (JsonElement fnCall : functionCalls) {
+                if (!fnCall.isJsonObject())
+                    continue;
+
+                var objFnCall = fnCall.getAsJsonObject();
+                if (!objFnCall.has("name") || !objFnCall.get("name").isJsonPrimitive())
+                    continue;
+
+                var name = objFnCall.get("name").getAsString();
+                var action = AiTools.registeredFunctions.get(name);
+                if (action == null) {
+                    MinecoloniesTalkingCitizens.LOGGER.warn("Unknown function call: {}", name);
+                    continue;
+                }
+
+                action.action().accept(this.manager.entity);
+            }
         }
 
         if (outer.has("serverContent") && outer.get("serverContent").isJsonObject()) {
@@ -134,7 +188,7 @@ public class GeminiWsClient extends WebSocketClient {
 
                         var mimeType = inlineData.get("mimeType").getAsString();
                         if (!mimeType.contains("audio/pcm")) {
-                            MinecoloniesTalkingCitizens.LOGGER.warn("Invalid mime type: " + inlineData.get("mimeType").getAsString());
+                            MinecoloniesTalkingCitizens.LOGGER.warn("Invalid mime type: {}", inlineData.get("mimeType").getAsString());
                             continue;
                         }
 
@@ -146,7 +200,7 @@ public class GeminiWsClient extends WebSocketClient {
                     }
                 }
             } else {
-                System.out.println("Unknown message: " + message);
+                MinecoloniesTalkingCitizens.LOGGER.warn("Unknown message: {}", message);
             }
         }
     }
@@ -160,7 +214,9 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         isInitiatingConnection = false;
-        PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+        if (code != 1000 && code != 1001) {
+            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+        }
         MinecoloniesTalkingCitizens.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
     }
 
@@ -171,6 +227,7 @@ public class GeminiWsClient extends WebSocketClient {
     }
 
     boolean sentGeneratingStatus = false;
+    long lastReconnectTime = 0;
 
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();
@@ -182,11 +239,16 @@ public class GeminiWsClient extends WebSocketClient {
         if (!setupComplete || this.isClosed()) {
             pending_prompt.add(audio);
             if (!this.isOpen() && !isInitiatingConnection) {
-                if (wasConnectedOnce)
+                if (shouldReconnect) {
+                    if (System.currentTimeMillis() - lastReconnectTime < 2500) {
+                        MinecoloniesTalkingCitizens.LOGGER.warn("Reconnecting too frequently, skipping this attempt");
+                        return;
+                    }
+                    lastReconnectTime = System.currentTimeMillis();
                     reconnect();
-                else {
+                } else {
                     connect();
-                    wasConnectedOnce = true;
+                    shouldReconnect = true;
                 }
 
                 isInitiatingConnection = true;

@@ -59,9 +59,6 @@ public class BidiGenerateContentSetup {
         }
     }
 
-    public static final List<String> MALE_VOICES = List.of("Puck", "Charon", "Fenir", "Orus");
-    public static final List<String> FEMALE_VOICES = List.of("Kore", "Aoede", "Leda", "Zephyr");
-
     public static class SystemInstruction {
         public List<Part> parts = new ArrayList<>();
 
@@ -76,5 +73,49 @@ public class BidiGenerateContentSetup {
     }
 
     public SystemInstruction systemInstruction;
-    public List<Object> tools;
+    public List<Tool> tools;
+
+    public static class Tool {
+        public List<FunctionDeclaration> functionDeclarations = new ArrayList<>();
+
+        //TODO rest of the fields
+        public static class FunctionDeclaration {
+            @NotNull
+            public String name;
+            @NotNull
+            public String description;
+
+
+            public FunctionDeclaration(@NotNull String name, @NotNull String description) {
+                this.name = name;
+                this.description = description;
+            }
+        }
+    }
+
+    public SessionResumptionConfig sessionResumption;
+
+    public static class SessionResumptionConfig {
+        public String handle;
+
+        public SessionResumptionConfig(@NotNull String handle) {
+            this.handle = handle;
+        }
+
+        public SessionResumptionConfig() {
+            this.handle = null;
+        }
+    }
+
+    public RealtimeInputConfig realtimeInputConfig;
+    public static class RealtimeInputConfig {
+        //TODO rest of the fields
+        public TurnCoverage turnCoverage;
+
+        public enum TurnCoverage {
+            TURN_COVERAGE_UNSPECIFIED,
+            TURN_INCLUDES_ONLY_ACTIVITY,
+            TURN_INCLUDES_ALL_INPUT
+        }
+    }
 }

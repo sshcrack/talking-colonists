@@ -124,7 +124,7 @@ dependencies {
     localRuntime "curse.maven:blockui-522992:6367809"
     localRuntime "curse.maven:domum-ornamentum-527361:6335398"
 
-    implementation "curse.maven:minecolonies-245506:6543415"
+    implementation "curse.maven:minecolonies-245506:${minecolonies_file}"
     jarJar(implementation('org.java-websocket:Java-WebSocket') {
         exclude group: 'org.slf4j', module: 'slf4j-api'
     }) {

@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+import me.sshcrack.mc_talking.manager.AiTools;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
@@ -69,7 +70,9 @@ public class MinecoloniesTalkingCitizens {
 
         // Register items
         ModItems.register(modEventBus);
+        ModAttachmentTypes.register(modEventBus);
         modEventBus.addListener(this::registerPayloadHandlers);
+        AiTools.register();
     }
 
     /**

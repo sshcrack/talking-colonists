@@ -1,18 +1,10 @@
 package me.sshcrack.mc_talking;
 
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
+import me.sshcrack.mc_talking.manager.AvailableAI;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
-
-import static me.sshcrack.mc_talking.MinecoloniesTalkingCitizens.LOGGER;
 
 // An example config class. This is not required, but it's a good idea to have one to keep your config organized.
 // Demonstrates how to use Neo's config APIs
@@ -52,6 +44,9 @@ public class Config
             .comment("If true, citizens will only respond to the talking device item; if false, looking at them will work")
             .define("use_talking_device", true);
 
+    public static final ModConfigSpec.ConfigValue<AvailableAI> CURRENT_AI_MODEL = BUILDER
+            .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well.")
+            .defineEnum("ai_model", AvailableAI.Flash2_5);
 
     public static final ModConfigSpec.ConfigValue<Integer> MAX_CONCURRENT_AGENTS = BUILDER
             .comment("Maximum number of AI agents that can be activated at once")
@@ -65,6 +60,7 @@ public class Config
             .build();
 
     public static String geminiApiKey;
+    public static AvailableAI currentAIModel;
     public static String language;
     public static int maxConcurrentAgents;
     public static boolean respondInGroups;
@@ -86,5 +82,6 @@ public class Config
         language = LANGUAGE.get();
         useTalkingDevice = USE_TALKING_DEVICE.get();
         maxConversationDistance = MAX_CONVERSATION_DISTANCE.get();
+        currentAIModel = CURRENT_AI_MODEL.get();
     }
 }
