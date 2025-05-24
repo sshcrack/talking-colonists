@@ -8,7 +8,7 @@ import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenSkillHandler;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.citizenhandlers.CitizenSkillHandler;
-import me.sshcrack.mc_talking.Config;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -255,17 +255,15 @@ public class CitizenContextUtils {
             } else if (r.isColonyManager() || r.isInitial()) {
                 prompt.append("- Show proper respect to colony leadership\n");
             }
-        }
-
-        // Final instruction
+        }        // Final instruction
         prompt.append("\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
-        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(Config.language));
+        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(McTalkingConfig.language));
         // Make sure the AI uses function declarations
         prompt.append("\nUse function declarations to perform actions.");
 
         return prompt.toString();
     }
-
+        
     /**
      * Adds detailed happiness information based on specific modifiers
      *

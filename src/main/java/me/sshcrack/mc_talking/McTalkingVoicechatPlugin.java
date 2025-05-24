@@ -7,6 +7,7 @@ import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -31,16 +32,16 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
     @Override
     public String getPluginId() {
-        return MineColoniesTalkingCitizens.MODID;
+        return McTalking.MODID;
     }
 
     @Override
     public void initialize(VoicechatApi api) {
-        MineColoniesTalkingCitizens.LOGGER.info("Initializing Voicechat Plugin");
+        McTalking.LOGGER.info("Initializing Voicechat Plugin");
     }
 
     public void onServerStart(VoicechatServerStartedEvent event) {
-        MineColoniesTalkingCitizens.LOGGER.info("Voicechat Server Started");
+        McTalking.LOGGER.info("Voicechat Server Started");
         vcApi = event.getVoicechat();
     }
 
@@ -58,23 +59,18 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         var packet = event.getPacket();
         if (packet.isWhispering())
-            return;
-
-        if (sender.isDisabled())
-            return;
-
-
-        var vcPlayer = sender.getPlayer();
-        if (sender.isInGroup() && !Config.respondInGroups)
+            return;        if (sender.isDisabled())
+            return;        var vcPlayer = sender.getPlayer();
+        if (sender.isInGroup() && !McTalkingConfig.respondInGroups)
             return;
 
         var player = (ServerPlayer) vcPlayer.getPlayer();
-        LivingEntity entity = MineColoniesTalkingCitizens.activeEntity.get(player.getUUID());
+        LivingEntity entity = ConversationManager.getActiveEntity(player.getUUID());
         if (entity == null) {
             return;
         }
 
-        var manager = MineColoniesTalkingCitizens.clients.get(entity.getUUID());
+        var manager = ConversationManager.getClient(entity.getUUID());
         if (manager == null) {
             return;
         }
