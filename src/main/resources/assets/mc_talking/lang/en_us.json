@@ -18,7 +18,10 @@
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
   "mc_talking.ai_status.listening": "Listening",
   "mc_talking.ai_status.thinking": "Thinking",
+  "mc_talking.ai_status.quota_exceeded": "Quota exceeded",
   "mc_talking.ai_status.talking": "Talking",
   "mc_talking.ai_status.error": "Error",
-  "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work."
+  "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work.",
+  "mc_talking.recruit_lore": "Maybe this little gift will help you get this citizen back to join your colony.",
+  "mc_talking.invalid_on_visitor": "You cannot use the Talking Device on visitors."
 }

@@ -260,7 +260,8 @@ public class CitizenContextUtils {
         // Final instruction
         prompt.append("\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
         prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(Config.language));
-        prompt.append("\nUse function declarations to perform actions if the description matches one of the registered functions.\n");
+        // Make sure the AI uses function declarations
+        prompt.append("\nUse function declarations to perform actions.");
 
         return prompt.toString();
     }

@@ -52,7 +52,7 @@ public class GeminiWsClient extends WebSocketClient {
     }
 
     @Override
-    public void onOpen(ServerHandshake handshakedata) {
+    public void onOpen(ServerHandshake handshakeData) {
         isInitiatingConnection = false;
         var setup = new BidiGenerateContentSetup("models/" + Config.currentAIModel.getName());
         setup.generationConfig.responseModalities = List.of("AUDIO");
@@ -88,7 +88,7 @@ public class GeminiWsClient extends WebSocketClient {
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
-        setup.tools.addAll(AiTools.getAllTools());
+        setup.tools.addAll(AITools.getAllTools());
 
         send(ClientMessages.setup(setup));
     }
@@ -121,7 +121,6 @@ public class GeminiWsClient extends WebSocketClient {
         }
 
         if (outer.has("sessionResumptionUpdate")) {
-            System.out.println(message);
             var obj = outer.get("sessionResumptionUpdate").getAsJsonObject();
             if (!obj.has("newHandle") || !obj.get("newHandle").isJsonPrimitive())
                 return;
@@ -149,7 +148,7 @@ public class GeminiWsClient extends WebSocketClient {
                     continue;
 
                 var name = objFnCall.get("name").getAsString();
-                var action = AiTools.registeredFunctions.get(name);
+                var action = AITools.registeredFunctions.get(name);
                 if (action == null) {
                     MineColoniesTalkingCitizens.LOGGER.warn("Unknown function call: {}", name);
                     continue;

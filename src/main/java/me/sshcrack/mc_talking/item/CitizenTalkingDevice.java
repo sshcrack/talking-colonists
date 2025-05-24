@@ -1,10 +1,13 @@
 package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.Config;
 import me.sshcrack.mc_talking.MineColoniesTalkingCitizens;
+import me.sshcrack.mc_talking.manager.AITools;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -76,6 +79,15 @@ public class CitizenTalkingDevice extends Item {
             return true; // Prevent attack on client side
         }
 
+        if (entity instanceof VisitorCitizen) {
+            player.sendSystemMessage(
+                    Component.translatable("mc_talking.invalid_on_visitor")
+                            .withStyle(ChatFormatting.RED)
+            );
+
+            return true; // Prevent attack on visitors
+        }
+
         ServerPlayer serverPlayer = (ServerPlayer) player;
         UUID playerId = serverPlayer.getUUID();
 
@@ -99,7 +111,7 @@ public class CitizenTalkingDevice extends Item {
 
         // If there was a previously focused entity, remove its glowing effect
         LivingEntity previousEntity = MineColoniesTalkingCitizens.activeEntity.get(playerId);
-        if(previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
+        if (previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
             citizen.getNavigation().stop();
             citizen.getLookControl().setLookAt(player);
             return true;
@@ -111,7 +123,13 @@ public class CitizenTalkingDevice extends Item {
         // Use the centralized startConversation method
         MineColoniesTalkingCitizens.startConversation(serverPlayer, citizen);
 
-        var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+
+        var compD = stack.get(DataComponents.CUSTOM_DATA);
+        if (compD == null) {
+            compD = CustomData.EMPTY;
+        }
+
+        var comp = compD.copyTag();
         comp.putUUID("talkingPlayer", playerId);
 
         stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));

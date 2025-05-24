@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
+/// Don't forget to also update `en_us.json`!!
 public enum AiStatus {
     ERROR,
     THINKING,
