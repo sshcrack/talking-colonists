@@ -16,7 +16,7 @@ public class GeminiStream implements Supplier<short[]> {
     private static final int TARGET_SAMPLE_RATE = 48000;
 
     private final Queue<short[]> audioFrames = new ConcurrentLinkedQueue<>();
-    private AudioChannel channel;
+    private final AudioChannel channel;
     @Nullable AudioPlayer player;
     private short[] remainingSamples = new short[0]; // For storing leftover samples
 
@@ -72,6 +72,15 @@ public class GeminiStream implements Supplier<short[]> {
 
             if (!audioFrames.isEmpty())
                 player.startPlaying();
+        }
+    }
+
+    public void stop() {
+        audioFrames.clear();
+        remainingSamples = new short[0];
+        if (player != null) {
+            player.stopPlaying();
+            player = null;
         }
     }
 

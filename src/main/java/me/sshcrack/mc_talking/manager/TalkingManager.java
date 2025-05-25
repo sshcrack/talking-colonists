@@ -3,7 +3,7 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
-import me.sshcrack.mc_talking.MineColoniesTalkingCitizens;
+import me.sshcrack.mc_talking.McTalking;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.ModList;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
@@ -16,12 +16,10 @@ public class TalkingManager {
     private static final DefaultArtifactVersion FIXED_VERSION = new DefaultArtifactVersion("1.21.1-2.5.31");
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private static final boolean IS_BUG_FIXED_VC = ModList.get().getModContainerById("voicechat")
-            .get().getModInfo()
-            .getVersion().compareTo(FIXED_VERSION) >= 0;
+    private static final boolean IS_BUG_FIXED_VC = ModList.get().getModContainerById("voicechat").get().getModInfo().getVersion().compareTo(FIXED_VERSION) >= 0;
 
     static {
-        MineColoniesTalkingCitizens.LOGGER.info("Compatibility check for voicechat, is bug fixed: {}", IS_BUG_FIXED_VC);
+        McTalking.LOGGER.info("Compatibility check for voicechat, is bug fixed: {}", IS_BUG_FIXED_VC);
     }
 
     GeminiWsClient client;
@@ -30,9 +28,8 @@ public class TalkingManager {
     OpusDecoder decoder;
 
     public TalkingManager(AbstractEntityCitizen entity, ServerPlayer initialPlayer) {
-        MineColoniesTalkingCitizens.LOGGER.info("Creating TalkingManager for entity: {}", entity.getStringUUID());
-        if (vcApi == null)
-            throw new IllegalStateException("Voicechat API is not initialized");
+        McTalking.LOGGER.info("Creating TalkingManager for entity: {}", entity.getStringUUID());
+        if (vcApi == null) throw new IllegalStateException("Voicechat API is not initialized");
 
         this.entity = entity;
 

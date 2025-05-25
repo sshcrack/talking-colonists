@@ -2,12 +2,10 @@ package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
-import me.sshcrack.mc_talking.Config;
-import me.sshcrack.mc_talking.MineColoniesTalkingCitizens;
-import me.sshcrack.mc_talking.manager.AITools;
+import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -42,7 +40,7 @@ public class CitizenTalkingDevice extends Item {
             return false;
 
         var uuid = comp.getUUID("talkingPlayer");
-        return MineColoniesTalkingCitizens.activeEntity.containsKey(uuid);
+        return ConversationManager.isPlayerInConversation(uuid);
     }
 
     @Override
@@ -64,7 +62,7 @@ public class CitizenTalkingDevice extends Item {
             }
 
             var uuid = comp.getUUID("talkingPlayer");
-            var isActive = MineColoniesTalkingCitizens.activeEntity.containsKey(uuid);
+            var isActive = ConversationManager.isPlayerInConversation(uuid);
             stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
         }
     }
@@ -89,10 +87,8 @@ public class CitizenTalkingDevice extends Item {
         }
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
-        UUID playerId = serverPlayer.getUUID();
-
-        // Check if API key is set
-        if (Config.geminiApiKey.isEmpty()) {
+        UUID playerId = serverPlayer.getUUID();        // Check if API key is set
+        if (McTalkingConfig.geminiApiKey.isEmpty()) {
             serverPlayer.sendSystemMessage(
                     Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
                             .withStyle(ChatFormatting.RED)
@@ -110,18 +106,15 @@ public class CitizenTalkingDevice extends Item {
         }
 
         // If there was a previously focused entity, remove its glowing effect
-        LivingEntity previousEntity = MineColoniesTalkingCitizens.activeEntity.get(playerId);
+        LivingEntity previousEntity = ConversationManager.getActiveEntity(playerId);
         if (previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
             citizen.getNavigation().stop();
             citizen.getLookControl().setLookAt(player);
             return true;
         }
 
-        // Set citizen as active entity and add glowing effect
-        MineColoniesTalkingCitizens.activeEntity.put(playerId, citizen);
-
         // Use the centralized startConversation method
-        MineColoniesTalkingCitizens.startConversation(serverPlayer, citizen);
+        ConversationManager.startConversation(serverPlayer, citizen);
 
 
         var compD = stack.get(DataComponents.CUSTOM_DATA);

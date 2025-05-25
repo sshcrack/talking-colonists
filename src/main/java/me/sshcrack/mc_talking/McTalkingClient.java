@@ -15,34 +15,61 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
-import static me.sshcrack.mc_talking.MineColoniesTalkingCitizens.aiStatus;
-
-@Mod(value = MineColoniesTalkingCitizens.MODID, dist = Dist.CLIENT)
+/**
+ * Client-side mod class for McTalking.
+ * Handles client-specific functionality like rendering and UI.
+ */
+@Mod(value = McTalking.MODID, dist = Dist.CLIENT)
 public class McTalkingClient {
 
+    /**
+     * Constructor for the client mod class.
+     * Registers event listeners and configuration screen.
+     *
+     * @param container The mod container
+     */
     public McTalkingClient(ModContainer container) {
+        // Register event listeners
         NeoForge.EVENT_BUS.register(this);
+
+        // Register configuration screen
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
 
+    /**
+     * Event handler for when the client disconnects from a server.
+     * Clears all AI status data.
+     *
+     * @param event The level unload event
+     */
     @SubscribeEvent
-    public void onDisconnect(LevelEvent.Unload e) {
-        aiStatus.clear();
+    public void onDisconnect(LevelEvent.Unload event) {
+        ConversationManager.clearAiStatus();
     }
 
+    /**
+     * Event handler for rendering entity name tags.
+     * Adds AI status indicators to citizen name tags.
+     *
+     * @param event The render name tag event
+     */
     @SubscribeEvent
     public void onRenderName(RenderNameTagEvent event) {
         var entity = event.getEntity();
-        var m = Minecraft.getInstance();
-        if (!(entity instanceof AbstractCivilianEntity citizen))
+        var minecraft = Minecraft.getInstance();
+
+        // Only handle citizens
+        if (!(entity instanceof AbstractCivilianEntity citizen)) {
+            return;
+        }
+
+        // Skip if player is null or entity is invisible
+        assert minecraft.player != null;
+        if (entity.isInvisibleTo(minecraft.player))
             return;
 
-        assert m.player != null;
-        if (entity.isInvisibleTo(m.player))
-            return;
-
-        var status = aiStatus.get(citizen.getUUID());
-        if (status == AiStatus.NONE || status == null)
+        var status = ConversationManager.getAiStatus(citizen.getUUID());
+        if (status == AiStatus.NONE)
             return;
 
         var text = Component.literal(" (")

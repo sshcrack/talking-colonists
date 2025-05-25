@@ -8,7 +8,9 @@ import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenSkillHandler;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.citizenhandlers.CitizenSkillHandler;
-import me.sshcrack.mc_talking.Config;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
+import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -54,9 +56,7 @@ public class CitizenContextUtils {
      * @return a formatted system prompt for LLM roleplay
      */
     public static String generateCitizenRoleplayPrompt(@NotNull final ICitizenData data, ServerPlayer speakingTo) {
-        final StringBuilder prompt = new StringBuilder();
-
-        // Main instruction - more concise
+        final StringBuilder prompt = new StringBuilder();        // Main instruction - more concise
         prompt.append("# ROLEPLAY AS ").append(data.getName()).append("\n\n");
         prompt.append("You: ").append(data.isChild() ? "Child" : "Adult").append(" ")
                 .append(data.isFemale() ? "woman" : "man");
@@ -231,10 +231,10 @@ public class CitizenContextUtils {
             for (var interaction : blockingInteractions) {
                 prompt.append("- ").append(interaction.getInquiry().getString());
             }
-        }
-
-        // Concise communication guidance
+        }        // Concise communication guidance
         prompt.append("\n## GUIDELINES\n");
+        prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
+        prompt.append("- Do not generate creative responses for information that functions can provide\n");
         prompt.append("- Speak in first person, keep responses brief\n");
         prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
@@ -255,13 +255,10 @@ public class CitizenContextUtils {
             } else if (r.isColonyManager() || r.isInitial()) {
                 prompt.append("- Show proper respect to colony leadership\n");
             }
-        }
-
-        // Final instruction
+        }        // Final instruction
         prompt.append("\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
-        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(Config.language));
-        // Make sure the AI uses function declarations
-        prompt.append("\nUse function declarations to perform actions.");
+        prompt.append("\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
+        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(McTalkingConfig.language));
 
         return prompt.toString();
     }
@@ -290,6 +287,7 @@ public class CitizenContextUtils {
         // Check for specific happiness modifiers
         List<String> modifiers = handler.getModifiers();
 
+        var hasSchool = data.getColony().hasBuilding("school", 1, true);
         for (String modifierId : modifiers) {
             IHappinessModifier modifier = handler.getModifier(modifierId);
             if (modifier != null) {
@@ -298,18 +296,31 @@ public class CitizenContextUtils {
                 // Only mention significantly negative or positive factors
                 if (factor < 0.8 || factor > 1.2) {
                     switch (modifierId) {
-                        case HEALTH:
-                            if (factor < 0.8) prompt.append("- Concerned about health issues\n");
-                            break;
-                        case FOOD:
-                            if (factor < 0.8) prompt.append("- Unhappy with food quality/variety\n");
-                            else prompt.append("- Very satisfied with food quality\n");
-                            break;
                         case HOMELESSNESS:
                             if (factor < 0.8) prompt.append("- Distressed about housing situation\n");
                             break;
                         case UNEMPLOYMENT:
                             if (factor < 0.8) prompt.append("- Anxious about employment status\n");
+                            break;
+                        case HEALTH:
+                            if (factor < 0.8) prompt.append("- Concerned about health issues\n");
+                            break;
+                        case IDLEATJOB:
+                            if (factor < 0.8) prompt.append("- Frustrated by lack of work to do\n");
+                            break;
+                        case SCHOOL:
+                            if (factor < 0.8) {
+                                if(hasSchool)
+                                    prompt.append("- Disappointed by lack of school activities\n");
+                                else
+                                    prompt.append("- Disappointed by lack of school in the colony\n");
+                            }
+                            if (factor > 1.2)
+                                prompt.append("- Enjoying school activities\n");
+                            break;
+                        case MYSTICAL_SITE:
+                            if (factor < 0.8) prompt.append("- Disappointed by lack of mystical experiences\n");
+                            else prompt.append("- Enjoying mystical site visits\n");
                             break;
                         case SECURITY:
                             if (factor < 0.8) prompt.append("- Feels unsafe in the colony\n");
@@ -319,12 +330,27 @@ public class CitizenContextUtils {
                             if (factor < 0.8) prompt.append("- Feeling socially isolated\n");
                             else prompt.append("- Enjoying colony social life\n");
                             break;
+                        case DAMAGE:
+                            if (factor < 0.8)
+                                prompt.append("- Have been injured recently\n");
+                            break;
+                        case DEATH:
+                            if (factor < 0.8) prompt.append("- Distressed by recent death in the colony\n");
+                            break;
+                        case RAIDWITHOUTDEATH:
+                            if (factor > 1.2)
+                                prompt.append("- Feeling safe because the recent raid was without civilan deaths\n");
+                            break;
+                        case FOOD:
+                            if (factor < 0.8) prompt.append("- Unhappy with food quality/variety\n");
+                            else prompt.append("- Very satisfied with food quality\n");
+                            break;
+
+
                         case SLEPTTONIGHT:
                             if (factor < 0.8) prompt.append("- Tired from lack of sleep\n");
                             break;
-                        case IDLEATJOB:
-                            if (factor < 0.8) prompt.append("- Frustrated by lack of work to do\n");
-                            break;
+
                     }
                 }
             }

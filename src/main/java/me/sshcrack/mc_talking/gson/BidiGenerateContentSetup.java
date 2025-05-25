@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.gson;
 
+import me.sshcrack.mc_talking.gson.properties.Property;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -85,6 +86,8 @@ public class BidiGenerateContentSetup {
             @NotNull
             public String description;
 
+            public Property parameters;
+
 
             public FunctionDeclaration(@NotNull String name, @NotNull String description) {
                 this.name = name;
@@ -108,6 +111,7 @@ public class BidiGenerateContentSetup {
     }
 
     public RealtimeInputConfig realtimeInputConfig;
+
     public static class RealtimeInputConfig {
         //TODO rest of the fields
         public TurnCoverage turnCoverage;
