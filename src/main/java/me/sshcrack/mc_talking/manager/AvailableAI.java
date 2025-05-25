@@ -9,6 +9,7 @@ public enum AvailableAI {
 
     @SuppressWarnings("unused")
     Flash2_0("gemini-2.0-flash-live-001", List.of("Puck", "Charon", "Orus"), List.of("Kore", "Aoede", "Leda", "Zephyr")),
+    @SuppressWarnings("unused")
     Flash2_5("gemini-2.5-flash-preview-native-audio-dialog",
             List.of("Puck", "Charon", "Orus", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Algenib", "Rasalgethi", "Alnilam", "Schedar", "Archid", "Zubenelgenubi", "Sadachbia", "Sadaltager"),
             List.of("Zephyr", "Kore", "Leda", "Aoede", "Callirrhoe", "Autonoe", "Despina", "Erinome", "Laomedeia", "Achernar", "Gacrux", "Pulcherrima", "Vindemiatrix", "Sulafat")

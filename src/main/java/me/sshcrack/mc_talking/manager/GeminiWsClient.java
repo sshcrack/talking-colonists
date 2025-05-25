@@ -1,13 +1,16 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.ModAttachmentTypes;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
+import me.sshcrack.mc_talking.gson.BidiGenerateContentToolResponse;
 import me.sshcrack.mc_talking.gson.ClientMessages;
 import me.sshcrack.mc_talking.gson.RealtimeInput;
+import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -129,6 +132,7 @@ public class GeminiWsClient extends WebSocketClient {
 
             var handle = obj.get("newHandle").getAsString();
             this.manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, handle);
+            return;
         }
 
         if (outer.has("toolCall")) {
@@ -153,7 +157,22 @@ public class GeminiWsClient extends WebSocketClient {
                     continue;
                 }
 
-                action.action().accept(this.manager.entity);
+                JsonObject args = null;
+                if (objFnCall.has("args")) {
+                    args = objFnCall.getAsJsonObject("args");
+                }
+
+                var colony = this.manager.entity.getCitizenColonyHandler().getColony();
+                var output = action.execute(this.manager.entity, colony, args);
+
+                var res = new BidiGenerateContentToolResponse();
+                res.functionResponses.add(new BidiGenerateContentToolResponse.FunctionResponse(
+                        objFnCall.get("id").getAsString(),
+                        name,
+                        output
+                ));
+
+                send(ClientMessages.response(res));
             }
 
             return;
@@ -164,6 +183,12 @@ public class GeminiWsClient extends WebSocketClient {
             if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
                 McTalking.LOGGER.info("Gemini turn complete");
                 PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+                return;
+            }
+
+            if(obj.has("interrupted") && obj.get("interrupted").getAsBoolean()) {
+                McTalking.LOGGER.info("Gemini generation interrupted");
+                stream.stop();
                 return;
             }
 

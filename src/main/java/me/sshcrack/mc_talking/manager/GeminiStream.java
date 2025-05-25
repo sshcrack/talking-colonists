@@ -75,6 +75,15 @@ public class GeminiStream implements Supplier<short[]> {
         }
     }
 
+    public void stop() {
+        audioFrames.clear();
+        remainingSamples = new short[0];
+        if (player != null) {
+            player.stopPlaying();
+            player = null;
+        }
+    }
+
     /**
      * Linear interpolation-based audio resampling
      *

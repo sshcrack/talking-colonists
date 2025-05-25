@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.gson;
 
+import me.sshcrack.mc_talking.gson.properties.Property;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -84,6 +85,8 @@ public class BidiGenerateContentSetup {
             public String name;
             @NotNull
             public String description;
+
+            public Property parameters;
 
 
             public FunctionDeclaration(@NotNull String name, @NotNull String description) {

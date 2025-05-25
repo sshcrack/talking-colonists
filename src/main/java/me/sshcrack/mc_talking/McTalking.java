@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.manager.AITools;
+import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
 import net.neoforged.bus.api.IEventBus;

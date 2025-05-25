@@ -24,8 +24,8 @@ public class McTalkingConfig {
             .define("gemini_key", "");
 
     public static final ModConfigSpec.ConfigValue<AvailableAI> CURRENT_AI_MODEL = BUILDER
-            .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well.")
-            .defineEnum("ai_model", AvailableAI.Flash2_5);
+            .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well. Flash2.5 burns the free tokens fast")
+            .defineEnum("ai_model", AvailableAI.Flash2_0);
 
     // Language Configuration
     public static final ModConfigSpec.ConfigValue<String> LANGUAGE = BUILDER
@@ -67,7 +67,8 @@ public class McTalkingConfig {
             .define("max_conversation_distance", 8.0);
 
     // Config specification
-    public static final ModConfigSpec SPEC = BUILDER.build();
+    public static final ModConfigSpec SPEC = BUILDER
+            .build();
 
     // Runtime configuration values
     public static String geminiApiKey;
