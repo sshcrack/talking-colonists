@@ -16,9 +16,7 @@ public class TalkingManager {
     private static final DefaultArtifactVersion FIXED_VERSION = new DefaultArtifactVersion("1.21.1-2.5.31");
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private static final boolean IS_BUG_FIXED_VC = ModList.get().getModContainerById("voicechat")
-            .get().getModInfo()
-            .getVersion().compareTo(FIXED_VERSION) >= 0;
+    private static final boolean IS_BUG_FIXED_VC = ModList.get().getModContainerById("voicechat").get().getModInfo().getVersion().compareTo(FIXED_VERSION) >= 0;
 
     static {
         McTalking.LOGGER.info("Compatibility check for voicechat, is bug fixed: {}", IS_BUG_FIXED_VC);
@@ -31,8 +29,7 @@ public class TalkingManager {
 
     public TalkingManager(AbstractEntityCitizen entity, ServerPlayer initialPlayer) {
         McTalking.LOGGER.info("Creating TalkingManager for entity: {}", entity.getStringUUID());
-        if (vcApi == null)
-            throw new IllegalStateException("Voicechat API is not initialized");
+        if (vcApi == null) throw new IllegalStateException("Voicechat API is not initialized");
 
         this.entity = entity;
 

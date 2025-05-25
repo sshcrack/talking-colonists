@@ -15,18 +15,12 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
 /**
  * Client-side mod class for McTalking.
  * Handles client-specific functionality like rendering and UI.
  */
 @Mod(value = McTalking.MODID, dist = Dist.CLIENT)
 public class McTalkingClient {
-    // Track AI status for entities on the client side
-    private static final Map<UUID, AiStatus> aiStatus = new HashMap<>();
 
     /**
      * Constructor for the client mod class.
@@ -37,7 +31,7 @@ public class McTalkingClient {
     public McTalkingClient(ModContainer container) {
         // Register event listeners
         NeoForge.EVENT_BUS.register(this);
-        
+
         // Register configuration screen
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
@@ -50,7 +44,7 @@ public class McTalkingClient {
      */
     @SubscribeEvent
     public void onDisconnect(LevelEvent.Unload event) {
-        aiStatus.clear();
+        ConversationManager.clearAiStatus();
     }
 
     /**
@@ -63,7 +57,7 @@ public class McTalkingClient {
     public void onRenderName(RenderNameTagEvent event) {
         var entity = event.getEntity();
         var minecraft = Minecraft.getInstance();
-        
+
         // Only handle citizens
         if (!(entity instanceof AbstractCivilianEntity citizen)) {
             return;
@@ -74,8 +68,8 @@ public class McTalkingClient {
         if (entity.isInvisibleTo(minecraft.player))
             return;
 
-        var status = aiStatus.get(citizen.getUUID());
-        if (status == AiStatus.NONE || status == null)
+        var status = ConversationManager.getAiStatus(citizen.getUUID());
+        if (status == AiStatus.NONE)
             return;
 
         var text = Component.literal(" (")

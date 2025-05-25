@@ -6,8 +6,10 @@ import com.google.gson.Gson;
 import javax.annotation.Nullable;
 
 public class ClientMessages {
-    @Nullable public BidiGenerateContentSetup setup;
-    @Nullable public RealtimeInput realtime_input;
+    @Nullable
+    public BidiGenerateContentSetup setup;
+    @Nullable
+    public RealtimeInput realtime_input;
 
     public static String setup(BidiGenerateContentSetup set) {
         var gson = new Gson();

@@ -28,16 +28,16 @@ public class McTalking {
      * Constructor for the mod class.
      * Registers event listeners, configurations, and initializes necessary components.
      *
-     * @param modEventBus The mod event bus to register events
+     * @param modEventBus  The mod event bus to register events
      * @param modContainer The mod container for configuration
      */
     public McTalking(IEventBus modEventBus, ModContainer modContainer) {
         // Register server events listener
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
-        
+
         // Register configuration
         modContainer.registerConfig(ModConfig.Type.COMMON, McTalkingConfig.SPEC);
-        
+
         // Register other components
         ModItems.register(modEventBus);
         ModAttachmentTypes.register(modEventBus);

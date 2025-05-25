@@ -43,7 +43,7 @@ public class McTalkingConfig {
     public static final ModConfigSpec.ConfigValue<Integer> LOOK_DURATION_TICKS = BUILDER
             .comment("How long the player needs to look at an entity before activating (in ticks, 20 ticks = 1 second)")
             .define("look_duration_ticks", 20);
-            
+
     public static final ModConfigSpec.ConfigValue<Integer> LOOK_TOLERANCE_MS = BUILDER
             .comment("Tolerance time in milliseconds when something walks between player and target")
             .define("look_tolerance_ms", 500);
@@ -100,9 +100,9 @@ public class McTalkingConfig {
         maxConversationDistance = MAX_CONVERSATION_DISTANCE.get();
         currentAIModel = CURRENT_AI_MODEL.get();
         GeminiWsClient.quotaExceeded = false;
-        
+
         McTalking.LOGGER.info("McTalking configuration loaded");
-        
+
         // Log warning if API key is not set
         if (geminiApiKey.isEmpty()) {
             McTalking.LOGGER.warn("Gemini API key not set. McTalking will be disabled until a key is provided.");

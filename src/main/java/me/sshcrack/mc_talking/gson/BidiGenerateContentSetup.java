@@ -108,6 +108,7 @@ public class BidiGenerateContentSetup {
     }
 
     public RealtimeInputConfig realtimeInputConfig;
+
     public static class RealtimeInputConfig {
         //TODO rest of the fields
         public TurnCoverage turnCoverage;

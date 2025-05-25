@@ -24,28 +24,28 @@ import java.util.*;
 public class ConversationManager {
     // Track AI status for each entity
     private static final Map<UUID, AiStatus> aiStatus = new HashMap<>();
-    
+
     // Track active AI clients for each entity
     private static final Map<UUID, TalkingManager> clients = new HashMap<>();
-    
+
     // Track which entity each player is actively conversing with
     private static final Map<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
 
     // Track which player is conversing with which entity
     private static final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
-    
+
     // Queue of entities recently added for conversation, for managing concurrent limits
     private static final Queue<UUID> addedEntities = new LinkedList<>();
-    
+
     // Track which entity each player is looking at
     private static final Map<UUID, UUID> playerLookingAt = new HashMap<>();
-    
+
     // Track how long each player has been looking at an entity (in ticks)
     private static final Map<UUID, Integer> lookDuration = new HashMap<>();
-    
+
     // Track the previous entity that was looked at for tolerance handling
     private static final Map<UUID, UUID> previousEntityLookedAt = new HashMap<>();
-    
+
     // Track when the last entity switch occurred
     private static final Map<UUID, Long> lastEntitySwitchTime = new HashMap<>();
 
@@ -53,7 +53,7 @@ public class ConversationManager {
      * Updates the AI status for a specific entity
      *
      * @param entityId The UUID of the entity
-     * @param status The AI status to set
+     * @param status   The AI status to set
      */
     public static void updateAiStatus(UUID entityId, AiStatus status) {
         aiStatus.put(entityId, status);
@@ -76,18 +76,21 @@ public class ConversationManager {
      */
     public static Map<UUID, AiStatus> getAllAiStatus() {
         return Collections.unmodifiableMap(aiStatus);
-    }    /**
+    }
+
+    /**
      * Clears all AI status data (typically on disconnect)
      */
     public static void clearAiStatus() {
         aiStatus.clear();
     }
-    
+
     /**
      * Adds an entity to the managed entities queue, respecting the maximum concurrent limit
      *
      * @param entityId The UUID of the entity to add
-     */    public static void addEntity(UUID entityId) {
+     */
+    public static void addEntity(UUID entityId) {
         addedEntities.add(entityId);
         if (addedEntities.size() > McTalkingConfig.maxConcurrentAgents) {
             var removedEntityId = addedEntities.poll();
@@ -100,13 +103,14 @@ public class ConversationManager {
             }
         }
     }
-    
+
     /**
      * Starts a conversation between a player and a citizen
      *
-     * @param player The player
+     * @param player  The player
      * @param citizen The citizen entity
-     */    public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
+     */
+    public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
         if (McTalkingConfig.geminiApiKey.isEmpty()) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.no_key")
@@ -132,7 +136,7 @@ public class ConversationManager {
     /**
      * Ends a conversation for a specific player
      *
-     * @param playerId The player's UUID
+     * @param playerId    The player's UUID
      * @param sendMessage Whether to send a message to the player
      */
     public static void endConversation(UUID playerId, boolean sendMessage) {
@@ -208,10 +212,11 @@ public class ConversationManager {
      * Increments the look duration for a player
      *
      * @param playerId The player's UUID
-     */    public static void incrementLookDuration(UUID playerId) {
+     */
+    public static void incrementLookDuration(UUID playerId) {
         lookDuration.put(playerId, getPlayerLookDuration(playerId) + 1);
     }
-    
+
     /**
      * Gets the active TalkingManager for an entity
      *
@@ -221,16 +226,17 @@ public class ConversationManager {
     public static TalkingManager getClientForEntity(UUID entityId) {
         return clients.get(entityId);
     }
-    
+
     /**
      * Gets the active TalkingManager for an entity (alias for getClientForEntity)
      *
      * @param entityId The UUID of the entity
      * @return The TalkingManager, or null if none exists
-     */    public static TalkingManager getClient(UUID entityId) {
+     */
+    public static TalkingManager getClient(UUID entityId) {
         return clients.get(entityId);
     }
-    
+
     /**
      * Gets the active entity for a player
      *
@@ -240,16 +246,17 @@ public class ConversationManager {
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {
         return activeEntity.get(playerId);
     }
-    
+
     /**
      * Gets the active entity for a player (alias for getActiveEntityForPlayer)
-     * 
+     *
      * @param playerId The player's UUID
      * @return The active entity, or null if none
-     */    public static AbstractEntityCitizen getActiveEntity(UUID playerId) {
+     */
+    public static AbstractEntityCitizen getActiveEntity(UUID playerId) {
         return activeEntity.get(playerId);
     }
-    
+
     /**
      * Gets the citizen a player is conversing with
      *
@@ -259,7 +266,7 @@ public class ConversationManager {
     public static UUID getPlayerConversationPartner(UUID playerId) {
         return playerConversationPartners.get(playerId);
     }
-    
+
     /**
      * Check distances between players and their conversation partners
      * End conversations that exceed the maximum allowed distance
@@ -294,23 +301,25 @@ public class ConversationManager {
                 endConversation(playerId, false);
                 continue;
             }
-              // Check distance
+            // Check distance
             double distanceSquared = player.distanceToSqr(citizen);
             if (distanceSquared > (McTalkingConfig.maxConversationDistance * McTalkingConfig.maxConversationDistance)) {
                 // Too far away, end conversation
                 endConversation(playerId, true);
             }
         }
-    }    /**
+    }
+
+    /**
      * Handles the transition to a new target entity
      *
-     * @param playerId The player's UUID
-     * @param currentTargetId The UUID of the current target
+     * @param playerId         The player's UUID
+     * @param currentTargetId  The UUID of the current target
      * @param previousTargetId The UUID of the previous target
      */
     private static void handleNewTargetEntity(UUID playerId, UUID currentTargetId, UUID previousTargetId) {
         long currentTime = System.currentTimeMillis();
-        
+
         // Check if it's a return to the previous entity within tolerance time
         UUID previousEntityId = previousEntityLookedAt.get(playerId);
         if (previousEntityId != null && previousEntityId.equals(currentTargetId)) {            // If we're returning to the previous entity within tolerance period
@@ -349,7 +358,7 @@ public class ConversationManager {
         lookDuration.remove(playerId);
         activeEntity.remove(playerId);
     }
-    
+
     /**
      * Cleans up all resources when server is stopping
      */

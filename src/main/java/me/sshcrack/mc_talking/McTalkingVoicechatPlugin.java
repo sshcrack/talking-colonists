@@ -59,8 +59,10 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         var packet = event.getPacket();
         if (packet.isWhispering())
-            return;        if (sender.isDisabled())
-            return;        var vcPlayer = sender.getPlayer();
+            return;
+        if (sender.isDisabled())
+            return;
+        var vcPlayer = sender.getPlayer();
         if (sender.isInGroup() && !McTalkingConfig.respondInGroups)
             return;
 

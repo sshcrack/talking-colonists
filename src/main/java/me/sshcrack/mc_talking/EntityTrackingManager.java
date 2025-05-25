@@ -15,13 +15,13 @@ import java.util.UUID;
 public class EntityTrackingManager {
     // Track which entity each player is looking at
     private final Map<UUID, UUID> playerLookingAt = new HashMap<>();
-    
+
     // Track how long each player has been looking at an entity (in ticks)
     private final Map<UUID, Integer> lookDuration = new HashMap<>();
-    
+
     // Track the previous entity that was looked at for tolerance handling
     private final Map<UUID, UUID> previousEntityLookedAt = new HashMap<>();
-    
+
     // Track when the last entity switch occurred
     private final Map<UUID, Long> lastEntitySwitchTime = new HashMap<>();
 
@@ -32,7 +32,8 @@ public class EntityTrackingManager {
      * @return The entity the player is looking at, or null if none
      */
     public AbstractEntityCitizen findEntityPlayerLookingAt(ServerPlayer player) {
-        var level = player.level();        return level.getNearestEntity(
+        var level = player.level();
+        return level.getNearestEntity(
                 AbstractEntityCitizen.class,
                 TargetingConditions.forNonCombat()
                         .range(McTalkingConfig.activationDistance),
@@ -88,30 +89,30 @@ public class EntityTrackingManager {
         playerLookingAt.remove(playerId);
         lookDuration.remove(playerId);
     }
-    
+
     /**
      * Get the entity a player is looking at
-     * 
+     *
      * @param playerId The player's UUID
      * @return The UUID of the entity the player is looking at, or null if none
      */
     public UUID getEntityPlayerLookingAt(UUID playerId) {
         return playerLookingAt.get(playerId);
     }
-    
+
     /**
      * Get how long a player has been looking at an entity
-     * 
+     *
      * @param playerId The player's UUID
      * @return The duration in ticks, or 0 if not looking at an entity
      */
     public int getLookDuration(UUID playerId) {
         return lookDuration.getOrDefault(playerId, 0);
     }
-    
+
     /**
      * Increment the look duration for a player
-     * 
+     *
      * @param playerId The player's UUID
      * @return The new duration
      */
@@ -120,7 +121,7 @@ public class EntityTrackingManager {
         lookDuration.put(playerId, currentDuration);
         return currentDuration;
     }
-    
+
     /**
      * Clean up all tracking data
      */

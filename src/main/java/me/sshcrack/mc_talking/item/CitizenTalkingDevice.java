@@ -2,13 +2,10 @@ package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.ConversationManager;
-import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.manager.AITools;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;

@@ -263,7 +263,7 @@ public class CitizenContextUtils {
 
         return prompt.toString();
     }
-        
+
     /**
      * Adds detailed happiness information based on specific modifiers
      *

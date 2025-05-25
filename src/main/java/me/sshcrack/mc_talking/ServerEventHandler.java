@@ -3,13 +3,11 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
-import me.sshcrack.mc_talking.network.AiStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
@@ -81,7 +79,9 @@ public class ServerEventHandler {
             // End conversation when player leaves
             ConversationManager.endConversation(player.getUUID(), false);
         }
-    }    /**
+    }
+
+    /**
      * Called every server tick
      */
     @SubscribeEvent
@@ -98,7 +98,7 @@ public class ServerEventHandler {
         // Process all players
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             UUID playerId = player.getUUID();
-            
+
             // Check if player is in a conversation
             UUID citizenId = ConversationManager.getPlayerConversationPartner(playerId);
             if (citizenId != null) {
@@ -139,11 +139,11 @@ public class ServerEventHandler {
 
         if (hitResult.getType() == HitResult.Type.ENTITY) {
             Entity targetEntity = ((EntityHitResult) hitResult).getEntity();
-            
+
             // Check if target is a citizen
             if (targetEntity instanceof AbstractEntityCitizen citizen) {
                 double distance = player.distanceToSqr(targetEntity);
-                
+
                 // Check if within activation distance
                 if (distance <= McTalkingConfig.activationDistance * McTalkingConfig.activationDistance) {
                     processLookingAtCitizen(player, citizen);
@@ -151,7 +151,7 @@ public class ServerEventHandler {
                 }
             }
         }
-        
+
         // Not looking at a valid target
         ConversationManager.setPlayerLookTarget(playerId, null);
     }
@@ -162,13 +162,13 @@ public class ServerEventHandler {
     private void processLookingAtCitizen(ServerPlayer player, AbstractEntityCitizen citizen) {
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
-        
+
         // Update or set looking target
         ConversationManager.setPlayerLookTarget(playerId, citizenId);
-        
+
         // Increment look duration
         ConversationManager.incrementLookDuration(playerId);
-        
+
         // Check if look duration exceeds threshold
         if (ConversationManager.getPlayerLookDuration(playerId) >= McTalkingConfig.lookDurationTicks) {
             // Check if player is alone or group conversations are enabled
@@ -176,7 +176,7 @@ public class ServerEventHandler {
             if (playerIsAlone || McTalkingConfig.respondInGroups) {
                 // Start conversation
                 ConversationManager.startConversation(player, citizen);
-                
+
                 // Update talking device model if player is holding one
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice && player.getInventory().selected == player.getInventory().findSlotMatchingItem(item)) {
@@ -190,7 +190,7 @@ public class ServerEventHandler {
                         Component.translatable("mc_talking.group_disabled")
                                 .withStyle(ChatFormatting.YELLOW)
                 );
-                
+
                 // Reset look duration to prevent spam
                 ConversationManager.setPlayerLookTarget(playerId, null);
             }
@@ -211,7 +211,7 @@ public class ServerEventHandler {
     private boolean isPlayerAlone(ServerPlayer player) {
         // Create bounding box around player
         AABB boundingBox = player.getBoundingBox().inflate(5.0);
-        
+
         // Count nearby players
         int nearbyPlayers = player.level().getNearbyEntities(
                 ServerPlayer.class,
@@ -219,7 +219,7 @@ public class ServerEventHandler {
                 player,
                 boundingBox
         ).size();
-        
+
         // Player is alone if only they are detected
         return nearbyPlayers <= 1;
     }

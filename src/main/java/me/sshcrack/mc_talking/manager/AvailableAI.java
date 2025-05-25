@@ -5,7 +5,7 @@ import java.util.Random;
 import java.util.UUID;
 
 public enum AvailableAI {
-    //Voice 'Fenir' isn't available for the API idk why
+    //Voice 'Fenir' isn't available for the API IDK why
 
     @SuppressWarnings("unused")
     Flash2_0("gemini-2.0-flash-live-001", List.of("Puck", "Charon", "Orus"), List.of("Kore", "Aoede", "Leda", "Zephyr")),

@@ -2,9 +2,9 @@ package me.sshcrack.mc_talking.manager;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.ModAttachmentTypes;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.ClientMessages;
 import me.sshcrack.mc_talking.gson.RealtimeInput;
@@ -36,7 +36,9 @@ public class GeminiWsClient extends WebSocketClient {
     private static final int MAX_BATCH_SIZE = 5; // Maximum number of audio packets in a batch
     private volatile Timer batchTimer;
     private volatile TimerTask currentBatchTask;
-    private final Object batchLock = new Object();    private static String getUrl() {
+    private final Object batchLock = new Object();
+
+    private static String getUrl() {
         return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + McTalkingConfig.geminiApiKey;
     }
 
@@ -51,7 +53,8 @@ public class GeminiWsClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakeData) {
-        isInitiatingConnection = false;        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.currentAIModel.getName());
+        isInitiatingConnection = false;
+        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.currentAIModel.getName());
         setup.generationConfig.responseModalities = List.of("AUDIO");
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = McTalkingConfig.language;
@@ -66,7 +69,8 @@ public class GeminiWsClient extends WebSocketClient {
             if (!sessionToken.isBlank()) {
                 setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
             }
-        }        setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+        }
+        setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.currentAIModel.getRandomVoice(uuid, female);
 
@@ -216,13 +220,23 @@ public class GeminiWsClient extends WebSocketClient {
         if (code != 1000 && code != 1001) {
             PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         }
-        if(reason.contains("You exceeded your current quota, please")) {
+        if (reason.contains("You exceeded your current quota, please")) {
             quotaExceeded = true;
             McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
             PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
         }
 
-        McTalking.LOGGER.info("GeminiWsClient closed: " + reason + " and code " + code);
+        if (reason.contains("BidiGenerateContent session not found")) {
+            manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, "");
+            new Thread(() -> {
+                if (!isOpen() || !isInitiatingConnection) {
+                    reconnect();
+                    isInitiatingConnection = true;
+                }
+            }).start();
+        }
+
+        McTalking.LOGGER.info("GeminiWsClient closed: {} and code {}", reason, code);
     }
 
     @Override
@@ -245,10 +259,10 @@ public class GeminiWsClient extends WebSocketClient {
             pending_prompt.add(audio);
             if (!this.isOpen() && !isInitiatingConnection) {
                 if (shouldReconnect) {
-                    if (System.currentTimeMillis() - lastReconnectTime < 2500) {
-                        McTalking.LOGGER.warn("Reconnecting too frequently, skipping this attempt");
+                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
                         return;
-                    }
+
+                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
                     lastReconnectTime = System.currentTimeMillis();
                     reconnect();
                 } else {
