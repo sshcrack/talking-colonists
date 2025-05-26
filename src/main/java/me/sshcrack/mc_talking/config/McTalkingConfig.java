@@ -24,7 +24,7 @@ public class McTalkingConfig {
             .define("gemini_key", "");
 
     public static final ModConfigSpec.ConfigValue<AvailableAI> CURRENT_AI_MODEL = BUILDER
-            .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well. Flash2.5 burns the free tokens fast")
+            .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well. Flash2.5 burns the free tokens fast. Flash2.5 has an issue for calling functions right now, so colonists are not able to leave the colony or get information about a citizen etc.")
             .defineEnum("ai_model", AvailableAI.Flash2_0);
 
     // Language Configuration

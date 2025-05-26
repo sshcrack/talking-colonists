@@ -216,6 +216,7 @@ modrinth {
     versionType = "beta"
     loaders = ["neoforge"]
     gameVersions = [minecraft_version]
+    changelog = "For a changelog take a look at https://github.com/sshcrack/talking-colonists/"
     syncBodyFrom = rootProject.file("README.md").text
     dependencies {
         required.project "simple-voice-chat"
@@ -225,8 +226,10 @@ modrinth {
 tasks.modrinth.dependsOn(tasks.modrinthSyncBody)
 tasks.register('publishCurseForge', TaskPublishCurseForge) {
     apiToken = curse_key
+    disableVersionDetection()
 
     def mainFile = upload(curseforge_project, jar)
+    mainFile.displayName = "[${project.name.capitalize()} [${minecraft_version}] ${project.version}"
     mainFile.addModLoader("neoforge")
     mainFile.releaseType = "beta"
     mainFile.addEnvironment("client", "server")

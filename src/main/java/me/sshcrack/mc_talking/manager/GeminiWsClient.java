@@ -250,9 +250,6 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         isInitiatingConnection = false;
-        if (code != 1000 && code != 1001) {
-            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-        }
         if (reason.contains("You exceeded your current quota, please")) {
             quotaExceeded = true;
             McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
@@ -267,6 +264,12 @@ public class GeminiWsClient extends WebSocketClient {
                     isInitiatingConnection = true;
                 }
             }).start();
+            return;
+        }
+
+
+        if (code != 1000 && code != 1001) {
+            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         }
 
         McTalking.LOGGER.info("GeminiWsClient closed: {} and code {}", reason, code);

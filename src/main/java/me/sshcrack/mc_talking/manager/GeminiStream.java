@@ -20,7 +20,7 @@ public class GeminiStream implements Supplier<short[]> {
     public static final int FRAME_SIZE_SAMPLES = 960;
     private static final int TARGET_SAMPLE_RATE = 48000;
     // Minimum buffer size for effective pitch shifting (about 100ms of audio)
-    private static final int MIN_BUFFER_SIZE_FOR_PITCH = TARGET_SAMPLE_RATE * 100;
+    private static final int MIN_BUFFER_SIZE_FOR_PITCH = TARGET_SAMPLE_RATE * 2;
     // Minimum number of frames to buffer before starting playback (about 500ms)
     private static final int MIN_FRAMES_BEFORE_PLAYBACK = 100;
 
