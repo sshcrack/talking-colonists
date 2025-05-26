@@ -81,10 +81,10 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         manager.promptAudioOpus(packet.getOpusEncodedData());
 
         // Cancel previous silence task if it exists
-        //cancelSilenceTask(entity.getUUID());
+        cancelSilenceTask(entity.getUUID());
 
         // Schedule silence to be sent after the voice packet
-        //scheduleSilenceTask(entity.getUUID(), manager);
+        scheduleSilenceTask(entity.getUUID(), manager);
     }
 
 
@@ -99,7 +99,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         // Schedule a task to stop sending silence after the duration
         executor.schedule(() -> {
-            future.cancel(false);
+            future.cancel(true);
             silenceTimeouts.remove(entityId);
         }, SILENCE_DURATION_MS, TimeUnit.MILLISECONDS);
 
@@ -110,7 +110,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     private void cancelSilenceTask(UUID entityId) {
         ScheduledFuture<?> future = silenceTimeouts.remove(entityId);
         if (future != null) {
-            future.cancel(false);
+            future.cancel(true);
         }
     }
 }

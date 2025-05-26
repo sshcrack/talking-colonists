@@ -3,7 +3,9 @@
   "package": "me.sshcrack.mc_talking.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "CitizenDataAccessor"
+    "CitizenDataAccessor",
+    "EventDescriptionManagerMixin",
+    "SoundUtilsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

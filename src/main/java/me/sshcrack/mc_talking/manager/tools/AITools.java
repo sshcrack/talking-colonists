@@ -47,7 +47,8 @@ public class AITools {
                 new LeaveColonyAction(),
                 new GetCitizenInfoAction(),
                 new ListCitizenAction(),
-                new GetInventoryAction()
+                new GetInventoryAction(),
+                new GetColonyAction()
         ));
     }
 }

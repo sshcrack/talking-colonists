@@ -35,7 +35,11 @@ public class TalkingManager {
 
         var uuid = IS_BUG_FIXED_VC ? UUID.randomUUID() : entity.getUUID();
         channel = vcApi.createEntityAudioChannel(uuid, vcApi.fromEntity(entity));
+        if (channel == null) {
+            throw new IllegalStateException("Failed to create audio channel for entity: " + entity.getStringUUID());
+        }
 
+        channel.setWhispering(true);
         client = new GeminiWsClient(this, initialPlayer);
         decoder = vcApi.createDecoder();
     }

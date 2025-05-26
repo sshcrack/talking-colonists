@@ -29,7 +29,7 @@ public class LeaveColonyAction extends FunctionAction {
     private static final String TAG_RECRUIT_COST_QTY = "rcostqty";
 
     public LeaveColonyAction() {
-        super("leave_colony", "You leave the colony.");
+        super("leave_colony", "You leave the colony and become a visitor. Use this ONLY if you are REALLY unhappy and the manager doesn't care about you.");
     }
 
     @Override

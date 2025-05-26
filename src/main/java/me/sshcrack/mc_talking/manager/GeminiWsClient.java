@@ -50,6 +50,12 @@ public class GeminiWsClient extends WebSocketClient {
         super(URI.create(getUrl()));
         this.manager = manager;
         stream = new GeminiStream(manager.channel);
+
+        var isFemale = manager.entity.getCitizenData().isFemale();
+        var isChild = manager.entity.getCitizenData().isChild();
+        if(isChild && !isFemale)
+            stream.setPitch(0.8f); // Increase pitch
+
         this.initialPlayer = player;
         PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
@@ -195,6 +201,8 @@ public class GeminiWsClient extends WebSocketClient {
             if (obj.has("generationComplete") && obj.get("generationComplete").getAsBoolean()) {
                 McTalking.LOGGER.info("Gemini generation complete");
                 PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
+
+                stream.flushAudio();
                 return;
             }
 
@@ -224,7 +232,7 @@ public class GeminiWsClient extends WebSocketClient {
                         var sampleRate = Integer.parseInt(sampleRateStr);
 
                         var data = Base64.getDecoder().decode(inlineData.get("data").getAsString());
-                        stream.addGeminiPcm(data, sampleRate);
+                        stream.addGeminiPcmWithPitch(data, sampleRate);
                     }
                 }
             } else {
@@ -267,7 +275,7 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onError(Exception ex) {
         PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-        McTalking.LOGGER.error("Error in GeminiWsClient", ex);
+        ex.printStackTrace();
     }
 
     boolean sentGeneratingStatus = false;
