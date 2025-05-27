@@ -34,6 +34,8 @@ public class GeminiWsClient extends WebSocketClient {
     ServerPlayer initialPlayer;
     TalkingManager manager;
     private final List<short[]> pending_prompt = new ArrayList<>();    // Audio batching variables
+    private final List<String> pendingSystemText = new ArrayList<>();
+
     private final List<short[]> audioBatch = Collections.synchronizedList(new ArrayList<>());
     private static final long BATCH_TIMEOUT = 100; // 100ms batch window
     private static final int MAX_BATCH_SIZE = 5; // Maximum number of audio packets in a batch
@@ -53,7 +55,7 @@ public class GeminiWsClient extends WebSocketClient {
 
         var isFemale = manager.entity.getCitizenData().isFemale();
         var isChild = manager.entity.getCitizenData().isChild();
-        if(isChild && !isFemale)
+        if (isChild && !isFemale)
             stream.setPitch(0.8f); // Increase pitch
 
         this.initialPlayer = player;
@@ -110,6 +112,13 @@ public class GeminiWsClient extends WebSocketClient {
         if (outer.has("setupComplete")) {
             McTalking.LOGGER.info("Gemini setup complete");
             setupComplete = true;
+            if (!pendingSystemText.isEmpty()) {
+                for (String text : pendingSystemText) {
+                    addSystemText(text);
+                }
+                pendingSystemText.clear();
+            }
+
             if (!pending_prompt.isEmpty()) {
                 for (short[] data : pending_prompt) {
                     addPromptAudio(data);
@@ -192,7 +201,7 @@ public class GeminiWsClient extends WebSocketClient {
                 return;
             }
 
-            if(obj.has("interrupted") && obj.get("interrupted").getAsBoolean()) {
+            if (obj.has("interrupted") && obj.get("interrupted").getAsBoolean()) {
                 McTalking.LOGGER.info("Gemini generation interrupted");
                 stream.stop();
                 return;
@@ -283,6 +292,33 @@ public class GeminiWsClient extends WebSocketClient {
 
     boolean sentGeneratingStatus = false;
     long lastReconnectTime = 0;
+
+    public void addSystemText(String newStatusPrompt) {
+        if (!setupComplete || this.isClosed()) {
+            pendingSystemText.add(newStatusPrompt);
+            if (!this.isOpen() && !isInitiatingConnection) {
+                if (shouldReconnect) {
+                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                        return;
+
+                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                    lastReconnectTime = System.currentTimeMillis();
+                    reconnect();
+                } else {
+                    connect();
+                    shouldReconnect = true;
+                }
+
+                isInitiatingConnection = true;
+            }
+            return;
+        }
+
+        var input = new RealtimeInput();
+        input.text = newStatusPrompt;
+
+        send(ClientMessages.input(input));
+    }
 
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();

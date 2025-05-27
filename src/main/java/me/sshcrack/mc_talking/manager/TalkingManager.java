@@ -57,4 +57,7 @@ public class TalkingManager {
         client.close();
         channel = null;
     }
+
+    public void promptSystemText(String newStatusPrompt) {
+    }
 }

@@ -1,11 +1,17 @@
 package me.sshcrack.mc_talking.gson;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.Base64;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class RealtimeInput {
+    @Nullable
     public Blob audio;
+
+    @Nullable
+    public String text;
 
     public static class Blob {
         public String data;

@@ -228,16 +228,6 @@ public class ConversationManager {
     }
 
     /**
-     * Gets the active TalkingManager for an entity (alias for getClientForEntity)
-     *
-     * @param entityId The UUID of the entity
-     * @return The TalkingManager, or null if none exists
-     */
-    public static TalkingManager getClient(UUID entityId) {
-        return clients.get(entityId);
-    }
-
-    /**
      * Gets the active entity for a player
      *
      * @param playerId The player's UUID

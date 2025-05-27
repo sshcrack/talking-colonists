@@ -444,7 +444,7 @@ public class CitizenContextUtils {
      * @param status the status enum
      * @return human-readable description
      */
-    private static String formatStatus(VisibleCitizenStatus status, ICitizenData data) {
+    public static String formatStatus(VisibleCitizenStatus status, ICitizenData data) {
         // Compare by reference to the static constants in VisibleCitizenStatus
         if (status == VisibleCitizenStatus.WORKING) {
             return "working";

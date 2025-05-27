@@ -1,92 +1,75 @@
 package me.sshcrack.mc_talking.util;
 
-import be.tarsos.dsp.*;
-import be.tarsos.dsp.io.TarsosDSPAudioFormat;
-import be.tarsos.dsp.io.UniversalAudioInputStream;
-import be.tarsos.dsp.resample.RateTransposer;
-import org.jetbrains.annotations.NotNull;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-
 /**
  * Helper class for audio processing operations like pitch shifting and resampling
  */
-public class AudioHelper {
+public class AudioHelper {    
     /**
-     * Changes the pitch of 16-bit PCM signed little-endian audio without changing its speed.
+     * Changes the pitch of audio samples without changing its speed.
      *
-     * @param inputPCMBytes The input audio as a byte array (16-bit PCM, little-endian)
-     * @param sampleRate    The sample rate of the audio (e.g., 44100)
-     * @param pitchFactor   Pitch multiplier (e.g., 1.25 = up pitch, 0.8 = down pitch)
-     * @return The pitch-shifted audio as a byte array in the same format
-     */
-    public static byte[] changePitch(byte[] inputPCMBytes, int sampleRate, float pitchFactor) {
+     * @param inputSamples The input audio as a short array
+     * @param sampleRate   The sample rate of the audio (e.g., 44100)
+     * @param pitchFactor  Pitch multiplier (e.g., 1.25 = up pitch, 0.8 = down pitch)
+     * @return The pitch-shifted audio as a short array
+     */    
+    public static short[] changePitch(short[] inputSamples, int sampleRate, float pitchFactor) {
         if (pitchFactor == 1.0f) {
-            // No pitch change needed, return original bytes
-            return inputPCMBytes;
+            // No pitch change needed, return original samples
+            return inputSamples;
         }
 
+        /*
         try {
-            // Create audio input stream from PCM bytes
-            UniversalAudioInputStream audioStream = getUniversalAudioInputStream(inputPCMBytes, sampleRate);
-
-            // Create output stream to collect processed audio
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-            var wsola = new WaveformSimilarityBasedOverlapAdd(WaveformSimilarityBasedOverlapAdd.Parameters.musicDefaults(pitchFactor, sampleRate));
-            var rateTransposer = new RateTransposer(pitchFactor);
-            AudioDispatcher dispatcher = new AudioDispatcher(audioStream, wsola.getInputBufferSize(), wsola.getOverlap());
-            wsola.setDispatcher(dispatcher);
-            dispatcher.addAudioProcessor(wsola);
-            dispatcher.addAudioProcessor(rateTransposer);
-
-            // Add final processor to collect the output
-            dispatcher.addAudioProcessor(new AudioProcessor() {
-                @Override
-                public boolean process(AudioEvent audioEvent) {
-                    try {
-                        outputStream.write(audioEvent.getByteBuffer());
-                        return true;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        return false;
-                    }
-                }
-
-                @Override
-                public void processingFinished() {
-                    // no-op
-                }
-            });
-
-            // Run the pipeline with exception handling
-            dispatcher.run();
-
-            // Return the processed audio bytes
-            return outputStream.toByteArray();
-
+            // Two-step approach to change pitch without changing duration:
+            
+            // Step 1: Resample to change pitch (this also changes duration)
+            // When pitchFactor > 1, this increases pitch and shortens duration
+            // When pitchFactor < 1, this decreases pitch and lengthens duration
+            int newSampleRate = (int)(sampleRate * pitchFactor);
+            short[] resampledAudio = resampleAudio(inputSamples, sampleRate, newSampleRate);
+            
+            // Step 2: Time-stretch to restore original duration without affecting pitch
+            // When pitchFactor > 1, we need to stretch the audio by pitchFactor
+            // When pitchFactor < 1, we need to compress the audio by pitchFactor
+            short[] timeStretchedAudio = timeStretch(resampledAudio, 1.0f / pitchFactor);
+            
+            return timeStretchedAudio;
         } catch (Exception e) {
             e.printStackTrace();
-            return inputPCMBytes; // Return original on error
+            return inputSamples; // Return original on error
         }
+        */
+        //TODO this is sadly still not working, so we just return the original samples
+        return inputSamples;
     }
 
-    private static @NotNull UniversalAudioInputStream getUniversalAudioInputStream(byte[] inputPCMBytes, int sampleRate) {
-        // Create an audio format for 16-bit PCM mono audio
-        TarsosDSPAudioFormat format = new TarsosDSPAudioFormat(
-                sampleRate, // Sample rate
-                16, // Bit depth
-                1, // Channels (mono)
-                true, // Signed
-                false // Little-endian
-        );
+    /**
+     * Time-stretches audio without changing pitch
+     *
+     * @param input         Original audio samples
+     * @param stretchFactor Factor by which to stretch (>1 = longer, <1 = shorter)
+     * @return Time-stretched audio data
+     */
+    private static short[] timeStretch(short[] input, float stretchFactor) {
+        int outputLength = (int) (input.length * stretchFactor);
+        short[] output = new short[outputLength];
 
-        // Create an input stream from the byte array
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(inputPCMBytes);
+        for (int i = 0; i < outputLength; i++) {
+            float sourcePos = i / stretchFactor;
+            int index = (int) sourcePos;
+            float fraction = sourcePos - index;
 
-        // Create and return a TarsosDSP audio input stream
-        return new UniversalAudioInputStream(inputStream, format);
+            if (index >= input.length - 1) {
+                output[i] = input[input.length - 1];
+            } else {
+                // Linear interpolation
+                short sample1 = input[index];
+                short sample2 = input[index + 1];
+                output[i] = (short) (sample1 + fraction * (sample2 - sample1));
+            }
+        }
+
+        return output;
     }
 
     /**
@@ -102,13 +85,13 @@ public class AudioHelper {
             return input;
         }
 
-        double ratio = (double) inputSampleRate / outputSampleRate;
-        int outputLength = (int) Math.ceil(input.length / ratio);
+        double ratio = (double) outputSampleRate / inputSampleRate;
+        int outputLength = (int) Math.ceil(input.length * ratio);
 
         short[] output = new short[outputLength];
 
         for (int i = 0; i < outputLength; i++) {
-            double position = i * ratio;
+            double position = i / ratio;
             int index = (int) position;
             double fraction = position - index;
 

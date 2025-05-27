@@ -3,12 +3,10 @@ package me.sshcrack.mc_talking.manager;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
-import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -93,7 +91,6 @@ public class GeminiStream implements Supplier<short[]> {
         incomingData.clear();
         incomingDataSize = 0;
 
-        combined = AudioHelper.changePitch(combined, sampleRate, pitchFactor);
 
         // Convert byte[] to short[] (assuming signed 16-bit PCM)
         short[] samples = new short[combined.length / 2];
@@ -102,6 +99,7 @@ public class GeminiStream implements Supplier<short[]> {
             samples[i] = (short) ((combined[i * 2] & 0xFF) | (combined[i * 2 + 1] << 8));
         }
 
+        samples = AudioHelper.changePitch(samples, sampleRate, 2f);
         // Apply sample rate conversion if needed
         if (sampleRate != TARGET_SAMPLE_RATE) {
             samples = AudioHelper.resampleAudio(samples, sampleRate, TARGET_SAMPLE_RATE);

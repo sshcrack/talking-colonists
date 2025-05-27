@@ -48,11 +48,6 @@ repositories {
         name = "henkelmax.public"
         url = 'https://maven.maxhenkel.de/repository/public'
     }
-
-    maven {
-        name = "TarsosDSP repository"
-        url = "https://mvn.0110.be/releases"
-    }
 }
 
 base {
@@ -138,20 +133,6 @@ dependencies {
         }
     }
 
-    jarJar(implementation('be.tarsos.dsp:core')) {
-        version {
-            strictly '[2.5,)'
-        }
-    }
-
-    jarJar(implementation('be.tarsos.dsp:jvm')) {
-        version {
-            strictly '[2.5,)'
-        }
-    }
-
-    additionalRuntimeClasspath 'be.tarsos.dsp:jvm:2.5'
-    additionalRuntimeClasspath 'be.tarsos.dsp:core:2.5'
     additionalRuntimeClasspath "org.java-websocket:Java-WebSocket:1.6.0"
 }
 

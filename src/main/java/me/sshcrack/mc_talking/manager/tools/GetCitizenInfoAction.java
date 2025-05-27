@@ -1,21 +1,13 @@
 package me.sshcrack.mc_talking.manager.tools;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.gson.properties.ObjectProperty;
 import me.sshcrack.mc_talking.gson.properties.PrimitiveProperty;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NumericTag;
-import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
-import java.util.UUID;
 
 public class GetCitizenInfoAction extends FunctionAction {
     public GetCitizenInfoAction() {

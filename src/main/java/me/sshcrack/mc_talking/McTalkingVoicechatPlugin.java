@@ -75,7 +75,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             return;
         }
 
-        var manager = ConversationManager.getClient(entity.getUUID());
+        var manager = ConversationManager.getClientForEntity(entity.getUUID());
         if (manager == null) {
             return;
         }
