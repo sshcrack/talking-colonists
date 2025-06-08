@@ -66,6 +66,10 @@ public class McTalkingConfig {
             .comment("Maximum distance the player can be from a citizen before the conversation is ended")
             .define("max_conversation_distance", 8.0);
 
+    public static final ModConfigSpec.ConfigValue<Boolean> TEXT_REPLY = BUILDER
+            .comment("If true, the AI will respond in chat with text messages instead of voice replies. Only applies to Gemini Live 2.0")
+            .define("text_reply", true);
+
     // Config specification
     public static final ModConfigSpec SPEC = BUILDER
             .build();
@@ -76,6 +80,7 @@ public class McTalkingConfig {
     public static String language;
     public static int maxConcurrentAgents;
     public static boolean respondInGroups;
+    public static boolean textReply;
     public static double activationDistance;
     public static int lookDurationTicks;
     public static int lookToleranceMs;
@@ -91,6 +96,7 @@ public class McTalkingConfig {
     @SubscribeEvent
     public static void onLoad(final ModConfigEvent event) {
         geminiApiKey = GEMINI_API_KEY.get();
+        textReply = TEXT_REPLY.get();
         respondInGroups = RESPOND_IN_GROUPS.get();
         activationDistance = ACTIVATION_DISTANCE.get();
         lookDurationTicks = LOOK_DURATION_TICKS.get();

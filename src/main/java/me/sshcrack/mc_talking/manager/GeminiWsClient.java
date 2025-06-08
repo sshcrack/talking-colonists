@@ -66,7 +66,11 @@ public class GeminiWsClient extends WebSocketClient {
     public void onOpen(ServerHandshake handshakeData) {
         isInitiatingConnection = false;
         var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.currentAIModel.getName());
-        setup.generationConfig.responseModalities = List.of("AUDIO");
+        var modality = new ArrayList<>(List.of("TEXT"));
+        if(McTalkingConfig.currentAIModel == AvailableAI.Flash2_5 || !McTalkingConfig.textReply)
+            modality.add("AUDIO");
+
+        setup.generationConfig.responseModalities = modality;
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = McTalkingConfig.language;
 
