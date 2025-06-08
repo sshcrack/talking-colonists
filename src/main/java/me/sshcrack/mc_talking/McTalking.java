@@ -36,7 +36,7 @@ public class McTalking {
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
 
         // Register configuration
-        modContainer.registerConfig(ModConfig.Type.COMMON, McTalkingConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
 
         // Register other components
         ModItems.register(modEventBus);

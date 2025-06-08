@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
 /**
  * Manages tracking of which entities players are looking at
  */
@@ -36,10 +38,10 @@ public class EntityTrackingManager {
         return level.getNearestEntity(
                 AbstractEntityCitizen.class,
                 TargetingConditions.forNonCombat()
-                        .range(McTalkingConfig.activationDistance),
+                        .range(CONFIG.activationDistance.get()),
                 player,
                 player.getX(), player.getY(), player.getZ(),
-                player.getBoundingBox().inflate(McTalkingConfig.activationDistance)
+                player.getBoundingBox().inflate(CONFIG.activationDistance.get())
         );
     }
 
@@ -57,7 +59,7 @@ public class EntityTrackingManager {
         UUID previousEntityId = previousEntityLookedAt.get(playerId);
         if (previousEntityId != null && previousEntityId.equals(currentTargetId)) {            // If we're returning to the previous entity within tolerance period
             long lastSwitchTime = lastEntitySwitchTime.getOrDefault(playerId, 0L);
-            if (currentTime - lastSwitchTime < McTalkingConfig.lookToleranceMs) {
+            if (currentTime - lastSwitchTime < CONFIG.lookToleranceMs.get()) {
                 // We came back to the previous entity quickly, restore previous duration
                 // but with a small penalty
                 int previousDuration = lookDuration.getOrDefault(playerId, 0);

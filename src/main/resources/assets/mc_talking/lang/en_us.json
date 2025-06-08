@@ -14,6 +14,7 @@
   "mc_talking.configuration.ai_model": "AI Model",
   "mc_talking.configuration.language": "Language",
   "mc_talking.configuration.max_conversation_distance": "Maximum conversation distance",
+  "mc_talking.configuration.ai_modality": "Modality",
   "mc_talking.configuration.title": "MineColonies Talking Configuration",
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
   "mc_talking.ai_status.listening": "Listening",

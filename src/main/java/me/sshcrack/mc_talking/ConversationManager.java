@@ -17,6 +17,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.*;
 
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
 /**
  * Manages conversations between players and citizens, including tracking
  * active conversations, entity focus, and handling conversation lifecycle.
@@ -92,7 +94,7 @@ public class ConversationManager {
      */
     public static void addEntity(UUID entityId) {
         addedEntities.add(entityId);
-        if (addedEntities.size() > McTalkingConfig.maxConcurrentAgents) {
+        if (addedEntities.size() > CONFIG.maxConcurrentAgents.get()) {
             var removedEntityId = addedEntities.poll();
             if (removedEntityId != null) {
                 var manager = clients.get(removedEntityId);
@@ -111,7 +113,7 @@ public class ConversationManager {
      * @param citizen The citizen entity
      */
     public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
-        if (McTalkingConfig.geminiApiKey.isEmpty()) {
+        if (CONFIG.geminiApiKey.get().isEmpty()) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.no_key")
                             .withStyle(ChatFormatting.RED)
@@ -237,6 +239,15 @@ public class ConversationManager {
         return activeEntity.get(playerId);
     }
 
+    public static UUID getPlayerForEntity(UUID entityId) {
+        for (Map.Entry<UUID, AbstractEntityCitizen> entry : activeEntity.entrySet()) {
+            if (entry.getValue().getUUID().equals(entityId)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     /**
      * Gets the active entity for a player (alias for getActiveEntityForPlayer)
      *
@@ -293,7 +304,7 @@ public class ConversationManager {
             }
             // Check distance
             double distanceSquared = player.distanceToSqr(citizen);
-            if (distanceSquared > (McTalkingConfig.maxConversationDistance * McTalkingConfig.maxConversationDistance)) {
+            if (distanceSquared > (CONFIG.maxConversationDistance.get() * CONFIG.maxConversationDistance.get())) {
                 // Too far away, end conversation
                 endConversation(playerId, true);
             }
@@ -314,7 +325,7 @@ public class ConversationManager {
         UUID previousEntityId = previousEntityLookedAt.get(playerId);
         if (previousEntityId != null && previousEntityId.equals(currentTargetId)) {            // If we're returning to the previous entity within tolerance period
             long lastSwitchTime = lastEntitySwitchTime.getOrDefault(playerId, 0L);
-            if (currentTime - lastSwitchTime < McTalkingConfig.lookToleranceMs) {
+            if (currentTime - lastSwitchTime < CONFIG.lookToleranceMs.get()) {
                 // We came back to the previous entity quickly, restore previous duration
                 // but with a small penalty
                 int previousDuration = lookDuration.getOrDefault(playerId, 0);

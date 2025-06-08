@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static com.minecolonies.api.util.constant.HappinessConstants.*;
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 /**
  * Utility class for generating context information about citizens for LLM interactions
@@ -258,7 +259,7 @@ public class CitizenContextUtils {
         }        // Final instruction
         prompt.append("\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
         prompt.append("\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
-        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(McTalkingConfig.language));
+        prompt.append("\nALWAYS respond in ").append(getLanguageNameFromCode(CONFIG.language.get()));
 
         return prompt.toString();
     }

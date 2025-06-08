@@ -3,9 +3,11 @@ package me.sshcrack.mc_talking.manager;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.ModAttachmentTypes;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.AvailableAI;
+import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentToolResponse;
 import me.sshcrack.mc_talking.gson.ClientMessages;
@@ -13,6 +15,8 @@ import me.sshcrack.mc_talking.gson.RealtimeInput;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.java_websocket.client.WebSocketClient;
@@ -22,6 +26,8 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class GeminiWsClient extends WebSocketClient {
     boolean setupComplete;
@@ -44,7 +50,7 @@ public class GeminiWsClient extends WebSocketClient {
     private final Object batchLock = new Object();
 
     private static String getUrl() {
-        return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + McTalkingConfig.geminiApiKey;
+        return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + CONFIG.geminiApiKey.get();
     }
 
     //TODO: Don't send packets to all players
@@ -65,29 +71,34 @@ public class GeminiWsClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake handshakeData) {
         isInitiatingConnection = false;
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.currentAIModel.getName());
-        var modality = new ArrayList<>(List.of("TEXT"));
-        if(McTalkingConfig.currentAIModel == AvailableAI.Flash2_5 || !McTalkingConfig.textReply)
-            modality.add("AUDIO");
+        var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
 
-        setup.generationConfig.responseModalities = modality;
-        setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
-        setup.generationConfig.speechConfig.language_code = McTalkingConfig.language;
-
-        var entity = this.manager.entity;
-        var female = entity.getCitizenData().isFemale();
-        var uuid = entity.getUUID();
-
-        setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
-        if (entity.hasData(ModAttachmentTypes.SESSION_TOKEN)) {
-            var sessionToken = entity.getData(ModAttachmentTypes.SESSION_TOKEN);
-            if (!sessionToken.isBlank()) {
-                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
-            }
+        var modality = CONFIG.modality.get();
+        setup.generationConfig.responseModalities = modality.getModes();
+        if (CONFIG.currentAiModel.get() == AvailableAI.Flash2_5) {
+            setup.generationConfig.responseModalities = List.of("AUDIO");
         }
-        setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
-        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.currentAIModel.getRandomVoice(uuid, female);
+
+        if (modality != ModalityModes.TEXT) {
+            setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
+            setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
+
+            var entity = this.manager.entity;
+            var female = entity.getCitizenData().isFemale();
+            var uuid = entity.getUUID();
+
+            setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
+            if (entity.hasData(ModAttachmentTypes.SESSION_TOKEN)) {
+                var sessionToken = entity.getData(ModAttachmentTypes.SESSION_TOKEN);
+                if (!sessionToken.isBlank()) {
+                    setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+                }
+            }
+            setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = CONFIG.currentAiModel.get().getRandomVoice(uuid, female);
+
+        }
 
         setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();
 
@@ -107,6 +118,7 @@ public class GeminiWsClient extends WebSocketClient {
         send(ClientMessages.setup(setup));
     }
 
+    private String currMsg = "";
     @Override
     public void onMessage(String message) {
         var p = JsonParser.parseString(message);
@@ -208,6 +220,14 @@ public class GeminiWsClient extends WebSocketClient {
             if (obj.has("interrupted") && obj.get("interrupted").getAsBoolean()) {
                 McTalking.LOGGER.info("Gemini generation interrupted");
                 stream.stop();
+
+                var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
+                if (player == null)
+                    return;
+                var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
+                if (sPlayer == null)
+                    return;
+                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg)));
                 return;
             }
 
@@ -215,7 +235,15 @@ public class GeminiWsClient extends WebSocketClient {
                 McTalking.LOGGER.info("Gemini generation complete");
                 PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
 
+
                 stream.flushAudio();
+                var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
+                if (player == null)
+                    return;
+                var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
+                if (sPlayer == null)
+                    return;
+                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg)));
                 return;
             }
 
@@ -228,6 +256,11 @@ public class GeminiWsClient extends WebSocketClient {
                             continue;
 
                         var pObj = part.getAsJsonObject();
+                        if (pObj.has("text") && pObj.get("text").isJsonPrimitive()) {
+                            var text = pObj.get("text").getAsString();
+                            currMsg += text;
+                        }
+
                         if (!pObj.has("inlineData") || !pObj.get("inlineData").isJsonObject())
                             continue;
 

@@ -23,6 +23,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.UUID;
 
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
 /**
  * Handler for server-side events related to player-citizen interactions.
  */
@@ -36,7 +38,7 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
-        if (!McTalkingConfig.geminiApiKey.isEmpty()) {
+        if (!CONFIG.geminiApiKey.get().isEmpty()) {
             return;
         }
 
@@ -107,7 +109,7 @@ public class ServerEventHandler {
             }
 
             // Only process looking logic if talking device isn't required or player is holding one
-            if (!McTalkingConfig.useTalkingDevice || isHoldingTalkingDevice(player)) {
+            if (!CONFIG.useTalkingDevice.get() || isHoldingTalkingDevice(player)) {
                 processPlayerLooking(player);
             }
         }
@@ -125,7 +127,7 @@ public class ServerEventHandler {
 
         // Check distance between player and entity
         double distanceSquared = player.distanceToSqr(activeEntity);
-        if (distanceSquared > McTalkingConfig.maxConversationDistance * McTalkingConfig.maxConversationDistance) {
+        if (distanceSquared > CONFIG.maxConversationDistance.get() * CONFIG.maxConversationDistance.get()) {
             ConversationManager.endConversation(player.getUUID(), true);
         }
     }
@@ -145,7 +147,7 @@ public class ServerEventHandler {
                 double distance = player.distanceToSqr(targetEntity);
 
                 // Check if within activation distance
-                if (distance <= McTalkingConfig.activationDistance * McTalkingConfig.activationDistance) {
+                if (distance <= CONFIG.activationDistance.get() * CONFIG.activationDistance.get()) {
                     processLookingAtCitizen(player, citizen);
                     return;
                 }
@@ -170,10 +172,10 @@ public class ServerEventHandler {
         ConversationManager.incrementLookDuration(playerId);
 
         // Check if look duration exceeds threshold
-        if (ConversationManager.getPlayerLookDuration(playerId) >= McTalkingConfig.lookDurationTicks) {
+        if (ConversationManager.getPlayerLookDuration(playerId) >= CONFIG.lookDurationTicks.get()) {
             // Check if player is alone or group conversations are enabled
             boolean playerIsAlone = isPlayerAlone(player);
-            if (playerIsAlone || McTalkingConfig.respondInGroups) {
+            if (playerIsAlone || CONFIG.respondInGroups.get()) {
                 // Start conversation
                 ConversationManager.startConversation(player, citizen);
 

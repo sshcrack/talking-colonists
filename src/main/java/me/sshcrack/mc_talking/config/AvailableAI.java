@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.manager;
+package me.sshcrack.mc_talking.config;
 
 import java.util.List;
 import java.util.Random;

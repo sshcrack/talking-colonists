@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
 @SuppressWarnings("unused")
 @ForgeVoicechatPlugin
 public class McTalkingVoicechatPlugin implements VoicechatPlugin {
@@ -66,7 +68,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         if (sender.isDisabled())
             return;
         var vcPlayer = sender.getPlayer();
-        if (sender.isInGroup() && !McTalkingConfig.respondInGroups)
+        if (sender.isInGroup() && !CONFIG.respondInGroups.get())
             return;
 
         var player = (ServerPlayer) vcPlayer.getPlayer();
