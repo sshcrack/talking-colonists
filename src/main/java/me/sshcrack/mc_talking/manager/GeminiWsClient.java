@@ -15,7 +15,6 @@ import me.sshcrack.mc_talking.gson.RealtimeInput;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
-import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -114,6 +113,9 @@ public class GeminiWsClient extends WebSocketClient {
 
         setup.systemInstruction = sys;
         setup.tools.addAll(AITools.getAllTools());
+        if(CONFIG.currentAiModel.get() == AvailableAI.Flash2_5 && CONFIG.enableFunctionWorkaround.get())
+            setup.tools.add(BidiGenerateContentSetup.Tool.googleSearch());
+
 
         send(ClientMessages.setup(setup));
     }
@@ -225,7 +227,7 @@ public class GeminiWsClient extends WebSocketClient {
                 if (player == null)
                     return;
                 var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
-                if (sPlayer == null)
+                if (sPlayer == null || currMsg.isBlank())
                     return;
                 sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg)));
                 return;
@@ -241,7 +243,7 @@ public class GeminiWsClient extends WebSocketClient {
                 if (player == null)
                     return;
                 var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
-                if (sPlayer == null)
+                if (sPlayer == null || currMsg.isBlank())
                     return;
                 sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg)));
                 return;

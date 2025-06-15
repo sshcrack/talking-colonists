@@ -11,6 +11,7 @@
   "mc_talking.configuration.look_tolerance_ms": "Look tolerance (ms)",
   "mc_talking.configuration.activation_distance": "Activation distance",
   "mc_talking.configuration.use_talking_device": "Use Talking Device",
+  "mc_talking.configuration.function_workaround": "Fix Gemini 2.5 functions",
   "mc_talking.configuration.ai_model": "AI Model",
   "mc_talking.configuration.language": "Language",
   "mc_talking.configuration.max_conversation_distance": "Maximum conversation distance",

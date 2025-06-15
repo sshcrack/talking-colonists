@@ -78,6 +78,14 @@ public class BidiGenerateContentSetup {
 
     public static class Tool {
         public List<FunctionDeclaration> functionDeclarations = new ArrayList<>();
+        public Object googleSearch = null;
+
+        public static Tool googleSearch() {
+            var tool = new Tool();
+            tool.functionDeclarations = null;
+            tool.googleSearch = new Object(); // Placeholder for Google Search tool
+            return tool;
+        }
 
         //TODO rest of the fields
         public static class FunctionDeclaration {

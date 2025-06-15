@@ -48,7 +48,8 @@ public class AITools {
                 new GetCitizenInfoAction(),
                 new ListCitizenAction(),
                 new GetInventoryAction(),
-                new GetColonyAction()
+                new GetColonyAction(),
+                new DropItemAction()
         ));
     }
 }
