@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.registry;
 
+import com.minecolonies.api.creativetab.ModCreativeTabs;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -26,7 +27,7 @@ public class ModItems {
     }
 
     private static void onBuildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+        if (event.getTabKey() == ModCreativeTabs.GENERAL.getKey()) {
             event.accept(TALKING_DEVICE.get(), CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
         }
     }

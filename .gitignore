@@ -5,6 +5,7 @@ bin
 .metadata
 .classpath
 .project
+base_template
 
 # idea
 out
