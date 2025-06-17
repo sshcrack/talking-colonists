@@ -1,7 +1,6 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;

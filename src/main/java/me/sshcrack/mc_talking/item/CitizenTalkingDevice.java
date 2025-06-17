@@ -3,7 +3,6 @@ package me.sshcrack.mc_talking.item;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
