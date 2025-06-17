@@ -6,12 +6,12 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModContainer;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.RenderNameTagEvent;
-import net.minecraftforge.client.gui.ConfigurationScreen;
-import net.minecraftforge.client.gui.IConfigScreenFactory;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.level.LevelEvent;
 
@@ -19,7 +19,7 @@ import net.minecraftforge.event.level.LevelEvent;
  * Client-side mod class for McTalking.
  * Handles client-specific functionality like rendering and UI.
  */
-@Mod(value = McTalking.MODID, dist = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = McTalking.MODID, value = Dist.CLIENT)
 public class McTalkingClient {
 
     /**
@@ -27,13 +27,20 @@ public class McTalkingClient {
      * Registers event listeners and configuration screen.
      *
      * @param container The mod container
-     */
-    public McTalkingClient(ModContainer container) {
+     */    public McTalkingClient(ModContainer container) {
         // Register event listeners
         MinecraftForge.EVENT_BUS.register(this);
 
         // Register configuration screen
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        ModLoadingContext.get().registerExtensionPoint(
+            ConfigScreenHandler.ConfigScreenFactory.class,
+            () -> new ConfigScreenHandler.ConfigScreenFactory(
+                (minecraft, screen) -> {
+                    // Return config screen from mod config
+                    return screen;
+                }
+            )
+        );
     }
 
     /**

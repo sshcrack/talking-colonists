@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"args": [],
+			"command": "./gradlew build",
+			"group": "build",
+			"isBackground": false,
+			"label": "Build Minecraft Mod",
+			"problemMatcher": [
+				"$gradle"
+			],
+			"type": "shell"
+		}
+	]
+}

@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import net.minecraft.ChatFormatting;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -24,20 +25,20 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class CitizenTalkingDevice extends Item {
 
+    private static final String TAG_TALKING_PLAYER = "talkingPlayer";
+    private static final String TAG_MODEL_DATA = "CustomModelData";
+
     public CitizenTalkingDevice() {
-        super(new Item.Properties().stacksTo(1).component(DataComponents.CUSTOM_DATA, CustomData.EMPTY));
+        super(new Item.Properties().stacksTo(1));
     }
 
     @Override
     public boolean isFoil(ItemStack stack) {
-        if (stack.get(DataComponents.CUSTOM_DATA) == null)
+        CompoundTag tag = stack.getTag();
+        if (tag == null || !tag.contains(TAG_TALKING_PLAYER))
             return false;
 
-        var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
-        if (!comp.contains("talkingPlayer"))
-            return false;
-
-        var uuid = comp.getUUID("talkingPlayer");
+        UUID uuid = tag.getUUID(TAG_TALKING_PLAYER);
         return ConversationManager.isPlayerInConversation(uuid);
     }
 
@@ -46,22 +47,20 @@ public class CitizenTalkingDevice extends Item {
         tooltipComponents.add(Component.translatable("item.mc_talking.talking_device.tooltip")
                 .withStyle(ChatFormatting.GRAY));
         super.appendHoverText(pStack, pLevel, tooltipComponents, pIsAdvanced);
-    }
-
-    @Override
+    }    @Override
     public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
 
         if (Math.random() <= 0.25) {
-            var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
-            if (!comp.contains("talkingPlayer")) {
-                stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+            CompoundTag tag = stack.getOrCreateTag();
+            if (!tag.contains(TAG_TALKING_PLAYER)) {
+                tag.putInt(TAG_MODEL_DATA, 0);
                 return;
             }
 
-            var uuid = comp.getUUID("talkingPlayer");
-            var isActive = ConversationManager.isPlayerInConversation(uuid);
-            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
+            UUID uuid = tag.getUUID(TAG_TALKING_PLAYER);
+            boolean isActive = ConversationManager.isPlayerInConversation(uuid);
+            tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);
         }
     }
 
@@ -109,22 +108,12 @@ public class CitizenTalkingDevice extends Item {
             citizen.getNavigation().stop();
             citizen.getLookControl().setLookAt(player);
             return true;
-        }
-
-        // Use the centralized startConversation method
+        }        // Use the centralized startConversation method
         ConversationManager.startConversation(serverPlayer, citizen);
 
-
-        var compD = stack.get(DataComponents.CUSTOM_DATA);
-        if (compD == null) {
-            compD = CustomData.EMPTY;
-        }
-
-        var comp = compD.copyTag();
-        comp.putUUID("talkingPlayer", playerId);
-
-        stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(comp));
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putUUID(TAG_TALKING_PLAYER, playerId);
+        tag.putInt(TAG_MODEL_DATA, 1);
 
         serverPlayer.sendSystemMessage(
                 Component.literal("Started conversation with " + citizen.getName().getString())

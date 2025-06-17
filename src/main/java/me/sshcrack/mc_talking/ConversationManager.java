@@ -7,13 +7,11 @@ import me.sshcrack.mc_talking.manager.TalkingManager;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomModelData;
-import net.minecraftforge.network.PacketDistributor;
 
 import java.util.*;
 
@@ -143,20 +141,24 @@ public class ConversationManager {
      */
     public static void endConversation(UUID playerId, boolean sendMessage) {
         UUID citizenId = playerConversationPartners.remove(playerId);
-        if (citizenId == null) return;
-
-        LivingEntity entity = activeEntity.remove(playerId);
+        if (citizenId == null) return;        LivingEntity entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
             ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
             if (player != null) {
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice) {
-                        item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                        CompoundTag tag = item.getOrCreateTag();
+                        tag.putInt("CustomModelData", 0);
                     }
                 }
 
-                PacketDistributor.sendToPlayersTrackingEntity(entity, new AiStatusPayload(citizenId, AiStatus.NONE));
-                PacketDistributor.sendToPlayer(player, new AiStatusPayload(citizenId, AiStatus.NONE));
+                // Send packets using the SimpleChannel
+                AiStatusPayload payload = new AiStatusPayload(citizenId, AiStatus.NONE);
+                // Send to all players tracking this entity
+                AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), payload);
+                // Send to the specific player
+                AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), payload);
+                
                 if (sendMessage) {
                     player.sendSystemMessage(Component.translatable("mc_talking.too_far")
                             .withStyle(ChatFormatting.YELLOW));

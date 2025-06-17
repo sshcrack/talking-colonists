@@ -3,13 +3,12 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -18,7 +17,7 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.event.TickEvent.ServerTickEvent;
+import net.minecraftforge.event.TickEvent;
 
 import java.util.UUID;
 
@@ -56,8 +55,7 @@ public class ServerEventHandler {
 
     /**
      * Called when an entity joins the level
-     */
-    @SubscribeEvent
+     */    @SubscribeEvent
     public void onPlayerJoin(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
@@ -66,7 +64,8 @@ public class ServerEventHandler {
         // Reset talking device model when player joins
         for (ItemStack item : player.getInventory().items) {
             if (item.getItem() instanceof CitizenTalkingDevice) {
-                item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                CompoundTag tag = item.getOrCreateTag();
+                tag.putInt("CustomModelData", 0);
             }
         }
     }
@@ -80,13 +79,15 @@ public class ServerEventHandler {
             // End conversation when player leaves
             ConversationManager.endConversation(player.getUUID(), false);
         }
-    }
-
-    /**
+    }    /**
      * Called every server tick
      */
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent.Post event) {
+    public void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        
         tickCounter++;
         if (tickCounter % 5 != 0) {
             return; // Only process every 5 ticks for performance
@@ -176,12 +177,11 @@ public class ServerEventHandler {
             boolean playerIsAlone = isPlayerAlone(player);
             if (playerIsAlone || CONFIG.respondInGroups.get()) {
                 // Start conversation
-                ConversationManager.startConversation(player, citizen);
-
-                // Update talking device model if player is holding one
+                ConversationManager.startConversation(player, citizen);                // Update talking device model if player is holding one
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice && player.getInventory().selected == player.getInventory().findSlotMatchingItem(item)) {
-                        item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+                        CompoundTag tag = item.getOrCreateTag();
+                        tag.putInt("CustomModelData", 1);
                         break;
                     }
                 }

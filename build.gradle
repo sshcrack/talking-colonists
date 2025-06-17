@@ -167,7 +167,7 @@ dependencies {
     localRuntime "maven.modrinth:simple-voice-chat:${voicechat_version}"
 
     implementation("com.ldtteam:minecolonies:${minecolonies_version}")
-    jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)')
+    implementation(jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)'))
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {

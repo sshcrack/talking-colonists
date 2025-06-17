@@ -1,17 +1,18 @@
 package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
+import me.sshcrack.mc_talking.capability.CapabilityHandler;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
+import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModContainer;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.network.event.RegisterPayloadHandlersEvent;
-import net.minecraftforge.network.handling.DirectionalPayloadHandler;
 import org.slf4j.Logger;
 
 /**
@@ -30,36 +31,27 @@ public class McTalking {
      *
      * @param modEventBus  The mod event bus to register events
      * @param modContainer The mod container for configuration
-     */
-    public McTalking(IEventBus modEventBus, ModContainer modContainer) {
+     */      public McTalking(IEventBus modEventBus, ModContainer modContainer) {
         // Register server events listener
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
 
         // Register configuration
-        modContainer.registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
 
         // Register other components
         ModItems.register(modEventBus);
-        ModAttachmentTypes.register(modEventBus);
-        modEventBus.addListener(this::registerPayloadHandlers);
+        modEventBus.addListener(this::registerCapabilities);
+        
+        // Initialize network
+        AiStatusPayload.registerMessages();
+        
         AITools.register();
-    }
-
-    /**
-     * Registers network payload handlers for communication between client and server.
+    }/**
+     * Registers capabilities for the mod
      *
-     * @param event The payload handlers registration event
+     * @param event The capabilities registration event
      */
-    public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        final var registrar = event.registrar("1");
-        registrar.playToClient(AiStatusPayload.TYPE, AiStatusPayload.STREAM_CODEC, new DirectionalPayloadHandler<>(
-                (payload, ctx) -> {
-                    ctx.enqueueWork(() -> {
-                        ConversationManager.updateAiStatus(payload.citizen(), payload.status());
-                    });
-                },
-                (a, b) -> {
-                }
-        ));
+    public void registerCapabilities(final RegisterCapabilitiesEvent event) {
+        CapabilityHandler.register(event);
     }
 }

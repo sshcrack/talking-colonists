@@ -10,13 +10,13 @@ import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.core.colony.buildings.modules.TavernBuildingModule;
 import com.minecolonies.core.colony.interactionhandling.RecruitmentInteraction;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.ItemLore;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -50,18 +50,22 @@ public class LeaveColonyAction extends FunctionAction {
             var invalidReturn = new JsonObject();
             invalidReturn.addProperty("error", "No tavern found in the colony.");
             return invalidReturn;
-        }
-
-        var data = citizen.getCitizenData();
+        }        var data = citizen.getCitizenData();
         var level = citizen.level();
         var pos = citizen.blockPosition();
 
         // First, serialize all citizen data to NBT
-        CompoundTag citizenTag = data.serializeNBT(level.registryAccess());
+        CompoundTag citizenTag = data.serializeNBT();
 
         // Create recruitment cost
         final ItemStack recruitCost = Items.DIAMOND.getDefaultInstance();
-        recruitCost.set(DataComponents.LORE, new ItemLore(List.of(Component.translatable("mc_talking.recruit_lore"))));
+        
+        // Add lore to the item
+        CompoundTag display = recruitCost.getOrCreateTagElement("display");
+        ListTag loreTag = new ListTag();
+        loreTag.add(StringTag.valueOf(Component.Serializer.toJson(Component.translatable("mc_talking.recruit_lore"))));
+        display.put("Lore", loreTag);
+        
         recruitCost.setCount(16);
 
         // Remove the original citizen
@@ -71,19 +75,18 @@ public class LeaveColonyAction extends FunctionAction {
         // Create a new visitor with proper registration
         IVisitorData visitorData = (IVisitorData) visitorManager.createAndRegisterCivilianData();
 
-        // Clean up the NBT to remove job data and add visitor-specific fields
-        citizenTag.remove("job");  // Remove job data as visitors don't have jobs
+        // Clean up the NBT to remove job data and add visitor-specific fields        citizenTag.remove("job");  // Remove job data as visitors don't have jobs
 
         // Add visitor-specific data
-        citizenTag.put(TAG_RECRUIT_COST, recruitCost.save(level.registryAccess()));  // Using save with no arguments
+        CompoundTag itemTag = new CompoundTag();
+        recruitCost.save(itemTag);
+        citizenTag.put(TAG_RECRUIT_COST, itemTag);
         citizenTag.putInt(TAG_RECRUIT_COST_QTY, recruitCost.getCount());
         BlockPosUtil.write(citizenTag, TAG_SITTING, BlockPos.ZERO);
 
         // Update the ID in the tag to match the new visitor ID
-        citizenTag.putInt(TAG_ID, visitorData.getId());
-
-        // Deserialize the modified NBT into the visitor
-        visitorData.deserializeNBT(level.registryAccess(), citizenTag);
+        citizenTag.putInt(TAG_ID, visitorData.getId());        // Deserialize the modified NBT into the visitor
+        visitorData.deserializeNBT(citizenTag);
 
         // Explicitly set home building (important for visitor functionality)
         visitorData.setHomeBuilding(building);
