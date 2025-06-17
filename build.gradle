@@ -48,6 +48,22 @@ repositories {
         name = "henkelmax.public"
         url = 'https://maven.maxhenkel.de/repository/public'
     }
+
+    maven {
+        name 'LDTTeam - Mods Maven'
+        url 'https://ldtteam.jfrog.io/ldtteam/mods-maven/'
+    }
+
+    maven {
+        // location of the maven that hosts JEI files since January 2023
+        name = "Jared's maven"
+        url = "https://maven.blamejared.com/"
+    }
+    maven {
+        // location of a maven mirror for JEI files, as a fallback
+        name = "ModMaven"
+        url = "https://modmaven.dev"
+    }
 }
 
 base {
@@ -117,14 +133,10 @@ configurations {
 
 dependencies {
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
-    localRuntime "maven.modrinth:simple-voice-chat:neoforge-${voicechat_dependency}"
+    localRuntime "maven.modrinth:simple-voice-chat:neoforge-${voicechat_version}"
 
-    localRuntime "curse.maven:structurize-298744:6515153"
-    localRuntime "curse.maven:multi-piston-303278:6515286"
-    localRuntime "curse.maven:blockui-522992:6367809"
-    localRuntime "curse.maven:domum-ornamentum-527361:6335398"
+    implementation("com.ldtteam:minecolonies:${minecolonies_version}")
 
-    implementation "curse.maven:minecolonies-245506:${minecolonies_file}"
     jarJar(implementation('org.java-websocket:Java-WebSocket') {
         exclude group: 'org.slf4j', module: 'slf4j-api'
     }) {
@@ -140,7 +152,7 @@ dependencies {
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
             minecraft_version      : minecraft_version,
-            voicechat_dependency   : voicechat_dependency,
+            voicechat_version      : voicechat_version,
             minecolonies_version   : minecolonies_version,
             minecraft_version_range: minecraft_version_range,
             neo_version            : neo_version,
