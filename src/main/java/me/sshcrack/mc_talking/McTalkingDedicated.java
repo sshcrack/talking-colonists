@@ -1,8 +1,8 @@
 package me.sshcrack.mc_talking;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.common.Mod;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.common.Mod;
 
 @Mod(value = McTalking.MODID, dist = Dist.DEDICATED_SERVER)
 public class McTalkingDedicated {

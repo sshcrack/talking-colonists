@@ -1,15 +1,15 @@
 package me.sshcrack.mc_talking;
 
 import com.mojang.serialization.Codec;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.attachment.AttachmentType;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.attachment.AttachmentType;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.function.Supplier;
 
 public class ModAttachmentTypes {
-    private static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, McTalking.MODID);
+    private static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister.create(ForgeRegistries.ATTACHMENT_TYPES, McTalking.MODID);
 
     public static final Supplier<AttachmentType<String>> SESSION_TOKEN = ATTACHMENT_TYPES.register(
             "session_token",

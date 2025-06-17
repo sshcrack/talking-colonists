@@ -6,6 +6,8 @@ bin
 .classpath
 .project
 
+base_template
+
 # idea
 out
 *.ipr
