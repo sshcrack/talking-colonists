@@ -107,14 +107,10 @@ jarJar.enable()
 repositories {
     mavenLocal()
 
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = "Modrinth"
-                url = "https://api.modrinth.com/maven"
-            }
-        }
-        filter {
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
             includeGroup "maven.modrinth"
         }
     }
@@ -164,12 +160,12 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
-    localRuntime "maven.modrinth:simple-voice-chat:${voicechat_version}"
+    runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-${voicechat_version}")
 
-    implementation("com.ldtteam:minecolonies:${minecolonies_version}")
-    localRuntime "com.ldtteam:domum_ornamentum:${domum_version}"
-    localRuntime "com.ldtteam:structurize:${structurize_version}"
-    localRuntime "com.ldtteam:blockui:${blockui_version}"
+    implementation fg.deobf("com.ldtteam:minecolonies:${minecolonies_version}")
+    runtimeOnly fg.deobf("com.ldtteam:domum_ornamentum:${domum_version}")
+    runtimeOnly fg.deobf("com.ldtteam:structurize:${structurize_version}")
+    runtimeOnly fg.deobf("com.ldtteam:blockui:${blockui_version}")
 
     implementation(jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)'))
 }

@@ -13,6 +13,7 @@ import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
 /**
@@ -29,9 +30,10 @@ public class McTalking {
      * Constructor for the mod class.
      * Registers event listeners, configurations, and initializes necessary components.
      *
-     * @param modEventBus  The mod event bus to register events
-     * @param modContainer The mod container for configuration
-     */      public McTalking(IEventBus modEventBus, ModContainer modContainer) {
+     */
+    public McTalking() {
+        var modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+
         // Register server events listener
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
 
