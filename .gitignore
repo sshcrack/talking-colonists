@@ -23,6 +23,7 @@ build
 eclipse
 run
 run_server
+run_forge
 runs
 run-data
 

@@ -32,7 +32,7 @@ minecraft {
 
     runs {
         client {
-            workingDirectory project.file('run')
+            workingDirectory project.file('run_forge')
 
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
@@ -167,6 +167,10 @@ dependencies {
     localRuntime "maven.modrinth:simple-voice-chat:${voicechat_version}"
 
     implementation("com.ldtteam:minecolonies:${minecolonies_version}")
+    localRuntime "com.ldtteam:domum_ornamentum:${domum_version}"
+    localRuntime "com.ldtteam:structurize:${structurize_version}"
+    localRuntime "com.ldtteam:blockui:${blockui_version}"
+
     implementation(jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)'))
 }
 
