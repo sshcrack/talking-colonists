@@ -258,7 +258,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     disableVersionDetection()
 
     def mainFile = upload(curseforge_project, jar)
-    mainFile.displayName = "[${project.name.capitalize()} [${minecraft_version}] ${project.version}"
+    mainFile.displayName = "[${project.name.capitalize()} forge - [${minecraft_version}] ${project.version}"
     mainFile.addModLoader("forge")
     mainFile.releaseType = "beta"
     mainFile.addEnvironment("client", "server")
