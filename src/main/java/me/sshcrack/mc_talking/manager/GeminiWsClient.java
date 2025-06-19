@@ -60,7 +60,9 @@ public class GeminiWsClient extends WebSocketClient {
         var isFemale = manager.entity.getCitizenData().isFemale();
         var isChild = manager.entity.getCitizenData().isChild();
         if (isChild && !isFemale)
-            stream.setPitch(0.8f); // Increase pitch        this.initialPlayer = player;
+            stream.setPitch(0.8f); // Increase pitch
+
+        this.initialPlayer = player;
         AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
 

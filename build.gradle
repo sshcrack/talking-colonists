@@ -9,6 +9,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
     id "com.modrinth.minotaur" version "2+"
     id 'net.darkhax.curseforgegradle' version '1.1+'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 jarJar.enable()
@@ -168,6 +169,7 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
     runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-${voicechat_version}")
@@ -186,6 +188,12 @@ dependencies {
     library (group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)') {
         jarJar.pin(it, "1.6.0")
     }
+}
+
+mixin {
+    // MixinGradle Settings
+    add sourceSets.main, 'mc_talking.mixins.refmap.json'
+    config 'mc_talking.mixins.json'
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
