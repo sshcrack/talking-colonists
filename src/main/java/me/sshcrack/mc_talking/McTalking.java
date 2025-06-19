@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 public class McTalking {
     public static final String MODID = "mc_talking";
     public static final Logger LOGGER = LogUtils.getLogger();
-    public static boolean isDedicated = false;
 
     /**
      * Constructor for the mod class.
