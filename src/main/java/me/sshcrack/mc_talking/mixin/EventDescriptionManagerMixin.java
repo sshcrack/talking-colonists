@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(EventDescriptionManager.class)
+@Mixin(value = EventDescriptionManager.class, remap = false)
 public class EventDescriptionManagerMixin {
     @Inject(method="addEventDescription", at=@At("HEAD"))
     private void mc_talking$onEvent(IColonyEventDescription event, CallbackInfo ci) {

@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.Map;
 
-@Mixin(CitizenData.class)
+@Mixin(value = CitizenData.class, remap = false)
 public interface CitizenDataAccessor {
     @Accessor("citizenChatOptions")
     Map<Component, IInteractionResponseHandler> getCitizenChatOptions();
