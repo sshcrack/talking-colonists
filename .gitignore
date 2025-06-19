@@ -21,6 +21,7 @@ build
 # other
 eclipse
 run
+run_server_forge
 run_server
 runs
 run-data
