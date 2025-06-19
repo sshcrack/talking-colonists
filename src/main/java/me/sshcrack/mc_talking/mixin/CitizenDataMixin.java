@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(CitizenData.class)
+@Mixin(value = CitizenData.class, remap = false)
 public class CitizenDataMixin {
     @Inject(method = "setVisibleStatus", at = @At("HEAD"))
     private void mc_talking$onSetVisibleStatus(VisibleCitizenStatus status, CallbackInfo ci) {
