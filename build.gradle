@@ -11,6 +11,8 @@ plugins {
     id 'net.darkhax.curseforgegradle' version '1.1+'
 }
 
+jarJar.enable()
+
 version = mod_version
 group = mod_group_id
 
@@ -31,6 +33,14 @@ minecraft {
     copyIdeResources = true
 
     runs {
+        configureEach {
+            lazyToken('minecraft_classpath') {
+                configurations.library.copyRecursive().resolve().collect {
+                    it.absolutePath
+                }.join(File.pathSeparator)
+            }
+        }
+
         client {
             workingDirectory project.file('run_forge')
 
@@ -101,9 +111,10 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    library
+    implementation.extendsFrom(library)
 }
 
-jarJar.enable()
 repositories {
     mavenLocal()
 
@@ -149,12 +160,11 @@ repositories {
     }
 }
 
-jarJar {
-    dependencies {
-        // Exclude any dependency which begins with 'com.google.gson.'
-        exclude(dependency('org.slf4j:slf4j-api'))
-    }
-}
+//jarJar {
+//    dependencies {
+//        exclude(dependency('org.slf4j:slf4j-api'))
+//    }
+//}
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
@@ -167,7 +177,15 @@ dependencies {
     runtimeOnly fg.deobf("com.ldtteam:structurize:${structurize_version}")
     runtimeOnly fg.deobf("com.ldtteam:blockui:${blockui_version}")
 
-    implementation(jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)'))
+//    implementation(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)') {
+//        transitive = false
+//        jarJar.pin(it, "1.6.0")
+//    }
+
+    jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)')
+    library (group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)') {
+        jarJar.pin(it, "1.6.0")
+    }
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
@@ -213,6 +231,16 @@ jar {
 
 // This is the preferred method to reobfuscate your jar file
 jar.finalizedBy('reobfJar')
+
+void addLicense(jarTask) {
+    jarTask.from('LICENSE') {
+        rename { "${it}_${project.archivesBaseName}" }
+    }
+}
+
+addLicense(jar)
+addLicense(tasks.jarJar)
+
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
