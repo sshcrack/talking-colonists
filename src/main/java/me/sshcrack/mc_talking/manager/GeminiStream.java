@@ -52,7 +52,7 @@ public class GeminiStream implements Supplier<short[]> {
      * @param data       Raw PCM audio data as byte array
      * @param sampleRate Sample rate of the audio data
      */
-    public void addGeminiPcmWithPitch(byte[] data, int sampleRate) {
+    public boolean addGeminiPcmWithPitch(byte[] data, int sampleRate) {
         lastSampleRate = sampleRate;
 
         // Add the new data to our buffer
@@ -65,8 +65,10 @@ public class GeminiStream implements Supplier<short[]> {
         // or if we're flushing (data.length == 0)
         // We'll collect more data before processing to ensure smoother playback
         if (incomingDataSize >= MIN_BUFFER_SIZE_FOR_PITCH * 2) {
-            processBufferedData(sampleRate, false);
+            return processBufferedData(sampleRate, false);
         }
+
+        return false;
     }
 
     /**
@@ -74,9 +76,9 @@ public class GeminiStream implements Supplier<short[]> {
      *
      * @param sampleRate Sample rate of the audio data
      */
-    private void processBufferedData(int sampleRate, boolean flushed) {
+    private boolean processBufferedData(int sampleRate, boolean flushed) {
         if (incomingDataSize == 0) {
-            return;
+            return false;
         }
 
         // Combine all buffered data
@@ -106,7 +108,7 @@ public class GeminiStream implements Supplier<short[]> {
         }
 
         // Process the audio samples
-        processAudioSamples(samples, flushed);
+        return processAudioSamples(samples, flushed);
     }
 
     /**
@@ -114,7 +116,7 @@ public class GeminiStream implements Supplier<short[]> {
      *
      * @param samples Audio samples to process
      */
-    private void processAudioSamples(short[] samples, boolean flushed) {
+    private boolean processAudioSamples(short[] samples, boolean flushed) {
         // Combine with any remaining samples from previous calls
         if (remainingSamples.length > 0) {
             short[] combined = new short[remainingSamples.length + samples.length];
@@ -153,8 +155,11 @@ public class GeminiStream implements Supplier<short[]> {
 
                 isPreBuffering = false;
                 player.startPlaying();
+                return true;
             }
         }
+
+        return false;
     }
 
     public void stop() {

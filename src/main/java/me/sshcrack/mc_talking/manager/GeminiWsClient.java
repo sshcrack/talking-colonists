@@ -235,7 +235,6 @@ public class GeminiWsClient extends WebSocketClient {
 
             if (obj.has("generationComplete") && obj.get("generationComplete").getAsBoolean()) {
                 McTalking.LOGGER.info("Gemini generation complete");
-                PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
 
 
                 stream.flushAudio();
@@ -280,7 +279,9 @@ public class GeminiWsClient extends WebSocketClient {
                         var sampleRate = Integer.parseInt(sampleRateStr);
 
                         var data = Base64.getDecoder().decode(inlineData.get("data").getAsString());
-                        stream.addGeminiPcmWithPitch(data, sampleRate);
+                        var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
+                        if (isJustStarted)
+                            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
                     }
                 }
             } else {
