@@ -24,6 +24,7 @@ run
 run_server
 runs
 run-data
+run_forge
 
 repo
 
