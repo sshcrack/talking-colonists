@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager.tools;
 
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup.Tool.FunctionDeclaration;
 
@@ -20,14 +21,21 @@ public class AITools {
         }
     }
 
-    public static List<BidiGenerateContentSetup.Tool> getAllTools() {
+    public static List<String> getRegisteredFunctionNames() {
+        return new ArrayList<>(registeredFunctions.keySet());
+    }
+
+    public static List<BidiGenerateContentSetup.Tool> getEnabledTools() {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
 
         var tool = new BidiGenerateContentSetup.Tool();
+        var rawToolsEnabled = McTalkingConfig.CONFIG.enabledTools.get();
+
         tool.functionDeclarations.addAll(
                 registeredFunctions
                         .values()
                         .stream()
+                        .filter(e -> rawToolsEnabled.contains(e.getName()))
                         .map(e -> {
                             var declaration = new FunctionDeclaration(e.getName(), e.getDescription());
                             if (e.getProperty() != null)
@@ -50,6 +58,7 @@ public class AITools {
                 new GetInventoryAction(),
                 new GetColonyAction(),
                 new DropItemAction()
+//                new JobSpecificAction()
         ));
     }
 }

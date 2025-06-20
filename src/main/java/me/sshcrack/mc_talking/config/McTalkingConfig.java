@@ -29,7 +29,10 @@ public class McTalkingConfig {
     // Resource Management
     public final ForgeConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
     public final ForgeConfigSpec.ConfigValue<Double> maxConversationDistance;
-    public final ForgeConfigSpec.ConfigValue<ModalityModes> modality;    public McTalkingConfig(ForgeConfigSpec.Builder builder) {
+    public final ForgeConfigSpec.ConfigValue<ModalityModes> modality;
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> enabledTools;
+
+    public McTalkingConfig(ForgeConfigSpec.Builder builder) {
 
         // API Configuration
         geminiApiKey = builder
@@ -94,7 +97,25 @@ public class McTalkingConfig {
                 .worldRestart()
                 .comment("The modality of the AI. If true, the AI will use text and audio, if false, it will only use text. Gemini Live 2.5 doesn't support text only output.")
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
-    }    static {
+
+
+        AtomicInteger currIndex = new AtomicInteger();
+        enabledTools = builder
+                .gameRestart()
+                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
+                .defineList("enabled_tools", AITools::getRegisteredFunctionNames, () -> {
+                    var l = AITools.getRegisteredFunctionNames();
+                    return l.get((currIndex.incrementAndGet() - 1) % l.size());
+                }, e -> {
+                    if(e instanceof String str) {
+                        return AITools.getRegisteredFunctionNames().contains(str);
+                    }
+
+                    return false;
+                });
+    }
+    
+    static {
         Pair<McTalkingConfig, ForgeConfigSpec> pair =
                 new ForgeConfigSpec.Builder().configure(McTalkingConfig::new);
 

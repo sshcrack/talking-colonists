@@ -29,6 +29,7 @@ public class McTalking {
      *
      */
     public McTalking() {
+        AITools.register();
         var modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         // Register server events listener
@@ -43,8 +44,6 @@ public class McTalking {
         
         // Initialize network
         AiStatusPayload.registerMessages();
-        
-        AITools.register();
     }/**
      * Registers capabilities for the mod
      *
