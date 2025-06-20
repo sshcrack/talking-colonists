@@ -161,12 +161,6 @@ repositories {
     }
 }
 
-//jarJar {
-//    dependencies {
-//        exclude(dependency('org.slf4j:slf4j-api'))
-//    }
-//}
-
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
@@ -178,11 +172,6 @@ dependencies {
     runtimeOnly fg.deobf("com.ldtteam:domum_ornamentum:${domum_version}")
     runtimeOnly fg.deobf("com.ldtteam:structurize:${structurize_version}")
     runtimeOnly fg.deobf("com.ldtteam:blockui:${blockui_version}")
-
-//    implementation(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)') {
-//        transitive = false
-//        jarJar.pin(it, "1.6.0")
-//    }
 
     jarJar(group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)')
     library (group: 'org.java-websocket', name: 'Java-WebSocket', version: '[1.5,)') {
