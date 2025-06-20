@@ -200,6 +200,19 @@ if (localPropertiesFile.exists()) {
 def modrinth_key = localProperties.getProperty('MODRINTH_API_KEY') ?: ""
 def curse_key = localProperties.getProperty('CURSEFORGE_API_KEY') ?: ""
 
+// Get changelog from file if provided via property
+def changelogText = "For a changelog take a look at https://github.com/sshcrack/talking-colonists/"
+def changelogFile = findProperty('changelogFile')
+if (changelogFile) {
+    def changelogFileObj = new File(changelogFile)
+    if (changelogFileObj.exists()) {
+        changelogText = changelogFileObj.text
+        println "Using changelog from: ${changelogFile}"
+    } else {
+        println "Warning: Changelog file not found: ${changelogFile}"
+    }
+}
+
 
 // Place modrinth block at the very end to ensure all properties are loaded and plugin is applied
 modrinth {
@@ -209,7 +222,7 @@ modrinth {
     versionType = "beta"
     loaders = ["neoforge"]
     gameVersions = [minecraft_version]
-    changelog = "For a changelog take a look at https://github.com/sshcrack/talking-colonists/"
+    changelog = changelogText
     syncBodyFrom = rootProject.file("README.md").text
     dependencies {
         required.project "simple-voice-chat"
@@ -229,7 +242,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     mainFile.addGameVersion(minecraft_version)
     mainFile.addRequirement("simple-voice-chat")
     mainFile.addRequirement("minecolonies")
-    mainFile.changelog = "For a changelog take a look at https://github.com/sshcrack/talking-colonists/"
+    mainFile.changelog = changelogText
 }
 
 tasks.register("publishAll")
