@@ -10,7 +10,7 @@ if($activeBranch -eq "forge-1.20.1") {
 $ErrorActionPreference = 'Stop'
 
 
-
+git stash --keep-index
 git commit -m $msg
 $hash = git rev-parse HEAD
 
@@ -20,3 +20,4 @@ git cherry-pick $hash
 git push
 
 git checkout $activeBranch
+git stash pop
