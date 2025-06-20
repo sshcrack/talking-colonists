@@ -1,7 +1,10 @@
 package me.sshcrack.mc_talking.config;
 
+import me.sshcrack.mc_talking.manager.tools.AITools;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.List;
 
 /**
  * Configuration class for the McTalking mod.
@@ -44,7 +47,8 @@ public class McTalkingConfig {
         currentAiModel = builder
                 .worldRestart()
                 .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well. Flash2.5 burns the free tokens fast. Flash2.5 can only execute functions (for example dropping items, getting information about the colony) when Google Search is enabled.")
-                .defineEnum("ai_model", AvailableAI.Flash2_5);        enableFunctionWorkaround = builder
+                .defineEnum("ai_model", AvailableAI.Flash2_5);
+        enableFunctionWorkaround = builder
                 .worldRestart()
                 .comment("Enables the Google Search so Flash2.5 can execute functions. Google Search will ONLY be enabled for Flash2.5.")
                 .define("function_workaround", true);
@@ -93,28 +97,26 @@ public class McTalkingConfig {
         maxConversationDistance = builder
                 .worldRestart()
                 .comment("Maximum distance the player can be from a citizen before the conversation is ended")
-                .define("max_conversation_distance", 8.0);        modality = builder
+                .define("max_conversation_distance", 8.0);
+
+        modality = builder
                 .worldRestart()
                 .comment("The modality of the AI. If true, the AI will use text and audio, if false, it will only use text. Gemini Live 2.5 doesn't support text only output.")
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
 
 
-        AtomicInteger currIndex = new AtomicInteger();
         enabledTools = builder
-                .gameRestart()
+                .worldRestart()
                 .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
-                .defineList("enabled_tools", AITools::getRegisteredFunctionNames, () -> {
-                    var l = AITools.getRegisteredFunctionNames();
-                    return l.get((currIndex.incrementAndGet() - 1) % l.size());
-                }, e -> {
-                    if(e instanceof String str) {
+                .defineList("enabled_tools", AITools::getRegisteredFunctionNames, e -> {
+                    if (e instanceof String str) {
                         return AITools.getRegisteredFunctionNames().contains(str);
                     }
 
                     return false;
                 });
     }
-    
+
     static {
         Pair<McTalkingConfig, ForgeConfigSpec> pair =
                 new ForgeConfigSpec.Builder().configure(McTalkingConfig::new);
