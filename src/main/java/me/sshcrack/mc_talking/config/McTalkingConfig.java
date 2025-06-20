@@ -1,7 +1,11 @@
 package me.sshcrack.mc_talking.config;
 
+import me.sshcrack.mc_talking.manager.tools.AITools;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Configuration class for the McTalking mod.
@@ -30,6 +34,7 @@ public class McTalkingConfig {
     public final ModConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
     public final ModConfigSpec.ConfigValue<Double> maxConversationDistance;
     public final ModConfigSpec.ConfigValue<ModalityModes> modality;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> enabledTools;
 
     public McTalkingConfig(ModConfigSpec.Builder builder) {
 
@@ -100,6 +105,22 @@ public class McTalkingConfig {
                 .gameRestart()
                 .comment("The modality of the AI. If true, the AI will use text and audio, if false, it will only use text. Gemini Live 2.5 doesn't support text only output.")
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
+
+
+        AtomicInteger currIndex = new AtomicInteger();
+        enabledTools = builder
+                .gameRestart()
+                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
+                .defineList("enabled_tools", AITools::getRegisteredFunctionNames, () -> {
+                    var l = AITools.getRegisteredFunctionNames();
+                    return l.get((currIndex.incrementAndGet() - 1) % l.size());
+                }, e -> {
+                    if(e instanceof String str) {
+                        return AITools.getRegisteredFunctionNames().contains(str);
+                    }
+
+                    return false;
+                });
     }
 
     static {

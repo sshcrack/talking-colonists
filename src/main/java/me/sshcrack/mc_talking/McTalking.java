@@ -31,6 +31,8 @@ public class McTalking {
      * @param modContainer The mod container for configuration
      */
     public McTalking(IEventBus modEventBus, ModContainer modContainer) {
+        AITools.register();
+
         // Register server events listener
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
 
@@ -41,7 +43,6 @@ public class McTalking {
         ModItems.register(modEventBus);
         ModAttachmentTypes.register(modEventBus);
         modEventBus.addListener(this::registerPayloadHandlers);
-        AITools.register();
     }
 
     /**

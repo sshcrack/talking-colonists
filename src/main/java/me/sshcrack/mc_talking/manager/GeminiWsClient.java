@@ -112,7 +112,7 @@ public class GeminiWsClient extends WebSocketClient {
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
-        setup.tools.addAll(AITools.getAllTools());
+        setup.tools.addAll(AITools.getEnabledTools());
         if(CONFIG.currentAiModel.get() == AvailableAI.Flash2_5 && CONFIG.enableFunctionWorkaround.get())
             setup.tools.add(BidiGenerateContentSetup.Tool.googleSearch());
 
