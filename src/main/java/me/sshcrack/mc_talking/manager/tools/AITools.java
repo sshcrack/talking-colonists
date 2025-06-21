@@ -29,13 +29,13 @@ public class AITools {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
 
         var tool = new BidiGenerateContentSetup.Tool();
-        var rawToolsEnabled = McTalkingConfig.CONFIG.enabledTools.get();
+        var rawToolsDisabled = McTalkingConfig.CONFIG.disabledTools.get();
 
         tool.functionDeclarations.addAll(
                 registeredFunctions
                         .values()
                         .stream()
-                        .filter(e -> rawToolsEnabled.contains(e.getName()))
+                        .filter(e -> !rawToolsDisabled.contains(e.getName()))
                         .map(e -> {
                             var declaration = new FunctionDeclaration(e.getName(), e.getDescription());
                             if (e.getProperty() != null)

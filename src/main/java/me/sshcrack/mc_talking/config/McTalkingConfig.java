@@ -4,6 +4,7 @@ import me.sshcrack.mc_talking.manager.tools.AITools;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -33,7 +34,7 @@ public class McTalkingConfig {
     public final ForgeConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
     public final ForgeConfigSpec.ConfigValue<Double> maxConversationDistance;
     public final ForgeConfigSpec.ConfigValue<ModalityModes> modality;
-    public final ForgeConfigSpec.ConfigValue<List<? extends String>> enabledTools;
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> disabledTools;
 
     public McTalkingConfig(ForgeConfigSpec.Builder builder) {
 
@@ -105,11 +106,15 @@ public class McTalkingConfig {
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
 
 
-        enabledTools = builder
-                .worldRestart()
+        AtomicInteger currIndex = new AtomicInteger();
+        disabledTools = builder
+                .gameRestart()
                 .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
-                .defineList("enabled_tools", AITools::getRegisteredFunctionNames, e -> {
-                    if (e instanceof String str) {
+                .defineList("disabled_tools", Collections::emptyList, () -> {
+                    var l = AITools.getRegisteredFunctionNames();
+                    return l.get((currIndex.incrementAndGet() - 1) % l.size());
+                }, e -> {
+                    if(e instanceof String str) {
                         return AITools.getRegisteredFunctionNames().contains(str);
                     }
 
