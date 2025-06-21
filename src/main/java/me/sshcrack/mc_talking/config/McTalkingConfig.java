@@ -4,6 +4,7 @@ import me.sshcrack.mc_talking.manager.tools.AITools;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -34,7 +35,7 @@ public class McTalkingConfig {
     public final ModConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
     public final ModConfigSpec.ConfigValue<Double> maxConversationDistance;
     public final ModConfigSpec.ConfigValue<ModalityModes> modality;
-    public final ModConfigSpec.ConfigValue<List<? extends String>> enabledTools;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> disabledTools;
 
     public McTalkingConfig(ModConfigSpec.Builder builder) {
 
@@ -108,10 +109,10 @@ public class McTalkingConfig {
 
 
         AtomicInteger currIndex = new AtomicInteger();
-        enabledTools = builder
+        disabledTools = builder
                 .gameRestart()
                 .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
-                .defineList("enabled_tools", AITools::getRegisteredFunctionNames, () -> {
+                .defineList("disabled_tools", Collections::emptyList, () -> {
                     var l = AITools.getRegisteredFunctionNames();
                     return l.get((currIndex.incrementAndGet() - 1) % l.size());
                 }, e -> {
