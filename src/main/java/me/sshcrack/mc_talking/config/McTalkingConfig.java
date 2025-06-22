@@ -111,7 +111,7 @@ public class McTalkingConfig {
         AtomicInteger currIndex = new AtomicInteger();
         disabledTools = builder
                 .gameRestart()
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
+                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Available tools are listed here: https://github.com/sshcrack/talking-colonists/blob/neoforge-1.21.1/AVAILABLE_TOOLS.md")
                 .defineList("disabled_tools", Collections::emptyList, () -> {
                     var l = AITools.getRegisteredFunctionNames();
                     return l.get((currIndex.incrementAndGet() - 1) % l.size());
