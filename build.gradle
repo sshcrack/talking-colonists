@@ -281,7 +281,7 @@ if (changelogFile) {
 modrinth {
     token = modrinth_key
     projectId = 'QJvWFsra'
-    uploadFile = jar.archiveFile
+    uploadFile = tasks.jarJar.archiveFile
     versionType = "beta"
     loaders = ["forge"]
     gameVersions = [minecraft_version]
@@ -297,7 +297,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     apiToken = curse_key
     disableVersionDetection()
 
-    def mainFile = upload(curseforge_project, jar)
+    def mainFile = upload(curseforge_project, tasks.jarJar.archiveFile)
     mainFile.displayName = "[${project.name.capitalize()} forge - [${minecraft_version}] ${project.version}"
     mainFile.addModLoader("forge")
     mainFile.releaseType = "beta"
@@ -310,5 +310,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
 
 tasks.register("publishAll")
 
+tasks.modrinth.dependsOn(tasks.jarJar)
+tasks.publishCurseForge.dependsOn(tasks.jarJar)
 tasks.publishAll.dependsOn(tasks.modrinth)
 tasks.publishAll.dependsOn(tasks.publishCurseForge)
