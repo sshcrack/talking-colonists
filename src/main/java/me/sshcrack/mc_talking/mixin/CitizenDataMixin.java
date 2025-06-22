@@ -13,10 +13,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class CitizenDataMixin {
     @Inject(method = "setVisibleStatus", at = @At("HEAD"))
     private void mc_talking$onSetVisibleStatus(VisibleCitizenStatus status, CallbackInfo ci) {
-        if (status == null)
+        var data = CitizenData.class.cast(this);
+        if (status == null || data == null)
             return;
 
-        var data = CitizenData.class.cast(this);
         var client = ConversationManager.getClientForEntity(data.getUUID());
         if (client == null)
             return;

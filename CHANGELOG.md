@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.2.2] - 2025-06-22
+### Fixed
+- Issue that caused crashing when loading into the world
+- Lengthen the silence duration that is being sent
+- Fix concurrent modification of the voice stream
+
 ## [1.2.1] - 2025-06-20
 ### Added
 - Added crafting recipe for talking device in 1.20.1

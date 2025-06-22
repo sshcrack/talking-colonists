@@ -15,6 +15,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class SoundUtilsMixin {
     @Inject(method = "playSoundAtCitizenWith(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lcom/minecolonies/api/sounds/EventType;Lcom/minecolonies/api/colony/ICivilianData;DD)V", at = @At("HEAD"), cancellable = true)
     private static void mc_talking$preventSoundWhenTalking(Level worldIn, BlockPos position, EventType type, ICivilianData citizenData, double chance, double volume, CallbackInfo ci) {
+        if(citizenData == null)
+            return;
+
         var c = ConversationManager.getClientForEntity(citizenData.getUUID());
         if(c == null)
             return;
