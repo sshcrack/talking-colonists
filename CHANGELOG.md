@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 - Issue that caused crashing when loading into the world
 - Lengthen the silence duration that is being sent
 - Fix concurrent modification of the voice stream
+- Add instruction to system prompt (no markdown anymore)
+- Fixed AI Model not outputting texte correctly
 
 ## [1.2.1] - 2025-06-20
 ### Added
