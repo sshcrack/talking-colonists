@@ -113,7 +113,7 @@ public class GeminiWsClient extends WebSocketClient {
 
         setup.systemInstruction = sys;
         setup.tools.addAll(AITools.getEnabledTools());
-        if(CONFIG.currentAiModel.get() == AvailableAI.Flash2_5 && CONFIG.enableFunctionWorkaround.get())
+        if (CONFIG.currentAiModel.get() == AvailableAI.Flash2_5 && CONFIG.enableFunctionWorkaround.get())
             setup.tools.add(BidiGenerateContentSetup.Tool.googleSearch());
 
 
@@ -121,6 +121,7 @@ public class GeminiWsClient extends WebSocketClient {
     }
 
     private String currMsg = "";
+
     @Override
     public void onMessage(String message) {
         var p = JsonParser.parseString(message);
@@ -229,7 +230,8 @@ public class GeminiWsClient extends WebSocketClient {
                 var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
                 if (sPlayer == null || currMsg.isBlank())
                     return;
-                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg)));
+                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+                currMsg = "";
                 return;
             }
 
@@ -244,7 +246,8 @@ public class GeminiWsClient extends WebSocketClient {
                 var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
                 if (sPlayer == null || currMsg.isBlank())
                     return;
-                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg)));
+                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+                currMsg = "";
                 return;
             }
 
@@ -257,7 +260,8 @@ public class GeminiWsClient extends WebSocketClient {
                             continue;
 
                         var pObj = part.getAsJsonObject();
-                        if (pObj.has("text") && pObj.get("text").isJsonPrimitive()) {
+                        var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
+                        if (pObj.has("text") && pObj.get("text").isJsonPrimitive() && hasTextEnabled) {
                             var text = pObj.get("text").getAsString();
                             currMsg += text;
                         }
