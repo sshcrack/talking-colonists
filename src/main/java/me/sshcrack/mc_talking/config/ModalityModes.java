@@ -10,8 +10,7 @@ public enum ModalityModes {
     public List<String> getModes() {
         return switch (this) {
             case TEXT -> List.of("TEXT");
-            case AUDIO -> List.of("AUDIO");
-            case TEXT_AND_AUDIO -> List.of("TEXT", "AUDIO");
+            case AUDIO, TEXT_AND_AUDIO -> List.of("AUDIO");
         };
     }
 }

@@ -104,7 +104,7 @@ public class McTalkingConfig {
 
         modality = builder
                 .worldRestart()
-                .comment("The modality of the AI. If true, the AI will use text and audio, if false, it will only use text. Gemini Live 2.5 doesn't support text only output.")
+                .comment("In which format the AI should respond. Can either be text or audio for Flash 2.0, audio only for Flash 2.5. Right now there is no support for text AND audio as far as I know (the value is still in there so it has backwards compatibility).")
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
 
 
