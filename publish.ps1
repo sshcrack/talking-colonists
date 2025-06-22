@@ -1,9 +1,9 @@
-$ErrorActionPreference = 'Stop'
-
 # Parse command line arguments for changelog file or default to CHANGELOG.md
 param (
     [string]$ChangelogFile = "CHANGELOG.md"
 )
+
+$ErrorActionPreference = 'Stop'
 
 # Verify the changelog file exists
 if (-not (Test-Path $ChangelogFile)) {
@@ -21,10 +21,12 @@ $changelogContent = Get-Content $ChangelogFile -Raw
 $latestChangelog = ""
 $latestChangelogVersion = ""
 
-if ($changelogContent -match '## \[(\d+\.\d+\.\d+)\].*?\r?\n(.*?)(?=\r?\n## \[|$)') {
+# The regex needs to match the first version in the file which will be the latest
+if ($changelogContent -match '(?s)## \[(\d+\.\d+\.\d+)\] - [^\r\n]*\r?\n(.*?)(?=\r?\n## \[|$)') {
     $latestChangelogVersion = $matches[1]
     $latestChangelog = $matches[2].Trim()
     Write-Host "Latest changelog version: $latestChangelogVersion"
+    Write-Host "Changelog content excerpt: $($latestChangelog.Substring(0, [Math]::Min(50, $latestChangelog.Length)))..."
     
     # Check if the versions match
     if ($latestChangelogVersion -ne $modVersion) {
@@ -42,7 +44,7 @@ if ($changelogContent -match '## \[(\d+\.\d+\.\d+)\].*?\r?\n(.*?)(?=\r?\n## \[|$
 $tempChangelogFile = [System.IO.Path]::GetTempFileName()
 $latestChangelog | Out-File -FilePath $tempChangelogFile -Encoding utf8
 
-Write-Host "Publishing with changelog from '$ChangelogFile'"
+Write-Host "Publishing with changelog from '$ChangelogFile' $latestChangelog"
 Write-Host "Temporary changelog file created at: $tempChangelogFile"
 
 git checkout forge-1.20.1
@@ -52,5 +54,5 @@ git checkout neoforge-1.21.1
 ./gradlew clean publishAll -PchangelogFile="$tempChangelogFile"
 
 # Clean up the temporary file
-Remove-Item $tempChangelogFile
-Write-Host "Temporary changelog file removed"
+# Remove-Item $tempChangelogFile
+Write-Host "Temporary changelog file removed $tempChangelogFile"
