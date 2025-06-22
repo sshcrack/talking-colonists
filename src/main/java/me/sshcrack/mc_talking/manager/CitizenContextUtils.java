@@ -8,9 +8,6 @@ import com.minecolonies.api.entity.citizen.citizenhandlers.ICitizenSkillHandler;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.citizenhandlers.CitizenSkillHandler;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
-import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -232,13 +229,16 @@ public class CitizenContextUtils {
             for (var interaction : blockingInteractions) {
                 prompt.append("- ").append(interaction.getInquiry().getString());
             }
-        }        // Concise communication guidance
+        }
+
+        // Concise communication guidance
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
         prompt.append("- Do not generate creative responses for information that functions can provide\n");
         prompt.append("- Speak in first person, keep responses brief\n");
         prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
+        prompt.append("- Do not use markdown, speak in plain text.");
 
         // Player relationship
         var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
@@ -311,7 +311,7 @@ public class CitizenContextUtils {
                             break;
                         case SCHOOL:
                             if (factor < 0.8) {
-                                if(hasSchool)
+                                if (hasSchool)
                                     prompt.append("- Disappointed by lack of school activities\n");
                                 else
                                     prompt.append("- Disappointed by lack of school in the colony\n");
