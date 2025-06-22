@@ -4,8 +4,10 @@ import me.sshcrack.mc_talking.manager.tools.AITools;
 import net.minecraftforge.common.ForgeConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Configuration class for the McTalking mod.
@@ -106,14 +108,10 @@ public class McTalkingConfig {
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
 
 
-        AtomicInteger currIndex = new AtomicInteger();
         disabledTools = builder
-                .gameRestart()
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions.")
-                .defineList("disabled_tools", Collections::emptyList, () -> {
-                    var l = AITools.getRegisteredFunctionNames();
-                    return l.get((currIndex.incrementAndGet() - 1) % l.size());
-                }, e -> {
+                .worldRestart()
+                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Available tools are listed here: https://github.com/sshcrack/talking-colonists/blob/forge-1.20.1/AVAILABLE_TOOLS.md")
+                .defineList("disabled_tools", Collections::emptyList, e -> {
                     if(e instanceof String str) {
                         return AITools.getRegisteredFunctionNames().contains(str);
                     }
