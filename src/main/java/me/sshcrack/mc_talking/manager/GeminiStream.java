@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -32,7 +33,7 @@ public class GeminiStream implements Supplier<short[]> {
     private int lastSampleRate = TARGET_SAMPLE_RATE; // Last processed sample rate
 
     // Single buffer for incoming audio data
-    private final List<byte[]> incomingData = new ArrayList<>();
+    private final List<byte[]> incomingData = Collections.synchronizedList(new ArrayList<>());
     private int incomingDataSize = 0;
 
     public GeminiStream(AudioChannel channel) {

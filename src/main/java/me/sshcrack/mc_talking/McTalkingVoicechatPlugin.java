@@ -38,7 +38,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     // Silence duration in milliseconds
-    private static final long SILENCE_DURATION_MS = 1500;
+    private static final long SILENCE_DURATION_MS = 2000;
     // Interval at which to send silence packets (ms)
     private static final long SILENCE_INTERVAL_MS = 20;
     // Threshold for voice inactivity before sending silence (ms)
