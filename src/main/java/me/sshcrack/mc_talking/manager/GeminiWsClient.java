@@ -5,7 +5,6 @@ import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
-import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.capability.EntityDataProvider;
@@ -112,7 +111,7 @@ public class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onSessionResumptionUpdate(String newHandle, boolean resumable) {
-        if(!resumable)
+        if (!resumable)
             return;
         EntityDataProvider.getFromEntity(this.manager.entity).ifPresent(provider -> {
             provider.setSessionToken(newHandle);
@@ -153,7 +152,7 @@ public class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onGeneratedText(String text) {
         var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
-        if(!hasTextEnabled)
+        if (!hasTextEnabled)
             return;
 
         currMsg += text;
@@ -177,18 +176,33 @@ public class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onSetupComplete() {
         McTalking.LOGGER.info("Gemini setup complete");
-        if (!pendingSystemText.isEmpty()) {
-            for (String text : pendingSystemText) {
-                addSystemText(text);
+        setupComplete = true;
+        
+        synchronized (pendingSystemText) {
+            if (!pendingSystemText.isEmpty()) {
+                List<String> textToProcess = new ArrayList<>(pendingSystemText);
+                pendingSystemText.clear();
+                
+                for (String text : textToProcess) {
+                    var input = new RealtimeInput();
+                    input.text = text;
+                    send(ClientMessages.input(input));
+                }
             }
-            pendingSystemText.clear();
         }
 
-        if (!pending_prompt.isEmpty()) {
-            for (short[] data : pending_prompt) {
-                addPromptAudio(data);
+        synchronized (pending_prompt) {
+            if (!pending_prompt.isEmpty()) {
+                List<short[]> audioToProcess = new ArrayList<>(pending_prompt);
+                pending_prompt.clear();
+                
+                for (short[] data : audioToProcess) {
+                    var input = new RealtimeInput();
+                    var byteAudio = vcApi.getAudioConverter().shortsToBytes(data);
+                    input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
+                    send(ClientMessages.input(input));
+                }
             }
-            pending_prompt.clear();
         }
     }
 
@@ -251,7 +265,9 @@ public class GeminiWsClient extends GeminiLiveClient {
 
     public void addSystemText(String newStatusPrompt) {
         if (!setupComplete || this.isClosed()) {
-            pendingSystemText.add(newStatusPrompt);
+            synchronized (pendingSystemText) {
+                pendingSystemText.add(newStatusPrompt);
+            }
             if (!this.isOpen() && !isInitiatingConnection) {
                 if (shouldReconnect) {
                     if (System.currentTimeMillis() - lastReconnectTime < 5000)
@@ -287,7 +303,10 @@ public class GeminiWsClient extends GeminiLiveClient {
 
 
         if (!setupComplete || this.isClosed()) {
-            pending_prompt.add(audio);
+            synchronized (pending_prompt) {
+                pending_prompt.add(audio);
+            }
+
             if (!this.isOpen() && !isInitiatingConnection) {
                 if (shouldReconnect) {
                     if (System.currentTimeMillis() - lastReconnectTime < 5000)
