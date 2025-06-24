@@ -15,11 +15,10 @@ import me.sshcrack.mc_talking.gson.RealtimeInput;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
+import me.sshcrack.websocket_lib.lib.client.WebSocketClient;
+import me.sshcrack.websocket_lib.lib.handshake.ServerHandshake;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -64,7 +63,7 @@ public class GeminiWsClient extends WebSocketClient {
             stream.setPitch(0.8f); // Increase pitch
 
         this.initialPlayer = player;
-        PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
 
     @Override
@@ -216,7 +215,7 @@ public class GeminiWsClient extends WebSocketClient {
             var obj = outer.getAsJsonObject("serverContent");
             if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
                 McTalking.LOGGER.info("Gemini turn complete");
-                PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+                AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
                 return;
             }
 
@@ -306,7 +305,7 @@ public class GeminiWsClient extends WebSocketClient {
         if (reason.contains("You exceeded your current quota, please")) {
             quotaExceeded = true;
             McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
-            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
+            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
         }
 
         if (reason.contains("BidiGenerateContent session not found")) {
@@ -322,7 +321,7 @@ public class GeminiWsClient extends WebSocketClient {
 
 
         if (code != 1000 && code != 1001) {
-            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         }
 
         McTalking.LOGGER.info("GeminiWsClient closed: {} and code {}", reason, code);
@@ -330,7 +329,7 @@ public class GeminiWsClient extends WebSocketClient {
 
     @Override
     public void onError(Exception ex) {
-        PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         ex.printStackTrace();
     }
 
@@ -368,7 +367,7 @@ public class GeminiWsClient extends WebSocketClient {
         var input = new RealtimeInput();
         input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", audio);
         if (sentGeneratingStatus)
-            PacketDistributor.sendToAllPlayers(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
 
 
         if (!setupComplete || this.isClosed()) {
