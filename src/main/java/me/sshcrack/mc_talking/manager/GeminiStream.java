@@ -3,13 +3,12 @@ package me.sshcrack.mc_talking.manager;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
@@ -35,9 +34,11 @@ public class GeminiStream implements Supplier<short[]> {
     // Single buffer for incoming audio data
     private final List<byte[]> incomingData = Collections.synchronizedList(new ArrayList<>());
     private int incomingDataSize = 0;
+    private final UUID entityUuid;
 
-    public GeminiStream(AudioChannel channel) {
+    public GeminiStream(AudioChannel channel, UUID entityUuid) {
         this.channel = channel;
+        this.entityUuid = entityUuid;
     }
 
     public void flushAudio() {
@@ -197,6 +198,7 @@ public class GeminiStream implements Supplier<short[]> {
         // Return null to stop playing when no more frames are available
         if (audioFrames.isEmpty()) {
             isPreBuffering = true;
+            AiStatusPayload.sendToAll(new AiStatusPayload(entityUuid, AiStatus.LISTENING));
             return null;
         }
 
