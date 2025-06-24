@@ -94,6 +94,15 @@ config="${mod_id}.mixins.json"
     side="BOTH"
 
 
+
+[[dependencies.${mod_id}]]
+    modId="websocket_lib"
+    mandatory=true
+    versionRange="[${websocket_lib_version},)"
+    ordering="BEFORE"
+    side="BOTH"
+
+
 [[dependencies.${mod_id}]]
     modId="minecolonies"
     mandatory=true
