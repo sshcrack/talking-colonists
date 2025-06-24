@@ -38,8 +38,8 @@ description='''${mod_description}'''
     side="BOTH"
 
 [[dependencies.${mod_id}]]
-    modId="websocket_lib"
+    modId="gemini_live_lib"
     mandatory=true
-    versionRange="[${websocket_lib_version},)"
+    versionRange="[${gemini_live_lib_version},)"
     ordering="BEFORE"
     side="BOTH"
