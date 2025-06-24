@@ -1,8 +1,7 @@
 package me.sshcrack.mc_talking.manager.tools;
 
+import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
-import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup.Tool.FunctionDeclaration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,7 +36,7 @@ public class AITools {
                         .stream()
                         .filter(e -> !rawToolsDisabled.contains(e.getName()))
                         .map(e -> {
-                            var declaration = new FunctionDeclaration(e.getName(), e.getDescription());
+                            var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(e.getName(), e.getDescription());
                             if (e.getProperty() != null)
                                 declaration.parameters = e.getProperty();
 
