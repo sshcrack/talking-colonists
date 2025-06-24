@@ -36,3 +36,10 @@ description='''${mod_description}'''
     versionRange="[1.20.1-1.1.900,)"
     ordering="NONE"
     side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="websocket_lib"
+    mandatory=true
+    versionRange="[${websocket_lib_version},)"
+    ordering="BEFORE"
+    side="BOTH"
