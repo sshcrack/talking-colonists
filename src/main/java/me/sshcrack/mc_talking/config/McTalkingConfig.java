@@ -49,7 +49,7 @@ public class McTalkingConfig {
 
         currentAiModel = builder
                 .worldRestart()
-                .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well. Flash2.5 burns the free tokens fast. Flash2.5 can only execute functions (for example dropping items, getting information about the colony) when Google Search is enabled.")
+                .comment("What kind of AI model to use. Flash2.5 is more advanced, more expensive but has more voices as well (not recommended for free usage). Flash2.5 burns the free tokens fast. Flash2.5 can only execute functions (for example dropping items, getting information about the colony) when Google Search is enabled.")
                 .defineEnum("ai_model", AvailableAI.Flash2_5);
         enableFunctionWorkaround = builder
                 .worldRestart()
