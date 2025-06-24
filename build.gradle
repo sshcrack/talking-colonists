@@ -32,14 +32,6 @@ minecraft {
     copyIdeResources = true
 
     runs {
-        configureEach {
-            lazyToken('minecraft_classpath') {
-                configurations.library.copyRecursive().resolve().collect {
-                    it.absolutePath
-                }.join(File.pathSeparator)
-            }
-        }
-
         client {
             workingDirectory project.file('run_forge')
 
