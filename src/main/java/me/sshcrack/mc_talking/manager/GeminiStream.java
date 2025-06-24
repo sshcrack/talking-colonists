@@ -58,8 +58,10 @@ public class GeminiStream implements Supplier<short[]> {
 
         // Add the new data to our buffer
         if (data.length > 0) {
-            incomingData.add(data);
-            incomingDataSize += data.length;
+            synchronized (incomingData) {
+                incomingData.add(data);
+                incomingDataSize += data.length;
+            }
         }
 
         // Only process if we have enough data for effective pitch shifting
@@ -76,23 +78,27 @@ public class GeminiStream implements Supplier<short[]> {
      * Process the buffered data, applying pitch shifting and preparing for playback
      *
      * @param sampleRate Sample rate of the audio data
-     */
-    private boolean processBufferedData(int sampleRate, boolean flushed) {
-        if (incomingDataSize == 0) {
-            return false;
-        }
+     */    private boolean processBufferedData(int sampleRate, boolean flushed) {
+        // Use a local variable to hold the data we're going to process
+        byte[] combined;
+        
+        synchronized (incomingData) {
+            if (incomingDataSize == 0) {
+                return false;
+            }
+            
+            // Combine all buffered data
+            combined = new byte[incomingDataSize];
+            int offset = 0;
+            for (byte[] chunk : incomingData) {
+                System.arraycopy(chunk, 0, combined, offset, chunk.length);
+                offset += chunk.length;
+            }
 
-        // Combine all buffered data
-        byte[] combined = new byte[incomingDataSize];
-        int offset = 0;
-        for (byte[] chunk : incomingData) {
-            System.arraycopy(chunk, 0, combined, offset, chunk.length);
-            offset += chunk.length;
+            // Clear the buffer after combining
+            incomingData.clear();
+            incomingDataSize = 0;
         }
-
-        // Clear the buffer after combining
-        incomingData.clear();
-        incomingDataSize = 0;
 
 
         // Convert byte[] to short[] (assuming signed 16-bit PCM)
