@@ -75,6 +75,10 @@ base {
     archivesName = mod_id
 }
 
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 neoForge {
