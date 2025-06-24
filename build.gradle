@@ -145,7 +145,7 @@ dependencies {
     localRuntime "maven.modrinth:simple-voice-chat:neoforge-${voicechat_version}"
 
     implementation("com.ldtteam:minecolonies:${minecolonies_version}")
-    implementation("me.sshcrack:websocket_lib:${websocket_lib_version}-${minecraft_version}-neoforge")
+    implementation("me.sshcrack:gemini_live_lib:${gemini_live_lib_version}-${minecraft_version}-neoforge")
 }
 
 
@@ -155,7 +155,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             voicechat_version      : voicechat_version,
             minecolonies_version   : minecolonies_version,
             minecraft_version_range: minecraft_version_range,
-            websocket_lib_version  : websocket_lib_version,
+            gemini_live_lib_version: gemini_live_lib_version,
             neo_version            : neo_version,
             neo_version_range      : neo_version_range,
             loader_version_range   : loader_version_range,
@@ -227,7 +227,7 @@ modrinth {
     syncBodyFrom = rootProject.file("README.md").text
     dependencies {
         required.project "simple-voice-chat"
-        required.project "websocket-lib"
+        required.project "gemini_live_lib"
     }
 }
 
@@ -244,7 +244,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     mainFile.addGameVersion(minecraft_version)
     mainFile.addRequirement("simple-voice-chat")
     mainFile.addRequirement("minecolonies")
-    mainFile.addRequirement("websocket-lib")
+    mainFile.addRequirement("gemini_live_lib")
     mainFile.changelog = changelogText
 }
 
