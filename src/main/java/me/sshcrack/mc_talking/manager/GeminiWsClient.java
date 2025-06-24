@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +29,6 @@ public class GeminiWsClient extends GeminiLiveClient {
     boolean isInitiatingConnection = false;
     boolean shouldReconnect = false;
 
-    public static boolean quotaExceeded = false;
 
     GeminiStream stream;
     ServerPlayer initialPlayer;
@@ -36,20 +36,10 @@ public class GeminiWsClient extends GeminiLiveClient {
     private final List<short[]> pending_prompt = new ArrayList<>();    // Audio batching variables
     private final List<String> pendingSystemText = new ArrayList<>();
 
-    private final List<short[]> audioBatch = Collections.synchronizedList(new ArrayList<>());
-    private static final long BATCH_TIMEOUT = 100; // 100ms batch window
-    private static final int MAX_BATCH_SIZE = 5; // Maximum number of audio packets in a batch
-    private volatile Timer batchTimer;
-    private volatile TimerTask currentBatchTask;
-    private final Object batchLock = new Object();
-
-    private static String getUrl() {
-        return "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=" + CONFIG.geminiApiKey.get();
-    }
 
     //TODO: Don't send packets to all players
     public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
-        super(URI.create(getUrl()));
+        super(CONFIG.geminiApiKey.get());
         this.manager = manager;
         stream = new GeminiStream(manager.channel);
 
@@ -63,8 +53,7 @@ public class GeminiWsClient extends GeminiLiveClient {
     }
 
     @Override
-    public void onOpen(ServerHandshake handshakeData) {
-        isInitiatingConnection = false;
+    public BidiGenerateContentSetup getSetup() {
         var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
 
         var modality = CONFIG.modality.get();
@@ -76,7 +65,6 @@ public class GeminiWsClient extends GeminiLiveClient {
         if (modality != ModalityModes.TEXT) {
             setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
             setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
-
             var entity = this.manager.entity;
             var female = entity.getCitizenData().isFemale();
             var uuid = entity.getUUID();
@@ -125,9 +113,8 @@ public class GeminiWsClient extends GeminiLiveClient {
     public void onSessionResumptionUpdate(String newHandle, boolean resumable) {
         if(!resumable)
             return;
-        EntityDataProvider.getFromEntity(this.manager.entity).ifPresent(provider -> {
-            provider.setSessionToken(newHandle);
-        });
+
+        this.manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN.get(), newHandle);
     }
 
     @Override
@@ -212,12 +199,19 @@ public class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.warn("Unknown function call: {}", name);
             return null;
         }
+
+        return action.execute(this.manager.entity, colony, args);
     }
 
     @Override
-    public void onMessage(ByteBuffer bytes) {
-        String newContent = new String(bytes.array(), StandardCharsets.UTF_8);
-        onMessage(newContent);
+    public void onQuotaExceeded() {
+        McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
+        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
+        try {
+            initialPlayer.sendSystemMessage(Component.literal("Quota exceeded for Gemini API, please check your API key and usage limits."));
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override
@@ -226,9 +220,7 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         //vcApi.getAudioConverter().shortsToBytes(data)
         if (reason.contains("BidiGenerateContent session not found")) {
-            EntityDataProvider.getFromEntity(manager.entity).ifPresent(provider -> {
-                provider.setSessionToken("");
-            });
+            manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, "");
             new Thread(() -> {
                 if (!isOpen() || !isInitiatingConnection) {
                     reconnect();
@@ -316,105 +308,7 @@ public class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void close() {
-        // Clean up timer resources
-        if (batchTimer != null) {
-            batchTimer.cancel();
-            batchTimer = null;
-        }
-        if (currentBatchTask != null) {
-            currentBatchTask.cancel();
-            currentBatchTask = null;
-        }
-
-        stream.close();
         super.close();
-    }
-
-    /**
-     * Batches audio data and sends it when a batch is complete or times out
-     *
-     * @param audio The audio data to batch
-     */
-    public void batchAudio(short[] audio) {
-        boolean batchFull;
-        boolean isFirstElement;
-
-        synchronized (batchLock) {
-            // Add to batch
-            audioBatch.add(audio);
-
-            // Check if batch is full
-            batchFull = audioBatch.size() >= MAX_BATCH_SIZE;
-            isFirstElement = audioBatch.size() == 1;
-        }
-
-        if (batchFull) {
-            // Process and send the batch immediately
-            sendCurrentBatch();
-        } else if (isFirstElement) {
-            // If this is the first element in the batch, start the timer
-            scheduleFlushTimer();
-        }
-    }
-
-    /**
-     * Schedules a timer to flush the current batch after the timeout period
-     */
-    private void scheduleFlushTimer() {
-        // Cancel any existing task
-        if (currentBatchTask != null) {
-            currentBatchTask.cancel();
-        }
-
-        // Create new task
-        currentBatchTask = new TimerTask() {
-            @Override
-            public void run() {
-                if (!audioBatch.isEmpty()) {
-                    sendCurrentBatch();
-                }
-            }
-        };
-
-        // Initialize timer if needed
-        if (batchTimer == null) {
-            batchTimer = new Timer("AudioBatchTimer", true);
-        }
-
-        // Schedule the task
-        batchTimer.schedule(currentBatchTask, BATCH_TIMEOUT);
-    }
-
-    /**
-     * Combines and sends the current batch of audio
-     */
-    private void sendCurrentBatch() {
-        List<short[]> batchCopy;
-
-        synchronized (batchLock) {
-            if (audioBatch.isEmpty()) return;
-
-            // Create a copy of the batch to work with
-            batchCopy = new ArrayList<>(audioBatch);
-            // Clear the original batch immediately to allow new additions
-            audioBatch.clear();
-        }
-
-        // Process the copy outside the synchronized block
-        int totalLength = 0;
-        for (short[] audioData : batchCopy) {
-            totalLength += audioData.length;
-        }
-
-        short[] combinedAudio = new short[totalLength];
-        int position = 0;
-
-        for (short[] audioData : batchCopy) {
-            System.arraycopy(audioData, 0, combinedAudio, position, audioData.length);
-            position += audioData.length;
-        }
-
-        // Send the combined audio
-        addPromptAudio(combinedAudio);
+        stream.close();
     }
 }
