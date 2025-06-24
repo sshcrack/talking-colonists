@@ -41,7 +41,7 @@ public class GeminiWsClient extends GeminiLiveClient {
     public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
         super(CONFIG.geminiApiKey.get());
         this.manager = manager;
-        stream = new GeminiStream(manager.channel);
+        stream = new GeminiStream(manager.channel, manager.entity.getUUID());
 
         var isFemale = manager.entity.getCitizenData().isFemale();
         var isChild = manager.entity.getCitizenData().isChild();
@@ -160,7 +160,6 @@ public class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onTurnComplete() {
         McTalking.LOGGER.info("Gemini turn complete");
-        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
 
     @Override
