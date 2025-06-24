@@ -172,7 +172,7 @@ dependencies {
     runtimeOnly fg.deobf("com.ldtteam:domum_ornamentum:${domum_version}")
     runtimeOnly fg.deobf("com.ldtteam:structurize:${structurize_version}")
     runtimeOnly fg.deobf("com.ldtteam:blockui:${blockui_version}")
-    implementation("me.sshcrack:websocket_lib:${websocket_lib_version}-${minecraft_version}-forge")
+    implementation("me.sshcrack:gemini_live_lib:${gemini_live_lib_version}-${minecraft_version}-forge")
 }
 
 mixin {
@@ -190,7 +190,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             loader_version_range   : loader_version_range,
             voicechat_version      : voicechat_version,
             minecolonies_version   : minecolonies_version,
-            websocket_lib_version  : websocket_lib_version,
+            gemini_live_lib_version  : gemini_live_lib_version,
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
@@ -286,7 +286,7 @@ modrinth {
     syncBodyFrom = rootProject.file("README.md").text
     dependencies {
         required.project "simple-voice-chat"
-        required.project "websocket-lib"
+        required.project "gemini_live_lib"
     }
 }
 
@@ -303,7 +303,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     mainFile.addGameVersion(minecraft_version)
     mainFile.addRequirement("simple-voice-chat")
     mainFile.addRequirement("minecolonies")
-    mainFile.addRequirement("websocket-lib")
+    mainFile.addRequirement("gemini_live_lib")
     mainFile.changelog = changelogText
 }
 
