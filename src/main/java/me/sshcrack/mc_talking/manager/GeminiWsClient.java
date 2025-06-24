@@ -19,6 +19,7 @@ import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
@@ -33,8 +34,8 @@ public class GeminiWsClient extends GeminiLiveClient {
     GeminiStream stream;
     ServerPlayer initialPlayer;
     TalkingManager manager;
-    private final List<short[]> pending_prompt = new ArrayList<>();    // Audio batching variables
-    private final List<String> pendingSystemText = new ArrayList<>();
+    private final List<short[]> pending_prompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
+    private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
 
 
     //TODO: Don't send packets to all players
