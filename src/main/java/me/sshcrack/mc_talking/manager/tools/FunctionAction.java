@@ -6,7 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.mc_talking.gson.properties.Property;
+import me.sshcrack.gemini_live_lib.gson.properties.Property;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NumericTag;

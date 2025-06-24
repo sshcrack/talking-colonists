@@ -1,33 +1,29 @@
 package me.sshcrack.mc_talking.manager;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import me.sshcrack.gemini_live_lib.GeminiLiveClient;
+import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
+import me.sshcrack.gemini_live_lib.gson.ClientMessages;
+import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
+import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.ModAttachmentTypes;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.ModalityModes;
-import me.sshcrack.mc_talking.gson.BidiGenerateContentSetup;
-import me.sshcrack.mc_talking.gson.BidiGenerateContentToolResponse;
-import me.sshcrack.mc_talking.gson.ClientMessages;
-import me.sshcrack.mc_talking.gson.RealtimeInput;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
-import me.sshcrack.websocket_lib.lib.client.WebSocketClient;
-import me.sshcrack.websocket_lib.lib.handshake.ServerHandshake;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
-public class GeminiWsClient extends WebSocketClient {
+public class GeminiWsClient extends GeminiLiveClient {
     boolean setupComplete;
     boolean isInitiatingConnection = false;
     boolean shouldReconnect = false;
@@ -115,181 +111,106 @@ public class GeminiWsClient extends WebSocketClient {
         if (CONFIG.currentAiModel.get() == AvailableAI.Flash2_5 && CONFIG.enableFunctionWorkaround.get())
             setup.tools.add(BidiGenerateContentSetup.Tool.googleSearch());
 
-
-        send(ClientMessages.setup(setup));
+        return setup;
     }
 
     private String currMsg = "";
 
     @Override
-    public void onMessage(String message) {
-        var p = JsonParser.parseString(message);
-        if (!p.isJsonObject())
-            return;
-        var outer = p.getAsJsonObject();
-        if (outer.has("setupComplete")) {
-            McTalking.LOGGER.info("Gemini setup complete");
-            setupComplete = true;
-            if (!pendingSystemText.isEmpty()) {
-                for (String text : pendingSystemText) {
-                    addSystemText(text);
-                }
-                pendingSystemText.clear();
-            }
+    public void onUsageMetadata(JsonObject obj) {
+        McTalking.LOGGER.info("Gemini usage metadata: {}", obj.toString());
+    }
 
-            if (!pending_prompt.isEmpty()) {
-                for (short[] data : pending_prompt) {
-                    addPromptAudio(data);
-                }
-                pending_prompt.clear();
-            }
+    @Override
+    public void onSessionResumptionUpdate(String newHandle, boolean resumable) {
+        if(!resumable)
             return;
+        EntityDataProvider.getFromEntity(this.manager.entity).ifPresent(provider -> {
+            provider.setSessionToken(newHandle);
+        });
+    }
+
+    @Override
+    public void onGenerationComplete() {
+        McTalking.LOGGER.info("Gemini generation complete");
+
+
+        stream.flushAudio();
+        var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
+        if (player == null)
+            return;
+        var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
+        if (sPlayer == null || currMsg.isBlank())
+            return;
+        sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+        currMsg = "";
+    }
+
+    @Override
+    public void onInterrupted() {
+        McTalking.LOGGER.info("Gemini generation interrupted");
+        stream.stop();
+
+        var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
+        if (player == null)
+            return;
+        var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
+        if (sPlayer == null || currMsg.isBlank())
+            return;
+        sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+        currMsg = "";
+    }
+
+    @Override
+    public void onGeneratedText(String text) {
+        var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
+        if(!hasTextEnabled)
+            return;
+
+        currMsg += text;
+    }
+
+    @Override
+    public void onTurnComplete() {
+        McTalking.LOGGER.info("Gemini turn complete");
+        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+    }
+
+    @Override
+    public void onGeneratedAudio(byte[] data, int sampleRate) {
+        var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
+        if (!isJustStarted)
+            return;
+
+        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
+    }
+
+    @Override
+    public void onSetupComplete() {
+        McTalking.LOGGER.info("Gemini setup complete");
+        if (!pendingSystemText.isEmpty()) {
+            for (String text : pendingSystemText) {
+                addSystemText(text);
+            }
+            pendingSystemText.clear();
         }
 
-
-        if (!setupComplete)
-            return;
-
-
-        if (outer.has("usageMetadata")) {
-            McTalking.LOGGER.info("Gemini usage metadata: {}", outer.get("usageMetadata").toString());
+        if (!pending_prompt.isEmpty()) {
+            for (short[] data : pending_prompt) {
+                addPromptAudio(data);
+            }
+            pending_prompt.clear();
         }
+    }
 
-        if (outer.has("sessionResumptionUpdate")) {
-            var obj = outer.get("sessionResumptionUpdate").getAsJsonObject();
-            if (!obj.has("newHandle") || !obj.get("newHandle").isJsonPrimitive())
-                return;
+    @Override
+    public JsonObject onFunctionCall(String name, @Nullable JsonObject args) {
+        var colony = this.manager.entity.getCitizenColonyHandler().getColony();
 
-            if (!obj.has("resumable") || !obj.get("resumable").getAsBoolean())
-                return;
-
-            var handle = obj.get("newHandle").getAsString();
-            this.manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, handle);
-            return;
-        }
-
-        if (outer.has("toolCall")) {
-            System.out.println("Tool call: " + message);
-            var obj = outer.getAsJsonObject("toolCall");
-            if (!obj.has("functionCalls") || !obj.get("functionCalls").isJsonArray())
-                return;
-
-            var functionCalls = obj.getAsJsonArray("functionCalls");
-            for (JsonElement fnCall : functionCalls) {
-                if (!fnCall.isJsonObject())
-                    continue;
-
-                var objFnCall = fnCall.getAsJsonObject();
-                if (!objFnCall.has("name") || !objFnCall.get("name").isJsonPrimitive())
-                    continue;
-
-                var name = objFnCall.get("name").getAsString();
-                var action = AITools.registeredFunctions.get(name);
-                if (action == null) {
-                    McTalking.LOGGER.warn("Unknown function call: {}", name);
-                    continue;
-                }
-
-                JsonObject args = null;
-                if (objFnCall.has("args")) {
-                    args = objFnCall.getAsJsonObject("args");
-                }
-
-                var colony = this.manager.entity.getCitizenColonyHandler().getColony();
-                var output = action.execute(this.manager.entity, colony, args);
-
-                var res = new BidiGenerateContentToolResponse();
-                res.functionResponses.add(new BidiGenerateContentToolResponse.FunctionResponse(
-                        objFnCall.get("id").getAsString(),
-                        name,
-                        output
-                ));
-
-                send(ClientMessages.response(res));
-            }
-
-            return;
-        }
-
-        if (outer.has("serverContent") && outer.get("serverContent").isJsonObject()) {
-            var obj = outer.getAsJsonObject("serverContent");
-            if (obj.has("turnComplete") && obj.get("turnComplete").getAsBoolean()) {
-                McTalking.LOGGER.info("Gemini turn complete");
-                AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
-                return;
-            }
-
-            if (obj.has("interrupted") && obj.get("interrupted").getAsBoolean()) {
-                McTalking.LOGGER.info("Gemini generation interrupted");
-                stream.stop();
-
-                var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
-                if (player == null)
-                    return;
-                var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
-                if (sPlayer == null || currMsg.isBlank())
-                    return;
-                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
-                currMsg = "";
-                return;
-            }
-
-            if (obj.has("generationComplete") && obj.get("generationComplete").getAsBoolean()) {
-                McTalking.LOGGER.info("Gemini generation complete");
-
-
-                stream.flushAudio();
-                var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
-                if (player == null)
-                    return;
-                var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
-                if (sPlayer == null || currMsg.isBlank())
-                    return;
-                sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
-                currMsg = "";
-                return;
-            }
-
-            if (obj.has("modelTurn")) {
-                var modelTurn = obj.getAsJsonObject("modelTurn");
-                if (modelTurn.has("parts")) {
-                    var parts = modelTurn.getAsJsonArray("parts");
-                    for (var part : parts) {
-                        if (!part.isJsonObject())
-                            continue;
-
-                        var pObj = part.getAsJsonObject();
-                        var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
-                        if (pObj.has("text") && pObj.get("text").isJsonPrimitive() && hasTextEnabled) {
-                            var text = pObj.get("text").getAsString();
-                            currMsg += text;
-                        }
-
-                        if (!pObj.has("inlineData") || !pObj.get("inlineData").isJsonObject())
-                            continue;
-
-                        var inlineData = pObj.getAsJsonObject("inlineData");
-                        if (!inlineData.has("data") || !inlineData.get("data").isJsonPrimitive())
-                            continue;
-
-                        var mimeType = inlineData.get("mimeType").getAsString();
-                        if (!mimeType.contains("audio/pcm")) {
-                            McTalking.LOGGER.warn("Invalid mime type: {}", inlineData.get("mimeType").getAsString());
-                            continue;
-                        }
-
-                        var sampleRateStr = mimeType.split("rate=")[1];
-                        var sampleRate = Integer.parseInt(sampleRateStr);
-
-                        var data = Base64.getDecoder().decode(inlineData.get("data").getAsString());
-                        var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
-                        if (isJustStarted)
-                            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
-                    }
-                }
-            } else {
-                McTalking.LOGGER.warn("Unknown message: {}", message);
-            }
+        var action = AITools.registeredFunctions.get(name);
+        if (action == null) {
+            McTalking.LOGGER.warn("Unknown function call: {}", name);
+            return null;
         }
     }
 
@@ -301,15 +222,13 @@ public class GeminiWsClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        isInitiatingConnection = false;
-        if (reason.contains("You exceeded your current quota, please")) {
-            quotaExceeded = true;
-            McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
-            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
-        }
+        super.onClose(code, reason, remote);
 
+        //vcApi.getAudioConverter().shortsToBytes(data)
         if (reason.contains("BidiGenerateContent session not found")) {
-            manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, "");
+            EntityDataProvider.getFromEntity(manager.entity).ifPresent(provider -> {
+                provider.setSessionToken("");
+            });
             new Thread(() -> {
                 if (!isOpen() || !isInitiatingConnection) {
                     reconnect();
@@ -318,8 +237,6 @@ public class GeminiWsClient extends WebSocketClient {
             }).start();
             return;
         }
-
-
         if (code != 1000 && code != 1001) {
             AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
         }
@@ -363,9 +280,12 @@ public class GeminiWsClient extends WebSocketClient {
         send(ClientMessages.input(input));
     }
 
+    @Override
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();
-        input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", audio);
+        var byteAudio = vcApi.getAudioConverter().shortsToBytes(audio);
+        input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
+
         if (sentGeneratingStatus)
             AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
 
