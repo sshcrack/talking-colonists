@@ -30,6 +30,7 @@ public class McTalkingConfig {
     public final ModConfigSpec.ConfigValue<Double> activationDistance;
     public final ModConfigSpec.ConfigValue<Boolean> useTalkingDevice;
     public final ModConfigSpec.ConfigValue<Boolean> enableFunctionWorkaround;
+    public final ModConfigSpec.ConfigValue<Boolean> sendErrorsToPlayers;
 
     // Resource Management
     public final ModConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
@@ -94,7 +95,7 @@ public class McTalkingConfig {
         maxConcurrentAgents = builder
                 .gameRestart()
                 .comment("Resource Management")
-                .comment("Maximum number of AI agents that can be activated at once (for free tier, this is limited to 3)")
+                .comment("Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
                 .define("max_concurrent_agents", 3, e -> e == null || (int) e > 0);
 
         maxConversationDistance = builder
@@ -122,6 +123,10 @@ public class McTalkingConfig {
 
                     return false;
                 });
+
+        sendErrorsToPlayers = builder
+                .comment("If true, errors will be sent to players that have OP permissions. If false, errors will only be logged to the console.")
+                .define("send_errors_to_players", true);
     }
 
     static {

@@ -245,7 +245,7 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         if (code != 1000 && code != 1001) {
             AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-            if (initialPlayer.hasPermissions(4) && !quotaExceeded)
+            if (initialPlayer.hasPermissions(4) && !quotaExceeded && CONFIG.sendErrorsToPlayers.get())
                 initialPlayer.sendSystemMessage(Component.literal("An error occurred in GeminiWsClient with reason " + reason + " and code " + code));
         }
 
@@ -259,7 +259,7 @@ public class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onError(Exception ex) {
         AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-        if (initialPlayer.hasPermissions(4))
+        if (initialPlayer.hasPermissions(4) && CONFIG.sendErrorsToPlayers.get())
             initialPlayer.sendSystemMessage(Component.literal("An error occurred in GeminiWsClient: " + ex.getMessage()));
 
         McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
