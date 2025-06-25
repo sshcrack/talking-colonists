@@ -94,7 +94,7 @@ public class McTalkingConfig {
         maxConcurrentAgents = builder
                 .gameRestart()
                 .comment("Resource Management")
-                .comment("Maximum number of AI agents that can be activated at once")
+                .comment("Maximum number of AI agents that can be activated at once (for free tier, this is limited to 3)")
                 .define("max_concurrent_agents", 3, e -> e == null || (int) e > 0);
 
         maxConversationDistance = builder
