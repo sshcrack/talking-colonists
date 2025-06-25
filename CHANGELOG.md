@@ -1,7 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.3.0] - 2025-06-22
+## [1.3.1] - 2025-06-25
+-  Directly send a chat message if an error occurs (can be disabled in the config)
+- Add notice for Flash2.5 supporting only one concurrent voice chat connection on free tier
+
+## [1.3.0] - 2025-06-24
 - Migrate Websocket to GeminiLiveLibrary mod for more modularity
 
 ## [1.2.2] - 2025-06-22
