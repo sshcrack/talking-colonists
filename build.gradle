@@ -5,6 +5,7 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.88'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'idea'
+    id 'maven-publish'
     id "com.modrinth.minotaur" version "2+"
     id 'net.darkhax.curseforgegradle' version '1.1+'
 }
@@ -15,6 +16,16 @@ tasks.named('wrapper', Wrapper).configure {
 
 version = mod_version
 group = mod_group_id
+
+
+tasks.register('sourcesJar', Jar) {
+    from sourceSets.main.allSource
+    archiveClassifier.set('sources')
+}
+
+artifacts {
+    archives sourcesJar
+}
 
 repositories {
     mavenLocal()
@@ -248,7 +259,35 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     mainFile.changelog = changelogText
 }
 
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'me.sshcrack'
+            artifactId = mod_id
+            version = project.version + "-" + minecraft_version + "-neoforge"
+
+            artifact(jar)
+            artifact(sourcesJar)
+        }
+    }
+
+    repositories {
+        maven {
+            name = "sshcrackRepository"
+            url = "https://maven.sshcrack.me/releases"
+
+            credentials {
+                username = localProperties.getProperty('MAVEN_USERNAME') ?: System.getenv('MAVEN_USERNAME')
+                password = localProperties.getProperty('MAVEN_PASSWORD') ?: System.getenv('MAVEN_PASSWORD')
+            }
+        }
+    }
+}
+
+
 tasks.register("publishAll")
 
 tasks.publishAll.dependsOn(tasks.modrinth)
 tasks.publishAll.dependsOn(tasks.publishCurseForge)
+tasks.publishAll.dependsOn(tasks.publish)
