@@ -19,6 +19,17 @@ base {
     archivesName = mod_id
 }
 
+
+tasks.register('sourcesJar', Jar) {
+    from sourceSets.main.allSource
+    archiveClassifier.set('sources')
+}
+
+artifacts {
+    archives sourcesJar
+}
+
+
 // Forge recommends Java 17 for 1.20.1
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -299,7 +310,34 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     mainFile.changelog = changelogText
 }
 
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = 'me.sshcrack'
+            artifactId = mod_id
+            version = project.version + "-" + minecraft_version + "-neoforge"
+
+            artifact(jar)
+            artifact(sourcesJar)
+        }
+    }
+
+    repositories {
+        maven {
+            name = "sshcrackRepository"
+            url = "https://maven.sshcrack.me/releases"
+
+            credentials {
+                username = localProperties.getProperty('MAVEN_USERNAME') ?: System.getenv('MAVEN_USERNAME')
+                password = localProperties.getProperty('MAVEN_PASSWORD') ?: System.getenv('MAVEN_PASSWORD')
+            }
+        }
+    }
+}
+
 tasks.register("publishAll")
 
 tasks.publishAll.dependsOn(tasks.modrinth)
+tasks.publishAll.dependsOn(tasks.publish)
 tasks.publishAll.dependsOn(tasks.publishCurseForge)
