@@ -316,7 +316,7 @@ publishing {
         maven(MavenPublication) {
             groupId = 'me.sshcrack'
             artifactId = mod_id
-            version = project.version + "-" + minecraft_version + "-neoforge"
+            version = project.version + "-" + minecraft_version + "-forge"
 
             artifact(jar)
             artifact(sourcesJar)
