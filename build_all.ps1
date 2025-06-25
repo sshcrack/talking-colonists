@@ -18,20 +18,11 @@ if (-not (Test-Path "both_loaders")) {
 }
 
 .\gradlew clean build
-if($activeBranch -eq "forge-1.20.1") {
-    Move-Item "./build/libs/*-all.jar" "both_loaders/mc_talking_$modVersion-forge-1.20.1.jar" -Force
-} else {
-    Move-Item "./build/libs/*.jar" "both_loaders/mc_talking_$modVersion-neoforge-1.21.1.jar" -Force
-}
+Move-Item "./build/libs/*.jar" "both_loaders/mc_talking_$modVersion-$activeBranch.jar" -Force
 
 git checkout $switchToBranch
 .\gradlew clean build
-
-if($switchToBranch -eq "forge-1.20.1") {
-    Move-Item "./build/libs/*-all.jar" "both_loaders/mc_talking_$modVersion-forge-1.20.1.jar" -Force
-} else {
-    Move-Item "./build/libs/*.jar" "both_loaders/mc_talking_$modVersion-neoforge-1.21.1.jar" -Force
-}
+Move-Item "./build/libs/*.jar" "both_loaders/mc_talking_$modVersion-$switchToBranch.jar" -Force
 
 git checkout $activeBranch
 Move-Item "both_loaders" "build/both_loaders" -Force
