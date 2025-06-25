@@ -1,6 +1,9 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-06-22
+- Migrate Websocket to GeminiLiveLibrary mod for more modularity
+
 ## [1.2.2] - 2025-06-22
 ### Fixed
 - Issue that caused crashing when loading into the world
