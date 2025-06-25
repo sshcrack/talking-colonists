@@ -176,12 +176,12 @@ public class GeminiWsClient extends GeminiLiveClient {
     public void onSetupComplete() {
         McTalking.LOGGER.info("Gemini setup complete");
         setupComplete = true;
-        
+
         synchronized (pendingSystemText) {
             if (!pendingSystemText.isEmpty()) {
                 List<String> textToProcess = new ArrayList<>(pendingSystemText);
                 pendingSystemText.clear();
-                
+
                 for (String text : textToProcess) {
                     var input = new RealtimeInput();
                     input.text = text;
@@ -194,7 +194,7 @@ public class GeminiWsClient extends GeminiLiveClient {
             if (!pending_prompt.isEmpty()) {
                 List<short[]> audioToProcess = new ArrayList<>(pending_prompt);
                 pending_prompt.clear();
-                
+
                 for (short[] data : audioToProcess) {
                     var input = new RealtimeInput();
                     var byteAudio = vcApi.getAudioConverter().shortsToBytes(data);
@@ -233,7 +233,6 @@ public class GeminiWsClient extends GeminiLiveClient {
     public void onClose(int code, String reason, boolean remote) {
         super.onClose(code, reason, remote);
 
-        //vcApi.getAudioConverter().shortsToBytes(data)
         if (reason.contains("BidiGenerateContent session not found")) {
             EntityDataProvider.getFromEntity(manager.entity).ifPresent(provider -> {
                 provider.setSessionToken("");
@@ -246,17 +245,27 @@ public class GeminiWsClient extends GeminiLiveClient {
             }).start();
             return;
         }
+
         if (code != 1000 && code != 1001) {
             AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
+            if (initialPlayer.hasPermissions(4) && !quotaExceeded)
+                initialPlayer.sendSystemMessage(Component.literal("An error occurred in GeminiWsClient with reason " + reason + " and code " + code));
         }
 
-        McTalking.LOGGER.info("GeminiWsClient closed: {} and code {}", reason, code);
+        if (code == 1000) {
+            McTalking.LOGGER.info("GeminiWsClient closed normally: {}", reason);
+        } else {
+            McTalking.LOGGER.warn("GeminiWsClient closed: {} and code {}", reason, code);
+        }
     }
 
     @Override
     public void onError(Exception ex) {
         AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-        ex.printStackTrace();
+        if (initialPlayer.hasPermissions(4))
+            initialPlayer.sendSystemMessage(Component.literal("An error occurred in GeminiWsClient: " + ex.getMessage()));
+
+        McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
     }
 
     boolean sentGeneratingStatus = false;
