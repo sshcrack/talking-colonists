@@ -295,7 +295,7 @@ tasks.register('publishCurseForge', TaskPublishCurseForge) {
     mainFile.addGameVersion(minecraft_version)
     mainFile.addRequirement("simple-voice-chat")
     mainFile.addRequirement("minecolonies")
-    mainFile.addRequirement("gemini_live_lib")
+    mainFile.addRequirement("gemini-live-lib")
     mainFile.changelog = changelogText
 }
 
