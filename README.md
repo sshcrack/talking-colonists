@@ -1,7 +1,7 @@
 You can interactively talk to citizens in your minecolonies just as if they were alive!
 
 ## Setup Guide
-0. Install all dependencies ([Minecolonies](https://www.curseforge.com/minecraft/mc-mods/minecolonies) and [Voicechat](https://modrinth.com/mod/simple-voice-chat))
+0. Install all dependencies ([Minecolonies](https://www.curseforge.com/minecraft/mc-mods/minecolonies), [Voicechat](https://modrinth.com/mod/simple-voice-chat) and [Gemini Live Lib](https://www.curseforge.com/minecraft/mc-mods/gemini-live-lib))
 1. Head to the [Google AI Studio](https://aistudio.google.com/u/0/apikey) and create an API key by pressing the blue button:
 
 ![blue Create API button](https://github.com/sshcrack/talking-colonists/blob/neoforge-1.21.1/imgs/create_btn.png?raw=true)
