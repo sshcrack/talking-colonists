@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class ListCitizenAction extends FunctionAction {
     public ListCitizenAction() {
-        super("list_citizens", "Listens all citizens in the colony");
+        super("list_citizens", "Listens all citizens in the colony by their names.");
     }
 
     @Override

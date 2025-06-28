@@ -18,7 +18,7 @@ import java.util.List;
 
 public class GetColonyAction extends FunctionAction {
     public GetColonyAction() {
-        super("get_colony", "Gets information about the colony. If no colony ID is provided, it returns the colony the citizen is currently living in",
+        super("get_colony", "Gets information about the colony. If no colony ID is provided, it returns the colony the citizen is currently living in. This includes the name of the colony, buildings, maxCitizens, overallHappiness and other useful information.",
                 new ObjectProperty(new HashMap<>() {{
                     put("colony_id", new PrimitiveProperty(PrimitiveProperty.Type.INTEGER, false));
                 }})

@@ -13,7 +13,7 @@ public class GetCitizenInfoAction extends FunctionAction {
     public GetCitizenInfoAction() {
         super(
                 "get_citizen_info",
-                "Get information about a citizen",
+                "Get information about a specific citizen by their name. This can be something like outer appearance, their skills, their current saturation, job, family, work places, quests and more.",
                 new ObjectProperty(new HashMap<>() {{
                     put("citizen_name", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
                 }})
