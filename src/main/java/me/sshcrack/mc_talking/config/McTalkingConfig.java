@@ -111,7 +111,7 @@ public class McTalkingConfig {
 
         disabledTools = builder
                 .worldRestart()
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Available tools are listed here: https://github.com/sshcrack/talking-colonists/blob/forge-1.20.1/AVAILABLE_TOOLS.md")
+                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /available_tools command to see a list of the available tools.")
                 .defineList("disabled_tools", Collections::emptyList, e -> {
                     if(e instanceof String str) {
                         return AITools.getRegisteredFunctionNames().contains(str);
