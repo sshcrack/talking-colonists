@@ -111,7 +111,7 @@ public class McTalkingConfig {
 
         disabledTools = builder
                 .worldRestart()
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /available_tools command to see a list of the available tools.")
+                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /list_tools command to see a list of the available tools.")
                 .defineList("disabled_tools", Collections::emptyList, e -> {
                     if(e instanceof String str) {
                         return AITools.getRegisteredFunctionNames().contains(str);

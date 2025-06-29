@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
@@ -17,6 +18,7 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 
 import java.util.UUID;
@@ -43,6 +45,11 @@ public class ServerEventHandler {
         McTalking.LOGGER.error("======================");
         McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
         McTalking.LOGGER.error("======================");
+    }
+
+    @SubscribeEvent
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        ListToolsCommand.register(event.getDispatcher());
     }
 
     /**
