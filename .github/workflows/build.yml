@@ -5,12 +5,8 @@ on:
     branches:
       - 'forge-1.20.1'
       - 'neoforge-1.21.1'
-      - 'forge-1.20.1-*'
-      - 'neoforge-1.21.1-*'
   pull_request:
-    branches:
-      - 'forge-1.20.1'
-      - 'neoforge-1.21.1'
+    types: [opened, reopened, edited, synchronize]
   workflow_dispatch:
 
 jobs:
