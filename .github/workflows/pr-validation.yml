@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, reopened, edited, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -79,46 +83,18 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const platform = '${{ steps.check-branch.outputs.platform }}';
+            const platformType = '${{ steps.check-branch.outputs.type }}';
             
-            // Try to add the label - if it doesn't exist, we'll create it
             try {
+              // Try to add the label (this will work if the label already exists)
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                labels: [platform]
+                labels: [platformType]
               });
+              console.log(`Successfully added label: ${platformType}`);
             } catch (error) {
-              console.log('Label may not exist, trying to create it first');
-              
-              // Determine color based on platform
-              const color = platform.includes('neoforge') ? '1d76db' : 'f97316';
-              
-              try {
-                // Create the label
-                await github.rest.issues.createLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  name: platform,
-                  color: color,
-                  description: `PR for ${platform}`
-                });
-                
-                // Try adding the label again
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  labels: [platform]
-                });
-              } catch (createError) {
-                console.log('Error creating or adding label:', createError);
-              }
+              console.log(`Unable to add label ${platformType}: ${error.message}`);
+              // We don't try to create labels anymore due to permission limitations
             }
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `✅ **Validation Passed**\n\nThis PR has been identified as targeting the **${platform}** platform.`
-            });
