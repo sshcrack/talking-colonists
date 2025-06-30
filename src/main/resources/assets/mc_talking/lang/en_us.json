@@ -26,5 +26,11 @@
   "mc_talking.ai_status.error": "Error",
   "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work.",
   "mc_talking.recruit_lore": "Maybe this little gift will help you get this citizen back to join your colony.",
-  "mc_talking.invalid_on_visitor": "You cannot use the Talking Device on visitors."
+  "mc_talking.invalid_on_visitor": "You cannot use the Talking Device on visitors.",
+  "mc_talking.commands.expect_tool": "Expected a tool name",
+  "mc_talking.commands.invalid_tool": "Invalid tool name: %s",
+  "mc_talking.commands.tool_not_found": "Tool not found.",
+  "mc_talking.commands.no_tools_available": "No tools available.",
+  "mc_talking.commands.tool_description": "The description of tool %s is:\n%s\nProperties:\n%s",
+  "mc_talking.commands.list_tools": "List of available tools:\n%s"
 }
