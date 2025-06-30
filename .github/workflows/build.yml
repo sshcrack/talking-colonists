@@ -1,6 +1,15 @@
 name: Build
 
-on: [push]
+on:
+  push:
+    branches:
+      - 'forge-1.20.1'
+      - 'neoforge-1.21.1'
+  pull_request:
+    branches:
+      - 'forge-1.20.1'
+      - 'neoforge-1.21.1'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -43,7 +52,8 @@ jobs:
           
           # For push events
           if [[ -n "${{ github.ref }}" && "${{ github.ref }}" == refs/heads/* ]]; then
-            BRANCH_NAME="${{ github.ref#refs/heads/ }}"
+            BRANCH_NAME="${{ github.ref }}"
+            BRANCH_NAME=${BRANCH_NAME#refs/heads/}
             
             NEOFORGE_VERSION=$(extract_version "$BRANCH_NAME" "neoforge")
             FORGE_VERSION=$(extract_version "$BRANCH_NAME" "forge")
@@ -73,6 +83,7 @@ jobs:
             echo "platform=forge-1.20.1" >> $GITHUB_OUTPUT
           fi
 
+      # Use Gradle's built-in caching mechanism
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -82,21 +93,20 @@ jobs:
             notifications
             jdks
             wrapper
+          # Cache build outputs in addition to dependencies
+          build-cache-path: .gradle/build-cache
+          # Generate dependency graph for better insights
           dependency-graph: generate
           
-      # Cache the .gradle directory and build outputs to speed up builds
-      - name: Cache Gradle Dependencies and Build Outputs
+      # Cache the build output directory to speed up successive builds
+      - name: Cache Build Outputs
         uses: actions/cache@v4
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            .gradle
             build
-          key: ${{ runner.os }}-gradle-${{ steps.platform.outputs.platform }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-build-${{ steps.platform.outputs.platform }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-gradle-${{ steps.platform.outputs.platform }}-
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-build-${{ steps.platform.outputs.platform }}-
 
       # This is needed to be able to run ./gradlew below
       - name: Make Gradle wrapper executable
