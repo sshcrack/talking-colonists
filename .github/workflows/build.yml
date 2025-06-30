@@ -93,8 +93,6 @@ jobs:
             notifications
             jdks
             wrapper
-          # Cache build outputs in addition to dependencies
-          build-cache-path: .gradle/build-cache
           # Generate dependency graph for better insights
           dependency-graph: generate
           
@@ -104,7 +102,8 @@ jobs:
         with:
           path: |
             build
-          key: ${{ runner.os }}-build-${{ steps.platform.outputs.platform }}-${{ github.sha }}
+            .gradle/build-cache
+          key: ${{ runner.os }}-build-${{ steps.platform.outputs.platform }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ steps.platform.outputs.platform }}-
 
