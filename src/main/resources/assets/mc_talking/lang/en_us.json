@@ -31,6 +31,6 @@
   "mc_talking.commands.invalid_tool": "Invalid tool name: %s",
   "mc_talking.commands.tool_not_found": "Tool not found.",
   "mc_talking.commands.no_tools_available": "No tools available.",
-  "mc_talking.commands.tool_description": "The description of tool %s is:\n%s\nProperties:\n%s",
+  "mc_talking.commands.tool_description": "The description of tool %s is:\n%s\nProperties:%s",
   "mc_talking.commands.list_tools": "List of available tools:\n%s"
 }

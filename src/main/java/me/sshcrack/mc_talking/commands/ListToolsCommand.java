@@ -32,6 +32,7 @@ public class ListToolsCommand {
         var prop = tool.getProperty();
         if (prop instanceof ObjectProperty objProp) {
             objProp.getProperties().forEach((key, value) -> {
+                strWriter.write("\n");
                 strWriter.write(key + ": ");
                 if (value instanceof PrimitiveProperty prim) {
                     strWriter.write(prim.getType());
@@ -47,8 +48,6 @@ public class ListToolsCommand {
                     strWriter.write("Unsupported type");
                 }
                 //TODO Add array
-
-                strWriter.write("\n");
             });
         }
 
