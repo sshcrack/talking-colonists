@@ -1,6 +1,6 @@
 name: Build
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build:
@@ -18,13 +18,91 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Determine Minecraft Platform
+        id: platform
+        run: |
+          # Function to extract version from branch name
+          extract_version() {
+            local branch="$1"
+            local prefix="$2"
+            
+            # Check if branch has version in format prefix-X.Y.Z-rest
+            if [[ "$branch" =~ ^$prefix-([0-9]+\.[0-9]+\.[0-9]+)(-.*)?$ ]]; then
+              echo "${prefix}-${BASH_REMATCH[1]}"
+            # Default version if no specific version in branch name
+            elif [[ "$branch" == $prefix-* ]]; then
+              if [[ "$prefix" == "neoforge" ]]; then
+                echo "neoforge-1.21.1"
+              else
+                echo "forge-1.20.1"
+              fi
+            else
+              echo ""
+            fi
+          }
+          
+          # For push events
+          if [[ -n "${{ github.ref }}" && "${{ github.ref }}" == refs/heads/* ]]; then
+            BRANCH_NAME="${{ github.ref#refs/heads/ }}"
+            
+            NEOFORGE_VERSION=$(extract_version "$BRANCH_NAME" "neoforge")
+            FORGE_VERSION=$(extract_version "$BRANCH_NAME" "forge")
+            
+            if [[ -n "$NEOFORGE_VERSION" ]]; then
+              echo "platform=$NEOFORGE_VERSION" >> $GITHUB_OUTPUT
+            elif [[ -n "$FORGE_VERSION" ]]; then
+              echo "platform=$FORGE_VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "platform=forge-1.20.1" >> $GITHUB_OUTPUT
+            fi
+          # For pull request events  
+          elif [[ -n "${{ github.head_ref }}" ]]; then
+            BRANCH_NAME="${{ github.head_ref }}"
+            
+            NEOFORGE_VERSION=$(extract_version "$BRANCH_NAME" "neoforge")
+            FORGE_VERSION=$(extract_version "$BRANCH_NAME" "forge")
+            
+            if [[ -n "$NEOFORGE_VERSION" ]]; then
+              echo "platform=$NEOFORGE_VERSION" >> $GITHUB_OUTPUT
+            elif [[ -n "$FORGE_VERSION" ]]; then
+              echo "platform=$FORGE_VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "platform=forge-1.20.1" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "platform=forge-1.20.1" >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+          gradle-home-cache-includes: |
+            caches
+            notifications
+            jdks
+            wrapper
+          dependency-graph: generate
+          
+      # Cache the .gradle directory and build outputs to speed up builds
+      - name: Cache Gradle Dependencies and Build Outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            .gradle
+            build
+          key: ${{ runner.os }}-gradle-${{ steps.platform.outputs.platform }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ steps.platform.outputs.platform }}-
+            ${{ runner.os }}-gradle-
 
       # This is needed to be able to run ./gradlew below
-      # You can run `git update-index --chmod +x gradlew` then remove this step.
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
       - name: Build with Gradle
         run: ./gradlew build
+        env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
