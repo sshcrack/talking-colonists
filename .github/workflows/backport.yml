@@ -33,7 +33,8 @@ jobs:
         uses: korthout/backport-action@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          auto_merge: false
+          auto_merge: true
+          branch_name: '${target_branch}-backport-${pull_number}'
           merge_conflict_action: skip
           add_labels: |
             backport
