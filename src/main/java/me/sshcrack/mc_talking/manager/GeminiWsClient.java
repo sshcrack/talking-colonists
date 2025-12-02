@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
@@ -57,9 +58,10 @@ public class GeminiWsClient extends GeminiLiveClient {
         var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
 
         var modality = CONFIG.modality.get();
-        setup.generationConfig.responseModalities = modality.getModes();
-        if (CONFIG.currentAiModel.get() == AvailableAI.Flash2_5) {
-            setup.generationConfig.responseModalities = List.of("AUDIO");
+        setup.generationConfig.responseModalities = modality.getModalities();
+
+        if(modality == ModalityModes.TEXT_AND_AUDIO) {
+            setup.outputAudioTranscription = new JsonObject();
         }
 
         if (modality != ModalityModes.TEXT) {
@@ -155,6 +157,11 @@ public class GeminiWsClient extends GeminiLiveClient {
             return;
 
         currMsg += text;
+    }
+
+    @Override
+    public void onOutputTranscription(String transcription) {
+        currMsg += transcription;
     }
 
     @Override
