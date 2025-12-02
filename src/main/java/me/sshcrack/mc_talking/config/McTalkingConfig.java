@@ -104,7 +104,7 @@ public class McTalkingConfig {
 
         modality = builder
                 .gameRestart()
-                .comment("In which format the AI should respond. This can be audio only for now. Right now there is no support for text AND audio as far as I know (the value is still in there so it has backwards compatibility).")
+                .comment("In which format the AI should respond. This can be text, audio or both.")
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
 
 
