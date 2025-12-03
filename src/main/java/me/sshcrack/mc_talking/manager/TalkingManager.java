@@ -26,16 +26,24 @@ public class TalkingManager {
     EntityAudioChannel channel;
     AbstractEntityCitizen entity;
     OpusDecoder decoder;
+    private final UUID sessionId;
 
     public TalkingManager(AbstractEntityCitizen entity, ServerPlayer initialPlayer) {
         McTalking.LOGGER.info("Creating TalkingManager for entity: {}", entity.getStringUUID());
         if (vcApi == null) throw new IllegalStateException("Voicechat API is not initialized");
 
         this.entity = entity;
+        this.sessionId = entity.getUUID();
+
+        // Acquire a session slot from the central manager
+        if (!SessionManager.acquireSession(sessionId, this::close)) {
+            throw new IllegalStateException("Cannot create TalkingManager: session limit reached");
+        }
 
         var uuid = IS_BUG_FIXED_VC ? UUID.randomUUID() : entity.getUUID();
         channel = vcApi.createEntityAudioChannel(uuid, vcApi.fromEntity(entity));
         if (channel == null) {
+            SessionManager.releaseSession(sessionId);
             throw new IllegalStateException("Failed to create audio channel for entity: " + entity.getStringUUID());
         }
 
@@ -54,6 +62,9 @@ public class TalkingManager {
     }
 
     public void close() {
+        // Release the session slot
+        SessionManager.releaseSession(sessionId);
+        
         client.close();
         channel = null;
     }

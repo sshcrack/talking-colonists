@@ -121,6 +121,16 @@ public class ConversationManager {
             return;
         }
 
+        // Check if the citizen is already in an NPC-NPC conversation
+        var citizenData = citizen.getCitizenData();
+        if (citizenData != null && me.sshcrack.mc_talking.manager.npc.NPCConversationManager.isNPCInConversation(citizenData.getId())) {
+            player.sendSystemMessage(
+                    Component.translatable("mc_talking.npc_busy")
+                            .withStyle(ChatFormatting.YELLOW)
+            );
+            return;
+        }
+
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
@@ -173,6 +183,21 @@ public class ConversationManager {
      */
     public static boolean isPlayerInConversation(UUID playerId) {
         return playerConversationPartners.containsKey(playerId);
+    }
+
+    /**
+     * Checks if a citizen entity is currently in a player conversation.
+     *
+     * @param citizenId The citizen's ID (from ICitizenData.getId())
+     * @return true if the citizen is in a player conversation
+     */
+    public static boolean isEntityInPlayerConversation(int citizenId) {
+        for (AbstractEntityCitizen citizen : activeEntity.values()) {
+            if (citizen.getCitizenData() != null && citizen.getCitizenData().getId() == citizenId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -379,5 +404,8 @@ public class ConversationManager {
         
         // Also cleanup NPC conversations
         me.sshcrack.mc_talking.manager.npc.NPCConversationManager.endAllConversations();
+        
+        // Clear all sessions
+        me.sshcrack.mc_talking.manager.SessionManager.clearAll();
     }
 }

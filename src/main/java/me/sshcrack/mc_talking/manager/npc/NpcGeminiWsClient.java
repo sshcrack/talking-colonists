@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.manager.npc;
 
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.ICitizenData;
+import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
@@ -9,7 +10,11 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.ModalityModes;
+import me.sshcrack.mc_talking.manager.GeminiStream;
+import me.sshcrack.mc_talking.manager.SessionManager;
 import me.sshcrack.mc_talking.manager.tools.AITools;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.network.AiStatusPayload;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -17,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 /**
@@ -30,7 +36,7 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
  * <ul>
  *   <li>Uses compact NPC system prompts designed for multi-NPC context</li>
  *   <li>Handles responses by broadcasting them to other NPCs</li>
- *   <li>No player audio handling - text-only communication</li>
+ *   <li>Supports audio output to entity voice channel</li>
  *   <li>Integrated with NPCConversation for message routing</li>
  * </ul>
  */
@@ -41,17 +47,23 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     private final UUID npcId;
     private final List<String> pendingSystemText;
     
+    // Audio output support
+    private EntityAudioChannel channel;
+    private GeminiStream stream;
+    
     private boolean setupComplete;
     private boolean isInitiatingConnection;
     private boolean shouldReconnect;
     private long lastReconnectTime;
     private String currentMessage;
+    private boolean sessionAcquired;
     
     /**
      * Creates a new NPC Gemini WebSocket client.
      * 
      * @param conversation The parent conversation this NPC belongs to
      * @param citizenData The citizen data for this NPC
+     * @throws IllegalStateException if a session slot cannot be acquired
      */
     public NpcGeminiWsClient(NPCConversation conversation, ICitizenData citizenData) {
         super(CONFIG.geminiApiKey.get());
@@ -65,8 +77,55 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
         this.shouldReconnect = false;
         this.lastReconnectTime = 0;
         this.currentMessage = "";
+        this.sessionAcquired = false;
+        
+        // Acquire a session slot from the central manager
+        if (!SessionManager.acquireSession(npcId, this::close)) {
+            throw new IllegalStateException("Cannot create NpcGeminiWsClient: session limit reached");
+        }
+        this.sessionAcquired = true;
+        
+        // Initialize audio channel for the NPC entity
+        initializeAudioChannel();
         
         McTalking.LOGGER.info("Created NpcGeminiWsClient for NPC: {}", citizenData.getName());
+    }
+    
+    /**
+     * Initializes the audio channel for the NPC entity.
+     */
+    private void initializeAudioChannel() {
+        if (vcApi == null) {
+            McTalking.LOGGER.warn("VoiceChat API not available, NPC {} will not have audio output", citizenData.getName());
+            return;
+        }
+        
+        var entityOpt = citizenData.getEntity();
+        if (entityOpt.isEmpty()) {
+            McTalking.LOGGER.warn("NPC {} has no entity, cannot create audio channel", citizenData.getName());
+            return;
+        }
+        
+        var entity = entityOpt.get();
+        
+        // Create a unique UUID for the channel (use random to avoid conflicts)
+        UUID channelId = UUID.randomUUID();
+        channel = vcApi.createEntityAudioChannel(channelId, vcApi.fromEntity(entity));
+        
+        if (channel == null) {
+            McTalking.LOGGER.warn("Failed to create audio channel for NPC: {}", citizenData.getName());
+            return;
+        }
+        
+        channel.setWhispering(true);
+        stream = new GeminiStream(channel, entity.getUUID());
+        
+        // Set pitch based on NPC characteristics
+        if (citizenData.isChild() && !citizenData.isFemale()) {
+            stream.setPitch(0.8f);
+        }
+        
+        McTalking.LOGGER.info("Audio channel created for NPC: {}", citizenData.getName());
     }
     
     /**
@@ -91,8 +150,27 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     public BidiGenerateContentSetup getSetup() {
         var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
         
-        // For NPC-to-NPC conversations, we use TEXT modality for efficiency
-        setup.generationConfig.responseModalities = new String[]{"TEXT"};
+        // Use configured modality for NPC conversations (supports audio output)
+        var modality = CONFIG.modality.get();
+        setup.generationConfig.responseModalities = modality.getModalities();
+        
+        if (modality == ModalityModes.TEXT_AND_AUDIO) {
+            setup.outputAudioTranscription = new JsonObject();
+        }
+        
+        // Configure speech settings if audio is enabled
+        if (modality != ModalityModes.TEXT) {
+            setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
+            setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
+            
+            var entityOpt = citizenData.getEntity();
+            UUID entityUuid = entityOpt.isPresent() ? entityOpt.get().getUUID() : npcId;
+            
+            setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = 
+                CONFIG.currentAiModel.get().getRandomVoice(entityUuid, citizenData.isFemale());
+        }
         
         // Build the compact system prompt for this NPC in the multi-NPC context
         var sys = new BidiGenerateContentSetup.SystemInstruction();
@@ -128,6 +206,11 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     public void onGenerationComplete() {
         McTalking.LOGGER.debug("NPC {} generation complete", citizenData.getName());
         
+        // Flush any remaining audio
+        if (stream != null) {
+            stream.flushAudio();
+        }
+        
         if (!currentMessage.isBlank()) {
             // Broadcast this NPC's response to other NPCs in the conversation
             conversation.broadcastToOthers(npcId, currentMessage.trim());
@@ -139,6 +222,11 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     public void onInterrupted() {
         McTalking.LOGGER.debug("NPC {} generation interrupted", citizenData.getName());
         
+        // Stop audio playback
+        if (stream != null) {
+            stream.stop();
+        }
+        
         if (!currentMessage.isBlank()) {
             // Still broadcast partial message
             conversation.broadcastToOthers(npcId, currentMessage.trim());
@@ -148,12 +236,17 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     
     @Override
     public void onGeneratedText(String text) {
+        var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
+        if (!hasTextEnabled)
+            return;
+        
         currentMessage += text;
     }
     
     @Override
     public void onOutputTranscription(String transcription) {
-        // Not used for NPC-to-NPC text conversations
+        // Capture transcription for audio mode
+        currentMessage += transcription;
     }
     
     @Override
@@ -163,13 +256,31 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
-        // NPC-to-NPC conversations are text-only, so we ignore audio output
+        // Send audio to the entity's voice channel
+        if (stream == null) {
+            return;
+        }
+        
+        var entityOpt = citizenData.getEntity();
+        UUID entityUuid = entityOpt.isPresent() ? entityOpt.get().getUUID() : npcId;
+        
+        var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
+        if (isJustStarted) {
+            // Notify that the NPC is now talking
+            AiStatusPayload.sendToAll(new AiStatusPayload(entityUuid, AiStatus.TALKING));
+        }
     }
     
     @Override
     public void onSetupComplete() {
         McTalking.LOGGER.info("NPC {} Gemini setup complete", citizenData.getName());
         setupComplete = true;
+        
+        // Send initial status
+        var entityOpt = citizenData.getEntity();
+        if (entityOpt.isPresent()) {
+            AiStatusPayload.sendToAll(new AiStatusPayload(entityOpt.get().getUUID(), AiStatus.LISTENING));
+        }
         
         // Process any pending messages
         synchronized (pendingSystemText) {
@@ -286,6 +397,26 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     @Override
     public void close() {
         super.close();
+        
+        // Release the session slot
+        if (sessionAcquired) {
+            SessionManager.releaseSession(npcId);
+            sessionAcquired = false;
+        }
+        
+        // Clean up audio resources
+        if (stream != null) {
+            stream.close();
+            stream = null;
+        }
+        channel = null;
+        
+        // Send status update
+        var entityOpt = citizenData.getEntity();
+        if (entityOpt.isPresent()) {
+            AiStatusPayload.sendToAll(new AiStatusPayload(entityOpt.get().getUUID(), AiStatus.NONE));
+        }
+        
         McTalking.LOGGER.info("Closed NpcGeminiWsClient for NPC: {}", citizenData.getName());
     }
 }

@@ -46,11 +46,53 @@ public class NPCConversationManager {
     // Active conversations indexed by their UUID
     private static final Map<UUID, NPCConversation> activeConversations = new ConcurrentHashMap<>();
     
+    // Track which NPCs are currently in NPC-NPC conversations (citizen ID -> conversation ID)
+    private static final Map<Integer, UUID> npcsInConversation = new ConcurrentHashMap<>();
+    
     // Maximum number of concurrent NPC conversations allowed
     private static final int MAX_CONVERSATIONS = 10;
     
     // Queue of conversation IDs for LRU eviction
     private static final Queue<UUID> conversationQueue = new LinkedList<>();
+    
+    /**
+     * Checks if a citizen is currently in an NPC-NPC conversation.
+     * 
+     * @param citizenId The citizen's ID
+     * @return true if the citizen is in an NPC-NPC conversation
+     */
+    public static boolean isNPCInConversation(int citizenId) {
+        return npcsInConversation.containsKey(citizenId);
+    }
+    
+    /**
+     * Gets the conversation ID for a citizen in an NPC-NPC conversation.
+     * 
+     * @param citizenId The citizen's ID
+     * @return The conversation ID, or null if not in a conversation
+     */
+    public static UUID getConversationForNPC(int citizenId) {
+        return npcsInConversation.get(citizenId);
+    }
+    
+    /**
+     * Registers an NPC as being in a conversation.
+     * 
+     * @param citizenId The citizen's ID
+     * @param conversationId The conversation ID
+     */
+    static void registerNPCInConversation(int citizenId, UUID conversationId) {
+        npcsInConversation.put(citizenId, conversationId);
+    }
+    
+    /**
+     * Unregisters an NPC from a conversation.
+     * 
+     * @param citizenId The citizen's ID
+     */
+    static void unregisterNPCFromConversation(int citizenId) {
+        npcsInConversation.remove(citizenId);
+    }
     
     /**
      * Creates a new multi-NPC conversation with the specified scheduler.
@@ -244,6 +286,9 @@ public class NPCConversationManager {
         for (UUID id : new ArrayList<>(activeConversations.keySet())) {
             endConversation(id);
         }
+        
+        // Clear any remaining tracked NPCs
+        npcsInConversation.clear();
         
         McTalking.LOGGER.info("Ended all NPC conversations");
     }

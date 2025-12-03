@@ -70,7 +70,7 @@ public class NPCConversation {
      * Adds an NPC to this conversation.
      * 
      * @param citizenData The citizen data for the NPC to add
-     * @return true if the NPC was added successfully, false if already present
+     * @return true if the NPC was added successfully, false if already present or unavailable
      */
     public boolean addNPC(ICitizenData citizenData) {
         UUID npcId = NPCConversationUtils.generateNpcId(citizenData);
@@ -80,13 +80,37 @@ public class NPCConversation {
             return false;
         }
         
+        // Check if NPC is already in another NPC conversation
+        if (NPCConversationManager.isNPCInConversation(citizenData.getId())) {
+            McTalking.LOGGER.warn("NPC {} is already in another NPC conversation", citizenData.getName());
+            return false;
+        }
+        
+        // Check if NPC is in a player conversation
+        if (me.sshcrack.mc_talking.ConversationManager.isEntityInPlayerConversation(citizenData.getId())) {
+            McTalking.LOGGER.warn("NPC {} is currently in a player conversation", citizenData.getName());
+            return false;
+        }
+        
         // Store citizen data
         npcData.put(npcId, citizenData);
         npcOrder.add(npcId);
         
+        // Register NPC as being in this conversation
+        NPCConversationManager.registerNPCInConversation(citizenData.getId(), conversationId);
+        
         // Create NPC-specific Gemini client
-        NpcGeminiWsClient client = new NpcGeminiWsClient(this, citizenData);
-        npcClients.put(npcId, client);
+        try {
+            NpcGeminiWsClient client = new NpcGeminiWsClient(this, citizenData);
+            npcClients.put(npcId, client);
+        } catch (IllegalStateException e) {
+            // Session limit reached, rollback
+            npcData.remove(npcId);
+            npcOrder.remove(npcId);
+            NPCConversationManager.unregisterNPCFromConversation(citizenData.getId());
+            McTalking.LOGGER.warn("Failed to add NPC {} to conversation: {}", citizenData.getName(), e.getMessage());
+            return false;
+        }
         
         McTalking.LOGGER.info("Added NPC {} to conversation {}", citizenData.getName(), conversationId);
         return true;
@@ -102,8 +126,13 @@ public class NPCConversation {
         NpcGeminiWsClient client = npcClients.remove(npcId);
         if (client != null) {
             client.close();
-            npcData.remove(npcId);
+            ICitizenData data = npcData.remove(npcId);
             npcOrder.remove(npcId);
+            
+            // Unregister NPC from conversation tracking
+            if (data != null) {
+                NPCConversationManager.unregisterNPCFromConversation(data.getId());
+            }
             
             // Adjust round-robin index if needed
             if (roundRobinIndex >= npcOrder.size()) {
@@ -316,6 +345,12 @@ public class NPCConversation {
      */
     public void end() {
         active = false;
+        
+        // Unregister all NPCs from conversation tracking
+        for (ICitizenData data : npcData.values()) {
+            NPCConversationManager.unregisterNPCFromConversation(data.getId());
+        }
+        
         for (NpcGeminiWsClient client : npcClients.values()) {
             client.close();
         }
