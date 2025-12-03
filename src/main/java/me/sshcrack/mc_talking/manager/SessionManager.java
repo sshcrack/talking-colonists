@@ -2,6 +2,8 @@ package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.McTalking;
 
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -25,7 +27,7 @@ public class SessionManager {
     private static final Queue<UUID> sessionQueue = new ConcurrentLinkedQueue<>();
     
     // Callbacks for session eviction
-    private static final java.util.Map<UUID, Runnable> evictionCallbacks = new ConcurrentHashMap<>();
+    private static final Map<UUID, Runnable> evictionCallbacks = new ConcurrentHashMap<>();
     
     /**
      * Attempts to acquire a session slot.
@@ -126,7 +128,7 @@ public class SessionManager {
      * Clears all sessions. Call during server shutdown.
      */
     public static void clearAll() {
-        for (UUID sessionId : new java.util.ArrayList<>(activeSessions)) {
+        for (UUID sessionId : new ArrayList<>(activeSessions)) {
             evictSession(sessionId);
         }
         activeSessions.clear();

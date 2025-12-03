@@ -108,7 +108,9 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
         
         var entity = entityOpt.get();
         
-        // Create a unique UUID for the channel (use random to avoid conflicts)
+        // Create a unique UUID for the channel to avoid conflicts with existing entity audio channels
+        // This is necessary when multiple NPCs may have overlapping entity UUIDs or when
+        // the same entity has multiple audio channels active
         UUID channelId = UUID.randomUUID();
         channel = vcApi.createEntityAudioChannel(channelId, vcApi.fromEntity(entity));
         
@@ -236,7 +238,8 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
     
     @Override
     public void onGeneratedText(String text) {
-        var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
+        var modality = CONFIG.modality.get();
+        var hasTextEnabled = modality == ModalityModes.TEXT || modality == ModalityModes.TEXT_AND_AUDIO;
         if (!hasTextEnabled)
             return;
         
