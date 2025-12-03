@@ -376,5 +376,8 @@ public class ConversationManager {
         lookDuration.clear();
         previousEntityLookedAt.clear();
         lastEntitySwitchTime.clear();
+        
+        // Also cleanup NPC conversations
+        me.sshcrack.mc_talking.manager.npc.NPCConversationManager.endAllConversations();
     }
 }

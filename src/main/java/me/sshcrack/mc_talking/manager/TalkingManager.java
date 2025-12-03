@@ -58,6 +58,13 @@ public class TalkingManager {
         channel = null;
     }
 
+    /**
+     * Sends a system text prompt to the AI client.
+     * This can be used to provide context or instructions to the AI.
+     * 
+     * @param newStatusPrompt The text prompt to send
+     */
     public void promptSystemText(String newStatusPrompt) {
+        client.addSystemText(newStatusPrompt);
     }
 }
