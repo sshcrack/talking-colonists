@@ -58,9 +58,7 @@ public class NpcGeminiWsClient extends GeminiLiveClient {
         
         this.conversation = conversation;
         this.citizenData = citizenData;
-        this.npcId = citizenData.getId() != 0 
-            ? UUID.nameUUIDFromBytes(String.valueOf(citizenData.getId()).getBytes())
-            : UUID.randomUUID();
+        this.npcId = NPCConversationUtils.generateNpcId(citizenData);
         this.pendingSystemText = Collections.synchronizedList(new ArrayList<>());
         this.setupComplete = false;
         this.isInitiatingConnection = false;

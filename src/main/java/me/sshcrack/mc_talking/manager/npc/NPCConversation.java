@@ -73,9 +73,7 @@ public class NPCConversation {
      * @return true if the NPC was added successfully, false if already present
      */
     public boolean addNPC(ICitizenData citizenData) {
-        UUID npcId = citizenData.getId() != 0 ? 
-            UUID.nameUUIDFromBytes(String.valueOf(citizenData.getId()).getBytes()) :
-            UUID.randomUUID();
+        UUID npcId = NPCConversationUtils.generateNpcId(citizenData);
         
         if (npcClients.containsKey(npcId)) {
             McTalking.LOGGER.warn("NPC {} is already in conversation {}", citizenData.getName(), conversationId);
@@ -213,10 +211,7 @@ public class NPCConversation {
      * Gets a random next speaker.
      */
     private UUID getNextRandom() {
-        if (npcOrder.isEmpty()) return null;
-        
-        Random random = new Random();
-        return npcOrder.get(random.nextInt(npcOrder.size()));
+        return NPCConversationUtils.getRandomElement(npcOrder);
     }
     
     /**
@@ -226,13 +221,12 @@ public class NPCConversation {
         if (npcOrder.isEmpty()) return null;
         if (npcOrder.size() == 1) return npcOrder.get(0);
         
-        Random random = new Random();
         List<UUID> candidates = new ArrayList<>(npcOrder);
         if (lastSpeaker != null) {
             candidates.remove(lastSpeaker);
         }
         
-        return candidates.get(random.nextInt(candidates.size()));
+        return NPCConversationUtils.getRandomElement(candidates);
     }
     
     /**
