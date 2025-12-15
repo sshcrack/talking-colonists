@@ -1,6 +1,9 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2025-12-15
+- Fixed compatibility with the newest minecolonies version
+
 ## [1.3.1] - 2025-06-25
 -  Directly send a chat message if an error occurs (can be disabled in the config)
 - Add notice for Flash2.5 supporting only one concurrent voice chat connection on free tier
