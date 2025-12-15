@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
@@ -288,7 +289,7 @@ public class CitizenContextUtils {
         // Check for specific happiness modifiers
         List<String> modifiers = handler.getModifiers();
 
-        var hasSchool = data.getColony().hasBuilding("school", 1, true);
+        var hasSchool = data.getColony().hasBuilding(ModBuildings.school.get().getRegistryName(), 1, true);
         for (String modifierId : modifiers) {
             IHappinessModifier modifier = handler.getModifier(modifierId);
             if (modifier != null) {
