@@ -83,7 +83,7 @@ repositories {
 }
 
 ext {
-    minecolonies_version = "${minecraft_version}-${minecolonies_version_suffix}"
+    voicechat_version = "${minecraft_version}-${voicechat_version_suffix}"
 }
 
 base {
