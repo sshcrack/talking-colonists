@@ -55,7 +55,13 @@ public class CitizenTalkingDevice extends Item {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
 
         if (Math.random() <= 0.25) {
-            var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+            var compD = stack.get(DataComponents.CUSTOM_DATA);
+            if(compD == null) {
+                stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                return;
+            }
+
+            var comp = compD.copyTag();
             if (!comp.contains("talkingPlayer")) {
                 stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
                 return;
