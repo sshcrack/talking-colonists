@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.buildings.IBuilding;
+import com.minecolonies.api.colony.buildings.ICommonBuilding;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.constant.Constants;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
@@ -43,8 +44,8 @@ public class GetColonyAction extends FunctionAction {
         colonyInfo.addProperty("isDay", colony.isDay());
         colonyInfo.addProperty("isUnderAttack", colony.isColonyUnderAttack());
         colonyInfo.addProperty("isActive", colony.isActive());
-        colonyInfo.addProperty("hasTownHall", colony.hasTownHall());
-        colonyInfo.addProperty("hasWarehouse", colony.hasWarehouse());
+        colonyInfo.addProperty("hasTownHall", colony.getServerBuildingManager().hasTownHall());
+        colonyInfo.addProperty("hasWarehouse", colony.getServerBuildingManager().hasWarehouse());
         colonyInfo.addProperty("overallHappiness", colony.getOverallHappiness());
         colonyInfo.addProperty("citizenCount", colony.getCitizenManager().getCurrentCitizenCount());
         colonyInfo.addProperty("maxCitizens", colony.getCitizenManager().getMaxCitizens());
@@ -55,7 +56,7 @@ public class GetColonyAction extends FunctionAction {
 
         // Buildings information
         final JsonArray buildingsArray = new JsonArray();
-        for (final IBuilding building : colony.getBuildingManager().getBuildings().values()) {
+        for (final var building : colony.getServerBuildingManager().getBuildings().values()) {
             final JsonObject buildingObj = new JsonObject();
             buildingObj.addProperty("type", building.getBuildingType().getRegistryName().getPath());
             buildingObj.addProperty("level", building.getBuildingLevel());
