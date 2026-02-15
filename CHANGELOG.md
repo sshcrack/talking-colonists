@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.3.3] - 2026-02-15
+## [1.3.4] - 2026-02-15
 - Fixed compatibility with the newest minecolonies version
 
 ## [1.3.3] - 2025-12-15
