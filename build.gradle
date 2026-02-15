@@ -82,6 +82,10 @@ repositories {
     }
 }
 
+ext {
+    minecolonies_version = "${minecraft_version}-${minecolonies_version_suffix}"
+}
+
 base {
     archivesName = mod_id
 }
