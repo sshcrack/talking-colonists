@@ -8,7 +8,7 @@ public enum AvailableAI {
     //Voice 'Fenir' isn't available for the API IDK why
 
     @SuppressWarnings("unused")
-    Flash2_5("gemini-2.5-flash-native-audio-preview-09-2025",
+    Flash2_5("gemini-3.1-flash-live-preview",
             List.of("Puck", "Charon", "Orus", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Algenib", "Rasalgethi", "Alnilam", "Schedar", "Archid", "Zubenelgenubi", "Sadachbia", "Sadaltager"),
             List.of("Zephyr", "Kore", "Leda", "Aoede", "Callirrhoe", "Autonoe", "Despina", "Erinome", "Laomedeia", "Achernar", "Gacrux", "Pulcherrima", "Vindemiatrix", "Sulafat")
     );
