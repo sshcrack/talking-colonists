@@ -282,8 +282,8 @@ publishing {
             url = "https://maven.sshcrack.me/releases"
 
             credentials {
-                username = localProperties.getProperty('MAVEN_USERNAME') ?: System.getenv('MAVEN_USERNAME')
-                password = localProperties.getProperty('MAVEN_PASSWORD') ?: System.getenv('MAVEN_PASSWORD')
+                username = findProperty('sshcrackRepoMavenUser') ?: System.getenv('sshcrackRepoMavenUser')
+                password = findProperty('sshcrackRepoMavenPassword') ?: System.getenv('sshcrackRepoMavenPassword')
             }
         }
     }
