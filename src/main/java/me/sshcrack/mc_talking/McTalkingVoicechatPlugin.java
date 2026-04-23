@@ -7,6 +7,7 @@ import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
+import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -56,13 +57,17 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     @Override
     public void initialize(VoicechatApi api) {
         McTalking.LOGGER.info("Initializing Voicechat Plugin");
+    }
 
-        // Start a periodic task to check for speech end and schedule silence packets
-        executor.scheduleAtFixedRate(this::checkForSpeechEnd,
-                PERIODIC_SILENCE_CHECK_MS, PERIODIC_SILENCE_CHECK_MS, TimeUnit.MILLISECONDS);
+    public void onStop(VoicechatServerStoppedEvent event) {
+        executor.shutdownNow();
     }
 
     public void onServerStart(VoicechatServerStartedEvent event) {
+        // Start a periodic task to check for speech end and schedule silence packets
+        executor.scheduleAtFixedRate(this::checkForSpeechEnd,
+            PERIODIC_SILENCE_CHECK_MS, PERIODIC_SILENCE_CHECK_MS, TimeUnit.MILLISECONDS);
+
         McTalking.LOGGER.info("Voicechat Server Started");
         vcApi = event.getVoicechat();
     }
@@ -71,21 +76,26 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public void registerEvents(EventRegistration registration) {
         registration.registerEvent(MicrophonePacketEvent.class, this::handleMicPacket);
         registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStart);
+        registration.registerEvent(VoicechatServerStoppedEvent.class, this::onStop);
     }
 
     public void handleMicPacket(MicrophonePacketEvent event) {
         var sender = event.getSenderConnection();
-        if (sender == null)
+        if (sender == null) {
             return;
+        }
 
         var packet = event.getPacket();
-        if (packet.isWhispering())
+        if (packet.isWhispering()) {
             return;
-        if (sender.isDisabled())
+        }
+        if (sender.isDisabled()) {
             return;
+        }
         var vcPlayer = sender.getPlayer();
-        if (sender.isInGroup() && !CONFIG.respondInGroups.get())
+        if (sender.isInGroup() && !CONFIG.respondInGroups.get()) {
             return;
+        }
 
         var player = (ServerPlayer) vcPlayer.getPlayer();
         LivingEntity entity = ConversationManager.getActiveEntity(player.getUUID());
@@ -232,9 +242,9 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
             // If we've exceeded the inactivity threshold and we're not already sending silence
             if (speechEndTime != null &&
-                    (currentTime - speechEndTime >= VOICE_INACTIVITY_THRESHOLD_MS) &&
-                    isSpeaking.getOrDefault(entityId, false) &&
-                    !silenceTimeouts.containsKey(entityId)) {
+                (currentTime - speechEndTime >= VOICE_INACTIVITY_THRESHOLD_MS) &&
+                isSpeaking.getOrDefault(entityId, false) &&
+                !silenceTimeouts.containsKey(entityId)) {
 
                 // Mark the entity as no longer speaking
                 isSpeaking.put(entityId, false);
@@ -258,8 +268,8 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
             // If not in the speech end detection map and not already sending silence
             if (!speechEndDetections.containsKey(entityId) &&
-                    !silenceTimeouts.containsKey(entityId) &&
-                    isSpeaking.getOrDefault(entityId, false)) {
+                !silenceTimeouts.containsKey(entityId) &&
+                isSpeaking.getOrDefault(entityId, false)) {
 
                 // If we've exceeded the inactivity threshold
                 if (lastActivity != null && (currentTime - lastActivity >= VOICE_INACTIVITY_THRESHOLD_MS * 3)) {
