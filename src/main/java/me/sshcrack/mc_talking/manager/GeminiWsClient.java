@@ -98,7 +98,7 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         setup.systemInstruction = sys;
         setup.tools.addAll(AITools.getEnabledTools());
-        if (CONFIG.currentAiModel.get() == AvailableAI.Flash2_5 && CONFIG.enableFunctionWorkaround.get())
+        if (CONFIG.currentAiModel.get() == AvailableAI.Flash3 && CONFIG.enableFunctionWorkaround.get())
             setup.tools.add(BidiGenerateContentSetup.Tool.googleSearch());
 
         return setup;

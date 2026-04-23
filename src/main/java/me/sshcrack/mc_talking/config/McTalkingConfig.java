@@ -50,7 +50,7 @@ public class McTalkingConfig {
         currentAiModel = builder
                 .gameRestart()
                 .comment("What kind of AI model to use. Right now, this is the only one Google offers")
-                .defineEnum("ai_model", AvailableAI.Flash2_5);
+                .defineEnum("ai_model", AvailableAI.Flash3);
         enableFunctionWorkaround = builder
                 .gameRestart()
                 .comment("Enables the Google Search so Flash2.5 can execute functions. Google Search will ONLY be enabled for Flash2.5.")
