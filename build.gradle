@@ -295,3 +295,7 @@ tasks.register("publishAll")
 tasks.publishAll.dependsOn(tasks.modrinth)
 tasks.publishAll.dependsOn(tasks.publishCurseForge)
 tasks.publishAll.dependsOn(tasks.publish)
+
+tasks.register("publishMaven") {
+    dependsOn(tasks.publishMavenPublicationToSshcrackRepositoryRepository)
+}
