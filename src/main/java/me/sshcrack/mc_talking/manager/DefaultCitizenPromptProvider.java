@@ -1,0 +1,406 @@
+package me.sshcrack.mc_talking.manager;
+
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
+import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
+import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
+import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
+import static com.minecolonies.api.util.constant.HappinessConstants.HEALTH;
+import static com.minecolonies.api.util.constant.HappinessConstants.HOMELESSNESS;
+import static com.minecolonies.api.util.constant.HappinessConstants.IDLEATJOB;
+import static com.minecolonies.api.util.constant.HappinessConstants.MYSTICAL_SITE;
+import static com.minecolonies.api.util.constant.HappinessConstants.RAIDWITHOUTDEATH;
+import static com.minecolonies.api.util.constant.HappinessConstants.SCHOOL;
+import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
+import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
+import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
+import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
+
+/**
+ * Default implementation for citizen prompt generation.
+ */
+public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
+
+    @Override
+    public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
+        final StringBuilder prompt = new StringBuilder();
+        prompt.append("# ROLEPLAY AS ").append(view.name()).append("\n\n");
+        prompt.append("You: ").append(view.child() ? "Child" : "Adult").append(" ")
+            .append(view.female() ? "woman" : "man");
+
+        if (view.jobName() != null) {
+            prompt.append(", **").append(view.jobName()).append("**");
+        } else {
+            prompt.append(", **unemployed**");
+        }
+
+        var sick = view.sick();
+        if (sick) {
+            prompt.append(", sick");
+        }
+
+        if (view.homeless()) {
+            prompt.append(", homeless");
+        }
+
+        prompt.append(".\n\n");
+
+        if (view.skills() != null && !view.skills().isEmpty()) {
+            appendCondensedSkills(view.skills(), prompt);
+        }
+
+        boolean hasRelationships = false;
+
+        if (view.parentNames() != null && !view.parentNames().isEmpty()) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Parents: ").append(String.join(", ", view.parentNames())).append("\n");
+        }
+
+        if (view.hasPartner()) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- In a relationship\n");
+        }
+
+        if (view.childCount() > 0) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Has ").append(view.childCount()).append(" ").append(view.childCount() == 1 ? "child" : "children")
+                .append("\n");
+        }
+
+        if (view.siblingCount() > 0) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Has ").append(view.siblingCount()).append(" ").append(view.siblingCount() == 1 ? "sibling" : "siblings")
+                .append("\n");
+        }
+
+        prompt.append("\n## CURRENT STATE\n");
+
+        appendDetailedHappinessState(view, prompt);
+
+        double saturation = view.saturation();
+        if (saturation <= 1) {
+            prompt.append("- Very hungry and weak from lack of food\n");
+        } else if (saturation <= 3) {
+            prompt.append("- Hungry and thinking about food\n");
+        } else if (saturation <= 5) {
+            prompt.append("- A bit peckish\n");
+        }
+
+        if (view.healthPercent() != null) {
+            double healthPercent = view.healthPercent();
+            if (healthPercent < 20) {
+                prompt.append("- Severely injured, in intense pain\n");
+            } else if (healthPercent < 50) {
+                prompt.append("- Injured and in pain\n");
+            } else if (healthPercent < 75) {
+                prompt.append("- Slightly hurt\n");
+            } else if (healthPercent == 100) {
+                prompt.append("- In perfect health\n");
+            }
+        }
+
+        if (sick) {
+            prompt.append("- Sick and feeling terrible. Needs medical attention\n");
+        }
+
+        if (view.homeless()) {
+            prompt.append("- Very concerned about not having a home\n");
+        }
+
+        if (!view.child() && view.jobName() == null) {
+            prompt.append("- Frustrated about not having a job\n");
+        }
+
+        final CitizenStatusView status = view.status();
+        if (status != null) {
+            prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
+        }
+
+        prompt.append("\n## EMOTIONAL PROFILE\n");
+
+        double happiness = view.happiness();
+
+        if (happiness > 8.0) {
+            prompt.append("- Generally cheerful and friendly\n");
+            prompt.append("- Optimistic about the colony's future\n");
+            prompt.append("- Likely to be helpful and engaging\n");
+        } else if (happiness > 5.0) {
+            prompt.append("- Generally neutral in demeanor\n");
+            prompt.append("- Moderately satisfied with life in the colony\n");
+            prompt.append("- Can be friendly but has some concerns\n");
+        } else if (happiness > 3.0) {
+            prompt.append("- Visibly unhappy and somewhat irritable\n");
+            prompt.append("- Might complain about colony conditions\n");
+            prompt.append("- Less interested in small talk, more focused on needs\n");
+        } else {
+            prompt.append("- Deeply unhappy and possibly hostile\n");
+            prompt.append("- Will openly complain and make demands\n");
+            prompt.append("- May refuse requests or be uncooperative\n");
+        }
+
+        if (sick) {
+            prompt.append("- Occasionally mentions symptoms or discomfort\n");
+        }
+
+        if (!view.blockingInteractionMessages().isEmpty()) {
+            prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
+            for (var message : view.blockingInteractionMessages()) {
+                prompt.append("- ").append(message);
+            }
+        }
+
+        prompt.append("\n## GUIDELINES\n");
+        prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
+        prompt.append("- Do not generate creative responses for information that functions can provide\n");
+        prompt.append("- Speak in first person, keep responses brief\n");
+        prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
+        prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
+        prompt.append("- Do not use markdown, speak in plain text.");
+
+        var relation = view.playerRelation();
+        if (relation != null) {
+            prompt.append("- Address player as ").append(relation.rankName()).append("\n");
+
+            if (relation.hostile()) {
+                prompt.append("- Be guarded and suspicious toward the player\n");
+            } else if (relation.colonyLeadership()) {
+                prompt.append("- Show proper respect to colony leadership\n");
+            }
+        }
+
+        prompt.append(
+            "\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
+        prompt.append(
+            "\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
+        prompt.append("\nALWAYS respond in ").append(view.responseLanguageName());
+
+        return prompt.toString();
+    }
+
+    private static void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {
+        double happiness = view.happiness();
+
+        if (happiness > 8.0) {
+            prompt.append("- Very happy (").append(String.format("%.1f", happiness)).append("/10)\n");
+        } else if (happiness > 5.0) {
+            prompt.append("- Content (").append(String.format("%.1f", happiness)).append("/10)\n");
+        } else if (happiness > 3.0) {
+            prompt.append("- Unhappy (").append(String.format("%.1f", happiness)).append("/10)\n");
+        } else {
+            prompt.append("- Miserable (").append(String.format("%.1f", happiness)).append("/10)\n");
+        }
+
+        for (var modifier : view.happinessModifiers()) {
+            String modifierId = modifier.id();
+            double factor = modifier.factor();
+            if (factor < 0.8 || factor > 1.2) {
+                switch (modifierId) {
+                    case HOMELESSNESS:
+                        if (factor < 0.8) {
+                            prompt.append("- Distressed about housing situation\n");
+                        }
+                        break;
+                    case UNEMPLOYMENT:
+                        if (factor < 0.8) {
+                            prompt.append("- Anxious about employment status\n");
+                        }
+                        break;
+                    case HEALTH:
+                        if (factor < 0.8) {
+                            prompt.append("- Concerned about health issues\n");
+                        }
+                        break;
+                    case IDLEATJOB:
+                        if (factor < 0.8) {
+                            prompt.append("- Frustrated by lack of work to do\n");
+                        }
+                        break;
+                    case SCHOOL:
+                        if (factor < 0.8) {
+                            if (view.hasSchool()) {
+                                prompt.append("- Disappointed by lack of school activities\n");
+                            } else {
+                                prompt.append("- Disappointed by lack of school in the colony\n");
+                            }
+                        }
+                        if (factor > 1.2) {
+                            prompt.append("- Enjoying school activities\n");
+                        }
+                        break;
+                    case MYSTICAL_SITE:
+                        if (factor < 0.8) {
+                            prompt.append("- Disappointed by lack of mystical experiences\n");
+                        } else {
+                            prompt.append("- Enjoying mystical site visits\n");
+                        }
+                        break;
+                    case SECURITY:
+                        if (factor < 0.8) {
+                            prompt.append("- Feels unsafe in the colony\n");
+                        } else {
+                            prompt.append("- Feels very secure in the colony\n");
+                        }
+                        break;
+                    case SOCIAL:
+                        if (factor < 0.8) {
+                            prompt.append("- Feeling socially isolated\n");
+                        } else {
+                            prompt.append("- Enjoying colony social life\n");
+                        }
+                        break;
+                    case DAMAGE:
+                        if (factor < 0.8) {
+                            prompt.append("- Have been injured recently\n");
+                        }
+                        break;
+                    case DEATH:
+                        if (factor < 0.8) {
+                            prompt.append("- Distressed by recent death in the colony\n");
+                        }
+                        break;
+                    case RAIDWITHOUTDEATH:
+                        if (factor > 1.2) {
+                            prompt.append("- Feeling safe because the recent raid was without civilan deaths\n");
+                        }
+                        break;
+                    case FOOD:
+                        if (factor < 0.8) {
+                            prompt.append("- Unhappy with food quality/variety\n");
+                        } else {
+                            prompt.append("- Very satisfied with food quality\n");
+                        }
+                        break;
+                    case SLEPTTONIGHT:
+                        if (factor < 0.8) {
+                            prompt.append("- Tired from lack of sleep\n");
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
+    private static void appendCondensedSkills(List<SkillLevelView> skillLevels, StringBuilder prompt) {
+        Map<String, Integer> skills = skillLevels.stream()
+            .collect(Collectors.toMap(SkillLevelView::name, SkillLevelView::level, Math::max));
+
+        String highestSkill = null;
+        int highestLevel = -1;
+        String secondSkill = null;
+        int secondLevel = -1;
+
+        for (Map.Entry<String, Integer> entry : skills.entrySet()) {
+            int level = entry.getValue();
+            if (level > highestLevel) {
+                secondSkill = highestSkill;
+                secondLevel = highestLevel;
+                highestSkill = entry.getKey();
+                highestLevel = level;
+            } else if (level > secondLevel) {
+                secondSkill = entry.getKey();
+                secondLevel = level;
+            }
+        }
+
+        if (highestSkill != null) {
+            prompt.append("\n## KEY ATTRIBUTES\n");
+            prompt.append("- Best at **").append(formatSkillName(highestSkill)).append("** (level ").append(highestLevel).append(")\n");
+
+            if (highestLevel >= 3) {
+                switch (highestSkill) {
+                    case "Intelligence" -> prompt.append("- Intellectual and thoughtful\n");
+                    case "Strength" -> prompt.append("- Values physical prowess\n");
+                    case "Creativity" -> prompt.append("- Has artistic mindset\n");
+                    case "Knowledge" -> prompt.append("- Well-read and informative\n");
+                    case "Dexterity" -> prompt.append("- Has nimble hands\n");
+                    case "Adaptability" -> prompt.append("- Flexible and quick to adapt\n");
+                    case "Focus" -> prompt.append("- Detail-oriented and methodical\n");
+                    case "Mana" -> prompt.append("- Spiritually sensitive\n");
+                    case "Athletics" -> prompt.append("- Physically active and energetic\n");
+                    case "Agility" -> prompt.append("- Quick and graceful\n");
+                    case "Stamina" -> prompt.append("- Has great endurance\n");
+                }
+            }
+
+            if (secondSkill != null && secondLevel >= 2) {
+                prompt.append("- Also good at **").append(formatSkillName(secondSkill)).append("**\n");
+            }
+
+            String lowestSkill = null;
+            int lowestLevel = Integer.MAX_VALUE;
+
+            for (Map.Entry<String, Integer> entry : skills.entrySet()) {
+                int level = entry.getValue();
+                if (level < lowestLevel) {
+                    lowestSkill = entry.getKey();
+                    lowestLevel = level;
+                }
+            }
+
+            if (lowestSkill != null && lowestLevel < 2 && highestLevel - lowestLevel >= 3) {
+                prompt.append("- Struggles with **").append(formatSkillName(lowestSkill)).append("**\n");
+            }
+        }
+    }
+
+    private static String formatSkillName(String skill) {
+        return skill.toLowerCase().replace('_', ' ');
+    }
+
+    @Override
+    public String formatStatus(CitizenStatusView status) {
+        switch (status.type()) {
+            case WORKING:
+                return "working";
+            case SLEEP:
+                return "sleeping";
+            case HOUSE:
+                return "at home";
+            case RAIDED:
+                return "on alert (raid)";
+            case MOURNING:
+                var deceased = String.join(",", status.contextValues());
+                return "mourning " + deceased;
+            case BAD_WEATHER:
+                return "sheltering from bad weather";
+            case SICK:
+                return "ill and needing care";
+            case EAT:
+                return "hungry and looking for food";
+            case UNKNOWN:
+            default:
+                break;
+        }
+
+        String translationKey = status.translationKey();
+        if (translationKey.contains(".")) {
+            String[] parts = translationKey.split("\\.");
+            return parts[parts.length - 1].toLowerCase().replace('_', ' ');
+        }
+
+        return translationKey;
+    }
+}

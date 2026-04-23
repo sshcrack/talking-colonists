@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking.manager;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
@@ -9,6 +8,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.ModAttachmentTypes;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.tools.AITools;
@@ -26,15 +26,15 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class GeminiWsClient extends GeminiLiveClient {
-    boolean setupComplete;
-    boolean isInitiatingConnection = false;
-    boolean shouldReconnect = false;
+    private boolean setupComplete;
+    private boolean isInitiatingConnection = false;
+    private boolean shouldReconnect = false;
 
 
-    GeminiStream stream;
-    ServerPlayer initialPlayer;
-    TalkingManager manager;
-    private final List<short[]> pending_prompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
+    private final GeminiStream stream;
+    private final ServerPlayer initialPlayer;
+    private final TalkingManager manager;
+    private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
 
 
@@ -92,7 +92,8 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
-        var prompt = CitizenContextUtils.generateCitizenRoleplayPrompt(manager.entity.getCitizenData(), initialPlayer);
+        var promptView = CitizenPromptViewFactory.create(manager.entity.getCitizenData(), initialPlayer);
+        var prompt = CitizenPromptService.generateCitizenRoleplayPrompt(promptView);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
         sys.parts.add(p);
 
@@ -196,10 +197,10 @@ public class GeminiWsClient extends GeminiLiveClient {
             }
         }
 
-        synchronized (pending_prompt) {
-            if (!pending_prompt.isEmpty()) {
-                List<short[]> audioToProcess = new ArrayList<>(pending_prompt);
-                pending_prompt.clear();
+        synchronized (pendingPrompt) {
+            if (!pendingPrompt.isEmpty()) {
+                List<short[]> audioToProcess = new ArrayList<>(pendingPrompt);
+                pendingPrompt.clear();
 
                 for (short[] data : audioToProcess) {
                     var input = new RealtimeInput();
@@ -315,8 +316,8 @@ public class GeminiWsClient extends GeminiLiveClient {
 
 
         if (!setupComplete || this.isClosed()) {
-            synchronized (pending_prompt) {
-                pending_prompt.add(audio);
+            synchronized (pendingPrompt) {
+                pendingPrompt.add(audio);
             }
 
             if (!this.isOpen() && !isInitiatingConnection) {
