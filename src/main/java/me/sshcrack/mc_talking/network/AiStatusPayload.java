@@ -3,15 +3,15 @@ package me.sshcrack.mc_talking.network;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 /*? if forge {*/
-/*import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
-*//*?}*/
+/*?}*/
 /*? if neoforge {*/
-import io.netty.buffer.ByteBuf;
+/*import io.netty.buffer.ByteBuf;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -19,14 +19,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
-/*?}*/
+*//*?}*/
 
 import java.util.UUID;
 import java.util.function.Supplier;
 
-public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*?}*/ {
+public class AiStatusPayload /*? if neoforge {*//*implements CustomPacketPayload*//*?}*/ {
     /*? if forge {*/
-    /*public static final String PROTOCOL_VERSION = "1";
+    public static final String PROTOCOL_VERSION = "1";
     public static final ResourceLocation CHANNEL_ID = new ResourceLocation(McTalking.MODID, "ai_status");
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             CHANNEL_ID,
@@ -34,10 +34,10 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
             PROTOCOL_VERSION::equals,
             PROTOCOL_VERSION::equals
     );
-    *//*?}*/
+    /*?}*/
 
     /*? if neoforge {*/
-    public static final CustomPacketPayload.Type<AiStatusPayload> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(McTalking.MODID, "ai_status"));
+    /*public static final CustomPacketPayload.Type<AiStatusPayload> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(McTalking.MODID, "ai_status"));
     public static final StreamCodec<ByteBuf, AiStatusPayload> STREAM_CODEC = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC,
             AiStatusPayload::citizen,
@@ -45,7 +45,7 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
             AiStatusPayload::status,
             AiStatusPayload::new
     );
-    /*?}*/
+    *//*?}*/
 
     private final UUID citizen;
     private final AiStatus status;
@@ -64,7 +64,7 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
     }
 
     /*? if forge {*/
-    /*public static void encode(AiStatusPayload msg, FriendlyByteBuf buf) {
+    public static void encode(AiStatusPayload msg, FriendlyByteBuf buf) {
         buf.writeUUID(msg.citizen);
         buf.writeEnum(msg.status);
     }
@@ -93,10 +93,10 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
     public static void sendToPlayersTrackingEntity(net.minecraft.world.entity.Entity entity, AiStatusPayload packet) {
         CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), packet);
     }
-    *//*?}*/
+    /*?}*/
 
     /*? if neoforge {*/
-    @Override
+    /*@Override
     public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
@@ -115,5 +115,5 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
     public static void sendToPlayersTrackingEntity(net.minecraft.world.entity.Entity entity, AiStatusPayload packet) {
         PacketDistributor.sendToPlayersTrackingEntity(entity, packet);
     }
-    /*?}*/
+    *//*?}*/
 }

@@ -13,20 +13,20 @@ import com.minecolonies.core.colony.buildings.modules.TavernBuildingModule;
 import com.minecolonies.core.colony.interactionhandling.RecruitmentInteraction;
 import net.minecraft.core.BlockPos;
 /*? if neoforge {*/
-import net.minecraft.core.component.DataComponents;
-/*?}*/
+/*import net.minecraft.core.component.DataComponents;
+*//*?}*/
 import net.minecraft.nbt.CompoundTag;
 /*? if forge {*/
-/*import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
-*//*?}*/
+/*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 /*? if neoforge {*/
-import net.minecraft.world.item.component.ItemLore;
-/*?}*/
+/*import net.minecraft.world.item.component.ItemLore;
+*//*?}*/
 import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
@@ -67,23 +67,23 @@ public class LeaveColonyAction extends FunctionAction {
 
         // First, serialize all citizen data to NBT
         /*? if forge {*/
-        /*CompoundTag citizenTag = data.serializeNBT();
-        *//*?}*/
-        /*? if neoforge {*/
-        CompoundTag citizenTag = data.serializeNBT(level.registryAccess());
+        CompoundTag citizenTag = data.serializeNBT();
         /*?}*/
+        /*? if neoforge {*/
+        /*CompoundTag citizenTag = data.serializeNBT(level.registryAccess());
+        *//*?}*/
 
         // Create recruitment cost
         final ItemStack recruitCost = Items.DIAMOND.getDefaultInstance();
         /*? if forge {*/
-        /*CompoundTag display = recruitCost.getOrCreateTagElement("display");
+        CompoundTag display = recruitCost.getOrCreateTagElement("display");
         ListTag loreTag = new ListTag();
         loreTag.add(StringTag.valueOf(Component.Serializer.toJson(Component.translatable("mc_talking.recruit_lore"))));
         display.put("Lore", loreTag);
-        *//*?}*/
-        /*? if neoforge {*/
-        recruitCost.set(DataComponents.LORE, new ItemLore(List.of(Component.translatable("mc_talking.recruit_lore"))));
         /*?}*/
+        /*? if neoforge {*/
+        /*recruitCost.set(DataComponents.LORE, new ItemLore(List.of(Component.translatable("mc_talking.recruit_lore"))));
+        *//*?}*/
         recruitCost.setCount(16);
 
         // Remove the original citizen
@@ -98,13 +98,13 @@ public class LeaveColonyAction extends FunctionAction {
 
         // Add visitor-specific data
         /*? if forge {*/
-        /*CompoundTag itemTag = new CompoundTag();
+        CompoundTag itemTag = new CompoundTag();
         recruitCost.save(itemTag);
         citizenTag.put(TAG_RECRUIT_COST, itemTag);
-        *//*?}*/
-        /*? if neoforge {*/
-        citizenTag.put(TAG_RECRUIT_COST, recruitCost.save(level.registryAccess()));
         /*?}*/
+        /*? if neoforge {*/
+        /*citizenTag.put(TAG_RECRUIT_COST, recruitCost.save(level.registryAccess()));
+        *//*?}*/
         citizenTag.putInt(TAG_RECRUIT_COST_QTY, recruitCost.getCount());
         BlockPosUtil.write(citizenTag, TAG_SITTING, BlockPos.ZERO);
 
@@ -113,11 +113,11 @@ public class LeaveColonyAction extends FunctionAction {
 
         // Deserialize the modified NBT into the visitor
         /*? if forge {*/
-        /*visitorData.deserializeNBT(citizenTag);
-        *//*?}*/
-        /*? if neoforge {*/
-        visitorData.deserializeNBT(level.registryAccess(), citizenTag);
+        visitorData.deserializeNBT(citizenTag);
         /*?}*/
+        /*? if neoforge {*/
+        /*visitorData.deserializeNBT(level.registryAccess(), citizenTag);
+        *//*?}*/
 
         // Explicitly set home building (important for visitor functionality)
         visitorData.setHomeBuilding(building);

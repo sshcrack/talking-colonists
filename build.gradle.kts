@@ -6,13 +6,6 @@ plugins {
 
 val currentLoader = if (project.name.endsWith("-forge")) "forge" else "neoforge"
 
-version = property("mod.version").toString()
-group = property("mod.group").toString()
-
-base {
-    archivesName.set(property("mod.id") as String)
-}
-
 repositories {
     mavenLocal()
 
@@ -65,8 +58,7 @@ repositories {
     }
 }
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(if (currentLoader == "forge") 17 else 21))
-
+var voicechat_version = "${property("minecraft_version")}-${property("voicechat_version_suffix")}"
 modSettings {
     clientOptions {
         fov = 90
@@ -76,13 +68,8 @@ modSettings {
         musicVolume = 0.0
     }
     variableReplacements.put("authors", property("mod.authors").toString())
-    variableReplacements.put("minecraft_version", property("minecraft_version").toString())
-    variableReplacements.put("minecraft_version_range", property("minecraft_version_range").toString())
-    variableReplacements.put("loader_version_range", property("loader_version_range").toString())
-    variableReplacements.put("neo_version_range", property("neo_version_range").toString())
-    variableReplacements.put("neoforge_version_range", property("neoforge_version_range").toString())
-    variableReplacements.put("forge_version_range", property("forge_version_range").toString())
-    variableReplacements.put("voicechat_version", "${property("minecraft_version")}-${property("voicechat_version_suffix")}")
+    variableReplacements.put("voicechat_version", voicechat_version)
+    variableReplacements.put("minecolonies_version", property("minecolonies_version")!!)
     variableReplacements.put("license", property("mod.license").toString())
     variableReplacements.put(
         "minecolonies_version",property("minecolonies_version").toString()!!
@@ -90,9 +77,14 @@ modSettings {
     variableReplacements.put("gemini_live_lib_version", property("gemini_live_lib_version").toString())
 }
 
-dependencies {
-    var voicechat_version = "${property("minecraft_version")}-${property("voicechat_version_suffix")}"
+publishMods {
+    curseforge {
+        clientRequired = true // Set as needed
+        serverRequired = true // Set as needed
+    }
+}
 
+dependencies {
     modImplementation("de.maxhenkel.voicechat:voicechat-api:${property("voicechat_api_version")}")
     localRuntime("maven.modrinth:simple-voice-chat:${currentLoader}-${voicechat_version}")
     modImplementation("com.ldtteam:minecolonies:${property("minecolonies_version")}")

@@ -4,14 +4,14 @@ import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 /*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.registries.ForgeRegistries;
-*//*?}*/
-/*? if neoforge {*/
-import net.minecraft.core.component.DataComponents;
 /*?}*/
+/*? if neoforge {*/
+/*import net.minecraft.core.component.DataComponents;
+*//*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -37,18 +37,18 @@ public class GetInventoryAction extends FunctionAction {
             JsonObject itemObj = new JsonObject();
             itemObj.addProperty("slot", i);
             /*? if forge {*/
-            /*ResourceLocation registryName = ForgeRegistries.ITEMS.getKey(stack.getItem());
+            ResourceLocation registryName = ForgeRegistries.ITEMS.getKey(stack.getItem());
             itemObj.addProperty("registry_id", registryName != null ? registryName.toString() : "unknown");
-            *//*?}*/
-            /*? if neoforge {*/
-            itemObj.addProperty("registry_id", stack.getItemHolder().getRegisteredName());
             /*?}*/
+            /*? if neoforge {*/
+            /*itemObj.addProperty("registry_id", stack.getItemHolder().getRegisteredName());
+            *//*?}*/
             itemObj.addProperty("name", stack.getDisplayName().getString());
             itemObj.addProperty("count", stack.getCount());
             itemObj.addProperty("max_count", stack.getMaxStackSize());
 
             /*? if forge {*/
-            /*CompoundTag tag = stack.getTag();
+            CompoundTag tag = stack.getTag();
             if (tag != null && tag.contains("display", 10)) {
                 CompoundTag displayTag = tag.getCompound("display");
                 if (displayTag.contains("Lore", 9)) {
@@ -61,9 +61,9 @@ public class GetInventoryAction extends FunctionAction {
                     itemObj.addProperty("lore", lore.toString());
                 }
             }
-            *//*?}*/
+            /*?}*/
             /*? if neoforge {*/
-            var lore = stack.get(DataComponents.LORE);
+            /*var lore = stack.get(DataComponents.LORE);
             if (lore != null) {
                 itemObj.addProperty("lore", lore
                         .lines()
@@ -72,7 +72,7 @@ public class GetInventoryAction extends FunctionAction {
                         .collect(Collectors.joining("\n"))
                 );
             }
-            /*?}*/
+            *//*?}*/
 
             obj.add("item_" + i, itemObj);
         }

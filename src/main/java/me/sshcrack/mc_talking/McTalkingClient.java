@@ -6,14 +6,14 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 /*? if forge {*/
-/*import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.client.event.RenderNameTagEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-*//*?}*/
+/*?}*/
 /*? if neoforge {*/
-import net.neoforged.api.distmarker.Dist;
+/*import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -22,26 +22,26 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
-/*?}*/
+*//*?}*/
 
 /**
  * Client-side mod class for McTalking.
  * Handles client-specific functionality like rendering and UI.
  */
 /*? if forge {*/
-/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-*//*?}*/
-/*? if neoforge {*/
-@Mod(value = McTalking.MODID, dist = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 /*?}*/
+/*? if neoforge {*/
+/*@Mod(value = McTalking.MODID, dist = Dist.CLIENT)
+*//*?}*/
 public class McTalkingClient {
 
     /*? if neoforge {*/
-    public McTalkingClient(ModContainer container) {
+    /*public McTalkingClient(ModContainer container) {
         NeoForge.EVENT_BUS.register(this);
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
-    /*?}*/
+    *//*?}*/
 
     /**
      * Event handler for when the client disconnects from a server.
@@ -51,11 +51,11 @@ public class McTalkingClient {
      */
     @SubscribeEvent
     /*? if forge {*/
-    /*public static void onDisconnect(LevelEvent.Unload event) {
-    *//*?}*/
-    /*? if neoforge {*/
-    public void onDisconnect(LevelEvent.Unload event) {
+    public static void onDisconnect(LevelEvent.Unload event) {
     /*?}*/
+    /*? if neoforge {*/
+    /*public void onDisconnect(LevelEvent.Unload event) {
+    *//*?}*/
         ConversationManager.clearAiStatus();
     }
 
@@ -67,11 +67,11 @@ public class McTalkingClient {
      */
     @SubscribeEvent
     /*? if forge {*/
-    /*public static void onRenderName(RenderNameTagEvent event) {
-    *//*?}*/
-    /*? if neoforge {*/
-    public void onRenderName(RenderNameTagEvent event) {
+    public static void onRenderName(RenderNameTagEvent event) {
     /*?}*/
+    /*? if neoforge {*/
+    /*public void onRenderName(RenderNameTagEvent event) {
+    *//*?}*/
         var entity = event.getEntity();
         var minecraft = Minecraft.getInstance();
 

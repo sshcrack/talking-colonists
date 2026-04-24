@@ -6,11 +6,11 @@ import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.McTalking;
 import net.minecraft.server.level.ServerPlayer;
 /*? if forge {*/
-/*import net.minecraftforge.fml.ModList;
-*//*?}*/
-/*? if neoforge {*/
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 /*?}*/
+/*? if neoforge {*/
+/*import net.neoforged.fml.ModList;
+*//*?}*/
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.util.UUID;

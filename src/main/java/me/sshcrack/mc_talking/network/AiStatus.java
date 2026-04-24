@@ -1,10 +1,10 @@
 package me.sshcrack.mc_talking.network;
 
 /*? if neoforge {*/
-import io.netty.buffer.ByteBuf;
+/*import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-/*?}*/
+*//*?}*/
 
 /// Don't forget to also update `en_us.json`!!
 public enum AiStatus {
@@ -23,6 +23,6 @@ public enum AiStatus {
     }
 
     /*? if neoforge {*/
-    public static final StreamCodec<ByteBuf, AiStatus> STREAM_CODEC = ByteBufCodecs.INT.map(AiStatus::fromId, Enum::ordinal);
-    /*?}*/
+    /*public static final StreamCodec<ByteBuf, AiStatus> STREAM_CODEC = ByteBufCodecs.INT.map(AiStatus::fromId, Enum::ordinal);
+    *//*?}*/
 }
