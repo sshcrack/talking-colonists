@@ -68,7 +68,7 @@ public class ServerEventHandler {
      * Called when the server starts
      */
     @SubscribeEvent
-    public static void onServerStart(ServerStartingEvent event) {
+    public void onServerStart(ServerStartingEvent event) {
         if (!CONFIG.geminiApiKey.get().isEmpty()) {
             return;
         }
@@ -79,7 +79,7 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
-    public static void onRegisterCommands(RegisterCommandsEvent event) {
+    public void onRegisterCommands(RegisterCommandsEvent event) {
         ListToolsCommand.register(event.getDispatcher());
     }
 
@@ -87,7 +87,7 @@ public class ServerEventHandler {
      * Called when the server stops
      */
     @SubscribeEvent
-    public static void onServerStop(ServerStoppingEvent event) {
+    public void onServerStop(ServerStoppingEvent event) {
         ConversationManager.cleanup();
     }
 
@@ -95,7 +95,7 @@ public class ServerEventHandler {
      * Called when an entity joins the level
      */
     @SubscribeEvent
-    public static void onPlayerJoin(EntityJoinLevelEvent event) {
+    public void onPlayerJoin(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -105,7 +105,7 @@ public class ServerEventHandler {
                 /*? if forge {*/
                 /*CompoundTag tag = item.getOrCreateTag();
                 tag.putInt("CustomModelData", 0);
-                
+
                 *//*?}*/
                 /*? if neoforge {*/
                 item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
@@ -118,7 +118,7 @@ public class ServerEventHandler {
      * Called when an entity leaves the level
      */
     @SubscribeEvent
-    public static void onPlayerLeave(EntityLeaveLevelEvent event) {
+    public void onPlayerLeave(EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ConversationManager.endConversation(player.getUUID(), false);
         }
@@ -129,14 +129,14 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     /*? if forge {*/
-    /*public static void onServerTick(TickEvent.ServerTickEvent event) {
+    /*public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-    
+
     *//*?}*/
     /*? if neoforge {*/
-    public static void onServerTick(ServerTickEvent.Post event) {
+    public void onServerTick(ServerTickEvent.Post event) {
     /*?}*/
         tickCounter++;
         if (tickCounter % 5 != 0) {
@@ -162,7 +162,7 @@ public class ServerEventHandler {
         }
     }
 
-    private static void checkConversationDistance(ServerPlayer player, UUID citizenId) {
+    private void checkConversationDistance(ServerPlayer player, UUID citizenId) {
         AbstractEntityCitizen activeEntity = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         if (activeEntity == null || !activeEntity.isAlive()) {
             ConversationManager.endConversation(player.getUUID(), false);
@@ -175,7 +175,7 @@ public class ServerEventHandler {
         }
     }
 
-    private static void processPlayerLooking(ServerPlayer player) {
+    private void processPlayerLooking(ServerPlayer player) {
         HitResult hitResult = player.pick(20.0, 0.0F, false);
         UUID playerId = player.getUUID();
 
@@ -195,7 +195,7 @@ public class ServerEventHandler {
         ConversationManager.setPlayerLookTarget(playerId, null);
     }
 
-    private static void processLookingAtCitizen(ServerPlayer player, AbstractEntityCitizen citizen) {
+    private void processLookingAtCitizen(ServerPlayer player, AbstractEntityCitizen citizen) {
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
@@ -212,7 +212,7 @@ public class ServerEventHandler {
                         /*? if forge {*/
                         /*CompoundTag tag = item.getOrCreateTag();
                         tag.putInt("CustomModelData", 1);
-                        
+
                         *//*?}*/
                         /*? if neoforge {*/
                         item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
@@ -231,12 +231,12 @@ public class ServerEventHandler {
         }
     }
 
-    private static boolean isHoldingTalkingDevice(ServerPlayer player) {
+    private boolean isHoldingTalkingDevice(ServerPlayer player) {
         ItemStack heldItem = player.getMainHandItem();
         return heldItem.getItem() instanceof CitizenTalkingDevice;
     }
 
-    private static boolean isPlayerAlone(ServerPlayer player) {
+    private boolean isPlayerAlone(ServerPlayer player) {
         AABB boundingBox = player.getBoundingBox().inflate(5.0);
 
         int nearbyPlayers = player.level().getNearbyEntities(

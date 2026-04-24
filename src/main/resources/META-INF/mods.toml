@@ -1,43 +1,43 @@
 modLoader="javafml" #mandatory
 loaderVersion="${loader_version_range}" #mandatory
-license="${mod_license}"
+license="${license}"
 
 [[mods]] #mandatory
-modId="${mod_id}" #mandatory
-version="${mod_version}" #mandatory
-displayName="${mod_name}" #mandatory
-authors="${mod_authors}" #optional
-description='''${mod_description}'''
+modId="${id}" #mandatory
+version="${version}" #mandatory
+displayName="${name}" #mandatory
+authors="${authors}" #optional
+description='''${description}'''
 
-[[dependencies.${mod_id}]] #optional
+[[dependencies.${id}]] #optional
 modId="forge" #mandatory
 mandatory=true #mandatory
 versionRange="${forge_version_range}" #mandatory
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${id}]]
 modId="minecraft"
 mandatory=true
 versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${id}]]
 modId="voicechat"
 mandatory=true
 versionRange="[1.20.1-2.4.0,)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${id}]]
 modId="minecolonies"
 mandatory=true
 versionRange="[1.20.1-1.1.1029,)"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.${mod_id}]]
+[[dependencies.${id}]]
 modId="gemini_live_lib"
 mandatory=true
 versionRange="[${gemini_live_lib_version},)"
