@@ -46,7 +46,12 @@ public class GetCitizenInfoAction extends FunctionAction {
         }
 
         var found = foundOpt.get();
+        /*? if forge {*/
+        /*var tag = found.serializeNBT();*/
+        /*?}*/
+        /*? if neoforge {*/
         var tag = found.serializeNBT(level.registryAccess());
+        /*?}*/
 
         return tagToJson(tag);
     }

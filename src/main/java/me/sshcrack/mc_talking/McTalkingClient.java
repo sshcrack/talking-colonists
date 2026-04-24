@@ -5,6 +5,14 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+/*? if forge {*/
+/*import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.level.LevelEvent;
+import net.minecraftforge.client.event.RenderNameTagEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;*/
+/*?}*/
+/*? if neoforge {*/
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -14,27 +22,26 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
+/*?}*/
 
 /**
  * Client-side mod class for McTalking.
  * Handles client-specific functionality like rendering and UI.
  */
+/*? if forge {*/
+/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)*/
+/*?}*/
+/*? if neoforge {*/
 @Mod(value = McTalking.MODID, dist = Dist.CLIENT)
+/*?}*/
 public class McTalkingClient {
 
-    /**
-     * Constructor for the client mod class.
-     * Registers event listeners and configuration screen.
-     *
-     * @param container The mod container
-     */
+    /*? if neoforge {*/
     public McTalkingClient(ModContainer container) {
-        // Register event listeners
         NeoForge.EVENT_BUS.register(this);
-
-        // Register configuration screen
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
+    /*?}*/
 
     /**
      * Event handler for when the client disconnects from a server.
@@ -43,7 +50,12 @@ public class McTalkingClient {
      * @param event The level unload event
      */
     @SubscribeEvent
+    /*? if forge {*/
+    /*public static void onDisconnect(LevelEvent.Unload event) {*/
+    /*?}*/
+    /*? if neoforge {*/
     public void onDisconnect(LevelEvent.Unload event) {
+    /*?}*/
         ConversationManager.clearAiStatus();
     }
 
@@ -54,16 +66,19 @@ public class McTalkingClient {
      * @param event The render name tag event
      */
     @SubscribeEvent
+    /*? if forge {*/
+    /*public static void onRenderName(RenderNameTagEvent event) {*/
+    /*?}*/
+    /*? if neoforge {*/
     public void onRenderName(RenderNameTagEvent event) {
+    /*?}*/
         var entity = event.getEntity();
         var minecraft = Minecraft.getInstance();
 
-        // Only handle citizens
         if (!(entity instanceof AbstractCivilianEntity citizen)) {
             return;
         }
 
-        // Skip if player is null or entity is invisible
         assert minecraft.player != null;
         if (entity.isInvisibleTo(minecraft.player))
             return;

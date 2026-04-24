@@ -4,23 +4,47 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.ChatFormatting;
+/*? if forge {*/
+/*import net.minecraft.nbt.CompoundTag;*/
+/*?}*/
+/*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
+/*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.item.ItemStack;
+/*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
+/*?}*/
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
+/*? if forge {*/
+/*import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
+import net.minecraftforge.event.level.LevelEvent;
+import net.minecraftforge.event.server.ServerStartingEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;*/
+/*?}*/
+/*? if neoforge {*/
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+/*?}*/
 
 import java.util.UUID;
 
@@ -29,16 +53,22 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 /**
  * Handler for server-side events related to player-citizen interactions.
  */
+/*? if forge {*/
+/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)*/
+/*?}*/
+/*? if neoforge {*/
+@EventBusSubscriber(modid = McTalking.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.DEDICATED_SERVER)
+/*?}*/
 public class ServerEventHandler {
 
     private static final TargetingConditions TARGETING_CONDITIONS = TargetingConditions.forNonCombat().ignoreLineOfSight();
-    private int tickCounter = 0;
+    private static int tickCounter = 0;
 
     /**
      * Called when the server starts
      */
     @SubscribeEvent
-    public void onServerStart(ServerStartingEvent event) {
+    public static void onServerStart(ServerStartingEvent event) {
         if (!CONFIG.geminiApiKey.get().isEmpty()) {
             return;
         }
@@ -49,7 +79,7 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
         ListToolsCommand.register(event.getDispatcher());
     }
 
@@ -57,7 +87,7 @@ public class ServerEventHandler {
      * Called when the server stops
      */
     @SubscribeEvent
-    public void onServerStop(ServerStoppingEvent event) {
+    public static void onServerStop(ServerStoppingEvent event) {
         ConversationManager.cleanup();
     }
 
@@ -65,15 +95,21 @@ public class ServerEventHandler {
      * Called when an entity joins the level
      */
     @SubscribeEvent
-    public void onPlayerJoin(EntityJoinLevelEvent event) {
+    public static void onPlayerJoin(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
 
-        // Reset talking device model when player joins
         for (ItemStack item : player.getInventory().items) {
             if (item.getItem() instanceof CitizenTalkingDevice) {
+                /*? if forge {*/
+                /*CompoundTag tag = item.getOrCreateTag();
+                tag.putInt("CustomModelData", 0);
+                */
+                /*?}*/
+                /*? if neoforge {*/
                 item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                /*?}*/
             }
         }
     }
@@ -82,9 +118,8 @@ public class ServerEventHandler {
      * Called when an entity leaves the level
      */
     @SubscribeEvent
-    public void onPlayerLeave(EntityLeaveLevelEvent event) {
+    public static void onPlayerLeave(EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // End conversation when player leaves
             ConversationManager.endConversation(player.getUUID(), false);
         }
     }
@@ -93,66 +128,63 @@ public class ServerEventHandler {
      * Called every server tick
      */
     @SubscribeEvent
-    public void onServerTick(ServerTickEvent.Post event) {
+    /*? if forge {*/
+    /*public static void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+    */
+    /*?}*/
+    /*? if neoforge {*/
+    public static void onServerTick(ServerTickEvent.Post event) {
+    /*?}*/
         tickCounter++;
         if (tickCounter % 5 != 0) {
-            return; // Only process every 5 ticks for performance
+            return;
         }
 
         if (event.getServer().getPlayerList().getPlayers().isEmpty()) {
             return;
         }
 
-        // Process all players
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             UUID playerId = player.getUUID();
 
-            // Check if player is in a conversation
             UUID citizenId = ConversationManager.getPlayerConversationPartner(playerId);
             if (citizenId != null) {
                 checkConversationDistance(player, citizenId);
-                continue; // Skip look processing if already in conversation
+                continue;
             }
 
-            // Only process looking logic if talking device isn't required or player is holding one
             if (!CONFIG.useTalkingDevice.get() || isHoldingTalkingDevice(player)) {
                 processPlayerLooking(player);
             }
         }
     }
 
-    /**
-     * Checks if a player is too far from their conversation partner
-     */
-    private void checkConversationDistance(ServerPlayer player, UUID citizenId) {
+    private static void checkConversationDistance(ServerPlayer player, UUID citizenId) {
         AbstractEntityCitizen activeEntity = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         if (activeEntity == null || !activeEntity.isAlive()) {
             ConversationManager.endConversation(player.getUUID(), false);
             return;
         }
 
-        // Check distance between player and entity
         double distanceSquared = player.distanceToSqr(activeEntity);
         if (distanceSquared > CONFIG.maxConversationDistance.get() * CONFIG.maxConversationDistance.get()) {
             ConversationManager.endConversation(player.getUUID(), true);
         }
     }
 
-    /**
-     * Processes a player looking at entities
-     */
-    private void processPlayerLooking(ServerPlayer player) {
+    private static void processPlayerLooking(ServerPlayer player) {
         HitResult hitResult = player.pick(20.0, 0.0F, false);
         UUID playerId = player.getUUID();
 
         if (hitResult.getType() == HitResult.Type.ENTITY) {
             Entity targetEntity = ((EntityHitResult) hitResult).getEntity();
 
-            // Check if target is a citizen
             if (targetEntity instanceof AbstractEntityCitizen citizen) {
                 double distance = player.distanceToSqr(targetEntity);
 
-                // Check if within activation distance
                 if (distance <= CONFIG.activationDistance.get() * CONFIG.activationDistance.get()) {
                     processLookingAtCitizen(player, citizen);
                     return;
@@ -160,67 +192,53 @@ public class ServerEventHandler {
             }
         }
 
-        // Not looking at a valid target
         ConversationManager.setPlayerLookTarget(playerId, null);
     }
 
-    /**
-     * Processes a player looking at a citizen
-     */
-    private void processLookingAtCitizen(ServerPlayer player, AbstractEntityCitizen citizen) {
+    private static void processLookingAtCitizen(ServerPlayer player, AbstractEntityCitizen citizen) {
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
-        // Update or set looking target
         ConversationManager.setPlayerLookTarget(playerId, citizenId);
-
-        // Increment look duration
         ConversationManager.incrementLookDuration(playerId);
 
-        // Check if look duration exceeds threshold
         if (ConversationManager.getPlayerLookDuration(playerId) >= CONFIG.lookDurationTicks.get()) {
-            // Check if player is alone or group conversations are enabled
             boolean playerIsAlone = isPlayerAlone(player);
             if (playerIsAlone || CONFIG.respondInGroups.get()) {
-                // Start conversation
                 ConversationManager.startConversation(player, citizen);
 
-                // Update talking device model if player is holding one
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice && player.getInventory().selected == player.getInventory().findSlotMatchingItem(item)) {
+                        /*? if forge {*/
+                        /*CompoundTag tag = item.getOrCreateTag();
+                        tag.putInt("CustomModelData", 1);
+                        */
+                        /*?}*/
+                        /*? if neoforge {*/
                         item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+                        /*?}*/
                         break;
                     }
                 }
             } else {
-                // Notify player that group conversations are disabled
                 player.sendSystemMessage(
                         Component.translatable("mc_talking.group_disabled")
                                 .withStyle(ChatFormatting.YELLOW)
                 );
 
-                // Reset look duration to prevent spam
                 ConversationManager.setPlayerLookTarget(playerId, null);
             }
         }
     }
 
-    /**
-     * Checks if a player is holding a talking device
-     */
-    private boolean isHoldingTalkingDevice(ServerPlayer player) {
+    private static boolean isHoldingTalkingDevice(ServerPlayer player) {
         ItemStack heldItem = player.getMainHandItem();
         return heldItem.getItem() instanceof CitizenTalkingDevice;
     }
 
-    /**
-     * Checks if a player is alone (no other players nearby)
-     */
-    private boolean isPlayerAlone(ServerPlayer player) {
-        // Create bounding box around player
+    private static boolean isPlayerAlone(ServerPlayer player) {
         AABB boundingBox = player.getBoundingBox().inflate(5.0);
 
-        // Count nearby players
         int nearbyPlayers = player.level().getNearbyEntities(
                 ServerPlayer.class,
                 TARGETING_CONDITIONS,
@@ -228,7 +246,6 @@ public class ServerEventHandler {
                 boundingBox
         ).size();
 
-        // Player is alone if only they are detected
         return nearbyPlayers <= 1;
     }
 }

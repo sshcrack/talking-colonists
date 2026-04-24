@@ -7,7 +7,6 @@ import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.ModAttachmentTypes;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.ModalityModes;
@@ -72,11 +71,9 @@ public class GeminiWsClient extends GeminiLiveClient {
             var uuid = entity.getUUID();
 
             setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
-            if (entity.hasData(ModAttachmentTypes.SESSION_TOKEN)) {
-                var sessionToken = entity.getData(ModAttachmentTypes.SESSION_TOKEN);
-                if (!sessionToken.isBlank()) {
-                    setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
-                }
+            var sessionToken = ConversationManager.getSessionToken(uuid);
+            if (!sessionToken.isBlank()) {
+                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
             }
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
@@ -117,7 +114,7 @@ public class GeminiWsClient extends GeminiLiveClient {
         if (!resumable)
             return;
 
-        this.manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN.get(), newHandle);
+        ConversationManager.setSessionToken(this.manager.entity.getUUID(), newHandle);
     }
 
     @Override
@@ -241,7 +238,7 @@ public class GeminiWsClient extends GeminiLiveClient {
         super.onClose(code, reason, remote);
 
         if (reason.contains("BidiGenerateContent session not found")) {
-            manager.entity.setData(ModAttachmentTypes.SESSION_TOKEN, "");
+            ConversationManager.setSessionToken(manager.entity.getUUID(), "");
             new Thread(() -> {
                 if (!isOpen() || !isInitiatingConnection) {
                     reconnect();

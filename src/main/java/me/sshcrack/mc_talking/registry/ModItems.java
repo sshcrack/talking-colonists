@@ -4,31 +4,44 @@ import com.minecolonies.api.creativetab.ModCreativeTabs;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+import java.util.function.Supplier;
+/*? if forge {*/
+/*import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;*/
+/*?}*/
+/*? if neoforge {*/
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+/*?}*/
 
 public class ModItems {
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(BuiltInRegistries.ITEM, McTalking.MODID);
+    /*? if forge {*/
+    /*public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, McTalking.MODID);*/
+    /*?}*/
 
-    // Register items
-    public static final DeferredHolder<Item, Item> TALKING_DEVICE = ITEMS.register("talking_device",
-            CitizenTalkingDevice::new);
+    /*? if neoforge {*/
+    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(BuiltInRegistries.ITEM, McTalking.MODID);
+    /*?}*/
+
+    public static final Supplier<Item> TALKING_DEVICE = ITEMS.register("talking_device", CitizenTalkingDevice::new);
 
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
-
-        // Add to creative tab
         modEventBus.addListener(ModItems::onBuildCreativeTabs);
     }
 
     private static void onBuildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == ModCreativeTabs.GENERAL.getKey()) {
-            event.accept(TALKING_DEVICE.get(), CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
+            /*? if forge {*/
+            /*event.accept(TALKING_DEVICE.get());*/
+            /*?}*/
+            /*? if neoforge {*/
+            event.accept(TALKING_DEVICE.get(), net.minecraft.world.item.CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
+            /*?}*/
         }
     }
 }

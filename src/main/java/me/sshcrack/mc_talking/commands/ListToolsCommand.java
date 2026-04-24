@@ -51,7 +51,7 @@ public class ListToolsCommand {
             });
         }
 
-        src.sendSuccess(() -> Component.translatableEscape("mc_talking.commands.tool_description", toolName, tool.getDescription(), strWriter.toString()), true);
+        src.sendSuccess(() -> Component.translatable("mc_talking.commands.tool_description", toolName, tool.getDescription(), strWriter.toString()), true);
         return 0;
     }
 
@@ -74,7 +74,7 @@ public class ListToolsCommand {
                         throw NO_TOOLS.create();
                     }
 
-                    src.sendSuccess(() -> Component.translatableEscape("mc_talking.commands.list_tools", String.join(", ", tools)), true);
+                    src.sendSuccess(() -> Component.translatable("mc_talking.commands.list_tools", String.join(", ", tools)), true);
                     return 1;
                 }));
     }
