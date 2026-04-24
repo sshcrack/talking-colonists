@@ -123,10 +123,10 @@ public class LeaveColonyAction extends FunctionAction {
         *//*?}*/
 
         // Explicitly set home building (important for visitor functionality)
-        visitorData.setHomeBuilding(building);
+        //visitorData.setHomeBuilding(building);
 
         // Spawn the visitor at the citizen's location
-        visitorManager.spawnOrCreateCivilian(visitorData, level, List.of(pos), true);
+        //visitorManager.spawnOrCreateCivilian(visitorData, level, List.of(pos), true);
 
         // Add to tavern's external citizens list - critical for recruitment to work
         module.getExternalCitizens().add(visitorData.getId());
