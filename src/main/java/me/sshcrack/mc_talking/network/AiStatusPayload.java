@@ -8,8 +8,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;*/
-/*?}*/
+import net.minecraftforge.network.simple.SimpleChannel;
+*//*?}*/
 /*? if neoforge {*/
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.UUIDUtil;
@@ -33,8 +33,8 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
             () -> PROTOCOL_VERSION,
             PROTOCOL_VERSION::equals,
             PROTOCOL_VERSION::equals
-    );*/
-    /*?}*/
+    );
+    *//*?}*/
 
     /*? if neoforge {*/
     public static final CustomPacketPayload.Type<AiStatusPayload> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(McTalking.MODID, "ai_status"));
@@ -92,8 +92,8 @@ public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*
 
     public static void sendToPlayersTrackingEntity(net.minecraft.world.entity.Entity entity, AiStatusPayload packet) {
         CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), packet);
-    }*/
-    /*?}*/
+    }
+    *//*?}*/
 
     /*? if neoforge {*/
     @Override

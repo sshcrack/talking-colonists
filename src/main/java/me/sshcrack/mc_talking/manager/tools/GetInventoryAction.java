@@ -7,8 +7,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 /*import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.registries.ForgeRegistries;*/
-/*?}*/
+import net.minecraftforge.registries.ForgeRegistries;
+*//*?}*/
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
 /*?}*/
@@ -38,8 +38,8 @@ public class GetInventoryAction extends FunctionAction {
             itemObj.addProperty("slot", i);
             /*? if forge {*/
             /*ResourceLocation registryName = ForgeRegistries.ITEMS.getKey(stack.getItem());
-            itemObj.addProperty("registry_id", registryName != null ? registryName.toString() : "unknown");*/
-            /*?}*/
+            itemObj.addProperty("registry_id", registryName != null ? registryName.toString() : "unknown");
+            *//*?}*/
             /*? if neoforge {*/
             itemObj.addProperty("registry_id", stack.getItemHolder().getRegisteredName());
             /*?}*/
@@ -60,8 +60,8 @@ public class GetInventoryAction extends FunctionAction {
                     }
                     itemObj.addProperty("lore", lore.toString());
                 }
-            }*/
-            /*?}*/
+            }
+            *//*?}*/
             /*? if neoforge {*/
             var lore = stack.get(DataComponents.LORE);
             if (lore != null) {

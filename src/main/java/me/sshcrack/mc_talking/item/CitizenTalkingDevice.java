@@ -5,8 +5,8 @@ import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;*/
-/*?}*/
+/*import net.minecraft.nbt.CompoundTag;
+*//*?}*/
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
 /*?}*/
@@ -25,8 +25,8 @@ import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 /*? if forge {*/
-/*import org.jetbrains.annotations.Nullable;*/
-/*?}*/
+/*import org.jetbrains.annotations.Nullable;
+*//*?}*/
 
 import java.util.List;
 import java.util.UUID;
@@ -37,13 +37,13 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 public class CitizenTalkingDevice extends Item {
     /*? if forge {*/
     /*private static final String TAG_TALKING_PLAYER = "talkingPlayer";
-    private static final String TAG_MODEL_DATA = "CustomModelData";*/
-    /*?}*/
+    private static final String TAG_MODEL_DATA = "CustomModelData";
+    *//*?}*/
 
     public CitizenTalkingDevice() {
         /*? if forge {*/
-        /*super(new Item.Properties().stacksTo(1));*/
-        /*?}*/
+        /*super(new Item.Properties().stacksTo(1));
+        *//*?}*/
         /*? if neoforge {*/
         super(new Item.Properties().stacksTo(1).component(DataComponents.CUSTOM_DATA, CustomData.EMPTY));
         /*?}*/
@@ -57,8 +57,8 @@ public class CitizenTalkingDevice extends Item {
             return false;
 
         UUID uuid = tag.getUUID(TAG_TALKING_PLAYER);
-        return ConversationManager.isPlayerInConversation(uuid);*/
-        /*?}*/
+        return ConversationManager.isPlayerInConversation(uuid);
+        *//*?}*/
         /*? if neoforge {*/
         if (stack.get(DataComponents.CUSTOM_DATA) == null)
             return false;
@@ -74,16 +74,16 @@ public class CitizenTalkingDevice extends Item {
 
     @Override
     /*? if forge {*/
-    /*public void appendHoverText(ItemStack pStack, @Nullable Level pLevel, List<Component> tooltipComponents, TooltipFlag pIsAdvanced) {*/
-    /*?}*/
+    /*public void appendHoverText(ItemStack pStack, @Nullable Level pLevel, List<Component> tooltipComponents, TooltipFlag pIsAdvanced) {
+    *//*?}*/
     /*? if neoforge {*/
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, List<Component> tooltipComponents, @NotNull TooltipFlag tooltipFlag) {
     /*?}*/
         tooltipComponents.add(Component.translatable("item.mc_talking.talking_device.tooltip")
                 .withStyle(ChatFormatting.GRAY));
         /*? if forge {*/
-        /*super.appendHoverText(pStack, pLevel, tooltipComponents, pIsAdvanced);*/
-        /*?}*/
+        /*super.appendHoverText(pStack, pLevel, tooltipComponents, pIsAdvanced);
+        *//*?}*/
         /*? if neoforge {*/
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
         /*?}*/
@@ -103,8 +103,8 @@ public class CitizenTalkingDevice extends Item {
 
             UUID uuid = tag.getUUID(TAG_TALKING_PLAYER);
             boolean isActive = ConversationManager.isPlayerInConversation(uuid);
-            tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);*/
-            /*?}*/
+            tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);
+            *//*?}*/
             /*? if neoforge {*/
             var compD = stack.get(DataComponents.CUSTOM_DATA);
             if(compD == null) {
@@ -177,8 +177,8 @@ public class CitizenTalkingDevice extends Item {
         /*? if forge {*/
         /*CompoundTag tag = stack.getOrCreateTag();
         tag.putUUID(TAG_TALKING_PLAYER, playerId);
-        tag.putInt(TAG_MODEL_DATA, 1);*/
-        /*?}*/
+        tag.putInt(TAG_MODEL_DATA, 1);
+        *//*?}*/
         /*? if neoforge {*/
 
         var compD = stack.get(DataComponents.CUSTOM_DATA);

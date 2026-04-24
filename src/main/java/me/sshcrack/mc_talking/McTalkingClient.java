@@ -10,8 +10,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.client.event.RenderNameTagEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;*/
-/*?}*/
+import net.minecraftforge.fml.common.Mod;
+*//*?}*/
 /*? if neoforge {*/
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -29,8 +29,8 @@ import net.neoforged.neoforge.event.level.LevelEvent;
  * Handles client-specific functionality like rendering and UI.
  */
 /*? if forge {*/
-/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)*/
-/*?}*/
+/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+*//*?}*/
 /*? if neoforge {*/
 @Mod(value = McTalking.MODID, dist = Dist.CLIENT)
 /*?}*/
@@ -51,8 +51,8 @@ public class McTalkingClient {
      */
     @SubscribeEvent
     /*? if forge {*/
-    /*public static void onDisconnect(LevelEvent.Unload event) {*/
-    /*?}*/
+    /*public static void onDisconnect(LevelEvent.Unload event) {
+    *//*?}*/
     /*? if neoforge {*/
     public void onDisconnect(LevelEvent.Unload event) {
     /*?}*/
@@ -67,8 +67,8 @@ public class McTalkingClient {
      */
     @SubscribeEvent
     /*? if forge {*/
-    /*public static void onRenderName(RenderNameTagEvent event) {*/
-    /*?}*/
+    /*public static void onRenderName(RenderNameTagEvent event) {
+    *//*?}*/
     /*? if neoforge {*/
     public void onRenderName(RenderNameTagEvent event) {
     /*?}*/

@@ -5,8 +5,8 @@ import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;*/
-/*?}*/
+/*import net.minecraft.nbt.CompoundTag;
+*//*?}*/
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
 /*?}*/
@@ -31,8 +31,8 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;*/
-/*?}*/
+import net.minecraftforge.fml.common.Mod;
+*//*?}*/
 /*? if neoforge {*/
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -54,8 +54,8 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
  * Handler for server-side events related to player-citizen interactions.
  */
 /*? if forge {*/
-/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)*/
-/*?}*/
+/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+*//*?}*/
 /*? if neoforge {*/
 @EventBusSubscriber(modid = McTalking.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.DEDICATED_SERVER)
 /*?}*/
@@ -105,8 +105,8 @@ public class ServerEventHandler {
                 /*? if forge {*/
                 /*CompoundTag tag = item.getOrCreateTag();
                 tag.putInt("CustomModelData", 0);
-                */
-                /*?}*/
+                
+                *//*?}*/
                 /*? if neoforge {*/
                 item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
                 /*?}*/
@@ -133,8 +133,8 @@ public class ServerEventHandler {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-    */
-    /*?}*/
+    
+    *//*?}*/
     /*? if neoforge {*/
     public static void onServerTick(ServerTickEvent.Post event) {
     /*?}*/
@@ -212,8 +212,8 @@ public class ServerEventHandler {
                         /*? if forge {*/
                         /*CompoundTag tag = item.getOrCreateTag();
                         tag.putInt("CustomModelData", 1);
-                        */
-                        /*?}*/
+                        
+                        *//*?}*/
                         /*? if neoforge {*/
                         item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
                         /*?}*/

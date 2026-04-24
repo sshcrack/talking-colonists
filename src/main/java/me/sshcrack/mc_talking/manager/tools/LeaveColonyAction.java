@@ -18,8 +18,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 /*? if forge {*/
 /*import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;*/
-/*?}*/
+import net.minecraft.nbt.StringTag;
+*//*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
@@ -67,8 +67,8 @@ public class LeaveColonyAction extends FunctionAction {
 
         // First, serialize all citizen data to NBT
         /*? if forge {*/
-        /*CompoundTag citizenTag = data.serializeNBT();*/
-        /*?}*/
+        /*CompoundTag citizenTag = data.serializeNBT();
+        *//*?}*/
         /*? if neoforge {*/
         CompoundTag citizenTag = data.serializeNBT(level.registryAccess());
         /*?}*/
@@ -79,8 +79,8 @@ public class LeaveColonyAction extends FunctionAction {
         /*CompoundTag display = recruitCost.getOrCreateTagElement("display");
         ListTag loreTag = new ListTag();
         loreTag.add(StringTag.valueOf(Component.Serializer.toJson(Component.translatable("mc_talking.recruit_lore"))));
-        display.put("Lore", loreTag);*/
-        /*?}*/
+        display.put("Lore", loreTag);
+        *//*?}*/
         /*? if neoforge {*/
         recruitCost.set(DataComponents.LORE, new ItemLore(List.of(Component.translatable("mc_talking.recruit_lore"))));
         /*?}*/
@@ -100,8 +100,8 @@ public class LeaveColonyAction extends FunctionAction {
         /*? if forge {*/
         /*CompoundTag itemTag = new CompoundTag();
         recruitCost.save(itemTag);
-        citizenTag.put(TAG_RECRUIT_COST, itemTag);*/
-        /*?}*/
+        citizenTag.put(TAG_RECRUIT_COST, itemTag);
+        *//*?}*/
         /*? if neoforge {*/
         citizenTag.put(TAG_RECRUIT_COST, recruitCost.save(level.registryAccess()));
         /*?}*/
@@ -113,8 +113,8 @@ public class LeaveColonyAction extends FunctionAction {
 
         // Deserialize the modified NBT into the visitor
         /*? if forge {*/
-        /*visitorData.deserializeNBT(citizenTag);*/
-        /*?}*/
+        /*visitorData.deserializeNBT(citizenTag);
+        *//*?}*/
         /*? if neoforge {*/
         visitorData.deserializeNBT(level.registryAccess(), citizenTag);
         /*?}*/

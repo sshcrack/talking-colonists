@@ -2,8 +2,8 @@ package me.sshcrack.mc_talking.config;
 
 import me.sshcrack.mc_talking.manager.tools.AITools;
 /*? if forge {*/
-/*import net.minecraftforge.common.ForgeConfigSpec;*/
-/*?}*/
+/*import net.minecraftforge.common.ForgeConfigSpec;
+*//*?}*/
 /*? if neoforge {*/
 import net.neoforged.neoforge.common.ModConfigSpec;
 /*?}*/
@@ -20,8 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class McTalkingConfig {
     public static final McTalkingConfig CONFIG;
     /*? if forge {*/
-    /*public static final ForgeConfigSpec CONFIG_SPEC;*/
-    /*?}*/
+    /*public static final ForgeConfigSpec CONFIG_SPEC;
+    *//*?}*/
     /*? if neoforge {*/
     public static final ModConfigSpec CONFIG_SPEC;
     /*?}*/
@@ -29,8 +29,8 @@ public class McTalkingConfig {
     // API Configuration
     /*? if forge {*/
     /*public final ForgeConfigSpec.ConfigValue<String> geminiApiKey;
-    public final ForgeConfigSpec.ConfigValue<AvailableAI> currentAiModel;*/
-    /*?}*/
+    public final ForgeConfigSpec.ConfigValue<AvailableAI> currentAiModel;
+    *//*?}*/
     /*? if neoforge {*/
     public final ModConfigSpec.ConfigValue<String> geminiApiKey;
     public final ModConfigSpec.ConfigValue<AvailableAI> currentAiModel;
@@ -38,8 +38,8 @@ public class McTalkingConfig {
 
     // Language Configuration
     /*? if forge {*/
-    /*public final ForgeConfigSpec.ConfigValue<String> language;*/
-    /*?}*/
+    /*public final ForgeConfigSpec.ConfigValue<String> language;
+    *//*?}*/
     /*? if neoforge {*/
     public final ModConfigSpec.ConfigValue<String> language;
     /*?}*/
@@ -52,8 +52,8 @@ public class McTalkingConfig {
     public final ForgeConfigSpec.ConfigValue<Double> activationDistance;
     public final ForgeConfigSpec.ConfigValue<Boolean> useTalkingDevice;
     public final ForgeConfigSpec.ConfigValue<Boolean> enableFunctionWorkaround;
-    public final ForgeConfigSpec.ConfigValue<Boolean> sendErrorsToPlayers;*/
-    /*?}*/
+    public final ForgeConfigSpec.ConfigValue<Boolean> sendErrorsToPlayers;
+    *//*?}*/
     /*? if neoforge {*/
     public final ModConfigSpec.ConfigValue<Boolean> respondInGroups;
     public final ModConfigSpec.ConfigValue<Integer> lookDurationTicks;
@@ -69,8 +69,8 @@ public class McTalkingConfig {
     /*public final ForgeConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
     public final ForgeConfigSpec.ConfigValue<Double> maxConversationDistance;
     public final ForgeConfigSpec.ConfigValue<ModalityModes> modality;
-    public final ForgeConfigSpec.ConfigValue<List<? extends String>> disabledTools;*/
-    /*?}*/
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> disabledTools;
+    *//*?}*/
     /*? if neoforge {*/
     public final ModConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
     public final ModConfigSpec.ConfigValue<Double> maxConversationDistance;
@@ -79,8 +79,8 @@ public class McTalkingConfig {
     /*?}*/
 
     /*? if forge {*/
-    /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {*/
-    /*?}*/
+    /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
+    *//*?}*/
     /*? if neoforge {*/
     public McTalkingConfig(ModConfigSpec.Builder builder) {
     /*?}*/
@@ -89,8 +89,8 @@ public class McTalkingConfig {
         geminiApiKey = builder
                 .comment("API Configuration")
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -99,8 +99,8 @@ public class McTalkingConfig {
 
         currentAiModel = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -108,8 +108,8 @@ public class McTalkingConfig {
                 .defineEnum("ai_model", AvailableAI.Flash3);
         enableFunctionWorkaround = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -120,8 +120,8 @@ public class McTalkingConfig {
         language = builder
                 .comment("Language Configuration")
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -131,8 +131,8 @@ public class McTalkingConfig {
         // Interaction Configuration
         respondInGroups = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -142,8 +142,8 @@ public class McTalkingConfig {
 
         lookDurationTicks = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -152,8 +152,8 @@ public class McTalkingConfig {
 
         lookToleranceMs = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -162,8 +162,8 @@ public class McTalkingConfig {
 
         activationDistance = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -172,8 +172,8 @@ public class McTalkingConfig {
 
         useTalkingDevice = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -183,8 +183,8 @@ public class McTalkingConfig {
         // Resource Management
         maxConcurrentAgents = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -194,8 +194,8 @@ public class McTalkingConfig {
 
         maxConversationDistance = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -204,8 +204,8 @@ public class McTalkingConfig {
 
         modality = builder
                 /*? if forge {*/
-                /*.worldRestart()*/
-                /*?}*/
+                /*.worldRestart()
+                *//*?}*/
                 /*? if neoforge {*/
                 .gameRestart()
                 /*?}*/
@@ -223,8 +223,8 @@ public class McTalkingConfig {
                     }
 
                     return false;
-                });*/
-        /*?}*/
+                });
+        *//*?}*/
         /*? if neoforge {*/
         AtomicInteger currIndex = new AtomicInteger();
         disabledTools = builder
@@ -250,8 +250,8 @@ public class McTalkingConfig {
     static {
         /*? if forge {*/
         /*Pair<McTalkingConfig, ForgeConfigSpec> pair =
-                new ForgeConfigSpec.Builder().configure(McTalkingConfig::new);*/
-        /*?}*/
+                new ForgeConfigSpec.Builder().configure(McTalkingConfig::new);
+        *//*?}*/
         /*? if neoforge {*/
         Pair<McTalkingConfig, ModConfigSpec> pair =
                 new ModConfigSpec.Builder().configure(McTalkingConfig::new);

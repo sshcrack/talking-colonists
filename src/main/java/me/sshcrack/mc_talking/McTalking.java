@@ -11,8 +11,8 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;*/
-/*?}*/
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+*//*?}*/
 /*? if neoforge {*/
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -42,8 +42,8 @@ public class McTalking {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
         ModItems.register(modEventBus);
         AiStatusPayload.registerMessages();
-    }*/
-    /*?}*/
+    }
+    *//*?}*/
 
     /*? if neoforge {*/
     public McTalking(IEventBus modEventBus, ModContainer modContainer) {
