@@ -28,6 +28,9 @@ import net.minecraft.world.item.Items;
 /*import net.minecraft.world.item.component.ItemLore;
 *//*?}*/
 import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static com.minecolonies.api.util.constant.NbtTagConstants.TAG_ID;
@@ -123,7 +126,7 @@ public class LeaveColonyAction extends FunctionAction {
         visitorData.setHomeBuilding(building);
 
         // Spawn the visitor at the citizen's location
-        visitorManager.spawnOrCreateCivilian(visitorData, level, pos, true);
+        visitorManager.spawnOrCreateCivilian(visitorData, level, List.of(pos), true);
 
         // Add to tavern's external citizens list - critical for recruitment to work
         module.getExternalCitizens().add(visitorData.getId());

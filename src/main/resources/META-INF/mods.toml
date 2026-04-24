@@ -1,45 +1,29 @@
-modLoader = "javafml" #mandatory
+modLoader = "javafml"
 loaderVersion = "*"
-license = "${license}"
+issueTrackerURL = "https://github.com/meza/Stonecraft/issues"
+license = "GPL-3.0"
 
-[[mods]] #mandatory
-modId = "${id}" #mandatory
-version = "${version}" #mandatory
-displayName = "${name}" #mandatory
-authors = "${authors}" #optional
-description = '''${description}'''
+[[mods]]
+modId = "${id}"
+version = "${version}"
+displayName = "${name}"
+authors = "Meza"
+description = '''
+${description}
+'''
+logoFile = "assets/${id}/icon.png"
+logoBlur = false
 
-[[dependencies.${ id }]] #optional
-modId = "forge" #mandatory
-mandatory = true #mandatory
-versionRange = "*"
-ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.${ id }]]
+[[dependencies.${id}]]
 modId = "minecraft"
 mandatory = true
 versionRange = "[${minecraftVersion},)"
 ordering = "NONE"
-side = "BOTH"
+side = "CLIENT"
 
-[[dependencies.${ id }]]
-modId = "voicechat"
+[[dependencies.${id}]]
+modId = "forge"
 mandatory = true
-versionRange = "[${voicechat_version},)"
+versionRange = "*"
 ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.${ id }]]
-modId = "minecolonies"
-mandatory = true
-versionRange = "[${minecolonies_version},)"
-ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.${ id }]]
-modId = "gemini_live_lib"
-mandatory = true
-versionRange = "[${gemini_live_lib_version},)"
-ordering = "BEFORE"
-side = "BOTH"
+side = "CLIENT"

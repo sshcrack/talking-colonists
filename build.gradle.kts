@@ -4,7 +4,8 @@ plugins {
     id("gg.meza.stonecraft")
 }
 
-val currentLoader = if (project.name.endsWith("-forge")) "forge" else "neoforge"
+val currentLoader = if (mod.isForge) "forge" else "neoforge"
+var voicechat_version = "${property("minecraft_version")}-${property("voicechat_version_suffix")}"
 
 repositories {
     mavenLocal()
@@ -58,7 +59,6 @@ repositories {
     }
 }
 
-var voicechat_version = "${property("minecraft_version")}-${property("voicechat_version_suffix")}"
 modSettings {
     clientOptions {
         fov = 90
@@ -72,7 +72,7 @@ modSettings {
     variableReplacements.put("minecolonies_version", property("minecolonies_version")!!)
     variableReplacements.put("license", property("mod.license").toString())
     variableReplacements.put(
-        "minecolonies_version",property("minecolonies_version").toString()!!
+        "minecolonies_version", property("minecolonies_version").toString()!!
     )
     variableReplacements.put("gemini_live_lib_version", property("gemini_live_lib_version").toString())
 }
@@ -86,7 +86,17 @@ publishMods {
 
 dependencies {
     modImplementation("de.maxhenkel.voicechat:voicechat-api:${property("voicechat_api_version")}")
-    localRuntime("maven.modrinth:simple-voice-chat:${currentLoader}-${voicechat_version}")
-    modImplementation("com.ldtteam:minecolonies:${property("minecolonies_version")}")
+    modRuntimeOnly("maven.modrinth:simple-voice-chat:${currentLoader}-${voicechat_version}")
     modImplementation("me.sshcrack:gemini_live_lib:${property("gemini_live_lib_version")}-${property("minecraft_version")}-${currentLoader}")
+
+    var domum_variant = if (mod.isForge) {
+        "domum_ornamentum"
+    } else {
+        "domum-ornamentum"
+    }
+
+    modImplementation("com.ldtteam:minecolonies:${property("minecolonies_version")}")
+    modRuntimeOnly("com.ldtteam:${domum_variant}:${property("domum_version")}")
+    modRuntimeOnly("com.ldtteam:structurize:${property("structurize_version")}")
+    modRuntimeOnly("com.ldtteam:blockui:${property("blockui_version")}")
 }
