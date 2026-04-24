@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
@@ -22,6 +23,19 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
+import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
+import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
+import static com.minecolonies.api.util.constant.HappinessConstants.HEALTH;
+import static com.minecolonies.api.util.constant.HappinessConstants.HOMELESSNESS;
+import static com.minecolonies.api.util.constant.HappinessConstants.IDLEATJOB;
+import static com.minecolonies.api.util.constant.HappinessConstants.MYSTICAL_SITE;
+import static com.minecolonies.api.util.constant.HappinessConstants.RAIDWITHOUTDEATH;
+import static com.minecolonies.api.util.constant.HappinessConstants.SCHOOL;
+import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
+import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
+import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
+import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -64,7 +78,7 @@ public final class CitizenPromptViewFactory {
                 if (modifier == null) {
                     return null;
                 }
-                return new HappinessModifierView(modifierId, modifier.getFactor(data));
+                return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
             })
             .filter(m -> m != null)
             .collect(Collectors.toList());
@@ -177,5 +191,49 @@ public final class CitizenPromptViewFactory {
         } catch (Exception e) {
             return localeCode;
         }
+    }
+
+    private static HappinessModifierType resolveHappinessModifierType(String modifierId) {
+        if (HOMELESSNESS.equals(modifierId)) {
+            return HappinessModifierType.HOMELESSNESS;
+        }
+        if (UNEMPLOYMENT.equals(modifierId)) {
+            return HappinessModifierType.UNEMPLOYMENT;
+        }
+        if (HEALTH.equals(modifierId)) {
+            return HappinessModifierType.HEALTH;
+        }
+        if (IDLEATJOB.equals(modifierId)) {
+            return HappinessModifierType.IDLEATJOB;
+        }
+        if (SCHOOL.equals(modifierId)) {
+            return HappinessModifierType.SCHOOL;
+        }
+        if (MYSTICAL_SITE.equals(modifierId)) {
+            return HappinessModifierType.MYSTICAL_SITE;
+        }
+        if (SECURITY.equals(modifierId)) {
+            return HappinessModifierType.SECURITY;
+        }
+        if (SOCIAL.equals(modifierId)) {
+            return HappinessModifierType.SOCIAL;
+        }
+        if (DAMAGE.equals(modifierId)) {
+            return HappinessModifierType.DAMAGE;
+        }
+        if (DEATH.equals(modifierId)) {
+            return HappinessModifierType.DEATH;
+        }
+        if (RAIDWITHOUTDEATH.equals(modifierId)) {
+            return HappinessModifierType.RAIDWITHOUTDEATH;
+        }
+        if (FOOD.equals(modifierId)) {
+            return HappinessModifierType.FOOD;
+        }
+        if (SLEPTTONIGHT.equals(modifierId)) {
+            return HappinessModifierType.SLEPTTONIGHT;
+        }
+
+        return HappinessModifierType.UNKNOWN;
     }
 }

@@ -4,26 +4,13 @@ import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
-import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
-import static com.minecolonies.api.util.constant.HappinessConstants.HEALTH;
-import static com.minecolonies.api.util.constant.HappinessConstants.HOMELESSNESS;
-import static com.minecolonies.api.util.constant.HappinessConstants.IDLEATJOB;
-import static com.minecolonies.api.util.constant.HappinessConstants.MYSTICAL_SITE;
-import static com.minecolonies.api.util.constant.HappinessConstants.RAIDWITHOUTDEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.SCHOOL;
-import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
-import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
-import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
-import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
 
 /**
  * Default implementation for citizen prompt generation.
@@ -212,10 +199,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         for (var modifier : view.happinessModifiers()) {
-            String modifierId = modifier.id();
+            HappinessModifierType modifierType = modifier.type();
             double factor = modifier.factor();
             if (factor < 0.8 || factor > 1.2) {
-                switch (modifierId) {
+                switch (modifierType) {
                     case HOMELESSNESS:
                         if (factor < 0.8) {
                             prompt.append("- Distressed about housing situation\n");
@@ -296,6 +283,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                             prompt.append("- Tired from lack of sleep\n");
                         }
                         break;
+                    case UNKNOWN:
                     default:
                         break;
                 }
