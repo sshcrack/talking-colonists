@@ -1,7 +1,7 @@
 package me.sshcrack.mc_talking.platform.forge;
 
 //? forge {
-/*import me.sshcrack.mc_talking.ModTemplate;
+import me.sshcrack.mc_talking.ModTemplate;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -15,4 +15,4 @@ public class ForgeClientEventSubscriber {
 		ModTemplate.onInitializeClient();
 	}
 }
-*///?}
+//?}

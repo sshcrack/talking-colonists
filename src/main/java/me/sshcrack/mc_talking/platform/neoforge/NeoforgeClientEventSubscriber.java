@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking.platform.neoforge;
 
 //? neoforge {
 
-import me.sshcrack.mc_talking.ModTemplate;
+/*import me.sshcrack.mc_talking.ModTemplate;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -15,4 +15,4 @@ public class NeoforgeClientEventSubscriber {
 		ModTemplate.onInitializeClient();
 	}
 }
-//?}
+*///?}

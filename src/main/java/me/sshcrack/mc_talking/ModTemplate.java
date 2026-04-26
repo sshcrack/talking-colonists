@@ -7,10 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 //? neoforge {
-import me.sshcrack.mc_talking.platform.neoforge.NeoforgePlatform;
-		//?} forge {
-/*import me.sshcrack.mc_talking.platform.forge.ForgePlatform;
- *///?}
+/*import me.sshcrack.mc_talking.platform.neoforge.NeoforgePlatform;
+		*///?} forge {
+import me.sshcrack.mc_talking.platform.forge.ForgePlatform;
+ //?}
 
 @SuppressWarnings("LoggingSimilarMessage")
 public class ModTemplate {
@@ -38,10 +38,10 @@ public class ModTemplate {
 
 	private static Platform createPlatformInstance() {
 		//? neoforge {
-		return new NeoforgePlatform();
-		//?} forge {
-		/*return new ForgePlatform();
-		 *///?}
+		/*return new NeoforgePlatform();
+		*///?} forge {
+		return new ForgePlatform();
+		 //?}
 	}
 
 	private static ResourceLocation id(String path) {
@@ -50,9 +50,9 @@ public class ModTemplate {
 
 	private static ResourceLocation id(String namespace, String path) {
 		//? forge {
-		/*return new ResourceLocation(namespace, path);
-		*///?} neoforge {
-		return ResourceLocation.fromNamespaceAndPath(namespace, path);
-		//?}
+		return new ResourceLocation(namespace, path);
+		//?} neoforge {
+		/*return ResourceLocation.fromNamespaceAndPath(namespace, path);
+		*///?}
 	}
 }

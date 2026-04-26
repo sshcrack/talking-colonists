@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking.platform.neoforge;
 
 //? neoforge {
 
-import me.sshcrack.mc_talking.event.ExampleEventHandler;
+/*import me.sshcrack.mc_talking.event.ExampleEventHandler;
 import net.minecraft.server.level.ServerPlayer; // sample_content
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -18,4 +18,4 @@ public class NeoforgeEventSubscriber {
 		} // sample_content
 	} // sample_content
 }
-//?}
+*///?}

@@ -1,7 +1,7 @@
 package me.sshcrack.mc_talking.platform.forge;
 
 //? forge {
-/*import me.sshcrack.mc_talking.event.ExampleEventHandler; // sample_content
+import me.sshcrack.mc_talking.event.ExampleEventHandler; // sample_content
 import net.minecraft.server.level.ServerPlayer; // sample_content
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -17,4 +17,4 @@ public class ForgeEventSubscriber {
 		} // sample_content
 	} // sample_content
 }
-*///?}
+//?}

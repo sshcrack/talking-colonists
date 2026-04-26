@@ -1,7 +1,7 @@
 package me.sshcrack.mc_talking.platform.forge;
 
 //? forge {
-/*import me.sshcrack.mc_talking.platform.Platform;
+import me.sshcrack.mc_talking.platform.Platform;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
 
@@ -27,4 +27,4 @@ public class ForgePlatform implements Platform {
 		return !FMLLoader.isProduction();
 	}
 }
-*///?}
+//?}
