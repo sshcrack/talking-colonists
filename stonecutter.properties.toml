@@ -14,14 +14,6 @@ mod.sources_url = "https://github.com/sshcrack/talking-colonists"
 mod.homepage_url = "https://github.com/sshcrack/talking-colonists"
 mod.issues_url = "https://github.com/sshcrack/talking-colonists/issues"
 mod.discord_url = "https://discord.gg/ScAsuQt5em"
-[[mod.pom.developers]]
-id = "minecolonies"
-name = "AuthorName"
-url = "https://github.com/ghost"
-[[mod.pom.developers]]
-id = "anotherauthorname"
-name = "AnotherAuthorName"
-url = "https://github.com/ghost"
 
 [forge]
 
