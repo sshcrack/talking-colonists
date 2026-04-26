@@ -1,0 +1,46 @@
+mod.id = "mc_talking"
+mod.name = "MineColonies Talking Citizens"
+mod.group = "me.sshcrack.mc_talking"
+mod.version = "1.4.2"
+mod.channel_tag = "-alpha.1"
+mod.description = "Uses Gemini Flash Live to make your citizens talk in Minecolonies."
+mod.authors = ["sshcrack"]
+mod.contributors = []
+mod.inception_year = "2025"
+mod.license.name = "All rights reserved"
+mod.license.url = "https://github.com/sshcrack/talking-colonists/blob/master/LICENSE.md"
+mod.license.dist = "repo"
+mod.sources_url = "https://github.com/sshcrack/talking-colonists"
+mod.homepage_url = "https://github.com/sshcrack/talking-colonists"
+mod.issues_url = "https://github.com/sshcrack/talking-colonists/issues"
+mod.discord_url = "https://discord.gg/ScAsuQt5em"
+[[mod.pom.developers]]
+id = "minecolonies"
+name = "AuthorName"
+url = "https://github.com/ghost"
+[[mod.pom.developers]]
+id = "anotherauthorname"
+name = "AnotherAuthorName"
+url = "https://github.com/ghost"
+
+[forge]
+
+[forge."1.20.1"]
+deps.minecraft = "1.20.1"
+deps.forge = "47.2.0"
+deps.minecolonies_version="1.20.1-1.1.1215-snapshot"
+deps.structurize_version="1.20.1-1.0.788-snapshot"
+deps.blockui_version="1.20.1-1.0.190-snapshot"
+deps.domum_version="1.20.1-1.0.288-snapshot"
+
+
+[neoforge]
+
+[neoforge."1.21.1"]
+deps.minecraft = "1.21.1"
+deps.neoforge = "21.1.213"
+deps.minecolonies_version="1.1.1269-1.21.1-snapshot"
+deps.structurize_version="1.0.823-1.21.1-snapshot"
+deps.blockui_version="1.0.211-1.21.1-snapshot"
+deps.domum_version="1.0.233-snapshot"
+

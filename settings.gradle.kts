@@ -1,37 +1,34 @@
 pluginManagement {
-    repositories {
-        mavenLocal()
-        gradlePluginPortal()
-        maven("https://maven.minecraftforge.net/")
-        maven("https://maven.neoforged.net/releases/")
-        maven("https://maven.parchmentmc.org")
-        maven("https://maven.fabricmc.net/")
-        maven("https://maven.architectury.dev/")
-    }
-    plugins {
-        id("com.modrinth.minotaur") version "2.+"
-    }
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		gradlePluginPortal()
+		maven("https://maven.fabricmc.net/") { name = "Fabric" }
+		maven("https://maven.neoforged.net/releases/") { name = "NeoForged" }
+		maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
+		maven("https://maven.kikugie.dev/releases") { name = "KikuGie Releases" }
+		maven("https://maven.parchmentmc.org") { name = "ParchmentMC" }
+	}
+	includeBuild("build-logic")
 }
 
 plugins {
-    //id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
-    id("gg.meza.stonecraft") version "1.9.+"
-    id("dev.kikugie.stonecutter") version "0.8.+"
+	id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+	id("dev.kikugie.stonecutter") version "0.9.2"
 }
 
 stonecutter {
-    centralScript = "build.gradle.kts"
-    kotlinController = true
-    shared {
-        fun mc(version: String, vararg loaders: String) {
-            for (loader in loaders) version("$version-$loader", version)
-        }
+	create(rootProject) {
+		fun match(version: String, vararg loaders: String) =
+			loaders.forEach { version("$version-$it", version).buildscript = getBuildscript(it, version) }
 
-        mc("1.21.1", "neoforge")
-        mc("1.20.1", "forge")
-        vcsVersion = "1.21.1-neoforge"
-    }
-    create(rootProject)
+		match("1.21.1", "neoforge")
+		match("1.20.1", "forge")
+
+		vcsVersion = "1.20.1-forge"
+	}
 }
 
-rootProject.name = "talking-colonists"
+private fun getBuildscript(loader: String, version: String): String {
+	return "build.$loader.gradle.kts"
+}
