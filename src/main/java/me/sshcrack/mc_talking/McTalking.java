@@ -6,22 +6,22 @@ import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
 /*? if forge {*/
-import net.minecraftforge.common.MinecraftForge;
+/*import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-/*?}*/
+*//*?}*/
 /*? if neoforge {*/
-/*import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.DirectionalPayloadHandler;
-*//*?}*/
+/*?}*/
 import org.slf4j.Logger;
 
 /**
@@ -34,7 +34,7 @@ public class McTalking {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     /*? if forge {*/
-    public McTalking() {
+    /*public McTalking() {
         initialize();
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -43,10 +43,10 @@ public class McTalking {
         ModItems.register(modEventBus);
         AiStatusPayload.registerMessages();
     }
-    /*?}*/
+    *//*?}*/
 
     /*? if neoforge {*/
-    /*public McTalking(IEventBus modEventBus, ModContainer modContainer) {
+    public McTalking(IEventBus modEventBus, ModContainer modContainer) {
         initialize();
 
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
@@ -54,14 +54,14 @@ public class McTalking {
         ModItems.register(modEventBus);
         modEventBus.addListener(this::registerPayloadHandlers);
     }
-    *//*?}*/
+    /*?}*/
 
     private void initialize() {
         AITools.register();
     }
 
     /*? if neoforge {*/
-    /*public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
+    public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
         final var registrar = event.registrar("1");
         registrar.playToClient(AiStatusPayload.TYPE, AiStatusPayload.STREAM_CODEC, new DirectionalPayloadHandler<>(
                 (payload, ctx) -> ctx.enqueueWork(() -> ConversationManager.updateAiStatus(payload.citizen(), payload.status())),
@@ -69,5 +69,5 @@ public class McTalking {
                 }
         ));
     }
-    *//*?}*/
+    /*?}*/
 }

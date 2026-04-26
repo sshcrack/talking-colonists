@@ -5,24 +5,24 @@ import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
-import net.minecraft.nbt.CompoundTag;
-/*?}*/
-/*? if neoforge {*/
-/*import net.minecraft.core.component.DataComponents;
+/*import net.minecraft.nbt.CompoundTag;
 *//*?}*/
+/*? if neoforge {*/
+import net.minecraft.core.component.DataComponents;
+/*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.item.ItemStack;
 /*? if neoforge {*/
-/*import net.minecraft.world.item.component.CustomModelData;
-*//*?}*/
+import net.minecraft.world.item.component.CustomModelData;
+/*?}*/
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 /*? if forge {*/
-import net.minecraftforge.api.distmarker.Dist;
+/*import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
@@ -32,9 +32,9 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-/*?}*/
+*//*?}*/
 /*? if neoforge {*/
-/*import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
@@ -44,7 +44,7 @@ import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-*//*?}*/
+/*?}*/
 
 import java.util.UUID;
 
@@ -54,11 +54,11 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
  * Handler for server-side events related to player-citizen interactions.
  */
 /*? if forge {*/
-@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
-/*?}*/
-/*? if neoforge {*/
-/*@EventBusSubscriber(modid = McTalking.MODID, bus = EventBusSubscriber.Bus.GAME, value = Dist.DEDICATED_SERVER)
+/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 *//*?}*/
+/*? if neoforge {*/
+@EventBusSubscriber(modid = McTalking.MODID, value = Dist.DEDICATED_SERVER)
+/*?}*/
 public class ServerEventHandler {
 
     private static final TargetingConditions TARGETING_CONDITIONS = TargetingConditions.forNonCombat().ignoreLineOfSight();
@@ -103,13 +103,13 @@ public class ServerEventHandler {
         for (ItemStack item : player.getInventory().items) {
             if (item.getItem() instanceof CitizenTalkingDevice) {
                 /*? if forge {*/
-                CompoundTag tag = item.getOrCreateTag();
+                /*CompoundTag tag = item.getOrCreateTag();
                 tag.putInt("CustomModelData", 0);
 
-                /*?}*/
-                /*? if neoforge {*/
-                /*item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
                 *//*?}*/
+                /*? if neoforge {*/
+                item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                /*?}*/
             }
         }
     }
@@ -129,15 +129,15 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     /*? if forge {*/
-    public void onServerTick(TickEvent.ServerTickEvent event) {
+    /*public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
 
-    /*?}*/
-    /*? if neoforge {*/
-    /*public void onServerTick(ServerTickEvent.Post event) {
     *//*?}*/
+    /*? if neoforge {*/
+    public void onServerTick(ServerTickEvent.Post event) {
+    /*?}*/
         tickCounter++;
         if (tickCounter % 5 != 0) {
             return;
@@ -210,13 +210,13 @@ public class ServerEventHandler {
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice && player.getInventory().selected == player.getInventory().findSlotMatchingItem(item)) {
                         /*? if forge {*/
-                        CompoundTag tag = item.getOrCreateTag();
+                        /*CompoundTag tag = item.getOrCreateTag();
                         tag.putInt("CustomModelData", 1);
 
-                        /*?}*/
-                        /*? if neoforge {*/
-                        /*item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
                         *//*?}*/
+                        /*? if neoforge {*/
+                        item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+                        /*?}*/
                         break;
                     }
                 }

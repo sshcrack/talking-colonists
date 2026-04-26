@@ -8,21 +8,21 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
-import net.minecraft.nbt.CompoundTag;
-/*?}*/
-/*? if neoforge {*/
-/*import net.minecraft.core.component.DataComponents;
+/*import net.minecraft.nbt.CompoundTag;
 *//*?}*/
+/*? if neoforge {*/
+import net.minecraft.core.component.DataComponents;
+/*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 /*? if neoforge {*/
-/*import net.minecraft.world.item.component.CustomModelData;
-*//*?}*/
+import net.minecraft.world.item.component.CustomModelData;
+/*?}*/
 /*? if neoforge {*/
-/*import net.neoforged.neoforge.network.PacketDistributor;
-*//*?}*/
+import net.neoforged.neoforge.network.PacketDistributor;
+/*?}*/
 
 import java.util.*;
 
@@ -162,24 +162,24 @@ public class ConversationManager {
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice) {
                         /*? if forge {*/
-                        CompoundTag tag = item.getOrCreateTag();
+                        /*CompoundTag tag = item.getOrCreateTag();
                         tag.putInt("CustomModelData", 0);
-                        /*?}*/
-                        /*? if neoforge {*/
-                        /*item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
                         *//*?}*/
+                        /*? if neoforge {*/
+                        item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                        /*?}*/
                     }
                 }
 
                 /*? if forge {*/
-                AiStatusPayload payload = new AiStatusPayload(citizenId, AiStatus.NONE);
+                /*AiStatusPayload payload = new AiStatusPayload(citizenId, AiStatus.NONE);
                 AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), payload);
                 AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), payload);
-                /*?}*/
-                /*? if neoforge {*/
-                /*AiStatusPayload.sendToPlayersTrackingEntity(entity, new AiStatusPayload(citizenId, AiStatus.NONE));
-                AiStatusPayload.sendToPlayer(player, new AiStatusPayload(citizenId, AiStatus.NONE));
                 *//*?}*/
+                /*? if neoforge {*/
+                AiStatusPayload.sendToPlayersTrackingEntity(entity, new AiStatusPayload(citizenId, AiStatus.NONE));
+                AiStatusPayload.sendToPlayer(player, new AiStatusPayload(citizenId, AiStatus.NONE));
+                /*?}*/
                 if (sendMessage) {
                     player.sendSystemMessage(Component.translatable("mc_talking.too_far")
                             .withStyle(ChatFormatting.YELLOW));
