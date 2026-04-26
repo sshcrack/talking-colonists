@@ -24,11 +24,11 @@ platform {
 		required("forge") {
 			forgeLikeVersionRange.set("[1,)")
 		}
-		required("minecolomies") {
+		required("minecolonies") {
 			curseforge = "minecolonies"
 			forgeLikeVersionRange = "[${prop("deps.minecolonies_version")},)"
 		}
-		required("gemini-live-lib") {
+		required("gemini_live_lib") {
 			curseforge = "gemini-live-lib"
 			forgeLikeVersionRange = "[${prop("deps.gemini_live_lib_version")},)"
 		}

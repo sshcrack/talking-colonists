@@ -29,7 +29,7 @@ url = "https://github.com/ghost"
 deps.minecraft = "1.20.1"
 deps.forge = "47.2.0"
 deps.minecolonies_version="1.20.1-1.1.1215-snapshot"
-deps.structurize_version="1.20.1-1.0.788-snapshot"
+deps.structurize_version="1.20.1-1.0.806-snapshot"
 deps.blockui_version="1.20.1-1.0.190-snapshot"
 deps.domum_version="1.20.1-1.0.288-snapshot"
 
@@ -38,9 +38,9 @@ deps.domum_version="1.20.1-1.0.288-snapshot"
 
 [neoforge."1.21.1"]
 deps.minecraft = "1.21.1"
+deps.parchment = "1.21.1:2024.11.17"
 deps.neoforge = "21.1.213"
 deps.minecolonies_version="1.1.1269-1.21.1-snapshot"
 deps.structurize_version="1.0.823-1.21.1-snapshot"
 deps.blockui_version="1.0.211-1.21.1-snapshot"
 deps.domum_version="1.0.233-snapshot"
-

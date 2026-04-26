@@ -50,8 +50,8 @@ public class ModTemplate {
 
 	private static ResourceLocation id(String namespace, String path) {
 		//? forge {
-		/*return new ResourceLocation(namespace, path);*/
-		//?} neoforge {
+		/*return new ResourceLocation(namespace, path);
+		*///?} neoforge {
 		return ResourceLocation.fromNamespaceAndPath(namespace, path);
 		//?}
 	}
