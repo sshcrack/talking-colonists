@@ -1,30 +1,32 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.ChatFormatting;
-/*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;
-*//*?}*/
-/*? if neoforge {*/
-import net.minecraft.core.component.DataComponents;
-/*?}*/
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 /*? if neoforge {*/
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.component.CustomModelData;
-/*?}*/
-/*? if neoforge {*/
-import net.neoforged.neoforge.network.PacketDistributor;
-/*?}*/
+/*? }*/
+/*? if forge {*/
+/*import net.minecraft.nbt.CompoundTag;
+*//*? }*/
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
@@ -167,19 +169,12 @@ public class ConversationManager {
                         *//*?}*/
                         /*? if neoforge {*/
                         item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
-                        /*?}*/
+                         /*?}*/
                     }
                 }
 
-                /*? if forge {*/
-                /*AiStatusPayload payload = new AiStatusPayload(citizenId, AiStatus.NONE);
-                AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), payload);
-                AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), payload);
-                *//*?}*/
-                /*? if neoforge {*/
                 AiStatusPayload.sendToPlayersTrackingEntity(entity, new AiStatusPayload(citizenId, AiStatus.NONE));
                 AiStatusPayload.sendToPlayer(player, new AiStatusPayload(citizenId, AiStatus.NONE));
-                /*?}*/
                 if (sendMessage) {
                     player.sendSystemMessage(Component.translatable("mc_talking.too_far")
                             .withStyle(ChatFormatting.YELLOW));

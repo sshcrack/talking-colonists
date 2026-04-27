@@ -155,7 +155,7 @@ dependencies {
     modImplementation("me.sshcrack:gemini_live_lib:${prop("deps.gemini_live_lib_version")}-${prop("deps.minecraft")}-forge")
 
     modImplementation("com.ldtteam:minecolonies:${prop("deps.minecolonies_version")}")
-    modRuntimeOnly("com.ldtteam:domum_ornamentum:${prop("deps.domum_version")}")
+    modRuntimeOnly("com.ldtteam:domum_ornamentum:${prop("deps.domum_version")}:universal")
     modRuntimeOnly("com.ldtteam:structurize:${prop("deps.structurize_version")}")
     modRuntimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
 }

@@ -100,8 +100,6 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         setup.systemInstruction = sys;
         setup.tools.addAll(AITools.getEnabledTools());
-        if (CONFIG.currentAiModel.get() == AvailableAI.Flash3 && CONFIG.enableFunctionWorkaround.get())
-            setup.tools.add(BidiGenerateContentSetup.Tool.googleSearch());
 
         return setup;
     }
@@ -110,7 +108,7 @@ public class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onUsageMetadata(JsonObject obj) {
-        McTalking.LOGGER.info("Gemini usage metadata: {}", obj.toString());
+        //McTalking.LOGGER.info("Gemini usage metadata: {}", obj.toString());
     }
 
     @Override
@@ -297,7 +295,7 @@ public class GeminiWsClient extends GeminiLiveClient {
                 pendingPrompt.add(audio);
             }
 
-            if (!this.isOpen() && !isInitiatingConnection) {
+            if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
                 if (shouldReconnect) {
                     if (System.currentTimeMillis() - lastReconnectTime < 5000)
                         return;
