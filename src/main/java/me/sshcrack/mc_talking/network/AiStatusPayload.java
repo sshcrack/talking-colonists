@@ -2,12 +2,14 @@ package me.sshcrack.mc_talking.network;
 
 import me.sshcrack.mc_talking.McTalking;
 /*? if forge {*/
-/*import net.minecraft.network.FriendlyByteBuf;
+/*import me.sshcrack.mc_talking.ConversationManager;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
+import java.util.function.Supplier;
 *//*?}*/
 /*? if neoforge {*/
 import io.netty.buffer.ByteBuf;

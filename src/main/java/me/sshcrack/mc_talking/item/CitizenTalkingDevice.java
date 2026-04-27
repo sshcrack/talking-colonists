@@ -36,178 +36,180 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class CitizenTalkingDevice extends Item {
-	/*? if forge {*/
+    /*? if forge {*/
     /*private static final String TAG_TALKING_PLAYER = "talkingPlayer";
     private static final String TAG_MODEL_DATA = "CustomModelData";
     *//*?}*/
 
-	public CitizenTalkingDevice() {
-		/*? if forge {*/
-		/*super(new Item.Properties().stacksTo(1));
-		 *//*?}*/
-		/*? if neoforge {*/
-		super(new Item.Properties().stacksTo(1).component(DataComponents.CUSTOM_DATA, CustomData.EMPTY));
-		/*?}*/
-	}
+    public CitizenTalkingDevice() {
+        /*? if forge {*/
+        /*super(new Item.Properties().stacksTo(1));
+         *//*?}*/
+        /*? if neoforge {*/
+        super(new Item.Properties().stacksTo(1).component(DataComponents.CUSTOM_DATA, CustomData.EMPTY));
+        /*?}*/
+    }
 
-	@Nullable
-	private UUID getUuidFromItem(ItemStack stack) {
-		/*? if forge {*/
+    @Nullable
+    private UUID getUuidFromItem(ItemStack stack) {
+        /*? if forge {*/
         /*CompoundTag tag = stack.getTag();
         if (tag == null || !tag.contains(TAG_TALKING_PLAYER))
             return null;
 
         return tag.getUUID(TAG_TALKING_PLAYER);
         *//*?}*/
-		/*? if neoforge {*/
-		if (stack.get(DataComponents.CUSTOM_DATA) == null)
-			return null;
+        /*? if neoforge {*/
+        if (stack.get(DataComponents.CUSTOM_DATA) == null)
+            return null;
 
-		var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
-		if (!comp.contains("talkingPlayer"))
-			return null;
+        var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        if (!comp.contains("talkingPlayer"))
+            return null;
 
-		return comp.getUUID("talkingPlayer");
-	}
+        return comp.getUUID("talkingPlayer");
+        /*?}*/
+    }
 
-	@Override
-	public boolean isFoil(ItemStack stack) {
-		UUID uuid = getUuidFromItem(stack);
-		if(uuid == null) {
-			return false;
-		}
+    @Override
+    public boolean isFoil(ItemStack stack) {
+        UUID uuid = getUuidFromItem(stack);
+        if (uuid == null) {
+            return false;
+        }
 
-		return ConversationManager.isPlayerInConversation(uuid);
-	}
+        return ConversationManager.isPlayerInConversation(uuid);
+    }
 
-	private void appendTooltip(List<Component> tooltipComponents) {
-		tooltipComponents.add(Component.translatable("item.mc_talking.talking_device.tooltip")
-				.withStyle(ChatFormatting.GRAY));
-	}
+    private void appendTooltip(List<Component> tooltipComponents) {
+        tooltipComponents.add(Component.translatable("item.mc_talking.talking_device.tooltip")
+                .withStyle(ChatFormatting.GRAY));
+    }
 
-	/*? if forge {*/
-	/*
-	@Override
+    /*? if forge {*/
+
+	/*@Override
 	public void appendHoverText(ItemStack pStack, @Nullable Level pLevel, List<Component> tooltipComponents, TooltipFlag pIsAdvanced) {
 	 appendTooltip(tooltipComponents);
 	 super.appendHoverText(pStack, pLevel, tooltipComponents, pIsAdvanced);
 	}
-	 	 */
-	/*?}*/
 
-	/*? if neoforge {*/
-	@Override
-	public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, List<Component> tooltipComponents,
-								@NotNull TooltipFlag tooltipFlag) {
-		appendTooltip(tooltipComponents);
-		super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-	}
-	/*?}*/
+    *//*?}*/
 
-	@Override
-	public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
-		super.inventoryTick(stack, level, entity, slotId, isSelected);
+    /*? if neoforge {*/
+    @Override
+    public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, List<Component> tooltipComponents,
+                                @NotNull TooltipFlag tooltipFlag) {
+        appendTooltip(tooltipComponents);
+        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+    }
+    /*?}*/
 
-		if (Math.random() <= 0.25) {
-			UUID uuid = getUuidFromItem(stack);
-			boolean isActive = uuid != null && ConversationManager.isPlayerInConversation(uuid);
-			/*? if forge {*/
-			/*tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);
-			 *//*?}*/
-			/*? if neoforge {*/
-			var compD = stack.get(DataComponents.CUSTOM_DATA);
-			if (compD == null) {
-				stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
-				return;
-			}
+    @Override
+    public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
+        super.inventoryTick(stack, level, entity, slotId, isSelected);
 
-			var comp = compD.copyTag();
-			if (!comp.contains("talkingPlayer")) {
-				stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
-				return;
-			}
+        if (Math.random() <= 0.25) {
+            UUID uuid = getUuidFromItem(stack);
+            boolean isActive = uuid != null && ConversationManager.isPlayerInConversation(uuid);
+            /*? if forge {*/
+            /*var tag = stack.getOrCreateTag();
+            tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);
+             *//*?}*/
+            /*? if neoforge {*/
+            var compD = stack.get(DataComponents.CUSTOM_DATA);
+            if (compD == null) {
+                stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                return;
+            }
 
-			stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
-			/*?}*/
-		}
-	}
+            var comp = compD.copyTag();
+            if (!comp.contains("talkingPlayer")) {
+                stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                return;
+            }
 
-	@Override
-	public boolean onLeftClickEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull Entity entity) {
-		if (!(entity instanceof AbstractEntityCitizen citizen)) {
-			return false; // Allow normal attack behavior for non-citizens
-		}
+            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
+            /*?}*/
+        }
+    }
 
-		if (player.level().isClientSide()) {
-			return true; // Prevent attack on client side
-		}
+    @Override
+    public boolean onLeftClickEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull Entity entity) {
+        if (!(entity instanceof AbstractEntityCitizen citizen)) {
+            return false; // Allow normal attack behavior for non-citizens
+        }
 
-		if (entity instanceof VisitorCitizen) {
-			player.sendSystemMessage(
-					Component.translatable("mc_talking.invalid_on_visitor")
-							.withStyle(ChatFormatting.RED)
-			);
+        if (player.level().isClientSide()) {
+            return true; // Prevent attack on client side
+        }
 
-			return true; // Prevent attack on visitors
-		}
+        if (entity instanceof VisitorCitizen) {
+            player.sendSystemMessage(
+                    Component.translatable("mc_talking.invalid_on_visitor")
+                            .withStyle(ChatFormatting.RED)
+            );
 
-		ServerPlayer serverPlayer = (ServerPlayer) player;
-		UUID playerId = serverPlayer.getUUID();        // Check if API key is set
-		if (CONFIG.geminiApiKey.get().isEmpty()) {
-			serverPlayer.sendSystemMessage(
-					Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
-							.withStyle(ChatFormatting.RED)
-			);
-			return true; // Still prevent attack
-		}
+            return true; // Prevent attack on visitors
+        }
 
-		// Check if voice chat API is initialized
-		if (vcApi == null) {
-			serverPlayer.sendSystemMessage(
-					Component.literal("Voice chat API is not initialized.")
-							.withStyle(ChatFormatting.RED)
-			);
-			return true; // Still prevent attack
-		}
+        ServerPlayer serverPlayer = (ServerPlayer) player;
+        UUID playerId = serverPlayer.getUUID();        // Check if API key is set
+        if (CONFIG.geminiApiKey.get().isEmpty()) {
+            serverPlayer.sendSystemMessage(
+                    Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
+                            .withStyle(ChatFormatting.RED)
+            );
+            return true; // Still prevent attack
+        }
 
-		// If there was a previously focused entity, remove its glowing effect
-		LivingEntity previousEntity = ConversationManager.getActiveEntity(playerId);
-		if (previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
-			citizen.getNavigation().stop();
-			citizen.getLookControl().setLookAt(player);
-			return true;
-		}
+        // Check if voice chat API is initialized
+        if (vcApi == null) {
+            serverPlayer.sendSystemMessage(
+                    Component.literal("Voice chat API is not initialized.")
+                            .withStyle(ChatFormatting.RED)
+            );
+            return true; // Still prevent attack
+        }
 
-		// Use the centralized startConversation method
-		ConversationManager.startConversation(serverPlayer, citizen);
+        // If there was a previously focused entity, remove its glowing effect
+        LivingEntity previousEntity = ConversationManager.getActiveEntity(playerId);
+        if (previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
+            citizen.getNavigation().stop();
+            citizen.getLookControl().setLookAt(player);
+            return true;
+        }
 
-		/*? if forge {*/
+        // Use the centralized startConversation method
+        ConversationManager.startConversation(serverPlayer, citizen);
+
+        /*? if forge {*/
         /*CompoundTag tag = stack.getOrCreateTag();
         tag.putUUID(TAG_TALKING_PLAYER, playerId);
         tag.putInt(TAG_MODEL_DATA, 1);
         *//*?}*/
-		/*? if neoforge {*/
+        /*? if neoforge {*/
 
-		var compD = stack.get(DataComponents.CUSTOM_DATA);
-		if (compD == null) {
-			compD = CustomData.EMPTY;
-		}
+        var compD = stack.get(DataComponents.CUSTOM_DATA);
+        if (compD == null) {
+            compD = CustomData.EMPTY;
+        }
 
-		var comp = compD.copyTag();
-		comp.putUUID("talkingPlayer", playerId);
+        var comp = compD.copyTag();
+        comp.putUUID("talkingPlayer", playerId);
 
-		stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
-		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(comp));
-		/*?}*/
+        stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(comp));
+        /*?}*/
 
-		serverPlayer.sendSystemMessage(
-				Component.literal("Started conversation with " + citizen.getName().getString())
-						.withStyle(ChatFormatting.GREEN)
-		);
+        serverPlayer.sendSystemMessage(
+                Component.literal("Started conversation with " + citizen.getName().getString())
+                        .withStyle(ChatFormatting.GREEN)
+        );
 
-		citizen.getNavigation().stop();
-		citizen.getLookControl().setLookAt(player);
+        citizen.getNavigation().stop();
+        citizen.getLookControl().setLookAt(player);
 
-		return true; // Prevent normal attack behavior
-	}
+        return true; // Prevent normal attack behavior
+    }
 }
