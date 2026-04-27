@@ -82,12 +82,12 @@ public class GeminiStream implements Supplier<short[]> {
      */    private boolean processBufferedData(int sampleRate, boolean flushed) {
         // Use a local variable to hold the data we're going to process
         byte[] combined;
-        
+
         synchronized (incomingData) {
             if (incomingDataSize == 0) {
                 return false;
             }
-            
+
             // Combine all buffered data
             combined = new byte[incomingDataSize];
             int offset = 0;
@@ -109,7 +109,7 @@ public class GeminiStream implements Supplier<short[]> {
             samples[i] = (short) ((combined[i * 2] & 0xFF) | (combined[i * 2 + 1] << 8));
         }
 
-        samples = AudioHelper.changePitch(samples, sampleRate, 2f);
+        samples = AudioHelper.changePitch(samples, sampleRate, pitchFactor);
         // Apply sample rate conversion if needed
         if (sampleRate != TARGET_SAMPLE_RATE) {
             samples = AudioHelper.resampleAudio(samples, sampleRate, TARGET_SAMPLE_RATE);

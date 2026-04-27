@@ -3,44 +3,44 @@ package me.sshcrack.mc_talking.util;
 /**
  * Helper class for audio processing operations like pitch shifting and resampling
  */
-public class AudioHelper {    
+public class AudioHelper {
     /**
      * Changes the pitch of audio samples without changing its speed.
+     * Uses the Sonic DSP library for high-fidelity speech processing.
      *
      * @param inputSamples The input audio as a short array
      * @param sampleRate   The sample rate of the audio (e.g., 44100)
      * @param pitchFactor  Pitch multiplier (e.g., 1.25 = up pitch, 0.8 = down pitch)
      * @return The pitch-shifted audio as a short array
-     */    
+     */
     public static short[] changePitch(short[] inputSamples, int sampleRate, float pitchFactor) {
-        if (pitchFactor == 1.0f) {
+        if (pitchFactor == 1.0f || inputSamples == null || inputSamples.length == 0) {
             // No pitch change needed, return original samples
             return inputSamples;
         }
 
-        /*
-        try {
-            // Two-step approach to change pitch without changing duration:
-            
-            // Step 1: Resample to change pitch (this also changes duration)
-            // When pitchFactor > 1, this increases pitch and shortens duration
-            // When pitchFactor < 1, this decreases pitch and lengthens duration
-            int newSampleRate = (int)(sampleRate * pitchFactor);
-            short[] resampledAudio = resampleAudio(inputSamples, sampleRate, newSampleRate);
-            
-            // Step 2: Time-stretch to restore original duration without affecting pitch
-            // When pitchFactor > 1, we need to stretch the audio by pitchFactor
-            // When pitchFactor < 1, we need to compress the audio by pitchFactor
-            short[] timeStretchedAudio = timeStretch(resampledAudio, 1.0f / pitchFactor);
-            
-            return timeStretchedAudio;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return inputSamples; // Return original on error
-        }
-        */
-        //TODO this is sadly still not working, so we just return the original samples
-        return inputSamples;
+        // Initialize Sonic for mono audio (1 channel)
+        Sonic sonic = new Sonic(sampleRate, 1);
+
+        // Sonic handles pitch, speed, and rate independently.
+        // We only alter the pitch factor here.
+        sonic.setPitch(pitchFactor);
+
+        // 1. Feed the raw audio into Sonic's internal processing stream
+        sonic.writeShortToStream(inputSamples, inputSamples.length);
+
+        // 2. Tell Sonic we are done writing so it can process the final "tail" of the audio
+        sonic.flushStream();
+
+        // 3. Retrieve the processed audio
+        // Note: The output array length might slightly differ from the input length
+        // due to the nature of Pitch Synchronous Overlap-Add algorithms.
+        int samplesAvailable = sonic.samplesAvailable();
+        short[] outputSamples = new short[samplesAvailable];
+
+        sonic.readShortFromStream(outputSamples, samplesAvailable);
+
+        return outputSamples;
     }
 
     /**

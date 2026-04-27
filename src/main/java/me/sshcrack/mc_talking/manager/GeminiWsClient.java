@@ -46,7 +46,7 @@ public class GeminiWsClient extends GeminiLiveClient {
         var isFemale = manager.entity.getCitizenData().isFemale();
         var isChild = manager.entity.getCitizenData().isChild();
         if (isChild && !isFemale)
-            stream.setPitch(0.8f); // Increase pitch
+            stream.setPitch(1.2f); // Increase pitch
 
         this.initialPlayer = player;
         AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
