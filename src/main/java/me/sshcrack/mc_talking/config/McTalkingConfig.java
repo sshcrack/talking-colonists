@@ -12,6 +12,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * Configuration class for the McTalking mod.
@@ -27,56 +28,26 @@ public class McTalkingConfig {
     /*?}*/
 
     // API Configuration
-    /*? if forge {*/
-    /*public final ForgeConfigSpec.ConfigValue<String> geminiApiKey;
-    public final ForgeConfigSpec.ConfigValue<AvailableAI> currentAiModel;
-    *//*?}*/
-    /*? if neoforge {*/
-    public final ModConfigSpec.ConfigValue<String> geminiApiKey;
-    public final ModConfigSpec.ConfigValue<AvailableAI> currentAiModel;
-    /*?}*/
+    public final Supplier<String> geminiApiKey;
+    public final Supplier<AvailableAI> currentAiModel;
 
     // Language Configuration
-    /*? if forge {*/
-    /*public final ForgeConfigSpec.ConfigValue<String> language;
-    *//*?}*/
-    /*? if neoforge {*/
-    public final ModConfigSpec.ConfigValue<String> language;
-    /*?}*/
+    public final Supplier<String> language;
 
     // Interaction Configuration
-    /*? if forge {*/
-    /*public final ForgeConfigSpec.ConfigValue<Boolean> respondInGroups;
-    public final ForgeConfigSpec.ConfigValue<Integer> lookDurationTicks;
-    public final ForgeConfigSpec.ConfigValue<Integer> lookToleranceMs;
-    public final ForgeConfigSpec.ConfigValue<Double> activationDistance;
-    public final ForgeConfigSpec.ConfigValue<Boolean> useTalkingDevice;
-    public final ForgeConfigSpec.ConfigValue<Boolean> enableFunctionWorkaround;
-    public final ForgeConfigSpec.ConfigValue<Boolean> sendErrorsToPlayers;
-    *//*?}*/
-    /*? if neoforge {*/
-    public final ModConfigSpec.ConfigValue<Boolean> respondInGroups;
-    public final ModConfigSpec.ConfigValue<Integer> lookDurationTicks;
-    public final ModConfigSpec.ConfigValue<Integer> lookToleranceMs;
-    public final ModConfigSpec.ConfigValue<Double> activationDistance;
-    public final ModConfigSpec.ConfigValue<Boolean> useTalkingDevice;
-    public final ModConfigSpec.ConfigValue<Boolean> enableFunctionWorkaround;
-    public final ModConfigSpec.ConfigValue<Boolean> sendErrorsToPlayers;
-    /*?}*/
+    public final Supplier<Boolean> respondInGroups;
+    public final Supplier<Integer> lookDurationTicks;
+    public final Supplier<Integer> lookToleranceMs;
+    public final Supplier<Double> activationDistance;
+    public final Supplier<Boolean> useTalkingDevice;
+    public final Supplier<Boolean> enableFunctionWorkaround;
+    public final Supplier<Boolean> sendErrorsToPlayers;
 
     // Resource Management
-    /*? if forge {*/
-    /*public final ForgeConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
-    public final ForgeConfigSpec.ConfigValue<Double> maxConversationDistance;
-    public final ForgeConfigSpec.ConfigValue<ModalityModes> modality;
-    public final ForgeConfigSpec.ConfigValue<List<? extends String>> disabledTools;
-    *//*?}*/
-    /*? if neoforge {*/
-    public final ModConfigSpec.ConfigValue<Integer> maxConcurrentAgents;
-    public final ModConfigSpec.ConfigValue<Double> maxConversationDistance;
-    public final ModConfigSpec.ConfigValue<ModalityModes> modality;
-    public final ModConfigSpec.ConfigValue<List<? extends String>> disabledTools;
-    /*?}*/
+    public final Supplier<Integer> maxConcurrentAgents;
+    public final Supplier<Double> maxConversationDistance;
+    public final Supplier<ModalityModes> modality;
+    public final Supplier<List<? extends String>> disabledTools;
 
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
@@ -86,137 +57,66 @@ public class McTalkingConfig {
     /*?}*/
 
         // API Configuration
-        geminiApiKey = builder
+        geminiApiKey = requireRestart(builder)
                 .comment("API Configuration")
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
                 .comment("This key is used to authenticate with the Gemini API. You can get one at https://aistudio.google.com/apikey")
                 .define("gemini_key", "");
 
-        currentAiModel = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        currentAiModel = requireRestart(builder)
                 .comment("What kind of AI model to use. Right now, this is the only one Google offers")
                 .defineEnum("ai_model", AvailableAI.Flash3);
-        enableFunctionWorkaround = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        enableFunctionWorkaround = requireRestart(builder)
                 .comment("Enables the Google Search so Flash2.5 can execute functions. Google Search will ONLY be enabled for Flash2.5.")
                 .define("function_workaround", true);
 
         // Language Configuration
-        language = builder
+        language = requireRestart(builder)
                 .comment("Language Configuration")
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
                 .comment("The language the AI should use to speak")
                 .define("language", "en-US");
 
         // Interaction Configuration
-        respondInGroups = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        respondInGroups = requireRestart(builder)
                 .comment("Interaction Configuration")
                 .comment("Whether the citizens should respond if the player is in a group or not.")
                 .define("respond_in_group", false);
 
-        lookDurationTicks = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        lookDurationTicks = requireRestart(builder)
                 .comment("How long the player needs to look at an entity before activating (in ticks, 20 ticks = 1 second)")
                 .define("look_duration_ticks", 20);
 
-        lookToleranceMs = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        lookToleranceMs = requireRestart(builder)
                 .comment("Tolerance time in milliseconds when something walks between player and target")
                 .define("look_tolerance_ms", 500);
 
-        activationDistance = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        activationDistance = requireRestart(builder)
                 .comment("Distance at which the player can talk to when looking at them the citizen")
                 .define("activation_distance", 3.0);
 
-        useTalkingDevice = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        useTalkingDevice = requireRestart(builder)
                 .comment("If true, citizens will only respond to the talking device item; if false, looking at them will work")
                 .define("use_talking_device", true);
 
         // Resource Management
-        maxConcurrentAgents = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        maxConcurrentAgents = requireRestart(builder)
                 .comment("Resource Management")
                 .comment("Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
                 .define("max_concurrent_agents", 3, e -> e == null || (int) e > 0);
 
-        maxConversationDistance = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        maxConversationDistance = requireRestart(builder)
                 .comment("Maximum distance the player can be from a citizen before the conversation is ended")
                 .define("max_conversation_distance", 8.0);
 
-        modality = builder
-                /*? if forge {*/
-                /*.worldRestart()
-                *//*?}*/
-                /*? if neoforge {*/
-                .gameRestart()
-                /*?}*/
+        modality = requireRestart(builder)
                 .comment("In which format the AI should respond. This can be text, audio or both.")
                 .defineEnum("ai_modality", ModalityModes.AUDIO);
 
+		var disabledToolsBuilder = requireRestart(builder)
+				.comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /list_tools command to see a list of the available tools.");
 
-        /*? if forge {*/
-        /*disabledTools = builder
-                .worldRestart()
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /list_tools command to see a list of the available tools.")
+
+		/*? if forge {*/
+        /*disabledTools = disabledToolsBuilder
                 .defineList("disabled_tools", Collections::emptyList, e -> {
                     if (e instanceof String str) {
                         return AITools.getRegisteredFunctionNames().contains(str);
@@ -227,9 +127,7 @@ public class McTalkingConfig {
         *//*?}*/
         /*? if neoforge {*/
         AtomicInteger currIndex = new AtomicInteger();
-        disabledTools = builder
-                .gameRestart()
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /list_tools command to see a list of the available tools.")
+        disabledTools = disabledToolsBuilder
                 .defineList("disabled_tools", Collections::emptyList, () -> {
                     var l = AITools.getRegisteredFunctionNames();
                     return l.get((currIndex.incrementAndGet() - 1) % l.size());
@@ -261,4 +159,8 @@ public class McTalkingConfig {
         CONFIG = pair.getLeft();
         CONFIG_SPEC = pair.getRight();
     }
+
+	private static ModConfigSpec.Builder requireRestart(ModConfigSpec.Builder builder) {
+		return builder.gameRestart();
+	}
 }
