@@ -9,7 +9,6 @@ import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
-import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -131,7 +130,10 @@ public class GeminiWsClient extends GeminiLiveClient {
         var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
         if (sPlayer == null || currMsg.isBlank())
             return;
-        sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+        if (CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO) {
+            sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+        }
+
         currMsg = "";
     }
 
