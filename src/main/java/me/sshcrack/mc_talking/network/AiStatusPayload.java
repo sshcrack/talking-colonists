@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking.network;
 
-import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 /*? if forge {*/
 /*import net.minecraft.network.FriendlyByteBuf;
@@ -22,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 /*?}*/
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
 public class AiStatusPayload /*? if neoforge {*/implements CustomPacketPayload/*?}*/ {
     /*? if forge {*/

@@ -154,7 +154,7 @@ public class ServerEventHandler {
 	 * Called every server tick
 	 */
 	@SubscribeEvent
-			/*? if forge {*/
+	/*? if forge {*/
 	/*public void onServerTick(TickEvent.ServerTickEvent event) {
 		if (event.phase != TickEvent.Phase.END) {
 			return;

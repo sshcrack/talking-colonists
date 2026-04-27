@@ -24,6 +24,7 @@ import net.minecraft.world.item.component.CustomModelData;
 /*?}*/
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 /*? if forge {*/
 /*import org.jetbrains.annotations.Nullable;
  *//*?}*/
@@ -49,63 +50,70 @@ public class CitizenTalkingDevice extends Item {
 		/*?}*/
 	}
 
-	@Override
-	public boolean isFoil(ItemStack stack) {
+	@Nullable
+	private UUID getUuidFromItem(ItemStack stack) {
 		/*? if forge {*/
         /*CompoundTag tag = stack.getTag();
         if (tag == null || !tag.contains(TAG_TALKING_PLAYER))
-            return false;
+            return null;
 
-        UUID uuid = tag.getUUID(TAG_TALKING_PLAYER);
-        return ConversationManager.isPlayerInConversation(uuid);
+        return tag.getUUID(TAG_TALKING_PLAYER);
         *//*?}*/
 		/*? if neoforge {*/
 		if (stack.get(DataComponents.CUSTOM_DATA) == null)
-			return false;
+			return null;
 
 		var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
 		if (!comp.contains("talkingPlayer"))
-			return false;
+			return null;
 
-		var uuid = comp.getUUID("talkingPlayer");
-		return ConversationManager.isPlayerInConversation(uuid);
-		/*?}*/
+		return comp.getUUID("talkingPlayer");
 	}
 
 	@Override
-			/*? if forge {*/
-	/*public void appendHoverText(ItemStack pStack, @Nullable Level pLevel, List<Component> tooltipComponents, TooltipFlag pIsAdvanced) {
-	 *//*?}*/
-			/*? if neoforge {*/
-	public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, List<Component> tooltipComponents,
-	                            @NotNull TooltipFlag tooltipFlag) {
-		/*?}*/
+	public boolean isFoil(ItemStack stack) {
+		UUID uuid = getUuidFromItem(stack);
+		if(uuid == null) {
+			return false;
+		}
+
+		return ConversationManager.isPlayerInConversation(uuid);
+	}
+
+	private void appendTooltip(List<Component> tooltipComponents) {
 		tooltipComponents.add(Component.translatable("item.mc_talking.talking_device.tooltip")
 				.withStyle(ChatFormatting.GRAY));
-		/*? if forge {*/
-		/*super.appendHoverText(pStack, pLevel, tooltipComponents, pIsAdvanced);
-		 *//*?}*/
-		/*? if neoforge {*/
-		super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-		/*?}*/
 	}
+
+	/*? if forge {*/
+	/*
+	@Override
+	public void appendHoverText(ItemStack pStack, @Nullable Level pLevel, List<Component> tooltipComponents, TooltipFlag pIsAdvanced) {
+	 appendTooltip(tooltipComponents);
+	 super.appendHoverText(pStack, pLevel, tooltipComponents, pIsAdvanced);
+	}
+	 	 */
+	/*?}*/
+
+	/*? if neoforge {*/
+	@Override
+	public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, List<Component> tooltipComponents,
+								@NotNull TooltipFlag tooltipFlag) {
+		appendTooltip(tooltipComponents);
+		super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+	}
+	/*?}*/
 
 	@Override
 	public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
 		super.inventoryTick(stack, level, entity, slotId, isSelected);
 
 		if (Math.random() <= 0.25) {
+			UUID uuid = getUuidFromItem(stack);
+			boolean isActive = uuid != null && ConversationManager.isPlayerInConversation(uuid);
 			/*? if forge {*/
-            /*CompoundTag tag = stack.getOrCreateTag();
-            if (!tag.contains(TAG_TALKING_PLAYER)) {
-                tag.putInt(TAG_MODEL_DATA, 0);
-                return;
-            }
-
-            UUID uuid = tag.getUUID(TAG_TALKING_PLAYER);
-            boolean isActive = ConversationManager.isPlayerInConversation(uuid);
-            tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);
-            *//*?}*/
+			/*tag.putInt(TAG_MODEL_DATA, isActive ? 1 : 0);
+			 *//*?}*/
 			/*? if neoforge {*/
 			var compD = stack.get(DataComponents.CUSTOM_DATA);
 			if (compD == null) {
@@ -119,8 +127,6 @@ public class CitizenTalkingDevice extends Item {
 				return;
 			}
 
-			var uuid = comp.getUUID("talkingPlayer");
-			var isActive = ConversationManager.isPlayerInConversation(uuid);
 			stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(isActive ? 1 : 0));
 			/*?}*/
 		}
