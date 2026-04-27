@@ -28,8 +28,6 @@ import net.minecraft.world.item.component.ItemLore;
 /*?}*/
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static com.minecolonies.api.util.constant.NbtTagConstants.TAG_ID;
@@ -65,7 +63,6 @@ public class LeaveColonyAction extends FunctionAction {
 
         var data = citizen.getCitizenData();
         var level = citizen.level();
-        var pos = citizen.blockPosition();
 
         // First, serialize all citizen data to NBT
         /*? if forge {*/

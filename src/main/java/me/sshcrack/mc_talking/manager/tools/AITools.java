@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.Map;
 
 public class AITools {
+    private AITools() {
+        /* This utility class should not be instantiated */
+    }
+
     public static final Map<String, FunctionAction> registeredFunctions = new HashMap<>();
 
     public static void add(FunctionAction action) {

@@ -50,7 +50,7 @@ public abstract class FunctionAction {
 
     protected JsonElement tagToJson(Tag tag, byte type) {
         switch (type) {
-            case CompoundTag.TAG_COMPOUND -> {
+            case Tag.TAG_COMPOUND -> {
                 var compound = (CompoundTag) tag;
                 var obj = new JsonObject();
                 for (String key : compound.getAllKeys()) {
@@ -60,7 +60,7 @@ public abstract class FunctionAction {
 
                 return obj;
             }
-            case CompoundTag.TAG_LIST -> {
+            case Tag.TAG_LIST -> {
                 var list = (ListTag) tag;
                 var jsonArray = new com.google.gson.JsonArray();
                 for (Tag element : list) {
@@ -68,27 +68,27 @@ public abstract class FunctionAction {
                 }
                 return jsonArray;
             }
-            case CompoundTag.TAG_STRING -> {
+            case Tag.TAG_STRING -> {
                 return new JsonPrimitive(tag.getAsString());
             }
-            case CompoundTag.TAG_INT -> {
+            case Tag.TAG_INT -> {
                 return new JsonPrimitive(((NumericTag) tag).getAsInt());
             }
-            case CompoundTag.TAG_LONG -> {
+            case Tag.TAG_LONG -> {
                 return new JsonPrimitive(((NumericTag) tag).getAsLong());
             }
-            case CompoundTag.TAG_DOUBLE -> {
+            case Tag.TAG_DOUBLE -> {
                 return new JsonPrimitive(((NumericTag) tag).getAsDouble());
             }
-            case CompoundTag.TAG_BYTE -> {
+            case Tag.TAG_BYTE -> {
                 return new JsonPrimitive(((NumericTag) tag).getAsByte());
             }
-            case CompoundTag.TAG_SHORT -> {
+            case Tag.TAG_SHORT -> {
                 return new JsonPrimitive(((NumericTag) tag).getAsShort());
             }
+            default -> {
+                return JsonNull.INSTANCE; // Unsupported type
+            }
         }
-
-        return JsonNull.INSTANCE; // Fallback for unsupported types
     }
-
 }
