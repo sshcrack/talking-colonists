@@ -1,34 +1,34 @@
 pluginManagement {
-	repositories {
-		mavenLocal()
-		mavenCentral()
-		gradlePluginPortal()
-		maven("https://maven.fabricmc.net/") { name = "Fabric" }
-		maven("https://maven.neoforged.net/releases/") { name = "NeoForged" }
-		maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
-		maven("https://maven.kikugie.dev/releases") { name = "KikuGie Releases" }
-		maven("https://maven.parchmentmc.org") { name = "ParchmentMC" }
-	}
-	includeBuild("build-logic")
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        gradlePluginPortal()
+        maven("https://maven.fabricmc.net/") { name = "Fabric" }
+        maven("https://maven.neoforged.net/releases/") { name = "NeoForged" }
+        maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
+        maven("https://maven.kikugie.dev/releases") { name = "KikuGie Releases" }
+        maven("https://maven.parchmentmc.org") { name = "ParchmentMC" }
+    }
+    includeBuild("build-logic")
 }
 
 plugins {
-	id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-	id("dev.kikugie.stonecutter") version "0.9.2"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+    id("dev.kikugie.stonecutter") version "0.9.2"
 }
 
 stonecutter {
-	create(rootProject) {
-		fun match(version: String, vararg loaders: String) =
-			loaders.forEach { version("$version-$it", version).buildscript = getBuildscript(it, version) }
+    create(rootProject) {
+        fun match(version: String, vararg loaders: String) =
+            loaders.forEach { version("$version-$it", version).buildscript = getBuildscript(it, version) }
 
-		match("1.21.1", "neoforge")
-		match("1.20.1", "forge")
+        match("1.21.1", "neoforge")
+        match("1.20.1", "forge")
 
-		vcsVersion = "1.20.1-forge"
-	}
+        vcsVersion = "1.20.1-forge"
+    }
 }
 
 private fun getBuildscript(loader: String, version: String): String {
-	return "build.$loader.gradle.kts"
+    return "build.$loader.gradle.kts"
 }

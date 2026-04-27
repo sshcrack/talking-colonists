@@ -5,6 +5,7 @@ import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
+import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
@@ -25,10 +26,13 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class GeminiWsClient extends GeminiLiveClient {
-    private boolean setupComplete;
-    private boolean isInitiatingConnection = false;
-    private boolean shouldReconnect = false;
+    /**
+     * This variable is used to track if the quota has been exceeded
+     */
+    private static boolean quotaExceeded;
 
+    private boolean shouldReconnect = false;
+    private boolean isInitiatingConnection = false;
 
     private final GeminiStream stream;
     private final ServerPlayer initialPlayer;
@@ -59,7 +63,7 @@ public class GeminiWsClient extends GeminiLiveClient {
         var modality = CONFIG.modality.get();
         setup.generationConfig.responseModalities = modality.getModalities();
 
-        if(modality == ModalityModes.TEXT_AND_AUDIO) {
+        if (modality == ModalityModes.TEXT_AND_AUDIO) {
             setup.outputAudioTranscription = new JsonObject();
         }
 
@@ -168,6 +172,12 @@ public class GeminiWsClient extends GeminiLiveClient {
     }
 
     @Override
+    public void onOpen(ServerHandshake data) {
+        isInitiatingConnection = false;
+        super.onOpen(data);
+    }
+
+    @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
         var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
         if (!isJustStarted)
@@ -179,8 +189,6 @@ public class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onSetupComplete() {
         McTalking.LOGGER.info("Gemini setup complete");
-        setupComplete = true;
-
         synchronized (pendingSystemText) {
             if (!pendingSystemText.isEmpty()) {
                 List<String> textToProcess = new ArrayList<>(pendingSystemText);
@@ -226,6 +234,7 @@ public class GeminiWsClient extends GeminiLiveClient {
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
         AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
+        quotaExceeded = true;
         try {
             initialPlayer.sendSystemMessage(Component.literal("Quota exceeded for Gemini API, please check your API key and usage limits."));
         } catch (Exception e) {
@@ -273,35 +282,6 @@ public class GeminiWsClient extends GeminiLiveClient {
     boolean sentGeneratingStatus = false;
     long lastReconnectTime = 0;
 
-    public void addSystemText(String newStatusPrompt) {
-        if (!setupComplete || this.isClosed()) {
-            synchronized (pendingSystemText) {
-                pendingSystemText.add(newStatusPrompt);
-            }
-            if (!this.isOpen() && !isInitiatingConnection) {
-                if (shouldReconnect) {
-                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                        return;
-
-                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                    lastReconnectTime = System.currentTimeMillis();
-                    reconnect();
-                } else {
-                    connect();
-                    shouldReconnect = true;
-                }
-
-                isInitiatingConnection = true;
-            }
-            return;
-        }
-
-        var input = new RealtimeInput();
-        input.text = newStatusPrompt;
-
-        send(ClientMessages.input(input));
-    }
-
     @Override
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();
@@ -312,7 +292,7 @@ public class GeminiWsClient extends GeminiLiveClient {
             AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
 
 
-        if (!setupComplete || this.isClosed()) {
+        if (!isSetupComplete() || this.isClosed()) {
             synchronized (pendingPrompt) {
                 pendingPrompt.add(audio);
             }
