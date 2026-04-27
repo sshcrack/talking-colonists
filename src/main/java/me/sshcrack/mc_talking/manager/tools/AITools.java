@@ -6,9 +6,10 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AITools {
-    public static final HashMap<String, FunctionAction> registeredFunctions = new HashMap<>();
+    public static final Map<String, FunctionAction> registeredFunctions = new HashMap<>();
 
     public static void add(FunctionAction action) {
         registeredFunctions.put(action.getName(), action);
