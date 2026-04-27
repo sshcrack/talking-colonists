@@ -33,7 +33,6 @@ public class DropItemAction extends FunctionAction {
 
         var slot_index = parameters.get("slot_index").getAsInt();
         var rCount = parameters.get("count").getAsInt();
-        var count = rCount < 0 ? 64 : rCount; // If count is negative, drop the entire stack (max 64)
 
         if (slot_index < 0 || slot_index >= citizen.getInventoryCitizen().getSlots()) {
             obj.addProperty("success", false);
@@ -48,6 +47,7 @@ public class DropItemAction extends FunctionAction {
             return obj;
         }
 
+        var count = rCount < 0 ? stack.getCount() : rCount; // If count is negative, drop the entire stack (max 64)
         if (count == 0 || count > stack.getCount()) {
             obj.addProperty("success", false);
             obj.addProperty("error", "Invalid count. Must be between 1 and " + stack.getCount() + " or negative to drop the entire stack.");
