@@ -19,9 +19,12 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 public class CitizenConversationGenerator {
     private static final String CONVERSATION_SYSTEM_PROMPT = """
             Generate a dialogue transcript using the structured format below.
+            Participants in this conversation are citizens from the MineColonies mod, each with unique personalities, needs, and relationships. Use the provided citizen information to create an immersive and realistic conversation that reflects their current states and emotional profiles.
+            The citizens can not give each other blocks or items, the "manager" of the colony can however.
 
             # Summary
-            A short summary abourt IMPORTANT messages in this conversation, serving as a memory for the citizens
+            A short summary about IMPORTANT messages in this conversation, serving as a memory for the citizens. This should be concise and only include information that would be relevant for the citizens to remember in future conversations.
+            Leave this blank if there are no important messages to summarize.
 
             # Audio Profile
             For each character: Describe their vocal identity (tone, personality, emotional baseline).
@@ -80,7 +83,6 @@ public class CitizenConversationGenerator {
             - Incorporate their needs naturally into dialogue
             - Match tone and pacing to the context
             - Do NOT summarize — output ONLY the formatted transcript
-
             """;
 
     private static final String FLASH_MODEL = "gemini-3-flash-preview";
@@ -115,10 +117,10 @@ public class CitizenConversationGenerator {
         }
 
         String apiKey = McTalkingConfig.CONFIG.geminiApiKey.get();
-        String citizenConversation;
+        String rawConversationOutput;
         try {
             McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
-            citizenConversation = GeminiFlash.sendFlashRequest(FLASH_MODEL, apiKey, new GeminiFlash.GenerateContentRequest() {{
+            rawConversationOutput = GeminiFlash.sendFlashRequest(FLASH_MODEL, apiKey, new GeminiFlash.GenerateContentRequest() {{
                 system_instruction = new SystemInstruction();
                 system_instruction.parts = List.of(new Part() {{
                     text = CONVERSATION_SYSTEM_PROMPT;
@@ -133,6 +135,27 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Failed to generate conversation using Gemini Flash", e);
         }
 
+        StringBuilder conversationBuilder = new StringBuilder();
+        StringBuilder summaryBuilder = new StringBuilder();
+
+        boolean isInSummary = false;
+        for (String line : rawConversationOutput.split("\n")) {
+            if (isInSummary) {
+                summaryBuilder.append(line).append("\n");
+            } else {
+                conversationBuilder.append(line).append("\n");
+            }
+
+            if (line.contains("# Summary")) {
+                isInSummary = true;
+            } else if (isInSummary && line.contains("# ")) {
+                isInSummary = false;
+            }
+        }
+
+        String summary = summaryBuilder.toString().trim();
+        McTalking.LOGGER.info("Got summary: {}", summary);
+
         List<GeminiTTS.AudioChunk> audioChunks;
         try {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
@@ -140,7 +163,7 @@ public class CitizenConversationGenerator {
                 contents = List.of(new GeminiTTS.RequestPayload.Content() {{
                     parts = List.of(new Part() {
                         {
-                            text = citizenConversation;
+                            text = conversationBuilder.toString();
                         }
                     });
                     role = "user";

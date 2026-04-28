@@ -40,6 +40,10 @@ public final class CitizenPromptService {
         return getProvider().generateCitizenRoleplayPrompt(view);
     }
 
+    public static String generateConversationalInfoPrompt(@NotNull CitizenPromptView view) {
+        return getProvider().generateConversationalInfoPrompt(view);
+    }
+
     public static String formatStatus(CitizenStatusView status) {
         return getProvider().formatStatus(status);
     }

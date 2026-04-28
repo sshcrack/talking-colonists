@@ -7,13 +7,16 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class ConversationCreatorDevice extends Item {
     public ConversationCreatorDevice() {
@@ -22,7 +25,7 @@ public class ConversationCreatorDevice extends Item {
                 .setNoRepair());
     }
 
-    private final List<AbstractEntityCitizen> conversationParticipants = new ArrayList<>();
+    private final Set<AbstractEntityCitizen> conversationParticipants = new HashSet<>();
 
     @Override
     public boolean onLeftClickEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull Entity entity) {
@@ -42,11 +45,19 @@ public class ConversationCreatorDevice extends Item {
 
     @Override
     public boolean onDroppedByPlayer(@NotNull ItemStack item, @NotNull Player player) {
-        List<AbstractEntityCitizen> participants = new ArrayList<>(conversationParticipants);
-        var conversation = new CitizenConversation(participants);
         conversationParticipants.clear();
 
-        player.sendSystemMessage(Component.literal("Started conversation with " + participants.size() + " participants").withStyle(ChatFormatting.GREEN));
+        return true;
+    }
+
+    @Override
+    public void onStopUsing(@NotNull ItemStack stack, @NotNull LivingEntity entity, int count) {
+        List<AbstractEntityCitizen> participants = new ArrayList<>(conversationParticipants);
+        var conversation = new CitizenConversation(participants);
+
+        if (entity instanceof Player player) {
+            player.sendSystemMessage(Component.literal("Started conversation with " + participants.size() + " participants").withStyle(ChatFormatting.GREEN));
+        }
 
         conversation.setOnStateChanged(newState -> {
             AiStatus newStatus = switch (newState) {
@@ -59,7 +70,5 @@ public class ConversationCreatorDevice extends Item {
                 ConversationManager.updateAiStatus(participant.getUUID(), newStatus);
             }
         });
-
-        return false;
     }
 }

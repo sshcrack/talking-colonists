@@ -68,7 +68,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         List<String> childNames = view.childNames();
-        if (childNames.size() > 0) {
+        if (!childNames.isEmpty()) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
                 hasRelationships = true;
@@ -79,7 +79,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         List<String> siblingNames = view.siblingNames();
-        if (siblingNames.size() > 0) {
+        if (!siblingNames.isEmpty()) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
                 hasRelationships = true;
