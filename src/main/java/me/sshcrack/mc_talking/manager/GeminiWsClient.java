@@ -90,6 +90,7 @@ public class GeminiWsClient extends GeminiLiveClient {
         //TODO: Allow citizens to speak for themselves
         //setup.realtimeInputConfig.turnCoverage = BidiGenerateContentSetup.RealtimeInputConfig.TurnCoverage.TURN_INCLUDES_ALL_INPUT;
 
+
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
         var promptView = CitizenPromptViewFactory.create(manager.entity.getCitizenData(), initialPlayer);

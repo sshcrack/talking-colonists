@@ -116,6 +116,21 @@ public final class CitizenPromptViewFactory {
             relation = new PlayerRelationView(rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
         }
 
+        List<String> childrenNames = new ArrayList<>();
+        if (data.getChildren() != null) {
+            for (int childId : data.getChildren()) {
+                var child = data.getColony().getCitizen(childId);
+                childrenNames.add(child.getName());
+            }
+        }
+        List<String> siblingNames = new ArrayList<>();
+        if (data.getSiblings() != null) {
+            for (int siblingId : data.getSiblings()) {
+                var sibling = data.getColony().getCitizen(siblingId);
+                siblingNames.add(sibling.getName());
+            }
+        }
+
         return new CitizenPromptView(
             data.getName(),
             data.isChild(),
@@ -125,8 +140,8 @@ public final class CitizenPromptViewFactory {
             data.getHomeBuilding() == null,
             parents,
             data.getPartner() != null,
-            data.getChildren() != null ? data.getChildren().size() : 0,
-            data.getSiblings() != null ? data.getSiblings().size() : 0,
+            childrenNames,
+            siblingNames,
             data.getSaturation(),
             healthPercent,
             createStatusView(data.getStatus(), data),

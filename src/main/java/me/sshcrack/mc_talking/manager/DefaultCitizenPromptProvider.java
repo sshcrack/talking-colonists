@@ -16,13 +16,19 @@ import java.util.stream.Collectors;
  * Default implementation for citizen prompt generation.
  */
 public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
-
     @Override
-    public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
-        final StringBuilder prompt = new StringBuilder();
-        prompt.append("# ROLEPLAY AS ").append(view.name()).append("\n\n");
-        prompt.append("You: ").append(view.child() ? "Child" : "Adult").append(" ")
-            .append(view.female() ? "woman" : "man");
+    public String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
+        StringBuilder prompt = new StringBuilder();
+        String name = view.name();
+        String citizen_type = (view.child() ? "Child" : "Adult") + " " + (view.female() ? "woman" : "man");
+
+        if (firstPerson) {
+            prompt.append("# ROLEPLAY AS ").append(name).append("\n\n");
+            prompt.append("You: ").append(citizen_type);
+        } else {
+            prompt.append("# CITIZEN INFO ").append(name).append("\n\n");
+            prompt.append("Type: ").append(citizen_type);
+        }
 
         if (view.jobName() != null) {
             prompt.append(", **").append(view.jobName()).append("**");
@@ -63,22 +69,25 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- In a relationship\n");
         }
 
-        if (view.childCount() > 0) {
+        List<String> childNames = view.childNames();
+        if (childNames.size() > 0) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
                 hasRelationships = true;
             }
-            prompt.append("- Has ").append(view.childCount()).append(" ").append(view.childCount() == 1 ? "child" : "children")
-                .append("\n");
+
+            prompt.append("- Has ").append(childNames.size()).append(" ").append(childNames.size() == 1 ? "child" : "children")
+                    .append(": ").append(String.join(", ", childNames)).append("\n");
         }
 
-        if (view.siblingCount() > 0) {
+        List<String> siblingNames = view.siblingNames();
+        if (siblingNames.size() > 0) {
             if (!hasRelationships) {
                 prompt.append("\n## RELATIONSHIPS\n");
                 hasRelationships = true;
             }
-            prompt.append("- Has ").append(view.siblingCount()).append(" ").append(view.siblingCount() == 1 ? "sibling" : "siblings")
-                .append("\n");
+            prompt.append("- Has ").append(siblingNames.size()).append(" ").append(siblingNames.size() == 1 ? "sibling" : "siblings")
+                    .append(": ").append(String.join(", ", siblingNames)).append("\n");
         }
 
         prompt.append("\n## CURRENT STATE\n");
@@ -157,6 +166,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
+        return prompt.toString();
+    }
+
+    @Override
+    public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
+        final StringBuilder prompt = new StringBuilder();
+        prompt.append(this.getGeneralCitizenPrompt(view));
+
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
         prompt.append("- Do not generate creative responses for information that functions can provide\n");
@@ -177,9 +194,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         prompt.append(
-            "\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
+                "\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
         prompt.append(
-            "\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
+                "\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
         prompt.append("\nALWAYS respond in ").append(view.responseLanguageName());
 
         return prompt.toString();
@@ -293,7 +310,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     private static void appendCondensedSkills(List<SkillLevelView> skillLevels, StringBuilder prompt) {
         Map<String, Integer> skills = skillLevels.stream()
-            .collect(Collectors.toMap(SkillLevelView::name, SkillLevelView::level, Math::max));
+                .collect(Collectors.toMap(SkillLevelView::name, SkillLevelView::level, Math::max));
 
         String highestSkill = null;
         int highestLevel = -1;

@@ -12,15 +12,15 @@
       "projectName": "1.20.1-forge",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
-        "@E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\clientRunProgramArgs.txt"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\clientRunProgramArgs.txt"
       ],
       "vmArgs": [
-        "@E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\clientRunVmArgs.txt",
-        "-Dfml.modFolders\u003dmc_talking%%E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\clientRunVmArgs.txt",
+        "-Dfml.modFolders\u003dmc_talking%%C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
       ],
       "cwd": "${workspaceFolder}\\versions\\1.20.1-forge\\run",
       "env": {
-        "MOD_CLASSES": "mc_talking%%E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
+        "MOD_CLASSES": "mc_talking%%C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
       },
       "console": "internalConsole",
       "shortenCommandLine": "none"
@@ -36,15 +36,15 @@
       "projectName": "1.20.1-forge",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
-        "@E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\serverRunProgramArgs.txt"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\serverRunProgramArgs.txt"
       ],
       "vmArgs": [
-        "@E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\serverRunVmArgs.txt",
-        "-Dfml.modFolders\u003dmc_talking%%E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\build\\moddev\\serverRunVmArgs.txt",
+        "-Dfml.modFolders\u003dmc_talking%%C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
       ],
       "cwd": "${workspaceFolder}\\versions\\1.20.1-forge\\run",
       "env": {
-        "MOD_CLASSES": "mc_talking%%E:\\Java\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
+        "MOD_CLASSES": "mc_talking%%C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.20.1-forge\\bin\\main"
       },
       "console": "internalConsole",
       "shortenCommandLine": "none"
@@ -60,11 +60,11 @@
       "projectName": "1.21.1-neoforge",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
-        "@E:\\Java\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\clientRunProgramArgs.txt"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\clientRunProgramArgs.txt"
       ],
       "vmArgs": [
-        "@E:\\Java\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\clientRunVmArgs.txt",
-        "-Dfml.modFolders\u003dmc_talking%%E:\\Java\\talking-colonists\\versions\\1.21.1-neoforge\\bin\\main"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\clientRunVmArgs.txt",
+        "-Dfml.modFolders\u003dmc_talking%%C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.21.1-neoforge\\bin\\main"
       ],
       "cwd": "${workspaceFolder}\\versions\\1.21.1-neoforge\\run",
       "env": {},
@@ -82,11 +82,11 @@
       "projectName": "1.21.1-neoforge",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
-        "@E:\\Java\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\serverRunProgramArgs.txt"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\serverRunProgramArgs.txt"
       ],
       "vmArgs": [
-        "@E:\\Java\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\serverRunVmArgs.txt",
-        "-Dfml.modFolders\u003dmc_talking%%E:\\Java\\talking-colonists\\versions\\1.21.1-neoforge\\bin\\main"
+        "@C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.21.1-neoforge\\build\\moddev\\serverRunVmArgs.txt",
+        "-Dfml.modFolders\u003dmc_talking%%C:\\Users\\hendr\\Documents\\Coding\\java\\McModding\\talking-colonists\\versions\\1.21.1-neoforge\\bin\\main"
       ],
       "cwd": "${workspaceFolder}\\versions\\1.21.1-neoforge\\run",
       "env": {},
