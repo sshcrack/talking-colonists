@@ -56,7 +56,7 @@ public class ConversationCreatorDevice extends Item {
     @NotNull
     @Override
     public InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Player player, @NotNull InteractionHand usedHand) {
-        if (!level.isClientSide()) {
+        if (level.isClientSide()) {
             return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }
 

@@ -1,13 +1,19 @@
 package me.sshcrack.mc_talking.conversations;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import net.minecraft.server.MinecraftServer;
@@ -48,15 +54,40 @@ public class CitizenConversation {
 
         this.participants = participants;
 
-        new Thread(() -> {/*
+        new Thread(() -> {
             McTalking.LOGGER.info("Starting conversation thread for {} participants...", participants.size());
-            List<GeminiTTS.AudioChunk> audio;
-            try {
-                audio = CitizenConversationGenerator.generateConversation(participants);
-            } catch (CitizenConversationGenerator.ConversationGenerationException e) {
-                McTalking.LOGGER.error("Failed to generate conversation audio: {}, original cause: {}", e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
-                setState(ConversationState.ENDED);
-                return;
+            Gson gson = new Gson();
+            Type listType = new TypeToken<java.util.List<GeminiTTS.AudioChunk>>() {}.getType();
+            Path debugPath = Paths.get("audio_debug.json");
+
+            List<GeminiTTS.AudioChunk> audio = null;
+
+            if (Files.exists(debugPath)) {
+                try {
+                    String json = Files.readString(debugPath);
+                    audio = gson.fromJson(json, listType);
+                    McTalking.LOGGER.info("Loaded conversation audio from audio_debug.json");
+                } catch (IOException | JsonSyntaxException e) {
+                    McTalking.LOGGER.error("Failed to read/parse audio_debug.json: {}", e.getMessage());
+                }
+            }
+
+            if (audio == null) {
+                try {
+                    audio = CitizenConversationGenerator.generateConversation(participants);
+                } catch (CitizenConversationGenerator.ConversationGenerationException e) {
+                    McTalking.LOGGER.error("Failed to generate conversation audio: {}, original cause: {}", e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
+                    setState(ConversationState.ENDED);
+                    return;
+                }
+
+                try {
+                    String out = gson.toJson(audio, listType);
+                    Files.writeString(debugPath, out);
+                    McTalking.LOGGER.info("Wrote generated conversation audio to audio_debug.json");
+                } catch (IOException e) {
+                    McTalking.LOGGER.error("Failed to write audio_debug.json: {}", e.getMessage());
+                }
             }
 
             synchronized (this) {
@@ -65,10 +96,9 @@ public class CitizenConversation {
                     return;
                 }
             }
-*/
-            List<GeminiTTS.AudioChunk> audio = (new Gson()).fromJson(DebugT.AUDIO_STUFFS, new TypeToken<List<GeminiTTS.AudioChunk>>() {
-            });
-            server.execute(() -> performConversation(audio));
+
+            List<GeminiTTS.AudioChunk> finalAudio = audio;
+            server.execute(() -> performConversation(finalAudio));
         }).start();
     }
 
@@ -152,6 +182,7 @@ public class CitizenConversation {
     }
 
     private void setState(ConversationState newState) {
+        McTalking.LOGGER.info("Conversation state changed to {}", newState);
         state.set(newState);
         if (onStateChanged != null) {
             onStateChanged.accept(newState);
