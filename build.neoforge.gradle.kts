@@ -32,7 +32,7 @@ platform {
             forgeLikeVersionRange = "[${prop("deps.gemini_live_lib_version")},)"
         }
         required("voicechat") {
-            curseforge = "voicechat"
+            curseforge = "simple-voice-chat"
             forgeLikeVersionRange = "[${voicechat_version},)"
         }
     }
