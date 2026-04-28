@@ -57,3 +57,20 @@ stonecutter parameters {
 	swaps["minecraft"] = "\"${node.metadata.version}\";"
 	constants["release"] = sc.properties.get<String>("mod.id") != "modtemplate"
 }
+
+subprojects {
+    tasks.matching { it.name.startsWith("publish") }.configureEach {
+        doFirst {
+            val libraryDir = file("../gemini-live-library")
+            val confirmed = project.findProperty("geminiPublished") == "true"
+                || System.getenv("GEMINI_PUBLISHED") == "true"
+
+            if (libraryDir.exists() && !confirmed) {
+                throw GradleException(
+                    "gemini-live-library is still included locally! " +
+                        "Either publish it first, or confirm with -PgeminiPublished=true"
+                )
+            }
+        }
+    }
+}

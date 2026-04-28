@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.registry;
 import com.minecolonies.api.creativetab.ModCreativeTabs;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+import me.sshcrack.mc_talking.item.ConversationCreatorDevice;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import java.util.function.Supplier;
@@ -21,13 +22,14 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public class ModItems {
     /*? if forge {*/
     /*public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, McTalking.MODID);
-    *//*?}*/
+     *//*?}*/
 
     /*? if neoforge {*/
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(BuiltInRegistries.ITEM, McTalking.MODID);
     /*?}*/
 
     public static final Supplier<Item> TALKING_DEVICE = ITEMS.register("talking_device", CitizenTalkingDevice::new);
+    public static final Supplier<Item> CONVERSATION_CREATOR = ITEMS.register("conversation_creator", ConversationCreatorDevice::new);
 
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
@@ -38,7 +40,7 @@ public class ModItems {
         if (event.getTabKey() == ModCreativeTabs.GENERAL.getKey()) {
             /*? if forge {*/
             /*event.accept(TALKING_DEVICE.get());
-            *//*?}*/
+             *//*?}*/
             /*? if neoforge {*/
             event.accept(TALKING_DEVICE.get(), net.minecraft.world.item.CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
             /*?}*/

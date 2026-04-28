@@ -7,22 +7,23 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
-import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
 import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
 import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
@@ -36,6 +37,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
 import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -45,7 +47,7 @@ public final class CitizenPromptViewFactory {
     private CitizenPromptViewFactory() {
     }
 
-    public static CitizenPromptView create(ICitizenData data, ServerPlayer speakingTo) {
+    public static CitizenPromptView create(ICitizenData data, @Nullable ServerPlayer speakingTo) {
         String jobName = null;
         if (data.getJob() != null) {
             jobName = Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
@@ -73,47 +75,49 @@ public final class CitizenPromptViewFactory {
         double happiness = happinessHandler.getHappiness(data.getColony(), data);
 
         List<HappinessModifierView> modifiers = happinessHandler.getModifiers().stream()
-            .map(modifierId -> {
-                IHappinessModifier modifier = happinessHandler.getModifier(modifierId);
-                if (modifier == null) {
-                    return null;
-                }
-                return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
-            })
-            .filter(m -> m != null)
-            .collect(Collectors.toList());
+                .map(modifierId -> {
+                    IHappinessModifier modifier = happinessHandler.getModifier(modifierId);
+                    if (modifier == null) {
+                        return null;
+                    }
+                    return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
 
         boolean hasSchool = data.getColony().getServerBuildingManager().hasBuilding(
-            ModBuildings.school.get().getRegistryName(),
-            1,
-            true
+                ModBuildings.school.get().getRegistryName(),
+                1,
+                true
         );
 
         List<SkillLevelView> skills = List.of();
         if (data.getCitizenSkillHandler() != null) {
             skills = data.getCitizenSkillHandler().getSkills().entrySet().stream()
-                .map(e -> new SkillLevelView(e.getKey().name(), e.getValue().getLevel()))
-                .collect(Collectors.toList());
+                    .map(e -> new SkillLevelView(e.getKey().name(), e.getValue().getLevel()))
+                    .collect(Collectors.toList());
         }
 
         List<String> blockingMessages = ((CitizenDataAccessor) data)
-            .getCitizenChatOptions()
-            .values()
-            .stream()
-            .filter(e -> e.getPriority().getPriority() >= ChatPriority.IMPORTANT.getPriority())
-            .map(e -> e.getInquiry().getString())
-            .collect(Collectors.toList());
+                .getCitizenChatOptions()
+                .values()
+                .stream()
+                .filter(e -> e.getPriority().getPriority() >= ChatPriority.IMPORTANT.getPriority())
+                .map(e -> e.getInquiry().getString())
+                .collect(Collectors.toList());
 
         PlayerRelationView relation = null;
-        var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
-        if (perms != null) {
-            var rank = perms.getRank();
-            String rankName = rank.isHostile() ? "enemy" : (
-                rank.isColonyManager() ? "manager" : (
-                    rank.isInitial() ? "leader" : "visitor"
-                )
-            );
-            relation = new PlayerRelationView(rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
+        if (speakingTo != null) {
+            var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
+            if (perms != null) {
+                var rank = perms.getRank();
+                String rankName = rank.isHostile() ? "enemy" : (
+                        rank.isColonyManager() ? "manager" : (
+                                rank.isInitial() ? "leader" : "visitor"
+                        )
+                );
+                relation = new PlayerRelationView(rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
+            }
         }
 
         List<String> childrenNames = new ArrayList<>();
@@ -132,26 +136,26 @@ public final class CitizenPromptViewFactory {
         }
 
         return new CitizenPromptView(
-            data.getName(),
-            data.isChild(),
-            data.isFemale(),
-            jobName,
-            data.getCitizenDiseaseHandler().isSick(),
-            data.getHomeBuilding() == null,
-            parents,
-            data.getPartner() != null,
-            childrenNames,
-            siblingNames,
-            data.getSaturation(),
-            healthPercent,
-            createStatusView(data.getStatus(), data),
-            happiness,
-            modifiers,
-            hasSchool,
-            skills,
-            blockingMessages,
-            relation,
-            getLanguageNameFromCode(CONFIG.language.get())
+                data.getName(),
+                data.isChild(),
+                data.isFemale(),
+                jobName,
+                data.getCitizenDiseaseHandler().isSick(),
+                data.getHomeBuilding() == null,
+                parents,
+                data.getPartner() != null,
+                childrenNames,
+                siblingNames,
+                data.getSaturation(),
+                healthPercent,
+                createStatusView(data.getStatus(), data),
+                happiness,
+                modifiers,
+                hasSchool,
+                skills,
+                blockingMessages,
+                relation,
+                getLanguageNameFromCode(CONFIG.language.get())
         );
     }
 

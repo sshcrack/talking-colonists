@@ -23,7 +23,9 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 @SuppressWarnings("unused")
 @ForgeVoicechatPlugin
 public class McTalkingVoicechatPlugin implements VoicechatPlugin {
+    public static final int TARGET_SAMPLE_RATE = 48000;
     public static VoicechatServerApi vcApi;
+
 
     // Map to track silence packet futures for each entity
     private final Map<UUID, ScheduledFuture<?>> silenceTimeouts = new ConcurrentHashMap<>();

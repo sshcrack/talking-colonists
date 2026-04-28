@@ -8,15 +8,19 @@ import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class GeminiStream implements Supplier<short[]> {
     public static final int FRAME_SIZE_SAMPLES = 960;
-    private static final int TARGET_SAMPLE_RATE = 48000;
     // Minimum buffer size for effective pitch shifting (about 100ms of audio)
     private static final int MIN_BUFFER_SIZE_FOR_PITCH = TARGET_SAMPLE_RATE * 2;
     // Minimum number of frames to buffer before starting playback (about 500ms)
@@ -79,7 +83,8 @@ public class GeminiStream implements Supplier<short[]> {
      * Process the buffered data, applying pitch shifting and preparing for playback
      *
      * @param sampleRate Sample rate of the audio data
-     */    private boolean processBufferedData(int sampleRate, boolean flushed) {
+     */
+    private boolean processBufferedData(int sampleRate, boolean flushed) {
         // Use a local variable to hold the data we're going to process
         byte[] combined;
 

@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -18,7 +19,7 @@ import net.minecraft.world.item.component.CustomModelData;
 /*import net.minecraft.nbt.CompoundTag;
 *//*? }*/
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
@@ -36,7 +38,7 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
  */
 public class ConversationManager {
     // Track AI status for each entity
-    private static final Map<UUID, AiStatus> aiStatus = new HashMap<>();
+    private static final Map<UUID, AiStatus> aiStatus = new ConcurrentHashMap<>();
 
     // Track active AI clients for each entity
     private static final Map<UUID, TalkingManager> clients = new HashMap<>();
@@ -81,15 +83,6 @@ public class ConversationManager {
      */
     public static AiStatus getAiStatus(UUID entityId) {
         return aiStatus.getOrDefault(entityId, AiStatus.NONE);
-    }
-
-    /**
-     * Gets all current AI status mappings
-     *
-     * @return Map of entity UUIDs to their AI status
-     */
-    public static Map<UUID, AiStatus> getAllAiStatus() {
-        return Collections.unmodifiableMap(aiStatus);
     }
 
     /**

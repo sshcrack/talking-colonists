@@ -3,7 +3,6 @@ package me.sshcrack.mc_talking.manager;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
-import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import org.jetbrains.annotations.NotNull;
@@ -16,8 +15,7 @@ import java.util.stream.Collectors;
  * Default implementation for citizen prompt generation.
  */
 public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
-    @Override
-    public String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
+    private String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
         StringBuilder prompt = new StringBuilder();
         String name = view.name();
         String citizen_type = (view.child() ? "Child" : "Adult") + " " + (view.female() ? "woman" : "man");
@@ -170,9 +168,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     @Override
+    public String generateConversationalInfoPrompt(@NotNull CitizenPromptView view) {
+        return getGeneralCitizenPrompt(view, false);
+    }
+
+    @Override
     public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
         final StringBuilder prompt = new StringBuilder();
-        prompt.append(this.getGeneralCitizenPrompt(view));
+        prompt.append(getGeneralCitizenPrompt(view, true));
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");

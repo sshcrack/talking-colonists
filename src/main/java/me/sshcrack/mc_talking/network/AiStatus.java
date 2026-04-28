@@ -12,6 +12,7 @@ public enum AiStatus {
     THINKING,
     QUOTA_EXCEEDED,
     TALKING,
+    IN_CONVERSATION,
     LISTENING,
     NONE;
 

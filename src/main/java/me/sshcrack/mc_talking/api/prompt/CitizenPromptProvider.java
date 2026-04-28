@@ -4,6 +4,8 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
+
 /**
  * Pluggable provider for citizen AI prompt generation.
  * Other mods can implement this interface and register their provider
@@ -18,6 +20,8 @@ public interface CitizenPromptProvider {
      * @return system prompt text
      */
     String generateCitizenRoleplayPrompt(@NotNull CitizenPromptView view);
+
+    String generateConversationalInfoPrompt(@NotNull CitizenPromptView view);
 
     /**
      * Formats a citizen status value into text used in prompt updates.
