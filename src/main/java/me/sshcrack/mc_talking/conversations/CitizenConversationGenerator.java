@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -85,7 +86,13 @@ public class CitizenConversationGenerator {
     private static final String FLASH_MODEL = "gemini-3-flash-preview";
     private static final String TTS_MODEL = "gemini-3-flash-tts-preview";
 
-    public static List<GeminiTTS.AudioChunk> generateConversation(List<AbstractEntityCitizen> conversationEntities) {
+    public static class ConversationGenerationException extends Exception {
+        public ConversationGenerationException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    public static List<GeminiTTS.AudioChunk> generateConversation(List<AbstractEntityCitizen> conversationEntities) throws ConversationGenerationException {
         StringBuilder citizenInfo = new StringBuilder();
         citizenInfo.append("-----\n");
 
@@ -110,6 +117,7 @@ public class CitizenConversationGenerator {
         String apiKey = McTalkingConfig.CONFIG.geminiApiKey.get();
         String citizenConversation;
         try {
+            McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
             citizenConversation = GeminiFlash.sendFlashRequest(FLASH_MODEL, apiKey, new GeminiFlash.GenerateContentRequest() {{
                 system_instruction = new SystemInstruction();
                 system_instruction.parts = List.of(new Part() {{
@@ -122,11 +130,12 @@ public class CitizenConversationGenerator {
                 }});
             }});
         } catch (InterruptedException | IOException | UnexpectedResponseException e) {
-            throw new RuntimeException(e);
+            throw new ConversationGenerationException("Failed to generate conversation using Gemini Flash", e);
         }
 
         List<GeminiTTS.AudioChunk> audioChunks;
         try {
+            McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
             audioChunks = GeminiTTS.generateAudioConversation(TTS_MODEL, apiKey, new GeminiTTS.RequestPayload() {{
                 contents = List.of(new GeminiTTS.RequestPayload.Content() {{
                     parts = List.of(new Part() {
@@ -148,8 +157,8 @@ public class CitizenConversationGenerator {
                     }
                 };
             }});
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+        } catch (IOException | InterruptedException | UnexpectedResponseException e) {
+            throw new ConversationGenerationException("Failed to generate conversation audio using Gemini TTS", e);
         }
 
         return audioChunks;

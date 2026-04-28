@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
@@ -48,7 +47,14 @@ public class CitizenConversation {
 
         new Thread(() -> {
             McTalking.LOGGER.info("Starting conversation thread for {} participants...", participants.size());
-            var audio = CitizenConversationGenerator.generateConversation(participants);
+            List<GeminiTTS.AudioChunk> audio;
+            try {
+                audio = CitizenConversationGenerator.generateConversation(participants);
+            } catch (CitizenConversationGenerator.ConversationGenerationException e) {
+                McTalking.LOGGER.error("Failed to generate conversation audio: {}", e.getMessage());
+                setState(ConversationState.ENDED);
+                return;
+            }
 
             synchronized (this) {
                 if (getState() == ConversationState.ENDED) {
@@ -132,6 +138,7 @@ public class CitizenConversation {
             setState(ConversationState.PLAYING_AUDIO);
         }
 
+        McTalking.LOGGER.info("Starting conversation playback at position {} with max distance {}", avg, maxDistance);
         player.startPlaying();
         player.setOnStopped(() -> {
             setState(ConversationState.ENDED);
