@@ -60,6 +60,7 @@ public class TalkingManager {
 
     public void close() {
         client.close();
+        decoder.close();
         channel = null;
     }
 

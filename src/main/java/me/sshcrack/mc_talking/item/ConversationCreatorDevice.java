@@ -6,11 +6,14 @@ import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.network.AiStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -50,15 +53,20 @@ public class ConversationCreatorDevice extends Item {
         return true;
     }
 
+    @NotNull
     @Override
-    public void onStopUsing(@NotNull ItemStack stack, @NotNull LivingEntity entity, int count) {
-        List<AbstractEntityCitizen> participants = new ArrayList<>(conversationParticipants);
-        var conversation = new CitizenConversation(participants);
-
-        if (entity instanceof Player player) {
-            player.sendSystemMessage(Component.literal("Started conversation with " + participants.size() + " participants").withStyle(ChatFormatting.GREEN));
+    public InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Player player, @NotNull InteractionHand usedHand) {
+        if (!level.isClientSide()) {
+            return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }
 
+        ServerLevel serverLevel = (ServerLevel) level;
+
+        List<AbstractEntityCitizen> participants = new ArrayList<>(conversationParticipants);
+        var conversation = new CitizenConversation(serverLevel.getServer(), participants);
+
+
+        player.sendSystemMessage(Component.literal("Started conversation with " + participants.size() + " participants").withStyle(ChatFormatting.GREEN));
         conversation.setOnStateChanged(newState -> {
             AiStatus newStatus = switch (newState) {
                 case GENERATING -> AiStatus.THINKING;
@@ -70,5 +78,6 @@ public class ConversationCreatorDevice extends Item {
                 ConversationManager.updateAiStatus(participant.getUUID(), newStatus);
             }
         });
+        return InteractionResultHolder.pass(player.getItemInHand(usedHand));
     }
 }

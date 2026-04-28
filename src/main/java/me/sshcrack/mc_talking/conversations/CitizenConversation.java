@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.conversations;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
@@ -8,6 +10,7 @@ import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.util.AudioHelper;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
@@ -38,14 +41,14 @@ public class CitizenConversation {
         ENDED
     }
 
-    public CitizenConversation(List<AbstractEntityCitizen> participants) {
+    public CitizenConversation(MinecraftServer server, List<AbstractEntityCitizen> participants) {
         if (participants.isEmpty()) {
             throw new IllegalArgumentException("Conversation must have at least one participant");
         }
 
         this.participants = participants;
 
-        new Thread(() -> {
+        new Thread(() -> {/*
             McTalking.LOGGER.info("Starting conversation thread for {} participants...", participants.size());
             List<GeminiTTS.AudioChunk> audio;
             try {
@@ -62,8 +65,10 @@ public class CitizenConversation {
                     return;
                 }
             }
-
-            performConversation(audio);
+*/
+            List<GeminiTTS.AudioChunk> audio = (new Gson()).fromJson(DebugT.AUDIO_STUFFS, new TypeToken<List<GeminiTTS.AudioChunk>>() {
+            });
+            server.execute(() -> performConversation(audio));
         }).start();
     }
 
