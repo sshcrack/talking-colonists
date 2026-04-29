@@ -4,6 +4,7 @@ import de.maxhenkel.voicechat.api.ForgeVoicechatPlugin;
 import de.maxhenkel.voicechat.api.VoicechatApi;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
+import de.maxhenkel.voicechat.api.VolumeCategory;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
@@ -12,7 +13,12 @@ import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.manager.TalkingManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import org.jetbrains.annotations.Nullable;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.net.URL;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -26,6 +32,8 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public static final int TARGET_SAMPLE_RATE = 48000;
     public static VoicechatServerApi vcApi;
+    public static final String DIRECT_PLAYER_DIALOG = "mc_talking_player_dialog";
+    public static final String CITIZEN_CONVERSATION = "mc_talking_citizen_conversation";
 
 
     // Map to track silence packet futures for each entity
@@ -70,11 +78,58 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public void onServerStart(VoicechatServerStartedEvent event) {
         // Start a periodic task to check for speech end and schedule silence packets
         executor.scheduleAtFixedRate(this::checkForSpeechEnd,
-            PERIODIC_SILENCE_CHECK_MS, PERIODIC_SILENCE_CHECK_MS, TimeUnit.MILLISECONDS);
+                PERIODIC_SILENCE_CHECK_MS, PERIODIC_SILENCE_CHECK_MS, TimeUnit.MILLISECONDS);
 
         McTalking.LOGGER.info("Voicechat Server Started");
         vcApi = event.getVoicechat();
+
+
+        VolumeCategory directDialog = vcApi.volumeCategoryBuilder()
+                .setId(DIRECT_PLAYER_DIALOG)
+                .setName("Player Citizen Dialog")
+                .setDescription("The volume of the citizens voice when talking directly to the player (so when the player used the Talking Device)")
+                .build();
+        VolumeCategory citizenConversation = vcApi.volumeCategoryBuilder()
+                .setId(CITIZEN_CONVERSATION)
+                .setName("Citizen Conversations")
+                .setDescription("The volume of the citizens voice when talking in a conversation with other citizens (so not directly to the player)")
+                .build();
+
+        //TODO add icons here
+
+        vcApi.registerVolumeCategory(directDialog);
+        vcApi.registerVolumeCategory(citizenConversation);
     }
+
+
+    @Nullable
+    private int[][] getIcon(String path) {
+        try {
+            Enumeration<URL> resources = McTalkingVoicechatPlugin.class.getClassLoader().getResources(path);
+            while (resources.hasMoreElements()) {
+                BufferedImage bufferedImage = ImageIO.read(resources.nextElement().openStream());
+                if (bufferedImage.getWidth() != 16) {
+                    continue;
+                }
+                if (bufferedImage.getHeight() != 16) {
+                    continue;
+                }
+                int[][] image = new int[16][16];
+                for (int x = 0; x < bufferedImage.getWidth(); x++) {
+                    for (int y = 0; y < bufferedImage.getHeight(); y++) {
+                        image[x][y] = bufferedImage.getRGB(x, y);
+                    }
+                }
+                return image;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
 
     @Override
     public void registerEvents(EventRegistration registration) {
@@ -246,9 +301,9 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
             // If we've exceeded the inactivity threshold and we're not already sending silence
             if (speechEndTime != null &&
-                (currentTime - speechEndTime >= VOICE_INACTIVITY_THRESHOLD_MS) &&
-                isSpeaking.getOrDefault(entityId, false) &&
-                !silenceTimeouts.containsKey(entityId)) {
+                    (currentTime - speechEndTime >= VOICE_INACTIVITY_THRESHOLD_MS) &&
+                    isSpeaking.getOrDefault(entityId, false) &&
+                    !silenceTimeouts.containsKey(entityId)) {
 
                 // Mark the entity as no longer speaking
                 isSpeaking.put(entityId, false);
@@ -272,8 +327,8 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
             // If not in the speech end detection map and not already sending silence
             if (!speechEndDetections.containsKey(entityId) &&
-                !silenceTimeouts.containsKey(entityId) &&
-                isSpeaking.getOrDefault(entityId, false)) {
+                    !silenceTimeouts.containsKey(entityId) &&
+                    isSpeaking.getOrDefault(entityId, false)) {
 
                 // If we've exceeded the inactivity threshold
                 if (lastActivity != null && (currentTime - lastActivity >= VOICE_INACTIVITY_THRESHOLD_MS * 3)) {

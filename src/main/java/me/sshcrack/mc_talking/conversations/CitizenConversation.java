@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -133,14 +134,15 @@ public class CitizenConversation {
         var vcLevel = vcApi.fromServerLevel(level);
         var avgPos = vcApi.createPosition(avg.x, avg.y, avg.z);
 
-        var audioChannel = vcApi.createLocationalAudioChannel(channelId, vcLevel, avgPos);
-        if (audioChannel == null) {
+        channel = vcApi.createLocationalAudioChannel(channelId, vcLevel, avgPos);
+        if (channel == null) {
             McTalking.LOGGER.error("Failed to create audio channel for conversation!");
             return;
         }
 
         float maxDistance = (float) maxPos.subtract(minPos).length();
-        audioChannel.setDistance(Math.max(maxDistance, audioChannel.getDistance()));
+        channel.setDistance(Math.max(maxDistance, channel.getDistance()));
+        channel.setCategory(McTalkingVoicechatPlugin.CITIZEN_CONVERSATION);
 
         var converter = vcApi.getAudioConverter();
         List<short[]> chunks = conversationAudio.stream()
@@ -160,7 +162,7 @@ public class CitizenConversation {
 
 
         encoder = vcApi.createEncoder(OpusEncoderMode.AUDIO);
-        AudioPlayer newPlayer = vcApi.createAudioPlayer(audioChannel, encoder, rawSamples);
+        AudioPlayer newPlayer = vcApi.createAudioPlayer(channel, encoder, rawSamples);
 
         synchronized (this) {
             if (getState() == ConversationState.ENDED) {

@@ -4,13 +4,14 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.EntityAudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import net.minecraft.server.level.ServerPlayer;
 /*? if forge {*/
 /*import net.minecraftforge.fml.ModList;
-*//*?}*/
+ *//*?}*/
 /*? if neoforge {*/
 import net.neoforged.fml.ModList;
- /*?}*/
+        /*?}*/
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.util.UUID;
@@ -44,6 +45,7 @@ public class TalkingManager {
             throw new IllegalStateException("Failed to create audio channel for entity: " + entity.getStringUUID());
         }
 
+        channel.setCategory(McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG);
         channel.setWhispering(true);
         client = new GeminiWsClient(this, initialPlayer);
         decoder = vcApi.createDecoder();
