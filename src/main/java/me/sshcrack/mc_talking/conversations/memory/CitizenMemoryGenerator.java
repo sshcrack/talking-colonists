@@ -58,6 +58,8 @@ public class CitizenMemoryGenerator extends Thread {
     private final String conversation;
     private final List<AbstractEntityCitizen> participants;
     private final MinecraftServer server;
+    private boolean shouldSaveMemory = false;
+    private GsonMemoryResponse savedResponse;
 
     public CitizenMemoryGenerator(String input, List<AbstractEntityCitizen> participants, MinecraftServer server) {
         this.conversation = input;
@@ -87,9 +89,21 @@ public class CitizenMemoryGenerator extends Thread {
             return;
         }
 
-        server.executeBlocking(() -> minecraftSaveMemoryRun(json));
+        if (shouldSaveMemory) {
+            server.executeBlocking(() -> minecraftSaveMemoryRun(json));
+        } else {
+            savedResponse = json;
+        }
 
         McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
+    }
+
+    public void scheduleOrSaveMemory() {
+        if (savedResponse != null) {
+            server.execute(() -> minecraftSaveMemoryRun(savedResponse));
+        } else {
+            shouldSaveMemory = true;
+        }
     }
 
     private void minecraftSaveMemoryRun(GsonMemoryResponse json) {
@@ -134,10 +148,12 @@ public class CitizenMemoryGenerator extends Thread {
 
     private static final List<CitizenMemoryGenerator> activeGenerators = new CopyOnWriteArrayList<>();
 
-    public static void addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens, MinecraftServer server) {
+    public static CitizenMemoryGenerator addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens, MinecraftServer server) {
         var generator = new CitizenMemoryGenerator(conversation, citizens, server);
         activeGenerators.add(generator);
         generator.start();
+
+        return generator;
     }
 
     public static void stopAllGenerators() {

@@ -176,22 +176,28 @@ public class CitizenConversationGenerator {
             speakerVoiceConfigs.add(config);
         }
 
-        String conversation = generateRawConversation(conversationEntities, citizenInfo, server);
+        RawConversation conversation = generateConversationAndMemory(conversationEntities, citizenInfo, server);
 
         String apiKey = CONFIG.geminiApiKey.get();
         try {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
-            GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation, speakerVoiceConfigs), chunkConsumer);
+            GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation.conversation(), speakerVoiceConfigs), chunkConsumer);
         } catch (IOException | UnexpectedResponseException e) {
             throw new ConversationGenerationException("Failed to generate conversation audio using Gemini TTS", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
         }
+
+        conversation.generator().scheduleOrSaveMemory();
+    }
+
+    public record RawConversation(String conversation, CitizenMemoryGenerator generator) {
+
     }
 
     @NotNull
-    private static String generateRawConversation(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo, MinecraftServer server) throws ConversationGenerationException {
+    private static RawConversation generateConversationAndMemory(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo, MinecraftServer server) throws ConversationGenerationException {
         String apiKey = CONFIG.geminiApiKey.get();
         String rawConversationOutput;
         try {
@@ -204,8 +210,7 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Conversation generation was interrupted", e);
         }
 
-        CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
-
-        return rawConversationOutput;
+        var generator = CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
+        return new RawConversation(rawConversationOutput, generator);
     }
 }

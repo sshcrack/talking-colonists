@@ -93,7 +93,10 @@ public class CitizenConversation {
         new Thread(() -> {
             setState(ConversationState.GENERATING);
             try {
+                // This blocking
                 CitizenConversationGenerator.generateConversation(participants, server, chunk -> stream.addGeminiPcmWithPitch(chunk.audioBytes(), chunk.sampleRate()));
+
+                // Only save memory if successful
             } catch (ConversationGenerationException e) {
                 McTalking.LOGGER.error("Failed to generate conversation audio: {}, original cause: {}", e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
             } finally {
