@@ -74,7 +74,7 @@ public class CitizenConversation {
 
             if (audio == null) {
                 try {
-                    audio = CitizenConversationGenerator.generateConversation(participants);
+                    audio = CitizenConversationGenerator.generateConversation(participants, server);
                 } catch (CitizenConversationGenerator.ConversationGenerationException e) {
                     McTalking.LOGGER.error("Failed to generate conversation audio: {}, original cause: {}", e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
                     setState(ConversationState.ENDED);

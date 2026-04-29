@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.conversations.memory.gson;
 
 import com.google.gson.*;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ public class GsonMemoryResponse {
 
     public static class GsonRelationshipMemory {
         public String target;
+        @Nullable
         public CitizenRelationshipChangeType type;
         public float change;
     }

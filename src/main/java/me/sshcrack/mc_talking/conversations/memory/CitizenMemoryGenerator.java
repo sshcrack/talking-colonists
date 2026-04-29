@@ -8,10 +8,15 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
+import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
@@ -54,10 +59,12 @@ public class CitizenMemoryGenerator extends Thread {
 
     private final String conversation;
     private final List<AbstractEntityCitizen> participants;
+    private final MinecraftServer server;
 
-    public CitizenMemoryGenerator(String input, List<AbstractEntityCitizen> participants) {
+    public CitizenMemoryGenerator(String input, List<AbstractEntityCitizen> participants, MinecraftServer server) {
         this.conversation = input;
-        this.participants = participants;
+        this.participants = Collections.unmodifiableList(participants);
+        this.server = server;
     }
 
     @Override
@@ -82,6 +89,12 @@ public class CitizenMemoryGenerator extends Thread {
             return;
         }
 
+        server.executeBlocking(() -> minecraftSaveMemoryRun(json));
+
+        McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
+    }
+
+    private void minecraftSaveMemoryRun(GsonMemoryResponse json) {
         for (var gsonCitizens : json.citizens) {
             var citizen = participants.stream()
                     .filter(c -> c.getName().getString().equals(gsonCitizens.name))
@@ -112,17 +125,29 @@ public class CitizenMemoryGenerator extends Thread {
                         .orElse(null);
                 if (target == null) {
                     McTalking.LOGGER.warn("Memory response contains relationship change with unknown target citizen: {}", relationship.target);
-                    continue;
+                } else if (relationship.type == null) {
+                    McTalking.LOGGER.warn("Memory response contains relationship change with null type for target citizen: {}", relationship.target);
+                } else {
+                    memory.addRelationshipChange(target.getUUID(), relationship.type, relationship.change);
                 }
-
-                memory.addRelationshipChange(target.getUUID(), relationship.type, relationship.change);
             }
         }
-
-        McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
     }
 
-    public static void addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens) {
-        new CitizenMemoryGenerator(conversation, citizens).start();
+    private static final List<CitizenMemoryGenerator> activeGenerators = new CopyOnWriteArrayList<>();
+
+    public static void addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens, MinecraftServer server) {
+        var generator = new CitizenMemoryGenerator(conversation, citizens, server);
+        activeGenerators.add(generator);
+        generator.start();
+    }
+
+    public static void stopAllGenerators() {
+        for (var generator : activeGenerators) {
+            generator.interrupt();
+        }
+
+        activeGenerators.clear();
+        //TODO shutdown cleanly and wait for threads to finish
     }
 }

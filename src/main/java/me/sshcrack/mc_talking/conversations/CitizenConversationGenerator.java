@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -86,12 +87,6 @@ public class CitizenConversationGenerator {
             - Do NOT summarize — output ONLY the formatted transcript
             """;
 
-    public static class ConversationGenerationException extends Exception {
-        public ConversationGenerationException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
-
     private static GeminiTTS.RequestPayload getTTSPrompt(String conversation, List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs) {
         GeminiTTS.RequestPayload payload = new GeminiTTS.RequestPayload();
 
@@ -143,7 +138,7 @@ public class CitizenConversationGenerator {
         return request;
     }
 
-    public static List<GeminiTTS.AudioChunk> generateConversation(List<AbstractEntityCitizen> conversationEntities) throws ConversationGenerationException {
+    public static List<GeminiTTS.AudioChunk> generateConversation(List<AbstractEntityCitizen> conversationEntities, MinecraftServer server) throws ConversationGenerationException {
         StringBuilder citizenInfo = new StringBuilder();
         citizenInfo.append("-----\n");
 
@@ -168,7 +163,7 @@ public class CitizenConversationGenerator {
             speakerVoiceConfigs.add(config);
         }
 
-        String conversation = generateRawConversation(conversationEntities, citizenInfo);
+        String conversation = generateRawConversation(conversationEntities, citizenInfo, server);
 /*
         String apiKey = McTalkingConfig.CONFIG.geminiApiKey.get();
         StringBuilder conversation = new StringBuilder();
@@ -231,7 +226,7 @@ public class CitizenConversationGenerator {
     }
 
     @NotNull
-    private static String generateRawConversation(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo) throws ConversationGenerationException {
+    private static String generateRawConversation(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo, MinecraftServer server) throws ConversationGenerationException {
         String apiKey = CONFIG.geminiApiKey.get();
         String rawConversationOutput;
         try {
@@ -244,7 +239,7 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Conversation generation was interrupted", e);
         }
 
-        CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities);
+        CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
 
         return rawConversationOutput;
     }
