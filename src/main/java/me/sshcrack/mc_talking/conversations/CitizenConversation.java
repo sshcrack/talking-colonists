@@ -32,7 +32,6 @@ public class CitizenConversation {
     private final List<AbstractEntityCitizen> participants;
     private final AtomicReference<ConversationState> state = new AtomicReference<>(ConversationState.GENERATING);
 
-    private List<GeminiTTS.AudioChunk> conversationAudio;
     private LocationalAudioChannel channel;
 
     private volatile AudioPlayer player;
@@ -126,7 +125,7 @@ public class CitizenConversation {
         }
 
 
-        Vec3 avg = sum.scale(1.0d / ((double) participants.size()));
+        Vec3 avg = sum.scale(1.0d / participants.size());
         //noinspection SequencedCollectionMethodCanBeUsed
         ServerLevel level = (ServerLevel) participants.get(0).level();
 
@@ -141,7 +140,7 @@ public class CitizenConversation {
         }
 
         float maxDistance = (float) maxPos.subtract(minPos).length();
-        audioChannel.setDistance(maxDistance);
+        audioChannel.setDistance(Math.max(maxDistance, audioChannel.getDistance()));
 
         var converter = vcApi.getAudioConverter();
         List<short[]> chunks = conversationAudio.stream()
