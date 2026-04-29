@@ -216,7 +216,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 "\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
         prompt.append(
                 "\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
-        prompt.append("\nALWAYS respond in ").append(view.responseLanguageName());
+        prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
 
         return prompt.toString();
     }
