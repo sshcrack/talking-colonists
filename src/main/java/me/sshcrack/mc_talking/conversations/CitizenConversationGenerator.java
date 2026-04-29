@@ -89,7 +89,8 @@ public class CitizenConversationGenerator {
 
             ## Rules
             - The transcript is the exact words the model will speak. An audio tag is a word in square brackets that indicates either how something should be said, a change of tone, or an interjection.
-            - You can control style, tone, accent, and pace using natural language prompts or audio tags
+            - You can control style, tone, accent, and pace using natural language prompts or audio tags.
+            - For audio tags, make sure to only focus on voices, not physical actions or sounds.
             Example:
             ```
             Thomas: I know right, [sarcastically] I couldn't believe it. [whispers] She should have totally left
