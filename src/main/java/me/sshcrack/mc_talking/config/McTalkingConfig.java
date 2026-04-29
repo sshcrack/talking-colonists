@@ -6,7 +6,7 @@ import me.sshcrack.mc_talking.manager.tools.AITools;
         *//*?}*/
 /*? if neoforge {*/
 import net.neoforged.neoforge.common.ModConfigSpec;
- /*?}*/
+/*?}*/
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Collections;
@@ -20,13 +20,14 @@ import java.util.function.Supplier;
  */
 public class McTalkingConfig {
     public static final McTalkingConfig CONFIG;
+    public static final String FLASH_MODEL = "gemini-3-flash-preview";
+    public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
+
     /*? if forge {*/
     /*public static final ForgeConfigSpec CONFIG_SPEC;
     *//*?}*/
     /*? if neoforge {*/
     public static final ModConfigSpec CONFIG_SPEC;
-    public static final String FLASH_MODEL = "gemini-3-flash-preview";
-    public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
     /*?}*/
 
     // API Configuration

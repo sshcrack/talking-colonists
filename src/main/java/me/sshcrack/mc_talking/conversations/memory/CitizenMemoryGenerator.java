@@ -5,7 +5,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemory;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 
@@ -77,24 +77,49 @@ public class CitizenMemoryGenerator extends Thread {
         }
 
         var json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
-        if(json == null) {
+        if (json == null) {
             McTalking.LOGGER.warn("Failed to parse memory response JSON: {}", memoryString);
             return;
         }
 
-        for (var citizenMemory : json.citizens) {
+        for (var gsonCitizens : json.citizens) {
             var citizen = participants.stream()
-                    .filter(c -> c.getName().getString().equals(citizenMemory.name))
+                    .filter(c -> c.getName().getString().equals(gsonCitizens.name))
                     .findFirst()
                     .orElse(null);
 
             if (citizen == null) {
-                McTalking.LOGGER.warn("Memory response contains unknown citizen: {}", citizenMemory.name);
+                McTalking.LOGGER.warn("Memory response contains unknown citizen: {}", gsonCitizens.name);
                 continue;
             }
 
-            citizen.getCitizenData().getMemory()
+            var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
+            var memory = data.mc_talking$getOrInitializeMemory();
+
+            var gsonMemory = gsonCitizens.memories;
+            for (String fact : gsonMemory.facts) {
+                memory.addFact(fact);
+            }
+
+            for (String event : gsonMemory.events) {
+                memory.addEvent(event);
+            }
+
+            for (GsonMemoryResponse.GsonRelationshipMemory relationship : gsonMemory.relationships) {
+                var target = participants.stream()
+                        .filter(c -> c.getName().getString().equals(relationship.target))
+                        .findFirst()
+                        .orElse(null);
+                if (target == null) {
+                    McTalking.LOGGER.warn("Memory response contains relationship change with unknown target citizen: {}", relationship.target);
+                    continue;
+                }
+
+                memory.addRelationshipChange(target.getCitizenData(), relationship.type, relationship.change);
+            }
         }
+
+        McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
     }
 
     public static void addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens) {

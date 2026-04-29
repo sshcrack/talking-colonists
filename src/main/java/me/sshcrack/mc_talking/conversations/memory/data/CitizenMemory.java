@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory.data;
 
+import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.core.colony.CitizenData;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -37,7 +38,7 @@ public class CitizenMemory {
         events.add(event);
     }
 
-    public void addRelationshipChange(CitizenData citizen, CitizenRelationshipChangeType type, float change) {
+    public void addRelationshipChange(ICitizenData citizen, CitizenRelationshipChangeType type, float change) {
         for (CitizenRelationshipMemory relationship : relationships) {
             if (relationship.getOtherCitizenId().equals(citizen.getUUID()) && relationship.getType() == type) {
                 relationship.addChange(change);

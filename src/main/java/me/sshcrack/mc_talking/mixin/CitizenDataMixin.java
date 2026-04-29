@@ -44,7 +44,7 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
     private void mc_talking$serializeMemoryNBT(HolderLookup.Provider provider, CallbackInfoReturnable<CompoundTag> cir) {
         CompoundTag tag = cir.getReturnValue();
         if (memory != null) {
-            if(tag.contains(TAG_MEMORY_KEY)) {
+            if (tag.contains(TAG_MEMORY_KEY)) {
                 McTalking.LOGGER.error("Memory data conflict found for citizen {}, not overwriting.", CitizenData.class.cast(this).getUUID());
                 return;
             }
@@ -54,15 +54,24 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
     }
 
     @Inject(method = "deserializeNBT(Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/nbt/CompoundTag;)V", at = @At("RETURN"))
-    private void mc_talking$deserializeMemoryNBT(HolderLookup.Provider provider, CompoundTag tag, CallbackInfo ci) {
-        if (tag.contains(TAG_MEMORY_KEY)) {
+    private void mc_talking$deserializeMemoryNBT(HolderLookup.Provider provider, CompoundTag nbtTagCompound, CallbackInfo ci) {
+        if (nbtTagCompound.contains(TAG_MEMORY_KEY)) {
             memory = new CitizenMemory();
-            memory.deserializeNbt(tag.getCompound(TAG_MEMORY_KEY));
+            memory.deserializeNbt(nbtTagCompound.getCompound(TAG_MEMORY_KEY));
         }
     }
 
     @Override
     public CitizenMemory mc_talking$getMemory() {
+        return memory;
+    }
+
+    @Override
+    public CitizenMemory mc_talking$getOrInitializeMemory() {
+        if (memory == null) {
+            memory = new CitizenMemory();
+        }
+
         return memory;
     }
 }
