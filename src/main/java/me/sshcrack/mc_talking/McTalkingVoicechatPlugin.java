@@ -32,8 +32,8 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public static final int TARGET_SAMPLE_RATE = 48000;
     public static VoicechatServerApi vcApi;
-    public static final String DIRECT_PLAYER_DIALOG = "mc_talking_player_dialog";
-    public static final String CITIZEN_CONVERSATION = "mc_talking_citizen_conversation";
+    public static final String DIRECT_PLAYER_DIALOG = "ptc_dialog";
+    public static final String CITIZEN_CONVERSATION = "ctc_dialog";
 
 
     // Map to track silence packet futures for each entity
@@ -75,7 +75,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         CitizenMemoryGenerator.stopAllGenerators();
     }
 
-    public void onServerStart(VoicechatServerStartedEvent event) {
+    public void onServerStarted(VoicechatServerStartedEvent event) {
         // Start a periodic task to check for speech end and schedule silence packets
         executor.scheduleAtFixedRate(this::checkForSpeechEnd,
                 PERIODIC_SILENCE_CHECK_MS, PERIODIC_SILENCE_CHECK_MS, TimeUnit.MILLISECONDS);
@@ -134,7 +134,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     @Override
     public void registerEvents(EventRegistration registration) {
         registration.registerEvent(MicrophonePacketEvent.class, this::handleMicPacket);
-        registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStart);
+        registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStarted);
         registration.registerEvent(VoicechatServerStoppedEvent.class, this::onStop);
     }
 
