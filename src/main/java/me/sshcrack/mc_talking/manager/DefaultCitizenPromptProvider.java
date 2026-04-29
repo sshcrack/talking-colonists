@@ -18,14 +18,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
         StringBuilder prompt = new StringBuilder();
         String name = view.name();
-        String citizen_type = (view.child() ? "Child" : "Adult") + " " + (view.female() ? "woman" : "man");
+        String citizenType = (view.child() ? "Child" : "Adult") + " " + (view.female() ? "woman" : "man");
 
         if (firstPerson) {
             prompt.append("# ROLEPLAY AS ").append(name).append("\n\n");
-            prompt.append("You: ").append(citizen_type);
+            prompt.append("You: ").append(citizenType);
         } else {
             prompt.append("# CITIZEN INFO ").append(name).append("\n\n");
-            prompt.append("Type: ").append(citizen_type);
+            prompt.append("Type: ").append(citizenType);
         }
 
         if (view.jobName() != null) {
@@ -49,45 +49,55 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             appendCondensedSkills(view.skills(), prompt);
         }
 
-        boolean hasRelationships = false;
+        addRelationships(view, prompt);
+        addCurrentState(view, prompt, sick);
+        addMemory(view, prompt);
 
-        if (view.parentNames() != null && !view.parentNames().isEmpty()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-            prompt.append("- Parents: ").append(String.join(", ", view.parentNames())).append("\n");
+        prompt.append("\n## EMOTIONAL PROFILE\n");
+
+        double happiness = view.happiness();
+
+        if (happiness > 8.0) {
+            prompt.append("- Generally cheerful and friendly\n");
+            prompt.append("- Optimistic about the colony's future\n");
+            prompt.append("- Likely to be helpful and engaging\n");
+        } else if (happiness > 5.0) {
+            prompt.append("- Generally neutral in demeanor\n");
+            prompt.append("- Moderately satisfied with life in the colony\n");
+            prompt.append("- Can be friendly but has some concerns\n");
+        } else if (happiness > 3.0) {
+            prompt.append("- Visibly unhappy and somewhat irritable\n");
+            prompt.append("- Might complain about colony conditions\n");
+            prompt.append("- Less interested in small talk, more focused on needs\n");
+        } else {
+            prompt.append("- Deeply unhappy and possibly hostile\n");
+            prompt.append("- Will openly complain and make demands\n");
+            prompt.append("- May refuse requests or be uncooperative\n");
         }
 
-        if (view.hasPartner()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-            prompt.append("- In a relationship\n");
+        if (sick) {
+            prompt.append("- Occasionally mentions symptoms or discomfort\n");
         }
 
-        List<String> childNames = view.childNames();
-        if (!childNames.isEmpty()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
+        if (!view.blockingInteractionMessages().isEmpty()) {
+            prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
+            for (var message : view.blockingInteractionMessages()) {
+                prompt.append("- ").append(message);
             }
-
-            prompt.append("- Has ").append(childNames.size()).append(" ").append(childNames.size() == 1 ? "child" : "children")
-                    .append(": ").append(String.join(", ", childNames)).append("\n");
         }
 
-        List<String> siblingNames = view.siblingNames();
-        if (!siblingNames.isEmpty()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-            prompt.append("- Has ").append(siblingNames.size()).append(" ").append(siblingNames.size() == 1 ? "sibling" : "siblings")
-                    .append(": ").append(String.join(", ", siblingNames)).append("\n");
-        }
+        return prompt.toString();
+    }
 
+    private void addMemory(CitizenPromptView view, StringBuilder prompt) {
+        var memories = view.memories();
+        if (memories != null) {
+            prompt.append("\n## MEMORIES\n");
+            prompt.append(memories.toPrompt(view.interestedParties()));
+        }
+    }
+
+    private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick) {
         prompt.append("\n## CURRENT STATE\n");
 
         appendDetailedHappinessState(view, prompt);
@@ -130,41 +140,47 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         if (status != null) {
             prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
         }
+    }
 
-        prompt.append("\n## EMOTIONAL PROFILE\n");
+    private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
+        boolean hasRelationships = false;
 
-        double happiness = view.happiness();
-
-        if (happiness > 8.0) {
-            prompt.append("- Generally cheerful and friendly\n");
-            prompt.append("- Optimistic about the colony's future\n");
-            prompt.append("- Likely to be helpful and engaging\n");
-        } else if (happiness > 5.0) {
-            prompt.append("- Generally neutral in demeanor\n");
-            prompt.append("- Moderately satisfied with life in the colony\n");
-            prompt.append("- Can be friendly but has some concerns\n");
-        } else if (happiness > 3.0) {
-            prompt.append("- Visibly unhappy and somewhat irritable\n");
-            prompt.append("- Might complain about colony conditions\n");
-            prompt.append("- Less interested in small talk, more focused on needs\n");
-        } else {
-            prompt.append("- Deeply unhappy and possibly hostile\n");
-            prompt.append("- Will openly complain and make demands\n");
-            prompt.append("- May refuse requests or be uncooperative\n");
-        }
-
-        if (sick) {
-            prompt.append("- Occasionally mentions symptoms or discomfort\n");
-        }
-
-        if (!view.blockingInteractionMessages().isEmpty()) {
-            prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
-            for (var message : view.blockingInteractionMessages()) {
-                prompt.append("- ").append(message);
+        if (view.parentNames() != null && !view.parentNames().isEmpty()) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
             }
+            prompt.append("- Parents: ").append(String.join(", ", view.parentNames())).append("\n");
         }
 
-        return prompt.toString();
+        if (view.hasPartner()) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- In a relationship\n");
+        }
+
+        List<String> childNames = view.childNames();
+        if (!childNames.isEmpty()) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+
+            prompt.append("- Has ").append(childNames.size()).append(" ").append(childNames.size() == 1 ? "child" : "children")
+                    .append(": ").append(String.join(", ", childNames)).append("\n");
+        }
+
+        List<String> siblingNames = view.siblingNames();
+        if (!siblingNames.isEmpty()) {
+            if (!hasRelationships) {
+                prompt.append("\n## RELATIONSHIPS\n");
+                hasRelationships = true;
+            }
+            prompt.append("- Has ").append(siblingNames.size()).append(" ").append(siblingNames.size() == 1 ? "sibling" : "siblings")
+                    .append(": ").append(String.join(", ", siblingNames)).append("\n");
+        }
     }
 
     @Override
@@ -187,7 +203,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         var relation = view.playerRelation();
         if (relation != null) {
-            prompt.append("- Address player as ").append(relation.rankName()).append("\n");
+            prompt.append("- Address player as ").append(relation.playerName()).append(", he has the role of a ").append(relation.rankName()).append("\n");
 
             if (relation.hostile()) {
                 prompt.append("- Be guarded and suspicious toward the player\n");

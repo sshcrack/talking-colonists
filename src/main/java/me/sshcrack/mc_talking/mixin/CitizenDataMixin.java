@@ -5,7 +5,7 @@ import com.minecolonies.core.colony.CitizenData;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemory;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
 import net.minecraft.core.HolderLookup;
@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class CitizenDataMixin implements CitizenDataMemoryExtended {
     private static final String TAG_MEMORY_KEY = "mc_talking_memory";
     @Unique
-    private CitizenMemory memory;
+    private CitizenMemories memory;
 
     @Inject(method = "setVisibleStatus", at = @At("HEAD"))
     private void mc_talking$onSetVisibleStatus(VisibleCitizenStatus status, CallbackInfo ci) {
@@ -56,20 +56,20 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
     @Inject(method = "deserializeNBT(Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/nbt/CompoundTag;)V", at = @At("RETURN"))
     private void mc_talking$deserializeMemoryNBT(HolderLookup.Provider provider, CompoundTag nbtTagCompound, CallbackInfo ci) {
         if (nbtTagCompound.contains(TAG_MEMORY_KEY)) {
-            memory = new CitizenMemory();
+            memory = new CitizenMemories();
             memory.deserializeNbt(nbtTagCompound.getCompound(TAG_MEMORY_KEY));
         }
     }
 
     @Override
-    public CitizenMemory mc_talking$getMemory() {
+    public CitizenMemories mc_talking$getMemory() {
         return memory;
     }
 
     @Override
-    public CitizenMemory mc_talking$getOrInitializeMemory() {
+    public CitizenMemories mc_talking$getOrInitializeMemory() {
         if (memory == null) {
-            memory = new CitizenMemory();
+            memory = new CitizenMemories();
         }
 
         return memory;

@@ -19,7 +19,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
@@ -93,7 +96,12 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
-        var promptView = CitizenPromptViewFactory.create(manager.entity.getCitizenData(), initialPlayer);
+        //TODO actually make a summary of the conversation after it has ended
+
+        Map<UUID, String> interestedParties = new HashMap<>();
+        interestedParties.put(initialPlayer.getUUID(), initialPlayer.getName().getString());
+
+        var promptView = CitizenPromptViewFactory.create(manager.entity.getCitizenData(), interestedParties, initialPlayer);
         var prompt = CitizenPromptService.generateCitizenRoleplayPrompt(promptView);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
         sys.parts.add(p);

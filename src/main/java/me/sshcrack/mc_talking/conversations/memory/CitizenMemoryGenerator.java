@@ -18,7 +18,7 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class CitizenMemoryGenerator extends Thread {
     private static final String PROMPT = ("""
-            Extract persistent memory from the following conversation.
+            Extract persistent memories from the following conversation.
 
             Return ONLY valid JSON.
 
@@ -62,9 +62,9 @@ public class CitizenMemoryGenerator extends Thread {
 
     @Override
     public void run() {
-        McTalking.LOGGER.debug("Starting memory generation for conversation: {}", conversation);
+        McTalking.LOGGER.debug("Starting memories generation for conversation: {}", conversation);
         String apiKey = CONFIG.geminiApiKey.get();
-        String memoryString = "";
+        String memoryString;
         try {
             memoryString = GeminiFlash.sendSimpleFlashRequest(apiKey, McTalkingConfig.FLASH_MODEL, PROMPT, conversation);
         } catch (InterruptedException e) {
@@ -72,13 +72,13 @@ public class CitizenMemoryGenerator extends Thread {
             McTalking.LOGGER.debug("Memory generation thread was interrupted for conversation: {}", conversation);
             return;
         } catch (UnexpectedResponseException | IOException e) {
-            McTalking.LOGGER.error("Failed to generate memory for conversation: {}", conversation, e);
+            McTalking.LOGGER.error("Failed to generate memories for conversation: {}", conversation, e);
             throw new RuntimeException(e);
         }
 
         var json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
         if (json == null) {
-            McTalking.LOGGER.warn("Failed to parse memory response JSON: {}", memoryString);
+            McTalking.LOGGER.warn("Failed to parse memories response JSON: {}", memoryString);
             return;
         }
 
@@ -115,7 +115,7 @@ public class CitizenMemoryGenerator extends Thread {
                     continue;
                 }
 
-                memory.addRelationshipChange(target.getCitizenData(), relationship.type, relationship.change);
+                memory.addRelationshipChange(target.getUUID(), relationship.type, relationship.change);
             }
         }
 

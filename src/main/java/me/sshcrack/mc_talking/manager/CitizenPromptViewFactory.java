@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
+import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
@@ -13,16 +14,19 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
 import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
@@ -47,7 +51,7 @@ public final class CitizenPromptViewFactory {
     private CitizenPromptViewFactory() {
     }
 
-    public static CitizenPromptView create(ICitizenData data, @Nullable ServerPlayer speakingTo) {
+    public static CitizenPromptView create(ICitizenData data, Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
         String jobName = null;
         if (data.getJob() != null) {
             jobName = Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
@@ -83,7 +87,7 @@ public final class CitizenPromptViewFactory {
                     return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .toList();
 
         boolean hasSchool = data.getColony().getServerBuildingManager().hasBuilding(
                 ModBuildings.school.get().getRegistryName(),
@@ -95,7 +99,7 @@ public final class CitizenPromptViewFactory {
         if (data.getCitizenSkillHandler() != null) {
             skills = data.getCitizenSkillHandler().getSkills().entrySet().stream()
                     .map(e -> new SkillLevelView(e.getKey().name(), e.getValue().getLevel()))
-                    .collect(Collectors.toList());
+                    .toList();
         }
 
         List<String> blockingMessages = ((CitizenDataAccessor) data)
@@ -104,19 +108,16 @@ public final class CitizenPromptViewFactory {
                 .stream()
                 .filter(e -> e.getPriority().getPriority() >= ChatPriority.IMPORTANT.getPriority())
                 .map(e -> e.getInquiry().getString())
-                .collect(Collectors.toList());
+                .toList();
 
         PlayerRelationView relation = null;
         if (speakingTo != null) {
+            String speakingName = speakingTo.getName().getString();
             var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
             if (perms != null) {
                 var rank = perms.getRank();
-                String rankName = rank.isHostile() ? "enemy" : (
-                        rank.isColonyManager() ? "manager" : (
-                                rank.isInitial() ? "leader" : "visitor"
-                        )
-                );
-                relation = new PlayerRelationView(rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
+                String rankName = getRankName(rank);
+                relation = new PlayerRelationView(speakingName, rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
             }
         }
 
@@ -155,8 +156,25 @@ public final class CitizenPromptViewFactory {
                 skills,
                 blockingMessages,
                 relation,
-                getLanguageNameFromCode(CONFIG.language.get())
+                getLanguageNameFromCode(CONFIG.language.get()),
+                ((CitizenDataMemoryExtended) data).mc_talking$getMemory(),
+                interestedParties
         );
+    }
+
+    @NotNull
+    private static String getRankName(Rank rank) {
+        if (rank.isHostile()) {
+            return "enemy";
+        }
+
+        if (rank.isColonyManager())
+            return "manager";
+
+        if (rank.isInitial())
+            return "leader";
+
+        return "visitor";
     }
 
     public static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {

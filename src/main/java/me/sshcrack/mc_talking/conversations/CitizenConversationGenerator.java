@@ -14,7 +14,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
@@ -145,8 +148,11 @@ public class CitizenConversationGenerator {
         citizenInfo.append("-----\n");
 
         List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs = new ArrayList<>();
+        Map<UUID, String> interestedParties = new HashMap<>();
+        conversationEntities.forEach(e -> interestedParties.put(e.getUUID(), e.getCitizenData().getName()));
+
         for (AbstractEntityCitizen entity : conversationEntities) {
-            CitizenPromptView view = CitizenPromptViewFactory.create(entity.getCitizenData(), null);
+            CitizenPromptView view = CitizenPromptViewFactory.create(entity.getCitizenData(), interestedParties, null);
             citizenInfo.append(CitizenPromptService.generateCitizenRoleplayPrompt(view)).append("\n-----\n");
 
             var isFemale = view.female();
