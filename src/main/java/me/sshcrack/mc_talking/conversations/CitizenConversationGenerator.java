@@ -12,6 +12,7 @@ import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -189,10 +190,13 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
         }
 
-        conversation.generator().scheduleOrSaveMemory();
+        //REVIEW: Maybe only save if the conversation has been finished fully
+        var generator = conversation.generator();
+        if(generator != null)
+            generator.scheduleOrSaveMemory();
     }
 
-    public record RawConversation(String conversation, CitizenMemoryGenerator generator) {
+    public record RawConversation(String conversation, @Nullable CitizenMemoryGenerator generator) {
 
     }
 
@@ -210,7 +214,10 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Conversation generation was interrupted", e);
         }
 
-        var generator = CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
+        CitizenMemoryGenerator generator = null;
+        if (CONFIG.enableCitizenMemory.get()) {
+            generator = CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
+        }
         return new RawConversation(rawConversationOutput, generator);
     }
 }

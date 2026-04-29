@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory;
 
+import com.google.gson.JsonSyntaxException;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
@@ -83,8 +84,10 @@ public class CitizenMemoryGenerator extends Thread {
             throw new RuntimeException(e);
         }
 
-        var json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
-        if (json == null) {
+        GsonMemoryResponse json;
+        try {
+            json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
+        } catch (JsonSyntaxException e) {
             McTalking.LOGGER.warn("Failed to parse memories response JSON: {}", memoryString);
             return;
         }

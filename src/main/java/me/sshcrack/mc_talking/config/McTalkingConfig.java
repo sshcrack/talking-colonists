@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  */
 public class McTalkingConfig {
     public static final McTalkingConfig CONFIG;
-    public static final String FLASH_MODEL = "gemini-flash-latest";
+    public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
     /*? if forge {*/
@@ -50,6 +50,7 @@ public class McTalkingConfig {
     public final Supplier<Double> maxConversationDistance;
     public final Supplier<ModalityModes> modality;
     public final Supplier<List<? extends String>> disabledTools;
+    public final Supplier<Boolean> enableCitizenMemory;
 
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
@@ -95,6 +96,10 @@ public class McTalkingConfig {
         useTalkingDevice = requireRestart(builder)
                 .comment("If true, citizens will only respond to the talking device item; if false, looking at them will work")
                 .define("use_talking_device", true);
+
+        enableCitizenMemory = requireRestart(builder)
+                .comment("If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
+                .define("enable_citizen_memory", true);
 
         // Resource Management
         maxConcurrentAgents = requireRestart(builder)
