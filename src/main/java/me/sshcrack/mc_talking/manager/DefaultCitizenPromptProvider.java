@@ -142,44 +142,32 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
-    private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
-        boolean hasRelationships = false;
+    private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder pprompt) {
+        StringBuilder relationshipPrompt = new StringBuilder();
 
         if (view.parentNames() != null && !view.parentNames().isEmpty()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-            prompt.append("- Parents: ").append(String.join(", ", view.parentNames())).append("\n");
+            relationshipPrompt.append("- Parents: ").append(String.join(", ", view.parentNames())).append("\n");
         }
 
         if (view.hasPartner()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-            prompt.append("- In a relationship\n");
+            relationshipPrompt.append("- In a relationship\n");
         }
 
         List<String> childNames = view.childNames();
         if (!childNames.isEmpty()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-
-            prompt.append("- Has ").append(childNames.size()).append(" ").append(childNames.size() == 1 ? "child" : "children")
+            relationshipPrompt.append("- Has ").append(childNames.size()).append(" ").append(childNames.size() == 1 ? "child" : "children")
                     .append(": ").append(String.join(", ", childNames)).append("\n");
         }
 
         List<String> siblingNames = view.siblingNames();
         if (!siblingNames.isEmpty()) {
-            if (!hasRelationships) {
-                prompt.append("\n## RELATIONSHIPS\n");
-                hasRelationships = true;
-            }
-            prompt.append("- Has ").append(siblingNames.size()).append(" ").append(siblingNames.size() == 1 ? "sibling" : "siblings")
+            relationshipPrompt.append("- Has ").append(siblingNames.size()).append(" ").append(siblingNames.size() == 1 ? "sibling" : "siblings")
                     .append(": ").append(String.join(", ", siblingNames)).append("\n");
+        }
+
+        if (!relationshipPrompt.isEmpty()) {
+            pprompt.append("\n## RELATIONSHIPS\n");
+            pprompt.append(relationshipPrompt);
         }
     }
 
