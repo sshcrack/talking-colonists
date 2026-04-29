@@ -73,7 +73,7 @@ public class CitizenMemoryGenerator extends Thread {
         String apiKey = CONFIG.geminiApiKey.get();
         String memoryString;
         try {
-            memoryString = GeminiFlash.sendSimpleFlashRequest(apiKey, McTalkingConfig.FLASH_MODEL, PROMPT, conversation);
+            memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             McTalking.LOGGER.debug("Memory generation thread was interrupted for conversation: {}", conversation);

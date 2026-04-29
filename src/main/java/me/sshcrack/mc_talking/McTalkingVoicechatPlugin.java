@@ -86,12 +86,12 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         VolumeCategory directDialog = vcApi.volumeCategoryBuilder()
                 .setId(DIRECT_PLAYER_DIALOG)
-                .setName("Player Citizen Dialog")
+                .setName("P2CitizenDialog")
                 .setDescription("The volume of the citizens voice when talking directly to the player (so when the player used the Talking Device)")
                 .build();
         VolumeCategory citizenConversation = vcApi.volumeCategoryBuilder()
                 .setId(CITIZEN_CONVERSATION)
-                .setName("Citizen Conversations")
+                .setName("C2CitizenDialog")
                 .setDescription("The volume of the citizens voice when talking in a conversation with other citizens (so not directly to the player)")
                 .build();
 

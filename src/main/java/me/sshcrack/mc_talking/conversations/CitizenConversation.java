@@ -6,14 +6,6 @@ import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.util.AudioHelper;
@@ -56,38 +48,14 @@ public class CitizenConversation {
 
         new Thread(() -> {
             McTalking.LOGGER.info("Starting conversation thread for {} participants...", participants.size());
-            Gson gson = new Gson();
-            Type listType = new TypeToken<java.util.List<GeminiTTS.AudioChunk>>() {}.getType();
-            Path debugPath = Paths.get("audio_debug.json");
+            List<GeminiTTS.AudioChunk> audio;
 
-            List<GeminiTTS.AudioChunk> audio = null;
-
-            if (Files.exists(debugPath)) {
-                try {
-                    String json = Files.readString(debugPath);
-                    audio = gson.fromJson(json, listType);
-                    McTalking.LOGGER.info("Loaded conversation audio from audio_debug.json");
-                } catch (IOException | JsonSyntaxException e) {
-                    McTalking.LOGGER.error("Failed to read/parse audio_debug.json: {}", e.getMessage());
-                }
-            }
-
-            if (audio == null) {
-                try {
-                    audio = CitizenConversationGenerator.generateConversation(participants, server);
-                } catch (ConversationGenerationException e) {
-                    McTalking.LOGGER.error("Failed to generate conversation audio: {}, original cause: {}", e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
-                    setState(ConversationState.ENDED);
-                    return;
-                }
-
-                try {
-                    String out = gson.toJson(audio, listType);
-                    Files.writeString(debugPath, out);
-                    McTalking.LOGGER.info("Wrote generated conversation audio to audio_debug.json");
-                } catch (IOException e) {
-                    McTalking.LOGGER.error("Failed to write audio_debug.json: {}", e.getMessage());
-                }
+            try {
+                audio = CitizenConversationGenerator.generateConversation(participants, server);
+            } catch (ConversationGenerationException e) {
+                McTalking.LOGGER.error("Failed to generate conversation audio: {}, original cause: {}", e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
+                setState(ConversationState.ENDED);
+                return;
             }
 
             synchronized (this) {
