@@ -1,26 +1,28 @@
 package me.sshcrack.mc_talking.conversations;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class CitizenConversationGenerator {
     private static final String CONVERSATION_SYSTEM_PROMPT = """
             Generate a dialogue transcript using the structured format below.
             Participants in this conversation are citizens from the MineColonies mod, each with unique personalities, needs, and relationships. Use the provided citizen information to create an immersive and realistic conversation that reflects their current states and emotional profiles.
             The citizens can not give each other blocks or items, the "manager" of the colony can however.
-
-            # Summary
-            A short summary about IMPORTANT messages in this conversation, serving as a memory for the citizens. This should be concise and only include information that would be relevant for the citizens to remember in future conversations.
-            Leave this blank if there are no important messages to summarize.
 
             # Audio Profile
             For each character: Describe their vocal identity (tone, personality, emotional baseline).
@@ -81,9 +83,6 @@ public class CitizenConversationGenerator {
             - Do NOT summarize — output ONLY the formatted transcript
             """;
 
-    private static final String FLASH_MODEL = "gemini-3-flash-preview";
-    private static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
-
     public static class ConversationGenerationException extends Exception {
         public ConversationGenerationException(String message, Throwable cause) {
             super(message, cause);
@@ -142,7 +141,7 @@ public class CitizenConversationGenerator {
     }
 
     public static List<GeminiTTS.AudioChunk> generateConversation(List<AbstractEntityCitizen> conversationEntities) throws ConversationGenerationException {
-        /*StringBuilder citizenInfo = new StringBuilder();
+        StringBuilder citizenInfo = new StringBuilder();
         citizenInfo.append("-----\n");
 
         List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs = new ArrayList<>();
@@ -163,41 +162,11 @@ public class CitizenConversationGenerator {
             speakerVoiceConfigs.add(config);
         }
 
+        String conversation = generateRawConversation(conversationEntities, citizenInfo);
+/*
         String apiKey = McTalkingConfig.CONFIG.geminiApiKey.get();
-        String rawConversationOutput;
-        try {
-            McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
-            rawConversationOutput = GeminiFlash.sendFlashRequest(FLASH_MODEL, apiKey, getFlashPrompt(citizenInfo.toString()));
-        } catch (InterruptedException | IOException | UnexpectedResponseException e) {
-            throw new ConversationGenerationException("Failed to generate conversation using Gemini Flash", e);
-        }
-
-        StringBuilder conversationBuilder = new StringBuilder();
-        StringBuilder summaryBuilder = new StringBuilder();
-
-        boolean isInSummary = false;
-        for (String line : rawConversationOutput.split("\n")) {
-            if (line.contains("# Summary")) {
-                isInSummary = true;
-                continue;
-            } else if (isInSummary && line.contains("# ")) {
-                isInSummary = false;
-            }
-
-            if (isInSummary) {
-                summaryBuilder.append(line).append("\n");
-            } else {
-                conversationBuilder.append(line).append("\n");
-            }
-        }
-
-        String summary = summaryBuilder.toString().trim();
-        McTalking.LOGGER.info("Got summary: {}", summary);
-
-*/
-        String apiKey = McTalkingConfig.CONFIG.geminiApiKey.get();
-        StringBuilder conversationBuilder = new StringBuilder();
-        conversationBuilder.append("""
+        StringBuilder conversation = new StringBuilder();
+        conversation.append("""
                 # Audio Profile
                 Tucker L. Gasper: Energetisch, hell und freundlich, jedoch mit einem leicht nervösen Unterton aufgrund von Sicherheitsbedenken.
                 Lennon G. Fletcher: Tief, resonant und ruhig, mit einem nachdenklichen, fast meditativen Rhythmus.
@@ -233,21 +202,44 @@ public class CitizenConversationGenerator {
                 Lennon G. Fletcher: [blickt in die Ferne] So ist es. Ich brauche diesen Pflasterstein, um die Struktur zu festigen. Hoffen wir, dass bald jemand vorbeikommt, Tucker. Die Einsamkeit hier oben auf dem Gerüst ist fast so schwer wie der Hunger.
 
                 """);
-
         List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs = (new Gson()).fromJson("""
                 [{"speaker":"Tucker L. Gasper","voice_config":{"prebuilt_voice_config":{"voice_name":"Sadachbia"}}},{"speaker":"Lennon G. Fletcher","voice_config":{"prebuilt_voice_config":{"voice_name":"Enceladus"}}}]
 
                 """, new TypeToken<List<GeminiTTS.RequestPayload.SpeakerVoiceConfig>>() {
         });
+*/
 
         List<GeminiTTS.AudioChunk> audioChunks;
+        String apiKey = CONFIG.geminiApiKey.get();
         try {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
-            audioChunks = GeminiTTS.generateAudioConversation(TTS_MODEL, apiKey, getTTSPrompt(conversationBuilder.toString(), speakerVoiceConfigs));
-        } catch (IOException | InterruptedException | UnexpectedResponseException e) {
+            audioChunks = GeminiTTS.generateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation, speakerVoiceConfigs));
+        } catch (IOException | UnexpectedResponseException e) {
             throw new ConversationGenerationException("Failed to generate conversation audio using Gemini TTS", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
         }
 
         return audioChunks;
+    }
+
+    @NotNull
+    private static String generateRawConversation(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo) throws ConversationGenerationException {
+        String apiKey = CONFIG.geminiApiKey.get();
+        String rawConversationOutput;
+        try {
+            McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
+            rawConversationOutput = GeminiFlash.sendFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, getFlashPrompt(citizenInfo.toString()));
+        } catch (IOException | UnexpectedResponseException e) {
+            throw new ConversationGenerationException("Failed to generate conversation using Gemini Flash", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConversationGenerationException("Conversation generation was interrupted", e);
+        }
+
+        CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities);
+
+        return rawConversationOutput;
     }
 }

@@ -25,7 +25,9 @@ public class McTalkingConfig {
     *//*?}*/
     /*? if neoforge {*/
     public static final ModConfigSpec CONFIG_SPEC;
-     /*?}*/
+    public static final String FLASH_MODEL = "gemini-3-flash-preview";
+    public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
+    /*?}*/
 
     // API Configuration
     public final Supplier<String> geminiApiKey;
