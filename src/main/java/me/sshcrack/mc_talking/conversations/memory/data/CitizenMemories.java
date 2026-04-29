@@ -59,7 +59,7 @@ public class CitizenMemories {
         relationships.add(new CitizenRelationshipMemory(targetUUID, type, change));
     }
 
-    public CompoundTag serializeNbt(HolderLookup.Provider provider) {
+    public CompoundTag serializeNbt() {
         CompoundTag tag = new CompoundTag();
         ListTag factsTag = new ListTag();
         for (String fact : facts) {
@@ -135,7 +135,7 @@ public class CitizenMemories {
 
         if (!relevantRelationships.isEmpty()) {
             prompt.append(" Relationships:\n");
-            prompt.append(" These are the relationship changes that are relevant to the current conversation based on the parties involved:\n");
+            prompt.append(" These are the relationship changes that are relevant to the current conversation based on the parties involved. The factor is neutral at 0:\n");
             for (CitizenRelationshipMemory relationship : relevantRelationships) {
                 String name = interestedParties.get(relationship.getTargetUUID());
 

@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  */
 public class McTalkingConfig {
     public static final McTalkingConfig CONFIG;
-    public static final String FLASH_MODEL = "gemini-3-flash-preview";
+    public static final String FLASH_MODEL = "gemini-flash-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
     /*? if forge {*/

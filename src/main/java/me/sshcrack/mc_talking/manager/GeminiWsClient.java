@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
@@ -47,7 +48,8 @@ public class GeminiWsClient extends GeminiLiveClient {
     public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
         super(CONFIG.geminiApiKey.get());
         this.manager = manager;
-        stream = new GeminiStream(manager.channel, manager.entity.getUUID());
+        stream = new GeminiStream(manager.channel);
+        stream.setOnPause(() -> Objects.requireNonNull(player.getServer()).execute(() -> AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING))));
 
         var isFemale = manager.entity.getCitizenData().isFemale();
         var isChild = manager.entity.getCitizenData().isChild();

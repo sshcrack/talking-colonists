@@ -14,9 +14,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
@@ -28,10 +26,10 @@ public class CitizenMemoryGenerator extends Thread {
             Return ONLY valid JSON.
 
             Rules:
-            - Only include information worth remembering long-term
             - Ignore small talk
-            - Prefer facts, relationships, opinions, and events
-            - Write from the perspective of each participant
+            - Prefer facts, relationships, opinions, and events. Don't include something like "I cannot work because I need spruce wood staircases"
+            - Make sure each fact is unique and different. Don't include information that only regards other citizen, like "Citizen XY needs ... to continue building"
+            - Write in first person and in the perspective of each participant
             - Be concise and structured
             - Allowed types of relationship changes:  %s
             - The change in the relationships should be a float between -1.0 and 1.0, where negative values indicate a worsening relationship and positive values indicate an improving relationship.
