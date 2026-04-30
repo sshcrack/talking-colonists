@@ -42,7 +42,6 @@ public class McTalkingConfig {
     public final Supplier<Integer> lookDurationTicks;
     public final Supplier<Integer> lookToleranceMs;
     public final Supplier<Double> activationDistance;
-    public final Supplier<Boolean> useTalkingDevice;
     public final Supplier<Boolean> sendErrorsToPlayers;
 
     // Resource Management
@@ -92,9 +91,6 @@ public class McTalkingConfig {
                 .comment("Distance at which the player can talk to when looking at them the citizen")
                 .define("activation_distance", 3.0);
 
-        useTalkingDevice = requireRestart(builder)
-                .comment("If true, citizens will only respond to the talking device item; if false, looking at them will work")
-                .define("use_talking_device", true);
 
         // Resource Management
         maxConcurrentAgents = requireRestart(builder)
