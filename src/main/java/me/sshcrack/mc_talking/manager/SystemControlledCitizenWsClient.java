@@ -10,11 +10,17 @@ import java.util.HashMap;
 import java.util.function.Consumer;
 
 public class SystemControlledCitizenWsClient extends GeminiWsClient {
-    private final Consumer<SystemControlledCitizenWsClient> onGenerationStop;
+    private final Consumer<SystemControlledCitizenWsClient> onConversationEnded;
 
-    public SystemControlledCitizenWsClient(AbstractEntityCitizen entity, Consumer<SystemControlledCitizenWsClient> onGenerationStop) {
+    public SystemControlledCitizenWsClient(AbstractEntityCitizen entity, Consumer<SystemControlledCitizenWsClient> onConversationEnded) {
         super(new CitzienEntityAudioProvider(entity, null), entity);
-        this.onGenerationStop = onGenerationStop;
+        this.onConversationEnded = onConversationEnded;
+    }
+
+    @Override
+    protected void onConversationEnded() {
+        onConversationEnded.accept(this);
+        super.onConversationEnded();
     }
 
     @Override
