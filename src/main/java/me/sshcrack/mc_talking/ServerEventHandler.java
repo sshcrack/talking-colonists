@@ -30,7 +30,6 @@ import net.minecraftforge.fml.common.Mod;
 /*? if neoforge {*/
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
@@ -46,12 +45,6 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 /**
  * Handler for server-side events related to player-citizen interactions.
  */
-/*? if forge {*/
-/*@Mod.EventBusSubscriber(modid = McTalking.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
- *//*?}*/
-/*? if neoforge {*/
-@EventBusSubscriber(modid = McTalking.MODID, value = Dist.DEDICATED_SERVER)
-/*?}*/
 public class ServerEventHandler {
     private int tickCounter = 0;
 
