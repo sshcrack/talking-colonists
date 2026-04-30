@@ -10,7 +10,7 @@ import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
-import me.sshcrack.mc_talking.manager.TalkingManager;
+import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
@@ -226,7 +226,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         return opusData.length > minimumVoicePacketSize;
     }
 
-    private void scheduleSilenceTask(UUID entityId, TalkingManager manager) {
+    private void scheduleSilenceTask(UUID entityId, GeminiWsClient manager) {
         // Only send silence if a silence task is not already running for this entity
         if (silenceTimeouts.containsKey(entityId)) {
             return;
@@ -238,7 +238,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
             // Generate low volume ambient noise instead of pure silence
             short[] ambientAudio = generateAmbientNoise(960);
-            manager.promptAudioRaw(ambientAudio);
+            manager.addPromptAudio(ambientAudio);
         }, 0, SILENCE_INTERVAL_MS, TimeUnit.MILLISECONDS);
 
         // Schedule a task to stop sending silence after the duration

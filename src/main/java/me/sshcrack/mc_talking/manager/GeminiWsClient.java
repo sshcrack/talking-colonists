@@ -10,21 +10,19 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.tools.AITools;
-import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.network.AiStatusPayload;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.manager.audio.AudioProvider;
+import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
+import de.maxhenkel.voicechat.api.opus.OpusDecoder;
+import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
@@ -37,30 +35,32 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private boolean isInitiatingConnection = false;
 
     private final GeminiStream stream;
-    private final ServerPlayer initialPlayer;
-    private final TalkingManager manager;
+    private final AudioProvider audioProvider;
+    private final AbstractEntityCitizen entity;
+    private final AudioChannel channel;
+    private final OpusDecoder decoder;
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
 
 
-    public TalkingManager getTalkingManager() {
-        return manager;
+    public AbstractEntityCitizen getEntity() {
+        return entity;
     }
 
-    //TODO: Don't send packets to all players
-    public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
+    // AudioProvider creates channels/decoders so this client can be tested/mockable
+    public GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
         super(CONFIG.geminiApiKey.get());
-        this.manager = manager;
-        stream = new GeminiStream(manager.channel);
+        this.audioProvider = audioProvider;
+        this.entity = entity;
+        this.channel = audioProvider.createChannel();
+        this.decoder = audioProvider.createDecoder();
+        stream = new GeminiStream(channel);
         stream.setOnPause(this::onStreamPause);
 
-        var isFemale = manager.entity.getCitizenData().isFemale();
-        var isChild = manager.entity.getCitizenData().isChild();
+        var isFemale = entity.getCitizenData().isFemale();
+        var isChild = entity.getCitizenData().isChild();
         if (isChild && !isFemale)
             stream.setPitch(1.2f); // Increase pitch
-
-        this.initialPlayer = player;
-        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
     }
 
     @Override
@@ -77,15 +77,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (modality != ModalityModes.TEXT) {
             setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
             setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
-            var entity = this.manager.entity;
-            var female = entity.getCitizenData().isFemale();
-            var uuid = entity.getUUID();
+                var entity = this.entity;
+                var female = entity.getCitizenData().isFemale();
+                var uuid = entity.getUUID();
 
-            setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
-            var sessionToken = ConversationManager.getSessionToken(uuid);
-            if (!sessionToken.isBlank()) {
-                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
-            }
+                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
+                var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
+                var sessionToken = mem.getSessionToken();
+                if (!sessionToken.isBlank()) {
+                    setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+                }
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = CONFIG.currentAiModel.get().getRandomVoice(uuid, female);
@@ -103,10 +104,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         //TODO change player when other player is talking to AI
         //TODO actually make a summary of the conversation after it has ended
 
-        Map<UUID, String> interestedParties = new HashMap<>();
-        interestedParties.put(initialPlayer.getUUID(), initialPlayer.getName().getString());
-
-        var p = new BidiGenerateContentSetup.SystemInstruction.Part(getPrompt());
+        var p = new BidiGenerateContentSetup.SystemInstruction.Part(getSystemPrompt());
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
@@ -117,6 +115,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected abstract String getSystemPrompt();
     protected abstract void onStreamPause();
+
+    // Event hooks implemented by concrete clients
+    protected abstract void onConversationEnded();
+    protected abstract void onGenerationStarted();
+    protected abstract void onGenerationPaused();
+    protected abstract void onQuotaExceededEvent(String message);
+    protected abstract void onErrorEvent(Exception ex);
 
     private String currMsg = "";
 
@@ -130,7 +135,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!resumable)
             return;
 
-        ConversationManager.setSessionToken(this.manager.entity.getUUID(), newHandle);
+        var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
+        mem.setSessionToken(newHandle);
     }
 
     @Override
@@ -139,14 +145,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
 
         stream.flushAudio();
-        var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
+        var player = ConversationManager.getPlayerForEntity(entity.getUUID());
         if (player == null)
             return;
-        var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
+        var sPlayer = Objects.requireNonNull(entity.level().getServer()).getPlayerList().getPlayer(player);
         if (sPlayer == null || currMsg.isBlank())
             return;
         if (CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO) {
-            sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+            sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
         }
 
         currMsg = "";
@@ -157,13 +163,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("Gemini generation interrupted");
         stream.stop();
 
-        var player = ConversationManager.getPlayerForEntity(manager.entity.getUUID());
+        var player = ConversationManager.getPlayerForEntity(entity.getUUID());
         if (player == null)
             return;
-        var sPlayer = initialPlayer.server.getPlayerList().getPlayer(player);
+        var sPlayer = Objects.requireNonNull(entity.level().getServer()).getPlayerList().getPlayer(player);
         if (sPlayer == null || currMsg.isBlank())
             return;
-        sPlayer.sendSystemMessage(manager.entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+        sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
         currMsg = "";
     }
 
@@ -197,8 +203,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
         if (!isJustStarted)
             return;
-
-        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.TALKING));
+        onGenerationStarted();
     }
 
     @Override
@@ -224,7 +229,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
                 for (short[] data : audioToProcess) {
                     var input = new RealtimeInput();
-                    var byteAudio = vcApi.getAudioConverter().shortsToBytes(data);
+                    var byteAudio = audioProvider.shortsToBytes(data);
                     input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
                     send(ClientMessages.input(input));
                 }
@@ -232,9 +237,22 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
     }
 
+    public void promptSystemText(String newStatusPrompt) {
+        if (!isSetupComplete() || this.isClosed()) {
+            synchronized (pendingSystemText) {
+                pendingSystemText.add(newStatusPrompt);
+            }
+            return;
+        }
+
+        var input = new RealtimeInput();
+        input.text = newStatusPrompt;
+        send(ClientMessages.input(input));
+    }
+
     @Override
     public JsonObject onFunctionCall(String name, @Nullable JsonObject args) {
-        var colony = this.manager.entity.getCitizenColonyHandler().getColony();
+        var colony = this.entity.getCitizenColonyHandler().getColony();
 
         var action = AITools.registeredFunctions.get(name);
         if (action == null) {
@@ -242,19 +260,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return null;
         }
 
-        return action.execute(this.manager.entity, colony, args);
+        return action.execute(this.entity, colony, args);
     }
 
     @Override
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
-        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.QUOTA_EXCEEDED));
         quotaExceeded = true;
-        try {
-            initialPlayer.sendSystemMessage(Component.literal("Quota exceeded for Gemini API, please check your API key and usage limits."));
-        } catch (Exception e) {
-            Thread.currentThread().interrupt();
-        }
+        onQuotaExceededEvent("Quota exceeded for Gemini API, please check your API key and usage limits.");
     }
 
     @Override
@@ -262,7 +275,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         super.onClose(code, reason, remote);
 
         if (reason.contains("BidiGenerateContent session not found")) {
-            ConversationManager.setSessionToken(manager.entity.getUUID(), "");
+            var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
+            mem.setSessionToken("");
             new Thread(() -> {
                 if (!isOpen() || !isInitiatingConnection) {
                     reconnect();
@@ -273,9 +287,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         if (code != 1000 && code != 1001) {
-            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-            if (initialPlayer.hasPermissions(4) && !quotaExceeded && CONFIG.sendErrorsToPlayers.get())
-                initialPlayer.sendSystemMessage(Component.literal("An error occurred in GeminiWsClient with reason " + reason + " and code " + code));
+            onErrorEvent(new RuntimeException("Close with code " + code + ": " + reason));
         }
 
         if (code == 1000) {
@@ -287,10 +299,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onError(Exception ex) {
-        AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.ERROR));
-        if (initialPlayer.hasPermissions(4) && CONFIG.sendErrorsToPlayers.get())
-            initialPlayer.sendSystemMessage(Component.literal("An error occurred in GeminiWsClient: " + ex.getMessage()));
-
+        onErrorEvent(ex);
         McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
     }
 
@@ -300,11 +309,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();
-        var byteAudio = vcApi.getAudioConverter().shortsToBytes(audio);
+        var byteAudio = audioProvider.shortsToBytes(audio);
         input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
 
         if (sentGeneratingStatus)
-            AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING));
+            onGenerationPaused();
 
 
         if (!isSetupComplete() || this.isClosed()) {
@@ -331,6 +340,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         send(ClientMessages.input(input));
+    }
+
+    public void promptAudioOpus(byte[] audio) {
+        if (decoder == null) return;
+        var raw = decoder.decode(audio);
+        addPromptAudio(raw);
     }
 
 

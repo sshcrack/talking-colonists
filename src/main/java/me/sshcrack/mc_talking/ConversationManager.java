@@ -1,9 +1,10 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
-import me.sshcrack.mc_talking.manager.TalkingManager;
+import me.sshcrack.mc_talking.manager.GeminiWsClient;
+import me.sshcrack.mc_talking.manager.PlayerToCitizenClient;
+import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import net.minecraft.ChatFormatting;
@@ -17,9 +18,8 @@ import net.minecraft.world.item.component.CustomModelData;
 /*? }*/
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
-*//*? }*/
+ *//*? }*/
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -41,7 +41,7 @@ public class ConversationManager {
     private static final Map<UUID, AiStatus> aiStatus = new ConcurrentHashMap<>();
 
     // Track active AI clients for each entity
-    private static final Map<UUID, TalkingManager> clients = new HashMap<>();
+    private static final Map<UUID, GeminiWsClient> clients = new HashMap<>();
 
     // Track which entity each player is actively conversing with
     private static final Map<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
@@ -132,8 +132,8 @@ public class ConversationManager {
         // Set citizen as active entity
         activeEntity.put(playerId, citizen);
 
-        // Create talking manager and add to clients
-        clients.put(citizenId, new TalkingManager(citizen, player));
+        // Create Gemini client and add to clients
+        clients.put(citizenId, new PlayerToCitizenClient(new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG), citizen, player));
         addEntity(citizenId);
 
         // Track this conversation pair
@@ -162,7 +162,7 @@ public class ConversationManager {
                         *//*?}*/
                         /*? if neoforge {*/
                         item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
-                         /*?}*/
+                        /*?}*/
                     }
                 }
 
@@ -236,7 +236,7 @@ public class ConversationManager {
      * @param entityId The UUID of the entity
      * @return The TalkingManager, or null if none exists
      */
-    public static TalkingManager getClientForEntity(UUID entityId) {
+    public static me.sshcrack.mc_talking.manager.GeminiWsClient getClientForEntity(UUID entityId) {
         return clients.get(entityId);
     }
 
@@ -383,7 +383,7 @@ public class ConversationManager {
      * Cleans up all resources when server is stopping
      */
     public static void cleanup() {
-        for (TalkingManager client : clients.values()) {
+        for (GeminiWsClient client : clients.values()) {
             client.close();
         }
         clients.clear();
