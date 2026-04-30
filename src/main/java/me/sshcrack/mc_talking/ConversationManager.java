@@ -3,14 +3,13 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
-import me.sshcrack.mc_talking.manager.PlayerToCitizenClient;
+import me.sshcrack.mc_talking.manager.PlayerToCitizenWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.network.AiStatusPayload;
+import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
@@ -21,12 +20,9 @@ import net.minecraft.world.item.component.CustomModelData;
  *//*? }*/
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,6 +33,10 @@ import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
  * active conversations, entity focus, and handling conversation lifecycle.
  */
 public class ConversationManager {
+    private ConversationManager() {
+        /* This utility class should not be instantiated */
+    }
+
     // Track AI status for each entity
     private static final Map<UUID, AiStatus> aiStatus = new ConcurrentHashMap<>();
 
@@ -51,19 +51,6 @@ public class ConversationManager {
 
     // Queue of entities recently added for conversation, for managing concurrent limits
     private static final Queue<UUID> addedEntities = new LinkedList<>();
-
-    // Track which entity each player is looking at
-    private static final Map<UUID, UUID> playerLookingAt = new HashMap<>();
-
-    // Track how long each player has been looking at an entity (in ticks)
-    private static final Map<UUID, Integer> lookDuration = new HashMap<>();
-
-    // Track the previous entity that was looked at for tolerance handling
-    private static final Map<UUID, UUID> previousEntityLookedAt = new HashMap<>();
-
-    // Track when the last entity switch occurred
-    private static final Map<UUID, Long> lastEntitySwitchTime = new HashMap<>();
-    private static final Map<UUID, String> sessionTokens = new HashMap<>();
 
     /**
      * Updates the AI status for a specific entity
@@ -133,7 +120,7 @@ public class ConversationManager {
         activeEntity.put(playerId, citizen);
 
         // Create Gemini client and add to clients
-        clients.put(citizenId, new PlayerToCitizenClient(new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG), citizen, player));
+        clients.put(citizenId, new PlayerToCitizenWsClient(new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG), citizen, player));
         addEntity(citizenId);
 
         // Track this conversation pair
@@ -150,7 +137,7 @@ public class ConversationManager {
         UUID citizenId = playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
 
-        LivingEntity entity = activeEntity.remove(playerId);
+        AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
             ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
             if (player != null) {
@@ -166,8 +153,8 @@ public class ConversationManager {
                     }
                 }
 
-                AiStatusPayload.sendToPlayersTrackingEntity(entity, new AiStatusPayload(citizenId, AiStatus.NONE));
-                AiStatusPayload.sendToPlayer(player, new AiStatusPayload(citizenId, AiStatus.NONE));
+
+                AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
                 if (sendMessage) {
                     player.sendSystemMessage(Component.translatable("mc_talking.too_far")
                             .withStyle(ChatFormatting.YELLOW));
@@ -184,50 +171,6 @@ public class ConversationManager {
      */
     public static boolean isPlayerInConversation(UUID playerId) {
         return playerConversationPartners.containsKey(playerId);
-    }
-
-    /**
-     * Gets the entity a player is currently looking at
-     *
-     * @param playerId The player's UUID
-     * @return The UUID of the entity, or null if not looking at any
-     */
-    public static UUID getPlayerLookTarget(UUID playerId) {
-        return playerLookingAt.get(playerId);
-    }
-
-    /**
-     * Sets the entity a player is currently looking at
-     *
-     * @param playerId The player's UUID
-     * @param entityId The UUID of the entity, or null if not looking at any
-     */
-    public static void setPlayerLookTarget(UUID playerId, UUID entityId) {
-        UUID previousTarget = playerLookingAt.get(playerId);
-        if (entityId == null) {
-            resetPlayerLookTracking(playerId);
-        } else if (previousTarget == null || !previousTarget.equals(entityId)) {
-            handleNewTargetEntity(playerId, entityId, previousTarget);
-        }
-    }
-
-    /**
-     * Gets the current look duration for a player
-     *
-     * @param playerId The player's UUID
-     * @return The current look duration in ticks
-     */
-    public static int getPlayerLookDuration(UUID playerId) {
-        return lookDuration.getOrDefault(playerId, 0);
-    }
-
-    /**
-     * Increments the look duration for a player
-     *
-     * @param playerId The player's UUID
-     */
-    public static void incrementLookDuration(UUID playerId) {
-        lookDuration.put(playerId, getPlayerLookDuration(playerId) + 1);
     }
 
     /**
@@ -279,106 +222,6 @@ public class ConversationManager {
         return playerConversationPartners.get(playerId);
     }
 
-    public static String getSessionToken(UUID entityId) {
-        return sessionTokens.getOrDefault(entityId, "");
-    }
-
-    public static void setSessionToken(UUID entityId, String token) {
-        sessionTokens.put(entityId, token);
-    }
-
-    /**
-     * Check distances between players and their conversation partners
-     * End conversations that exceed the maximum allowed distance
-     *
-     * @param players List of server players to check
-     */
-    public static void checkPlayerDistances(List<ServerPlayer> players) {
-        // Make a copy to avoid concurrent modification
-        Set<UUID> playerIds = new HashSet<>(playerConversationPartners.keySet());
-
-        for (UUID playerId : playerIds) {
-            ServerPlayer player = null;
-
-            // Find the player in the server's player list
-            for (ServerPlayer serverPlayer : players) {
-                if (serverPlayer.getUUID().equals(playerId)) {
-                    player = serverPlayer;
-                    break;
-                }
-            }
-
-            if (player == null) {
-                // Player not online anymore
-                endConversation(playerId, false);
-                continue;
-            }
-
-            UUID citizenId = playerConversationPartners.get(playerId);
-            if (citizenId == null) continue;            // Find the citizen entity
-            AbstractEntityCitizen citizen = activeEntity.get(playerId);
-            if (citizen == null || !citizen.isAlive()) {
-                endConversation(playerId, false);
-                continue;
-            }
-            // Check distance
-            double distanceSquared = player.distanceToSqr(citizen);
-            if (distanceSquared > (CONFIG.maxConversationDistance.get() * CONFIG.maxConversationDistance.get())) {
-                // Too far away, end conversation
-                endConversation(playerId, true);
-            }
-        }
-    }
-
-    /**
-     * Handles the transition to a new target entity
-     *
-     * @param playerId         The player's UUID
-     * @param currentTargetId  The UUID of the current target
-     * @param previousTargetId The UUID of the previous target
-     */
-    private static void handleNewTargetEntity(UUID playerId, UUID currentTargetId, UUID previousTargetId) {
-        long currentTime = System.currentTimeMillis();
-
-        // Check if it's a return to the previous entity within tolerance time
-        UUID previousEntityId = previousEntityLookedAt.get(playerId);
-        if (previousEntityId != null && previousEntityId.equals(currentTargetId)) {            // If we're returning to the previous entity within tolerance period
-            long lastSwitchTime = lastEntitySwitchTime.getOrDefault(playerId, 0L);
-            if (currentTime - lastSwitchTime < CONFIG.lookToleranceMs.get()) {
-                // We came back to the previous entity quickly, restore previous duration
-                // but with a small penalty
-                int previousDuration = lookDuration.getOrDefault(playerId, 0);
-                lookDuration.put(playerId, Math.max(0, previousDuration - 5));
-                playerLookingAt.put(playerId, currentTargetId);
-                return;
-            }
-        }
-
-        // This is a new entity or we exceeded tolerance time
-        playerLookingAt.put(playerId, currentTargetId);
-        previousEntityLookedAt.put(playerId, previousTargetId);
-        lastEntitySwitchTime.put(playerId, currentTime);
-        lookDuration.put(playerId, 0);
-        activeEntity.remove(playerId);
-    }
-
-    /**
-     * Reset tracking data when a player stops looking at entities
-     *
-     * @param playerId Player UUID
-     */
-    private static void resetPlayerLookTracking(UUID playerId) {
-        UUID previousTargetId = playerLookingAt.get(playerId);
-        if (previousTargetId != null) {
-            previousEntityLookedAt.put(playerId, previousTargetId);
-            lastEntitySwitchTime.put(playerId, System.currentTimeMillis());
-        }
-
-        playerLookingAt.remove(playerId);
-        lookDuration.remove(playerId);
-        activeEntity.remove(playerId);
-    }
-
     /**
      * Cleans up all resources when server is stopping
      */
@@ -391,10 +234,5 @@ public class ConversationManager {
         activeEntity.clear();
         playerConversationPartners.clear();
         addedEntities.clear();
-        playerLookingAt.clear();
-        lookDuration.clear();
-        previousEntityLookedAt.clear();
-        lastEntitySwitchTime.clear();
-        sessionTokens.clear();
     }
 }

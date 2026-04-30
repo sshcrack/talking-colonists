@@ -4,6 +4,7 @@ import com.minecolonies.api.creativetab.ModCreativeTabs;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.item.ConversationCreatorDevice;
+import me.sshcrack.mc_talking.item.MumblingTriggerDevice;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import java.util.function.Supplier;
@@ -30,6 +31,7 @@ public class ModItems {
 
     public static final Supplier<Item> TALKING_DEVICE = ITEMS.register("talking_device", CitizenTalkingDevice::new);
     public static final Supplier<Item> CONVERSATION_CREATOR = ITEMS.register("conversation_creator", ConversationCreatorDevice::new);
+    public static final Supplier<Item> MUMBLING_TRIGGER_DEVICE = ITEMS.register("mumbling_trigger_device", MumblingTriggerDevice::new);
 
     public static void register(IEventBus modEventBus) {
         ITEMS.register(modEventBus);
