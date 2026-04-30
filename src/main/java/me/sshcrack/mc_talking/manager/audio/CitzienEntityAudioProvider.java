@@ -4,10 +4,9 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
-
-import org.jetbrains.annotations.Nullable;
 
 public class CitzienEntityAudioProvider implements AudioProvider {
     private final AbstractEntityCitizen entity;
@@ -30,7 +29,7 @@ public class CitzienEntityAudioProvider implements AudioProvider {
             throw new IllegalStateException("Failed to create audio channel for entity: " + entity.getStringUUID());
         }
 
-        if(channelId != null) {
+        if (channelId != null) {
             channel.setCategory(channelId);
         }
 

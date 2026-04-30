@@ -191,7 +191,7 @@ public class GeminiStream implements Supplier<short[]> {
     public void close() {
         if (player != null)
             player.stopPlaying();
-        if(encoder != null) {
+        if (encoder != null) {
             encoder.close();
         }
     }
@@ -208,7 +208,7 @@ public class GeminiStream implements Supplier<short[]> {
         // Return null to stop playing when no more frames are available
         if (audioFrames.isEmpty()) {
             isPreBuffering = true;
-            if(onPause != null) {
+            if (onPause != null) {
                 onPause.run();
             }
             return null;

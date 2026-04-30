@@ -8,11 +8,9 @@ import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomModelData;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -23,6 +21,8 @@ import java.util.UUID;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 /*? if neoforge {*/
+import net.minecraft.world.item.component.CustomModelData;
+import net.minecraft.core.component.DataComponents;
 /*? }*/
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
