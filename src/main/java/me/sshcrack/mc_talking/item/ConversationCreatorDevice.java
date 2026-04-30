@@ -60,11 +60,9 @@ public class ConversationCreatorDevice extends Item {
             return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }
 
-        ServerLevel serverLevel = (ServerLevel) level;
-
         List<AbstractEntityCitizen> participants = new ArrayList<>(conversationParticipants);
-        var conversation = new CitizenConversation(serverLevel.getServer(), participants);
-
+        var conversation = new CitizenConversation(player.getServer(), participants);
+        conversation.performConversation();
 
         player.sendSystemMessage(Component.literal("Started conversation with " + participants.size() + " participants").withStyle(ChatFormatting.GREEN));
         conversation.setOnStateChanged(newState -> {

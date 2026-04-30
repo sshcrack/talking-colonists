@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory;
 
+import com.google.gson.JsonSyntaxException;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
@@ -14,9 +15,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
@@ -28,10 +27,10 @@ public class CitizenMemoryGenerator extends Thread {
             Return ONLY valid JSON.
 
             Rules:
-            - Only include information worth remembering long-term
             - Ignore small talk
-            - Prefer facts, relationships, opinions, and events
-            - Write from the perspective of each participant
+            - Prefer facts, relationships, opinions, and events. Don't include something like "I cannot work because I need spruce wood staircases"
+            - Make sure each fact is unique and different. Don't include information that only regards other citizen, like "Citizen XY needs ... to continue building"
+            - Write in first person and in the perspective of each participant
             - Be concise and structured
             - Allowed types of relationship changes:  %s
             - The change in the relationships should be a float between -1.0 and 1.0, where negative values indicate a worsening relationship and positive values indicate an improving relationship.
@@ -60,6 +59,8 @@ public class CitizenMemoryGenerator extends Thread {
     private final String conversation;
     private final List<AbstractEntityCitizen> participants;
     private final MinecraftServer server;
+    private boolean shouldSaveMemory = false;
+    private GsonMemoryResponse savedResponse;
 
     public CitizenMemoryGenerator(String input, List<AbstractEntityCitizen> participants, MinecraftServer server) {
         this.conversation = input;
@@ -83,15 +84,29 @@ public class CitizenMemoryGenerator extends Thread {
             throw new RuntimeException(e);
         }
 
-        var json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
-        if (json == null) {
+        GsonMemoryResponse json;
+        try {
+            json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
+        } catch (JsonSyntaxException e) {
             McTalking.LOGGER.warn("Failed to parse memories response JSON: {}", memoryString);
             return;
         }
 
-        server.executeBlocking(() -> minecraftSaveMemoryRun(json));
+        if (shouldSaveMemory) {
+            server.executeBlocking(() -> minecraftSaveMemoryRun(json));
+        } else {
+            savedResponse = json;
+        }
 
         McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
+    }
+
+    public void scheduleOrSaveMemory() {
+        if (savedResponse != null) {
+            server.execute(() -> minecraftSaveMemoryRun(savedResponse));
+        } else {
+            shouldSaveMemory = true;
+        }
     }
 
     private void minecraftSaveMemoryRun(GsonMemoryResponse json) {
@@ -136,10 +151,12 @@ public class CitizenMemoryGenerator extends Thread {
 
     private static final List<CitizenMemoryGenerator> activeGenerators = new CopyOnWriteArrayList<>();
 
-    public static void addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens, MinecraftServer server) {
+    public static CitizenMemoryGenerator addAndGenerateMemory(String conversation, List<AbstractEntityCitizen> citizens, MinecraftServer server) {
         var generator = new CitizenMemoryGenerator(conversation, citizens, server);
         activeGenerators.add(generator);
         generator.start();
+
+        return generator;
     }
 
     public static void stopAllGenerators() {

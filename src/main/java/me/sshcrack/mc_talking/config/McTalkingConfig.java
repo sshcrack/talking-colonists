@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  */
 public class McTalkingConfig {
     public static final McTalkingConfig CONFIG;
-    public static final String FLASH_MODEL = "gemini-3-flash-preview";
+    public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
     /*? if forge {*/
@@ -49,6 +49,7 @@ public class McTalkingConfig {
     public final Supplier<Double> maxConversationDistance;
     public final Supplier<ModalityModes> modality;
     public final Supplier<List<? extends String>> disabledTools;
+    public final Supplier<Boolean> enableCitizenMemory;
 
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
@@ -91,6 +92,10 @@ public class McTalkingConfig {
                 .comment("Distance at which the player can talk to when looking at them the citizen")
                 .define("activation_distance", 3.0);
 
+
+        enableCitizenMemory = requireRestart(builder)
+                .comment("If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
+                .define("enable_citizen_memory", true);
 
         // Resource Management
         maxConcurrentAgents = requireRestart(builder)

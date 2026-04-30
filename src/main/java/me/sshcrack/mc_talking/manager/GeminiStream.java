@@ -38,11 +38,15 @@ public class GeminiStream implements Supplier<short[]> {
     // Single buffer for incoming audio data
     private final List<byte[]> incomingData = Collections.synchronizedList(new ArrayList<>());
     private int incomingDataSize = 0;
-    private final UUID entityUuid;
 
-    public GeminiStream(AudioChannel channel, UUID entityUuid) {
+    private Runnable onPause;
+
+    public GeminiStream(AudioChannel channel) {
         this.channel = channel;
-        this.entityUuid = entityUuid;
+    }
+
+    public void setOnPause(Runnable onPause) {
+        this.onPause = onPause;
     }
 
     public void flushAudio() {
@@ -203,7 +207,9 @@ public class GeminiStream implements Supplier<short[]> {
         // Return null to stop playing when no more frames are available
         if (audioFrames.isEmpty()) {
             isPreBuffering = true;
-            AiStatusPayload.sendToAll(new AiStatusPayload(entityUuid, AiStatus.LISTENING));
+            if(onPause != null) {
+                onPause.run();
+            }
             return null;
         }
 
