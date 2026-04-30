@@ -39,9 +39,6 @@ public class McTalkingConfig {
 
     // Interaction Configuration
     public final Supplier<Boolean> respondInGroups;
-    public final Supplier<Integer> lookDurationTicks;
-    public final Supplier<Integer> lookToleranceMs;
-    public final Supplier<Double> activationDistance;
     public final Supplier<Boolean> sendErrorsToPlayers;
 
     // Resource Management
@@ -88,17 +85,6 @@ public class McTalkingConfig {
                 .comment("Whether the citizens should respond if the player is in a group or not.")
                 .define("respond_in_group", false);
 
-        lookDurationTicks = requireRestart(builder)
-                .comment("How long the player needs to look at an entity before activating (in ticks, 20 ticks = 1 second)")
-                .define("look_duration_ticks", 20);
-
-        lookToleranceMs = requireRestart(builder)
-                .comment("Tolerance time in milliseconds when something walks between player and target")
-                .define("look_tolerance_ms", 500);
-
-        activationDistance = requireRestart(builder)
-                .comment("Distance at which the player can talk to when looking at them the citizen")
-                .define("activation_distance", 3.0);
 
         // Citizen - Citizen Interaction (Conversations between them)
 
@@ -165,7 +151,7 @@ public class McTalkingConfig {
 
         mumblingDetectionRange = builder
                 .comment("Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
-                .define("mumbling_detection_range", 6.0);
+                .define("mumbling_detection_range", 10.0);
 
         mumblingCheckIntervalTicks = builder
                 .comment("How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")

@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.manager;
 
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
+import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
@@ -37,6 +38,7 @@ public class GeminiStream implements Supplier<short[]> {
     private int incomingDataSize = 0;
 
     private Runnable onPause;
+    private OpusEncoder encoder;
 
     public GeminiStream(AudioChannel channel) {
         this.channel = channel;
@@ -163,7 +165,7 @@ public class GeminiStream implements Supplier<short[]> {
 
             // Only start playing when we have enough buffered frames
             if (!audioFrames.isEmpty() && (!isPreBuffering || audioFrames.size() >= MIN_FRAMES_BEFORE_PLAYBACK || flushed)) {
-                var encoder = vcApi.createEncoder(OpusEncoderMode.AUDIO);
+                encoder = vcApi.createEncoder(OpusEncoderMode.AUDIO);
                 player = vcApi.createAudioPlayer(channel, encoder, this);
 
 
@@ -187,9 +189,11 @@ public class GeminiStream implements Supplier<short[]> {
     }
 
     public void close() {
-
         if (player != null)
             player.stopPlaying();
+        if(encoder != null) {
+            encoder.close();
+        }
     }
 
     @Override

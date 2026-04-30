@@ -2,31 +2,32 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
-import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
+import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-/*? if neoforge {*/
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.component.CustomModelData;
-/*? }*/
-/*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;
- *//*? }*/
 
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
+/*? if neoforge {*/
+/*? }*/
+/*? if forge {*/
+/*import net.minecraft.nbt.CompoundTag;
+ */
+/*? }*/
 
 /**
  * Manages conversations between players and citizens, including tracking
@@ -59,9 +60,9 @@ public class ConversationManager {
         if (addedEntities.size() > CONFIG.maxConcurrentAgents.get()) {
             var removedEntityId = addedEntities.poll();
             if (removedEntityId != null) {
-                var manager = clients.get(removedEntityId);
-                if (manager != null) {
-                    manager.close();
+                var client = clients.get(removedEntityId);
+                if (client != null) {
+                    client.close();
                     clients.remove(removedEntityId);
                 }
             }
@@ -82,10 +83,15 @@ public class ConversationManager {
         if (clients.containsKey(citizenId)) return; // Already managed
 
         var client = new CitizenWsClient(citizen,
-                c -> c.addPromptTextAfterTalkingComplete("You continue mumbling."));
+                c -> {
+                    c.close();
+                    if(clients.computeIfPresent(citizenId, (id, existingClient) -> existingClient == c ? null : existingClient) == null) {
+                        addedEntities.remove(citizenId);
+                    }
+                });
         client.addPromptTextAfterTalkingComplete(
                 "You feel the urge to mutter something under your breath. " +
-                "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.");
+                        "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.");
         clients.put(citizenId, client);
         addEntity(citizenId);
     }

@@ -65,7 +65,7 @@ public class CitizenWsClient extends GeminiWsClient {
      * @param entity                  the citizen entity
      * @param onSystemConversationEnded callback invoked when each mumbling turn ends
      */
-    public CitizenWsClient(AbstractEntityCitizen entity, Consumer<CitizenWsClient> onSystemConversationEnded) {
+    public CitizenWsClient(AbstractEntityCitizen entity, @Nullable Consumer<CitizenWsClient> onSystemConversationEnded) {
         super(new CitzienEntityAudioProvider(entity, null), entity);
         this.player = null;
         this.onSystemConversationEnded = onSystemConversationEnded;
@@ -153,9 +153,9 @@ public class CitizenWsClient extends GeminiWsClient {
     protected void onConversationEnded() {
         if (onSystemConversationEnded != null) {
             onSystemConversationEnded.accept(this);
-        } else {
-            super.onConversationEnded();
         }
+
+        super.onConversationEnded();
     }
 
     /** Resolves the active player directly from the stored field, falling back to the registry. */
