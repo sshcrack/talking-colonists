@@ -1,9 +1,9 @@
 {
-  "format_version": "1.21.11",
+  "format_version": "1.9.0",
   "credit": "Made by sshcrack",
   "parent": "minecraft:item/handheld",
   "textures": {
-    "1": "mc_talking:item/talking_device_active",
+    "layer0": "mc_talking:item/talking_device_active",
     "particle": "mc_talking:item/talking_device_active"
   },
   "overrides": [
