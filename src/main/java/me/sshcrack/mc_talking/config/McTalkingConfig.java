@@ -51,6 +51,14 @@ public class McTalkingConfig {
     public final Supplier<Boolean> enableCitizenMemory;
     public final Supplier<Boolean> enableCitizenToCitizenConversation;
 
+    // Citizen-to-Citizen conversation mode
+    public final Supplier<ConversationMode> conversationMode;
+
+    // Random citizen-to-citizen conversations
+    public final Supplier<Boolean> enableRandomConversations;
+    public final Supplier<Double> randomConversationChance;
+    public final Supplier<Integer> randomConversationCheckIntervalTicks;
+
     // Proximity Mumbling
     public final Supplier<Double> mumblingChance;
     public final Supplier<Double> mumblingDetectionRange;
@@ -95,6 +103,26 @@ public class McTalkingConfig {
         enableCitizenToCitizenConversation = requireRestart(builder)
                 .comment("If true, citizens will be able to start conversations with each other without player involvement. Only recommended for paid tiers, as there are only at max 10 conversations per day available for the free tier")
                 .define("enable_citizen_to_citizen_conversation", false);
+
+        conversationMode = requireRestart(builder)
+                .comment("How citizen-to-citizen conversations are generated.")
+                .comment("LIVE_WEBSOCKETS (default/cheaper): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.")
+                .comment("FLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio.")
+                .defineEnum("conversation_mode", ConversationMode.LIVE_WEBSOCKETS);
+
+        // Random citizen-to-citizen conversations
+        enableRandomConversations = requireRestart(builder)
+                .comment("Random Citizen Conversations")
+                .comment("If true, citizens will randomly start conversations with each other based on the chance below. Requires enable_citizen_to_citizen_conversation to be true.")
+                .define("enable_random_conversations", true);
+
+        randomConversationChance = builder
+                .comment("Chance (0.0-1.0) that a pair of nearby citizens start a random conversation per check interval")
+                .define("random_conversation_chance", 0.05);
+
+        randomConversationCheckIntervalTicks = builder
+                .comment("How often (in server ticks) to check for random citizen conversations. 20 ticks = 1 second")
+                .define("random_conversation_check_interval_ticks", 400, e -> e == null || (int) e > 0);
 
         // Resource Management
         maxConcurrentAgents = requireRestart(builder)

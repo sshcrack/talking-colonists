@@ -32,122 +32,253 @@ import net.minecraft.core.component.DataComponents;
 /**
  * Manages conversations between players and citizens, including tracking
  * active conversations, entity focus, and handling conversation lifecycle.
+ *
+ * <h3>Slot priority</h3>
+ * <ul>
+ *   <li><b>High-priority (player conversations)</b>: always succeed. When all
+ *       {@code maxConcurrentAgents} slots are full they evict the oldest
+ *       <em>non-player</em> session to make room.</li>
+ *   <li><b>Low-priority (mumbles, citizen-to-citizen)</b>: rejected when no
+ *       free or evictable non-player slot is available, so they can never
+ *       displace a player.</li>
+ * </ul>
+ *
+ * <h3>"Already busy" guard</h3>
+ * Every entry point checks {@link #isCitizenBusy} before creating a new
+ * session, so a citizen that is already mumbling, in a player conversation, or
+ * in a citizen-to-citizen conversation will never be started again.
  */
 public class ConversationManager {
-    private ConversationManager() {
-        /* This utility class should not be instantiated */
-    }
+    private ConversationManager() { /* utility class */ }
 
-    // Track active AI clients for each entity
+    // Active AI clients keyed by citizen entity UUID
     private static final Map<UUID, GeminiWsClient> clients = new HashMap<>();
 
-    // Track which entity each player is actively conversing with
+    // playerId → citizen entity the player is talking to
     private static final Map<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
 
-    // Track which player is conversing with which entity
+    // playerId → citizenId (the citizen the player is currently in conversation with)
     private static final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
 
-    // Queue of entities recently added for conversation, for managing concurrent limits
+    /**
+     * Insertion-ordered queue of all occupied citizen slots.
+     * The head (oldest) is the first eviction candidate.
+     */
     private static final Queue<UUID> addedEntities = new LinkedList<>();
 
+    // -------------------------------------------------------------------------
+    // Slot management (priority-aware, synchronized)
+    // -------------------------------------------------------------------------
+
     /**
-     * Adds an entity to the managed entities queue, respecting the maximum concurrent limit
+     * Tries to claim one agent slot for {@code entityId}.
      *
-     * @param entityId The UUID of the entity to add
+     * <ul>
+     *   <li><b>High-priority</b> ({@code isPlayerConversation=true}): always
+     *       succeeds; evicts the oldest non-player session when at capacity.</li>
+     *   <li><b>Low-priority</b> ({@code isPlayerConversation=false}): succeeds
+     *       only when a slot is free or a non-player slot can be evicted without
+     *       displacing any player. Returns {@code false} otherwise.</li>
+     * </ul>
+     *
+     * @return {@code true} if the slot was granted
      */
-    public static void addEntity(UUID entityId) {
-        addedEntities.add(entityId);
-        if (addedEntities.size() > CONFIG.maxConcurrentAgents.get()) {
-            var removedEntityId = addedEntities.poll();
-            if (removedEntityId != null) {
-                var client = clients.get(removedEntityId);
-                if (client != null) {
-                    client.close();
-                    clients.remove(removedEntityId);
-                }
-            }
+    public static synchronized boolean claimSlot(UUID entityId, boolean isPlayerConversation) {
+        if (addedEntities.contains(entityId)) return true; // already registered
+
+        int max = CONFIG.maxConcurrentAgents.get();
+
+        if (addedEntities.size() < max) {
+            addedEntities.add(entityId);
+            return true;
         }
+
+        // At capacity – find a non-player slot to evict
+        UUID victim = findEvictableNonPlayerSlot();
+
+        if (victim == null) {
+            // Every slot belongs to a player conversation
+            if (!isPlayerConversation) {
+                // Low priority – refuse so no player is displaced
+                return false;
+            }
+            // High priority last-resort: evict the oldest slot even if it is a player
+            victim = addedEntities.poll();
+        } else {
+            addedEntities.remove(victim);
+        }
+
+        evict(victim);
+        addedEntities.add(entityId);
+        return true;
     }
 
     /**
-     * Starts a citizen mumbling to itself when a player is nearby.
-     * A looping {@link CitizenWsClient} is created in system-controlled mode.
-     * No player is associated; use {@link #startConversation} to transition seamlessly.
+     * Releases the slot for {@code entityId} without closing its client.
+     * Use when the client is already closed externally.
+     */
+    public static synchronized void releaseSlot(UUID entityId) {
+        addedEntities.remove(entityId);
+    }
+
+    /**
+     * Registers a client that was created externally (e.g. a
+     * {@link me.sshcrack.mc_talking.conversations.LiveConversationWsClient})
+     * in the client map. The slot must already have been claimed via
+     * {@link #claimSlot}.
+     */
+    public static synchronized void registerExternalClient(UUID entityId, GeminiWsClient client) {
+        clients.put(entityId, client);
+    }
+
+    /**
+     * Removes an externally-created client from the map and releases its slot.
+     * Does <em>not</em> close the client.
+     */
+    public static synchronized void unregisterExternalClient(UUID entityId) {
+        clients.remove(entityId);
+        releaseSlot(entityId);
+    }
+
+    /**
+     * Returns {@code true} if at least {@code slotsNeeded} slots can be granted
+     * at low priority (free slots + evictable non-player slots ≥ slotsNeeded).
+     */
+    public static synchronized boolean hasLowPriorityCapacity(int slotsNeeded) {
+        int max = CONFIG.maxConcurrentAgents.get();
+        int free = max - addedEntities.size();
+        if (free >= slotsNeeded) return true;
+
+        int evictable = 0;
+        for (UUID id : addedEntities) {
+            if (getPlayerForEntity(id) == null) evictable++;
+        }
+        return (free + evictable) >= slotsNeeded;
+    }
+
+    /** The oldest non-player entity in the queue that can be evicted, or {@code null}. */
+    private static UUID findEvictableNonPlayerSlot() {
+        for (UUID id : addedEntities) {
+            if (getPlayerForEntity(id) == null) return id;
+        }
+        return null;
+    }
+
+    /** Closes and removes the client for {@code entityId}. */
+    private static void evict(UUID entityId) {
+        if (entityId == null) return;
+        GeminiWsClient client = clients.remove(entityId);
+        if (client != null) client.close();
+        McTalking.LOGGER.info("[ConversationManager] Evicted slot for entity {} to make room", entityId);
+    }
+
+    // -------------------------------------------------------------------------
+    // "Already busy" check
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns {@code true} when the citizen already has any kind of active
+     * session: mumbling, player conversation, or citizen-to-citizen conversation.
+     * Use this before starting any new session to avoid duplicates.
+     */
+    public static boolean isCitizenBusy(UUID citizenId) {
+        return clients.containsKey(citizenId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Public conversation API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Starts a citizen mumbling to itself when a player is nearby (low-priority).
      *
-     * @param citizen the citizen to start mumbling
+     * <p>Silently returns if the citizen is already busy or if no low-priority
+     * slot is available (pool is full of player conversations).</p>
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
         if (CONFIG.geminiApiKey.get().isEmpty()) return;
 
         UUID citizenId = citizen.getUUID();
-        if (clients.containsKey(citizenId)) return; // Already managed
+
+        // Busy guard: citizen already has any kind of active session
+        if (isCitizenBusy(citizenId)) return;
+
+        // Low-priority: refuse if doing so would evict a player session
+        if (!claimSlot(citizenId, false)) {
+            McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for mumbling citizen {}", citizenId);
+            return;
+        }
 
         var client = new CitizenWsClient(citizen,
                 c -> {
                     c.close();
-                    if(clients.computeIfPresent(citizenId, (id, existingClient) -> existingClient == c ? null : existingClient) == null) {
-                        addedEntities.remove(citizenId);
+                    if (clients.computeIfPresent(citizenId,
+                            (id, existing) -> existing == c ? null : existing) == null) {
+                        releaseSlot(citizenId);
                     }
                 });
         client.addPromptTextAfterTalkingComplete(
                 "You feel the urge to mutter something under your breath. " +
                         "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.");
         clients.put(citizenId, client);
-        addEntity(citizenId);
     }
 
     /**
-     * Starts a conversation between a player and a citizen
+     * Starts a conversation between a player and a citizen (high-priority).
      *
-     * @param player  The player
-     * @param citizen The citizen entity
+     * <p>If the citizen is already mumbling the existing session is reused
+     * (no reconnect). If the citizen is in a different active session (citizen-to-
+     * citizen) it is closed first so the player always wins.</p>
      */
     public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
         if (CONFIG.geminiApiKey.get().isEmpty()) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.no_key")
-                            .withStyle(ChatFormatting.RED)
-            );
+                            .withStyle(ChatFormatting.RED));
             return;
         }
 
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
-        // Set citizen as active entity
         activeEntity.put(playerId, citizen);
 
-        // Reuse an existing mumbling session if one is already running for this citizen
         GeminiWsClient existingClient = clients.get(citizenId);
-        if (existingClient instanceof CitizenWsClient citizenWsClient && citizenWsClient.isMumbling()) {
-            citizenWsClient.transitionToPlayer(player);
+
+        if (existingClient instanceof CitizenWsClient cws && cws.isMumbling()) {
+            // Reuse the mumbling session – slot is already held
+            cws.transitionToPlayer(player);
         } else {
-            // Create a new player conversation client
+            // Close any non-player session that is occupying this citizen's slot
+            if (existingClient != null) {
+                existingClient.close();
+                clients.remove(citizenId);
+                // slot stays in addedEntities; claimSlot will see it already present
+            }
+
+            // High-priority claim (may evict an older non-player slot if at capacity)
+            claimSlot(citizenId, true);
             clients.put(citizenId, new CitizenWsClient(
                     new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
                     citizen, player));
-            addEntity(citizenId);
         }
 
-        // Track this conversation pair
         playerConversationPartners.put(playerId, citizenId);
     }
 
     /**
-     * Ends a conversation for a specific player
+     * Ends a conversation for a specific player.
      *
      * @param playerId    The player's UUID
-     * @param sendMessage Whether to send a message to the player
+     * @param sendMessage Whether to send a "too far" message to the player
      */
     public static void endConversation(UUID playerId, boolean sendMessage) {
         UUID citizenId = playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
 
-        // Close and remove the AI client so the mumbling/conversation session ends cleanly
         GeminiWsClient client = clients.remove(citizenId);
-        if (client != null) {
-            client.close();
-        }
+        if (client != null) client.close();
+        releaseSlot(citizenId);
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
@@ -165,7 +296,6 @@ public class ConversationManager {
                     }
                 }
 
-
                 AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
                 if (sendMessage) {
                     player.sendSystemMessage(Component.translatable("mc_talking.too_far")
@@ -175,83 +305,45 @@ public class ConversationManager {
         }
     }
 
-    /**
-     * Checks if a player is already in a conversation
-     *
-     * @param playerId The player's UUID
-     * @return true if the player is in a conversation, false otherwise
-     */
+    // -------------------------------------------------------------------------
+    // Query helpers
+    // -------------------------------------------------------------------------
+
     public static boolean isPlayerInConversation(UUID playerId) {
         return playerConversationPartners.containsKey(playerId);
     }
 
-    /**
-     * Gets the active TalkingManager for an entity
-     *
-     * @param entityId The UUID of the entity
-     * @return The TalkingManager, or null if none exists
-     */
     public static GeminiWsClient getClientForEntity(UUID entityId) {
         return clients.get(entityId);
     }
 
-    /**
-     * Gets the active entity for a player
-     *
-     * @param playerId The player's UUID
-     * @return The active entity, or null if none
-     */
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {
         return activeEntity.get(playerId);
     }
 
+    /** Returns the player UUID that is actively conversing with the given citizen, or {@code null}. */
     public static UUID getPlayerForEntity(UUID entityId) {
         for (Map.Entry<UUID, AbstractEntityCitizen> entry : activeEntity.entrySet()) {
-            if (entry.getValue().getUUID().equals(entityId)) {
-                return entry.getKey();
-            }
+            if (entry.getValue().getUUID().equals(entityId)) return entry.getKey();
         }
         return null;
     }
 
-    /**
-     * Gets the active entity for a player (alias for getActiveEntityForPlayer)
-     *
-     * @param playerId The player's UUID
-     * @return The active entity, or null if none
-     */
     public static AbstractEntityCitizen getActiveEntity(UUID playerId) {
         return activeEntity.get(playerId);
     }
 
-    /**
-     * Gets the citizen a player is conversing with
-     *
-     * @param playerId The player's UUID
-     * @return The UUID of the citizen, or null if not in conversation
-     */
     public static UUID getPlayerConversationPartner(UUID playerId) {
         return playerConversationPartners.get(playerId);
     }
 
-    /**
-     * Returns {@code true} if the citizen is currently in a system-controlled mumbling session
-     * (i.e. a {@link CitizenWsClient} exists for this entity but no player is attached yet).
-     *
-     * @param citizenId the citizen's UUID
-     */
     public static boolean isCitizenMumbling(UUID citizenId) {
         GeminiWsClient client = clients.get(citizenId);
         return client instanceof CitizenWsClient c && c.isMumbling();
     }
 
-    /**
-     * Cleans up all resources when server is stopping
-     */
     public static void cleanup() {
-        for (GeminiWsClient client : clients.values()) {
-            client.close();
-        }
+        for (GeminiWsClient client : clients.values()) client.close();
         clients.clear();
         activeEntity.clear();
         playerConversationPartners.clear();

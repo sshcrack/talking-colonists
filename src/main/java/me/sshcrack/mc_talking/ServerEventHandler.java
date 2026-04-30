@@ -3,7 +3,10 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.commands.ListToolsCommand;
+import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.util.AiStatusHelper;
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
  *//*?}*/
@@ -16,6 +19,11 @@ import net.minecraft.world.item.ItemStack;
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
         /*?}*/
+import net.minecraft.world.phys.AABB;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 /*? if forge {*/
 /*import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -38,8 +46,6 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /*?}*/
-
-import java.util.UUID;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
@@ -114,8 +120,11 @@ public class ServerEventHandler {
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);
         boolean doMumblingCheck = (tickCounter % CONFIG.mumblingCheckIntervalTicks.get() == 0);
+        boolean doRandomConvCheck = CONFIG.enableCitizenToCitizenConversation.get()
+                && CONFIG.enableRandomConversations.get()
+                && (tickCounter % CONFIG.randomConversationCheckIntervalTicks.get() == 0);
 
-        if (!doDistanceCheck && !doMumblingCheck) {
+        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck) {
             return;
         }
 
@@ -123,7 +132,11 @@ public class ServerEventHandler {
             return;
         }
 
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+        // Collect players currently in a conversation so we can guard against
+        // mumbles / random conversations interrupting them.
+        var activePlayers = server.getPlayerList().getPlayers();
+
+        for (ServerPlayer player : activePlayers) {
             UUID playerId = player.getUUID();
 
             if (doDistanceCheck) {
@@ -133,9 +146,15 @@ public class ServerEventHandler {
                 }
             }
 
+            // Mumbling: only if this player is NOT in a conversation
             if (doMumblingCheck && !ConversationManager.isPlayerInConversation(playerId)) {
                 checkForMumblingCitizens(player);
             }
+        }
+
+        // Random citizen-to-citizen conversations (once per interval, not per player)
+        if (doRandomConvCheck) {
+            checkForRandomConversations(server);
         }
     }
 
@@ -176,15 +195,75 @@ public class ServerEventHandler {
         var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
         for (AbstractEntityCitizen citizen : citizens) {
-            if (citizen instanceof VisitorCitizen) {
-                continue;
-            }
-            if (ConversationManager.getClientForEntity(citizen.getUUID()) != null) {
-                continue;
-            }
+            if (citizen instanceof VisitorCitizen) continue;
+            // Skip if this citizen already has any kind of active session
+            if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
             if (Math.random() < CONFIG.mumblingChance.get()) {
                 ConversationManager.startMumbling(citizen);
                 break; // Only trigger one mumbling citizen per player per check
+            }
+        }
+    }
+
+    /**
+     * Scans for pairs of nearby citizens that are not currently managed and
+     * randomly starts a citizen-to-citizen conversation between them.
+     *
+     * <p>Citizens that are currently talking to a player are excluded to avoid
+     * interrupting ongoing player conversations.</p>
+     */
+    private void checkForRandomConversations(MinecraftServer server) {
+        if (CONFIG.geminiApiKey.get().isEmpty()) return;
+
+        double range = CONFIG.mumblingDetectionRange.get() * 2;
+
+        for (var level : server.getAllLevels()) {
+            var allCitizens = level.getEntitiesOfClass(AbstractEntityCitizen.class,
+                    new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000,
+                             30_000_000, level.getMaxBuildHeight(),  30_000_000));
+
+            for (AbstractEntityCitizen citizen : allCitizens) {
+                if (citizen instanceof VisitorCitizen) continue;
+                // Skip if this citizen already has any kind of active session
+                if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
+
+                if (Math.random() >= CONFIG.randomConversationChance.get()) continue;
+
+                // Find a nearby partner
+                var nearbyBox = citizen.getBoundingBox().inflate(range);
+                var candidates = level.getEntitiesOfClass(AbstractEntityCitizen.class, nearbyBox);
+
+                List<AbstractEntityCitizen> partners = new ArrayList<>();
+                for (AbstractEntityCitizen candidate : candidates) {
+                    if (candidate == citizen) continue;
+                    if (candidate instanceof VisitorCitizen) continue;
+                    // Skip if this candidate already has any kind of active session
+                    if (ConversationManager.isCitizenBusy(candidate.getUUID())) continue;
+                    partners.add(candidate);
+                }
+
+                if (partners.isEmpty()) continue;
+
+                // Pick a random partner
+                AbstractEntityCitizen partner = partners.get((int) (Math.random() * partners.size()));
+
+                McTalking.LOGGER.info("[RandomConv] Starting conversation between {} and {}",
+                        citizen.getCitizenData().getName(), partner.getCitizenData().getName());
+
+                var conversation = new CitizenConversation(server, List.of(citizen, partner));
+                conversation.setOnStateChanged(newState -> {
+                    AiStatus status = switch (newState) {
+                        case GENERATING -> AiStatus.THINKING;
+                        case PLAYING_AUDIO -> AiStatus.IN_CONVERSATION;
+                        case ENDED -> AiStatus.NONE;
+                    };
+                    AiStatusHelper.setAiStatusSynced(citizen, status);
+                    AiStatusHelper.setAiStatusSynced(partner, status);
+                });
+                conversation.performConversation();
+
+                // Only start one random conversation per check to keep API usage bounded
+                return;
             }
         }
     }
