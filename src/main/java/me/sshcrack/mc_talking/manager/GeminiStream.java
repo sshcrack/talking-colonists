@@ -35,7 +35,6 @@ public class GeminiStream implements Supplier<short[]> {
 
     // Single buffer for incoming audio data
     private final List<byte[]> incomingData = Collections.synchronizedList(new ArrayList<>());
-    private int incomingDataSize = 0;
 
     private Runnable onPause;
     private OpusEncoder encoder;
@@ -50,7 +49,7 @@ public class GeminiStream implements Supplier<short[]> {
 
     public void flushAudio() {
         // Process any remaining buffered data
-        if (incomingDataSize > 0) {
+        if (!incomingData.isEmpty()) {
             processBufferedData(lastSampleRate, true);
         }
     }
@@ -68,14 +67,13 @@ public class GeminiStream implements Supplier<short[]> {
         if (data.length > 0) {
             synchronized (incomingData) {
                 incomingData.add(data);
-                incomingDataSize += data.length;
             }
         }
 
-        // Only process if we have enough data for effective pitch shifting
-        // or if we're flushing (data.length == 0)
-        // We'll collect more data before processing to ensure smoother playback
-        if (incomingDataSize >= MIN_BUFFER_SIZE_FOR_PITCH * 2) {
+        // Only process if we have enough data for effective pitch shifting.
+        // We collect more data before processing to ensure smoother playback.
+        int bufferedBytes = incomingData.stream().mapToInt(b -> b.length).sum();
+        if (bufferedBytes >= MIN_BUFFER_SIZE_FOR_PITCH * 2) {
             return processBufferedData(sampleRate, false);
         }
 
@@ -88,34 +86,26 @@ public class GeminiStream implements Supplier<short[]> {
      * @param sampleRate Sample rate of the audio data
      */
     private boolean processBufferedData(int sampleRate, boolean flushed) {
-        // Use a local variable to hold the data we're going to process
         byte[] combined;
 
         synchronized (incomingData) {
-            if (incomingDataSize == 0) {
+            if (incomingData.isEmpty()) {
                 return false;
             }
 
-            // Combine all buffered data
-            combined = new byte[incomingDataSize];
+            // Combine all buffered chunks into a single array
+            int totalBytes = incomingData.stream().mapToInt(b -> b.length).sum();
+            combined = new byte[totalBytes];
             int offset = 0;
             for (byte[] chunk : incomingData) {
                 System.arraycopy(chunk, 0, combined, offset, chunk.length);
                 offset += chunk.length;
             }
 
-            // Clear the buffer after combining
             incomingData.clear();
-            incomingDataSize = 0;
         }
 
-
-        // Convert byte[] to short[] (assuming signed 16-bit PCM)
-        short[] samples = new short[combined.length / 2];
-        for (int i = 0; i < samples.length; i++) {
-            // Convert little-endian bytes to short
-            samples[i] = (short) ((combined[i * 2] & 0xFF) | (combined[i * 2 + 1] << 8));
-        }
+        short[] samples = AudioHelper.bytesToShorts(combined);
 
         samples = AudioHelper.changePitch(samples, sampleRate, pitchFactor);
         // Apply sample rate conversion if needed
@@ -198,25 +188,17 @@ public class GeminiStream implements Supplier<short[]> {
 
     @Override
     public short[] get() {
-        // Return the next frame if available
         short[] frame = audioFrames.poll();
-
         if (frame != null) {
             return frame;
         }
 
-        // Return null to stop playing when no more frames are available
-        if (audioFrames.isEmpty()) {
-            isPreBuffering = true;
-            if (onPause != null) {
-                onPause.run();
-            }
-            return null;
+        // Queue is empty — pause playback and notify the client
+        isPreBuffering = true;
+        if (onPause != null) {
+            onPause.run();
         }
-
-        // In case we need to provide silence instead of stopping
-        // (This branch shouldn't normally be reached)
-        return new short[FRAME_SIZE_SAMPLES];
+        return null;
     }
 
     public void setPitch(float pitch) {

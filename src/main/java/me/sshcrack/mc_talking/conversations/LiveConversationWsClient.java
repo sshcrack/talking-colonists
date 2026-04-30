@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import me.sshcrack.mc_talking.util.AudioHelper;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
@@ -146,7 +147,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
     public void onGeneratedAudio(byte[] data, int sampleRate) {
         // Accumulate raw PCM (int16 little-endian) for peer forwarding
         // The parent converts byte[] → short[] internally; we do it here too.
-        short[] chunk = bytesToShorts(data);
+        short[] chunk = AudioHelper.bytesToShorts(data);
         short[] combined = new short[lastGeneratedPcm.length + chunk.length];
         System.arraycopy(lastGeneratedPcm, 0, combined, 0, lastGeneratedPcm.length);
         System.arraycopy(chunk, 0, combined, lastGeneratedPcm.length, chunk.length);
@@ -156,15 +157,4 @@ public class LiveConversationWsClient extends GeminiWsClient {
         super.onGeneratedAudio(data, sampleRate);
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private static short[] bytesToShorts(byte[] bytes) {
-        short[] out = new short[bytes.length / 2];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (short) ((bytes[i * 2] & 0xFF) | (bytes[i * 2 + 1] << 8));
-        }
-        return out;
-    }
 }

@@ -38,6 +38,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private boolean shouldReconnect = false;
     private boolean isInitiatingConnection = false;
     private boolean generationComplete = false;
+    /** Whether the AI has started generating audio at least once (used to gate onGenerationPaused). */
+    private boolean sentGeneratingStatus = false;
+    private long lastReconnectTime = 0;
+
+    /** Accumulates AI-generated text/transcription for the current turn to display in chat. */
+    private String currentTurnTranscript = "";
 
     private final GeminiStream stream;
     private final AudioProvider audioProvider;
@@ -165,6 +171,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     protected void onGenerationStarted() {
+        sentGeneratingStatus = true;
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
     }
 
@@ -202,16 +209,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onGenerationComplete() {
         McTalking.LOGGER.info("Gemini generation complete");
 
-
         stream.flushAudio();
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currMsg.isBlank())
+        if (sPlayer == null || currentTurnTranscript.isBlank())
             return;
         if (CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO) {
-            sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
+            sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
         }
 
-        currMsg = "";
+        currentTurnTranscript = "";
     }
 
     @Override
@@ -220,10 +226,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         stream.stop();
 
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currMsg.isBlank())
+        if (sPlayer == null || currentTurnTranscript.isBlank())
             return;
-        sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));
-        currMsg = "";
+        sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
+        currentTurnTranscript = "";
     }
 
     @Override
@@ -232,12 +238,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!hasTextEnabled)
             return;
 
-        currMsg += text;
+        currentTurnTranscript += text;
     }
 
     @Override
     public void onOutputTranscription(String transcription) {
-        currMsg += transcription;
+        currentTurnTranscript += transcription;
     }
 
     @Override
@@ -323,8 +329,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             mem.setSessionToken("");
             new Thread(() -> {
                 if (!isOpen() || !isInitiatingConnection) {
+                    isInitiatingConnection = true; // set before reconnect to prevent double-reconnect
                     reconnect();
-                    isInitiatingConnection = true;
                 }
             }).start();
             return;
@@ -346,9 +352,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         onErrorEvent(ex);
         McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
     }
-
-    boolean sentGeneratingStatus = false;
-    long lastReconnectTime = 0;
 
     @Override
     public void addPromptAudio(short[] audio) {

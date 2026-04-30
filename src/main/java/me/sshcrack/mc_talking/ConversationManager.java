@@ -60,6 +60,9 @@ public class ConversationManager {
     // playerId → citizenId (the citizen the player is currently in conversation with)
     private static final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
 
+    // citizenId → playerId reverse map for O(1) getPlayerForEntity lookups
+    private static final Map<UUID, UUID> citizenToPlayer = new HashMap<>();
+
     /**
      * Insertion-ordered queue of all occupied citizen slots.
      * The head (oldest) is the first eviction candidate.
@@ -181,7 +184,7 @@ public class ConversationManager {
      * session: mumbling, player conversation, or citizen-to-citizen conversation.
      * Use this before starting any new session to avoid duplicates.
      */
-    public static boolean isCitizenBusy(UUID citizenId) {
+    public static synchronized boolean isCitizenBusy(UUID citizenId) {
         return clients.containsKey(citizenId);
     }
 
@@ -212,9 +215,11 @@ public class ConversationManager {
         var client = new CitizenWsClient(citizen,
                 c -> {
                     c.close();
-                    if (clients.computeIfPresent(citizenId,
-                            (id, existing) -> existing == c ? null : existing) == null) {
-                        releaseSlot(citizenId);
+                    synchronized (ConversationManager.class) {
+                        if (clients.get(citizenId) == c) {
+                            clients.remove(citizenId);
+                            releaseSlot(citizenId);
+                        }
                     }
                 });
         client.addPromptTextAfterTalkingComplete(
@@ -242,6 +247,7 @@ public class ConversationManager {
         UUID citizenId = citizen.getUUID();
 
         activeEntity.put(playerId, citizen);
+        citizenToPlayer.put(citizenId, playerId);
 
         GeminiWsClient existingClient = clients.get(citizenId);
 
@@ -276,6 +282,7 @@ public class ConversationManager {
         UUID citizenId = playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
 
+        citizenToPlayer.remove(citizenId);
         GeminiWsClient client = clients.remove(citizenId);
         if (client != null) client.close();
         releaseSlot(citizenId);
@@ -323,14 +330,7 @@ public class ConversationManager {
 
     /** Returns the player UUID that is actively conversing with the given citizen, or {@code null}. */
     public static UUID getPlayerForEntity(UUID entityId) {
-        for (Map.Entry<UUID, AbstractEntityCitizen> entry : activeEntity.entrySet()) {
-            if (entry.getValue().getUUID().equals(entityId)) return entry.getKey();
-        }
-        return null;
-    }
-
-    public static AbstractEntityCitizen getActiveEntity(UUID playerId) {
-        return activeEntity.get(playerId);
+        return citizenToPlayer.get(entityId);
     }
 
     public static UUID getPlayerConversationPartner(UUID playerId) {
@@ -347,6 +347,7 @@ public class ConversationManager {
         clients.clear();
         activeEntity.clear();
         playerConversationPartners.clear();
+        citizenToPlayer.clear();
         addedEntities.clear();
     }
 }

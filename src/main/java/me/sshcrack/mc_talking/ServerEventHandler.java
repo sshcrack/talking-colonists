@@ -19,7 +19,7 @@ import net.minecraft.world.item.ItemStack;
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
         /*?}*/
-import net.minecraft.world.phys.AABB;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -209,6 +209,10 @@ public class ServerEventHandler {
      * Scans for pairs of nearby citizens that are not currently managed and
      * randomly starts a citizen-to-citizen conversation between them.
      *
+     * <p>Only citizens within range of an online player are considered — citizens
+     * in unloaded or player-free areas would be inaudible anyway, and scanning the
+     * entire world on every check is expensive on large servers.</p>
+     *
      * <p>Citizens that are currently talking to a player are excluded to avoid
      * interrupting ongoing player conversations.</p>
      */
@@ -217,24 +221,20 @@ public class ServerEventHandler {
 
         double range = CONFIG.mumblingDetectionRange.get() * 2;
 
-        for (var level : server.getAllLevels()) {
-            var allCitizens = level.getEntitiesOfClass(AbstractEntityCitizen.class,
-                    new AABB(-30_000_000, level.getMinBuildHeight(), -30_000_000,
-                             30_000_000, level.getMaxBuildHeight(),  30_000_000));
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            var nearbyBox = player.getBoundingBox().inflate(range);
+            var citizens = player.serverLevel().getEntitiesOfClass(AbstractEntityCitizen.class, nearbyBox);
 
-            for (AbstractEntityCitizen citizen : allCitizens) {
+            for (AbstractEntityCitizen citizen : citizens) {
                 if (citizen instanceof VisitorCitizen) continue;
                 // Skip if this citizen already has any kind of active session
                 if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
 
                 if (Math.random() >= CONFIG.randomConversationChance.get()) continue;
 
-                // Find a nearby partner
-                var nearbyBox = citizen.getBoundingBox().inflate(range);
-                var candidates = level.getEntitiesOfClass(AbstractEntityCitizen.class, nearbyBox);
-
+                // Find a nearby partner from the same proximity list (no second query needed)
                 List<AbstractEntityCitizen> partners = new ArrayList<>();
-                for (AbstractEntityCitizen candidate : candidates) {
+                for (AbstractEntityCitizen candidate : citizens) {
                     if (candidate == citizen) continue;
                     if (candidate instanceof VisitorCitizen) continue;
                     // Skip if this candidate already has any kind of active session

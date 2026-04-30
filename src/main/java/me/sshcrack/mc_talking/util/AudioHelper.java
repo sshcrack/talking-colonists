@@ -73,6 +73,20 @@ public class AudioHelper {
     }
 
     /**
+     * Converts a little-endian signed 16-bit PCM byte array to a short array.
+     *
+     * @param bytes Raw PCM bytes (must have even length)
+     * @return Decoded samples
+     */
+    public static short[] bytesToShorts(byte[] bytes) {
+        short[] out = new short[bytes.length / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (short) ((bytes[i * 2] & 0xFF) | (bytes[i * 2 + 1] << 8));
+        }
+        return out;
+    }
+
+    /**
      * Linear interpolation-based audio resampling for changing sample rate
      *
      * @param input            Original audio samples
