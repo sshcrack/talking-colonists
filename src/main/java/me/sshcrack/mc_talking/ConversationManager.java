@@ -37,9 +37,6 @@ public class ConversationManager {
         /* This utility class should not be instantiated */
     }
 
-    // Track AI status for each entity
-    private static final Map<UUID, AiStatus> aiStatus = new ConcurrentHashMap<>();
-
     // Track active AI clients for each entity
     private static final Map<UUID, GeminiWsClient> clients = new HashMap<>();
 
@@ -51,33 +48,6 @@ public class ConversationManager {
 
     // Queue of entities recently added for conversation, for managing concurrent limits
     private static final Queue<UUID> addedEntities = new LinkedList<>();
-
-    /**
-     * Updates the AI status for a specific entity
-     *
-     * @param entityId The UUID of the entity
-     * @param status   The AI status to set
-     */
-    public static void updateAiStatus(UUID entityId, AiStatus status) {
-        aiStatus.put(entityId, status);
-    }
-
-    /**
-     * Gets the current AI status for an entity
-     *
-     * @param entityId The UUID of the entity
-     * @return The current AI status, or NONE if not set
-     */
-    public static AiStatus getAiStatus(UUID entityId) {
-        return aiStatus.getOrDefault(entityId, AiStatus.NONE);
-    }
-
-    /**
-     * Clears all AI status data (typically on disconnect)
-     */
-    public static void clearAiStatus() {
-        aiStatus.clear();
-    }
 
     /**
      * Adds an entity to the managed entities queue, respecting the maximum concurrent limit
@@ -230,7 +200,6 @@ public class ConversationManager {
             client.close();
         }
         clients.clear();
-        aiStatus.clear();
         activeEntity.clear();
         playerConversationPartners.clear();
         addedEntities.clear();

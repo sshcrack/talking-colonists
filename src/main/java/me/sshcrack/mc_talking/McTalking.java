@@ -64,7 +64,7 @@ public class McTalking {
     public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
         final var registrar = event.registrar("1");
         registrar.playToClient(AiStatusPayload.TYPE, AiStatusPayload.STREAM_CODEC, new DirectionalPayloadHandler<>(
-                (payload, ctx) -> ctx.enqueueWork(() -> ConversationManager.updateAiStatus(payload.citizen(), payload.status())),
+                (payload, ctx) -> ctx.enqueueWork(() -> McTalkingClient.updateAiStatus(payload.citizen(), payload.status())),
                 (a, b) -> {
                 }
         ));

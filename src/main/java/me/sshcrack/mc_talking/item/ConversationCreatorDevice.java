@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -79,7 +80,7 @@ public class ConversationCreatorDevice extends Item {
             };
 
             for (AbstractEntityCitizen participant : participants) {
-                ConversationManager.updateAiStatus(participant.getUUID(), newStatus);
+                AiStatusHelper.setAiStatusSynced(participant, newStatus);
             }
         });
         return InteractionResultHolder.pass(player.getItemInHand(usedHand));

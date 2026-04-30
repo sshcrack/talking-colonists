@@ -10,7 +10,7 @@ public class AiStatusHelper {
     }
 
     public static void setAiStatusSynced(AbstractEntityCitizen citizen, AiStatus status) {
-        citizen.level().getServer().execute(() -> AiStatusHelper.setAiStatusSynced(citizen, status));
+        citizen.level().getServer().execute(() -> AiStatusHelper.setAiStatusOnServerThread(citizen, status));
     }
 
     public static void setAiStatusOnServerThread(AbstractEntityCitizen citizen, AiStatus status) {

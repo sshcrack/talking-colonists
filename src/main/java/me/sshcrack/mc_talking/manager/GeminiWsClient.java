@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.google.gson.JsonObject;
+import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
@@ -35,6 +36,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     private boolean shouldReconnect = false;
     private boolean isInitiatingConnection = false;
+    private boolean generationComplete = false;
 
     private final GeminiStream stream;
     private final AudioProvider audioProvider;
@@ -43,7 +45,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final OpusDecoder decoder;
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
 
+    @Nullable
+    private VisibleCitizenStatus lastStatus;
 
     public AbstractEntityCitizen getEntity() {
         return entity;
@@ -65,6 +70,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             stream.setPitch(1.2f); // Increase pitch
     }
 
+    @Nullable
+    public VisibleCitizenStatus getLastStatus() {
+        return lastStatus;
+    }
+
+    public void setLastStatus(@Nullable VisibleCitizenStatus lastStatus) {
+        this.lastStatus = lastStatus;
+    }
+
     @Override
     public BidiGenerateContentSetup getSetup() {
         var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
@@ -79,16 +93,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (modality != ModalityModes.TEXT) {
             setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
             setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
-                var entity = this.entity;
-                var female = entity.getCitizenData().isFemale();
-                var uuid = entity.getUUID();
+            var entity = this.entity;
+            var female = entity.getCitizenData().isFemale();
+            var uuid = entity.getUUID();
 
-                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
-                var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
-                var sessionToken = mem.getSessionToken();
-                if (!sessionToken.isBlank()) {
-                    setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
-                }
+            setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
+            var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
+            var sessionToken = mem.getSessionToken();
+            if (!sessionToken.isBlank()) {
+                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+            }
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = CONFIG.currentAiModel.get().getRandomVoice(uuid, female);
@@ -118,11 +132,23 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected abstract String getSystemPrompt();
 
     protected void onStreamPause() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+        if (generationComplete) {
+            onConversationEnded();
+        } else {
+            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+        }
     }
 
     protected void onConversationEnded() {
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+        if (!pendingTextAfterTalking.isEmpty()) {
+            String message = String.join("\n", pendingTextAfterTalking);
+            pendingTextAfterTalking.clear();
+            var input = new RealtimeInput();
+            input.text = message;
+
+            send(ClientMessages.input(input));
+        }
     }
 
     protected void onGenerationStarted() {
@@ -134,8 +160,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     protected abstract void onQuotaExceededEvent(String message);
+
     protected abstract void onErrorEvent(Exception ex);
 
+    @Override
+    public void send(String text) {
+        super.send(text);
+        generationComplete = false;
+    }
 
     private String currMsg = "";
 
@@ -204,6 +236,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onTurnComplete() {
         McTalking.LOGGER.info("Gemini turn complete");
+        generationComplete = true;
     }
 
     @Override
@@ -222,6 +255,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+
         McTalking.LOGGER.info("Gemini setup complete");
         synchronized (pendingSystemText) {
             if (!pendingSystemText.isEmpty()) {
@@ -238,6 +273,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         synchronized (pendingPrompt) {
             if (!pendingPrompt.isEmpty()) {
+                McTalking.LOGGER.info("Sending {} pending audio inputs", pendingPrompt.size());
                 List<short[]> audioToProcess = new ArrayList<>(pendingPrompt);
                 pendingPrompt.clear();
 
@@ -249,19 +285,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 }
             }
         }
-    }
-
-    public void promptSystemText(String newStatusPrompt) {
-        if (!isSetupComplete() || this.isClosed()) {
-            synchronized (pendingSystemText) {
-                pendingSystemText.add(newStatusPrompt);
-            }
-            return;
-        }
-
-        var input = new RealtimeInput();
-        input.text = newStatusPrompt;
-        send(ClientMessages.input(input));
     }
 
     @Override
@@ -356,7 +379,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         send(ClientMessages.input(input));
     }
 
-    public void addPromptText(String text) {
+    public void addPromptTextAfterTalkingComplete(String text) {
         var input = new RealtimeInput();
         input.text = text;
 
@@ -386,7 +409,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return;
         }
 
-        send(ClientMessages.input(input));
+        pendingTextAfterTalking.add(text);
     }
 
     public void promptAudioOpus(byte[] audio) {

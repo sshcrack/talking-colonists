@@ -39,9 +39,18 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
             return;
         }
 
+        if (client.getLastStatus() == null) {
+            client.setLastStatus(status);
+        }
+
+        if (client.getLastStatus() != null && client.getLastStatus().equals(status)) {
+            return;
+        }
+
         var statusView = CitizenPromptViewFactory.createStatusView(status, data);
         var newStatusPrompt = String.format("You are now %s", CitizenPromptService.formatStatus(statusView));
-        client.promptSystemText(newStatusPrompt);
+        client.setLastStatus(status);
+        client.addPromptTextAfterTalkingComplete(newStatusPrompt);
     }
 
     /*? if neoforge {*/

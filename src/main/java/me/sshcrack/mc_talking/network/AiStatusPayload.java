@@ -75,7 +75,7 @@ public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/
     }
 
     public static void handle(AiStatusPayload msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> ConversationManager.updateAiStatus(msg.citizen, msg.status));
+        ctx.get().enqueueWork(() -> me.sshcrack.mc_talking.McTalkingClient.updateAiStatus(msg.citizen, msg.status));
         ctx.get().setPacketHandled(true);
     }
 

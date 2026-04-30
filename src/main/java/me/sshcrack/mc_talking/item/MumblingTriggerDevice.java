@@ -29,9 +29,9 @@ public class MumblingTriggerDevice extends Item {
 
 
         var client = new SystemControlledCitizenWsClient(citizen, c -> {
-            c.promptSystemText("You continue mumbling.");
+            c.addPromptTextAfterTalkingComplete("You continue mumbling.");
         });
-        client.addPromptText("You should start mumbling to yourself about your work and life.");
+        client.addPromptTextAfterTalkingComplete("You should start mumbling to yourself about your work and life.");
         player.sendSystemMessage(Component.literal("Started mumbling for selected citizen").withStyle(ChatFormatting.GREEN));
 
         return true; // Prevent normal attack behavior

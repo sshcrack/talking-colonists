@@ -23,6 +23,9 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
 /*?}*/
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Client-side mod class for McTalking.
@@ -35,6 +38,20 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 @Mod(value = McTalking.MODID, dist = Dist.CLIENT)
 /*?}*/
 public class McTalkingClient {
+    // Track AI status for each entity
+    private static final Map<UUID, AiStatus> aiStatus = new ConcurrentHashMap<>();
+
+
+    /**
+     * Updates the AI status for a specific entity
+     *
+     * @param entityId The UUID of the entity
+     * @param status   The AI status to set
+     */
+    public static void updateAiStatus(UUID entityId, AiStatus status) {
+        aiStatus.put(entityId, status);
+    }
+
 
     /*? if neoforge {*/
     public McTalkingClient(ModContainer container) {
@@ -56,7 +73,7 @@ public class McTalkingClient {
     /*? if neoforge {*/
     public void onDisconnect(LevelEvent.Unload event) {
     /*?}*/
-        ConversationManager.clearAiStatus();
+        aiStatus.clear();
     }
 
     /**
@@ -83,8 +100,8 @@ public class McTalkingClient {
         if (entity.isInvisibleTo(minecraft.player))
             return;
 
-        var status = ConversationManager.getAiStatus(citizen.getUUID());
-        if (status == AiStatus.NONE)
+        var status = aiStatus.get(citizen.getUUID());
+        if (status == null || status == AiStatus.NONE)
             return;
 
         var text = Component.literal(" (")

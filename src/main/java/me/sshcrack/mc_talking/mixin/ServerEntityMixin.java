@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.mixin;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.duck.AbstractEntityCitizenAiStatusProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
@@ -57,6 +58,7 @@ public class ServerEntityMixin {
             return;
         }
 
+        McTalking.LOGGER.info("Citizen {} has dirty AI status {}, sending update to clients", citizen.getUUID(), provider.mc_talking$getAiStatus());
         mc_talking$sendToPlayersTrackingEntity(citizen, provider.mc_talking$getAiStatus());
         provider.mc_talking$markStatusClean();
     }
