@@ -19,6 +19,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -131,6 +132,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected abstract String getSystemPrompt();
 
+    /**
+     * Resolves the active player for this conversation so that generated text and transcriptions
+     * can be forwarded as chat messages. Subclasses may override this to provide the player
+     * directly without going through {@link ConversationManager}.
+     */
+    @Nullable
+    protected ServerPlayer resolveActivePlayer() {
+        var playerUUID = ConversationManager.getPlayerForEntity(entity.getUUID());
+        if (playerUUID == null) return null;
+        return Objects.requireNonNull(entity.level().getServer()).getPlayerList().getPlayer(playerUUID);
+    }
+
     protected void onStreamPause() {
         if (generationComplete) {
             onConversationEnded();
@@ -191,10 +204,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
 
         stream.flushAudio();
-        var player = ConversationManager.getPlayerForEntity(entity.getUUID());
-        if (player == null)
-            return;
-        var sPlayer = Objects.requireNonNull(entity.level().getServer()).getPlayerList().getPlayer(player);
+        var sPlayer = resolveActivePlayer();
         if (sPlayer == null || currMsg.isBlank())
             return;
         if (CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO) {
@@ -209,10 +219,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("Gemini generation interrupted");
         stream.stop();
 
-        var player = ConversationManager.getPlayerForEntity(entity.getUUID());
-        if (player == null)
-            return;
-        var sPlayer = Objects.requireNonNull(entity.level().getServer()).getPlayerList().getPlayer(player);
+        var sPlayer = resolveActivePlayer();
         if (sPlayer == null || currMsg.isBlank())
             return;
         sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currMsg.trim())));

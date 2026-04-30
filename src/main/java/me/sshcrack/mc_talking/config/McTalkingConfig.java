@@ -39,9 +39,6 @@ public class McTalkingConfig {
 
     // Interaction Configuration
     public final Supplier<Boolean> respondInGroups;
-    public final Supplier<Integer> lookDurationTicks;
-    public final Supplier<Integer> lookToleranceMs;
-    public final Supplier<Double> activationDistance;
     public final Supplier<Boolean> sendErrorsToPlayers;
 
     // Resource Management
@@ -53,6 +50,11 @@ public class McTalkingConfig {
     // Citizen - Citizen Interaction
     public final Supplier<Boolean> enableCitizenMemory;
     public final Supplier<Boolean> enableCitizenToCitizenConversation;
+
+    // Proximity Mumbling
+    public final Supplier<Double> mumblingChance;
+    public final Supplier<Double> mumblingDetectionRange;
+    public final Supplier<Integer> mumblingCheckIntervalTicks;
 
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
@@ -83,17 +85,6 @@ public class McTalkingConfig {
                 .comment("Whether the citizens should respond if the player is in a group or not.")
                 .define("respond_in_group", false);
 
-        lookDurationTicks = requireRestart(builder)
-                .comment("How long the player needs to look at an entity before activating (in ticks, 20 ticks = 1 second)")
-                .define("look_duration_ticks", 20);
-
-        lookToleranceMs = requireRestart(builder)
-                .comment("Tolerance time in milliseconds when something walks between player and target")
-                .define("look_tolerance_ms", 500);
-
-        activationDistance = requireRestart(builder)
-                .comment("Distance at which the player can talk to when looking at them the citizen")
-                .define("activation_distance", 3.0);
 
         // Citizen - Citizen Interaction (Conversations between them)
 
@@ -151,6 +142,20 @@ public class McTalkingConfig {
         sendErrorsToPlayers = builder
                 .comment("If true, errors will be sent to players that have OP permissions. If false, errors will only be logged to the console.")
                 .define("send_errors_to_players", true);
+
+        // Proximity Mumbling
+        mumblingChance = builder
+                .comment("Proximity Mumbling")
+                .comment("Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
+                .define("mumbling_chance", 0.05);
+
+        mumblingDetectionRange = builder
+                .comment("Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
+                .define("mumbling_detection_range", 10.0);
+
+        mumblingCheckIntervalTicks = builder
+                .comment("How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
+                .define("mumbling_check_interval_ticks", 200, e -> e == null || (int) e > 0);
     }
 
     static {

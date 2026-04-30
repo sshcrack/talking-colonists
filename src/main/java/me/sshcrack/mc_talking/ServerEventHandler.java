@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 /*? if forge {*/
@@ -110,7 +111,11 @@ public class ServerEventHandler {
 
     private void onServerTickCommon(MinecraftServer server) {
         tickCounter++;
-        if (tickCounter % 5 != 0) {
+
+        boolean doDistanceCheck = (tickCounter % 5 == 0);
+        boolean doMumblingCheck = (tickCounter % CONFIG.mumblingCheckIntervalTicks.get() == 0);
+
+        if (!doDistanceCheck && !doMumblingCheck) {
             return;
         }
 
@@ -121,9 +126,15 @@ public class ServerEventHandler {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             UUID playerId = player.getUUID();
 
-            UUID citizenId = ConversationManager.getPlayerConversationPartner(playerId);
-            if (citizenId != null) {
-                checkConversationDistance(player, citizenId);
+            if (doDistanceCheck) {
+                UUID citizenId = ConversationManager.getPlayerConversationPartner(playerId);
+                if (citizenId != null) {
+                    checkConversationDistance(player, citizenId);
+                }
+            }
+
+            if (doMumblingCheck && !ConversationManager.isPlayerInConversation(playerId)) {
+                checkForMumblingCitizens(player);
             }
         }
     }
@@ -156,6 +167,25 @@ public class ServerEventHandler {
         double distanceSquared = player.distanceToSqr(activeEntity);
         if (distanceSquared > CONFIG.maxConversationDistance.get() * CONFIG.maxConversationDistance.get()) {
             ConversationManager.endConversation(player.getUUID(), true);
+        }
+    }
+
+    private void checkForMumblingCitizens(ServerPlayer player) {
+        double range = CONFIG.mumblingDetectionRange.get();
+        var aabb = player.getBoundingBox().inflate(range);
+        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
+
+        for (AbstractEntityCitizen citizen : citizens) {
+            if (citizen instanceof VisitorCitizen) {
+                continue;
+            }
+            if (ConversationManager.getClientForEntity(citizen.getUUID()) != null) {
+                continue;
+            }
+            if (Math.random() < CONFIG.mumblingChance.get()) {
+                ConversationManager.startMumbling(citizen);
+                break; // Only trigger one mumbling citizen per player per check
+            }
         }
     }
 }

@@ -2,31 +2,32 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
-import me.sshcrack.mc_talking.manager.PlayerToCitizenWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-/*? if neoforge {*/
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.component.CustomModelData;
-/*? }*/
-/*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;
- *//*? }*/
 
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
+/*? if neoforge {*/
+/*? }*/
+/*? if forge {*/
+/*import net.minecraft.nbt.CompoundTag;
+ */
+/*? }*/
 
 /**
  * Manages conversations between players and citizens, including tracking
@@ -59,13 +60,40 @@ public class ConversationManager {
         if (addedEntities.size() > CONFIG.maxConcurrentAgents.get()) {
             var removedEntityId = addedEntities.poll();
             if (removedEntityId != null) {
-                var manager = clients.get(removedEntityId);
-                if (manager != null) {
-                    manager.close();
+                var client = clients.get(removedEntityId);
+                if (client != null) {
+                    client.close();
                     clients.remove(removedEntityId);
                 }
             }
         }
+    }
+
+    /**
+     * Starts a citizen mumbling to itself when a player is nearby.
+     * A looping {@link CitizenWsClient} is created in system-controlled mode.
+     * No player is associated; use {@link #startConversation} to transition seamlessly.
+     *
+     * @param citizen the citizen to start mumbling
+     */
+    public static void startMumbling(AbstractEntityCitizen citizen) {
+        if (CONFIG.geminiApiKey.get().isEmpty()) return;
+
+        UUID citizenId = citizen.getUUID();
+        if (clients.containsKey(citizenId)) return; // Already managed
+
+        var client = new CitizenWsClient(citizen,
+                c -> {
+                    c.close();
+                    if(clients.computeIfPresent(citizenId, (id, existingClient) -> existingClient == c ? null : existingClient) == null) {
+                        addedEntities.remove(citizenId);
+                    }
+                });
+        client.addPromptTextAfterTalkingComplete(
+                "You feel the urge to mutter something under your breath. " +
+                        "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.");
+        clients.put(citizenId, client);
+        addEntity(citizenId);
     }
 
     /**
@@ -89,9 +117,17 @@ public class ConversationManager {
         // Set citizen as active entity
         activeEntity.put(playerId, citizen);
 
-        // Create Gemini client and add to clients
-        clients.put(citizenId, new PlayerToCitizenWsClient(new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG), citizen, player));
-        addEntity(citizenId);
+        // Reuse an existing mumbling session if one is already running for this citizen
+        GeminiWsClient existingClient = clients.get(citizenId);
+        if (existingClient instanceof CitizenWsClient citizenWsClient && citizenWsClient.isMumbling()) {
+            citizenWsClient.transitionToPlayer(player);
+        } else {
+            // Create a new player conversation client
+            clients.put(citizenId, new CitizenWsClient(
+                    new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
+                    citizen, player));
+            addEntity(citizenId);
+        }
 
         // Track this conversation pair
         playerConversationPartners.put(playerId, citizenId);
@@ -106,6 +142,12 @@ public class ConversationManager {
     public static void endConversation(UUID playerId, boolean sendMessage) {
         UUID citizenId = playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
+
+        // Close and remove the AI client so the mumbling/conversation session ends cleanly
+        GeminiWsClient client = clients.remove(citizenId);
+        if (client != null) {
+            client.close();
+        }
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
@@ -190,6 +232,17 @@ public class ConversationManager {
      */
     public static UUID getPlayerConversationPartner(UUID playerId) {
         return playerConversationPartners.get(playerId);
+    }
+
+    /**
+     * Returns {@code true} if the citizen is currently in a system-controlled mumbling session
+     * (i.e. a {@link CitizenWsClient} exists for this entity but no player is attached yet).
+     *
+     * @param citizenId the citizen's UUID
+     */
+    public static boolean isCitizenMumbling(UUID citizenId) {
+        GeminiWsClient client = clients.get(citizenId);
+        return client instanceof CitizenWsClient c && c.isMumbling();
     }
 
     /**
