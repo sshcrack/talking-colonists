@@ -54,6 +54,11 @@ public class McTalkingConfig {
     public final Supplier<Boolean> enableCitizenMemory;
     public final Supplier<Boolean> enableCitizenToCitizenConversation;
 
+    // Proximity Mumbling
+    public final Supplier<Double> mumblingChance;
+    public final Supplier<Double> mumblingDetectionRange;
+    public final Supplier<Integer> mumblingCheckIntervalTicks;
+
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
         *//*?}*/
@@ -151,6 +156,20 @@ public class McTalkingConfig {
         sendErrorsToPlayers = builder
                 .comment("If true, errors will be sent to players that have OP permissions. If false, errors will only be logged to the console.")
                 .define("send_errors_to_players", true);
+
+        // Proximity Mumbling
+        mumblingChance = builder
+                .comment("Proximity Mumbling")
+                .comment("Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
+                .define("mumbling_chance", 0.05);
+
+        mumblingDetectionRange = builder
+                .comment("Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
+                .define("mumbling_detection_range", 6.0);
+
+        mumblingCheckIntervalTicks = builder
+                .comment("How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
+                .define("mumbling_check_interval_ticks", 200, e -> e == null || (int) e > 0);
     }
 
     static {
