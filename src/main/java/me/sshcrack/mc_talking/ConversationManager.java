@@ -179,7 +179,7 @@ public class ConversationManager {
      * @param entityId The UUID of the entity
      * @return The TalkingManager, or null if none exists
      */
-    public static me.sshcrack.mc_talking.manager.GeminiWsClient getClientForEntity(UUID entityId) {
+    public static GeminiWsClient getClientForEntity(UUID entityId) {
         return clients.get(entityId);
     }
 

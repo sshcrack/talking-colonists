@@ -51,7 +51,7 @@ public final class CitizenPromptViewFactory {
     private CitizenPromptViewFactory() {
     }
 
-    public static CitizenPromptView create(ICitizenData data, Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
+    public static CitizenPromptView create(ICitizenData data, @NotNull Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
         String jobName = null;
         if (data.getJob() != null) {
             jobName = Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
@@ -177,7 +177,7 @@ public final class CitizenPromptViewFactory {
         return "visitor";
     }
 
-    public static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {
+    private static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {
         if (status == null) {
             return null;
         }

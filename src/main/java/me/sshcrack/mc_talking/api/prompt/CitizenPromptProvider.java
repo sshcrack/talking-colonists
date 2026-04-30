@@ -59,4 +59,6 @@ public interface CitizenPromptProvider {
 
         return translationKey;
     }
+
+    String generateSystemControlledRoleplayPrompt(CitizenPromptView view);
 }

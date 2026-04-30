@@ -47,4 +47,8 @@ public final class CitizenPromptService {
     public static String formatStatus(CitizenStatusView status) {
         return getProvider().formatStatus(status);
     }
+
+    public static String generateSystemControlledRoleplayPrompt(@NotNull CitizenPromptView view) {
+        return getProvider().generateSystemControlledRoleplayPrompt(view);
+    }
 }

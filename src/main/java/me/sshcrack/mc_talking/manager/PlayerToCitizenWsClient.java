@@ -32,25 +32,6 @@ public class PlayerToCitizenWsClient extends GeminiWsClient {
         return CitizenPromptService.generateCitizenRoleplayPrompt(promptView);
     }
 
-    @Override
-    protected void onStreamPause() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
-    }
-
-    @Override
-    protected void onConversationEnded() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
-    }
-
-    @Override
-    protected void onGenerationStarted() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
-    }
-
-    @Override
-    protected void onGenerationPaused() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
-    }
 
     @Override
     protected void onQuotaExceededEvent(String message) {
@@ -70,4 +51,5 @@ public class PlayerToCitizenWsClient extends GeminiWsClient {
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal("An error occurred in GeminiWsClient: " + ex.getMessage()));
         });
     }
+
 }

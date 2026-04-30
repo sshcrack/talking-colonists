@@ -177,6 +177,27 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     @Override
+    public String generateSystemControlledRoleplayPrompt(CitizenPromptView view) {
+        return String.format("""
+                        You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.
+                        %s
+                        ## GUIDELINES
+                        - HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST
+                        - Do not generate creative responses for information that functions can provide
+                        - Speak in first person
+                        - YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES
+                        - DO NOT start conversations with generic greetings if unhappy or in distress
+                        - Do not use markdown, speak in plain text.
+                        Stay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.
+                        REMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.
+                        Start by speaking in the language %s and ONLY switch if the user is speaking in another language
+                        """,
+                getGeneralCitizenPrompt(view, true),
+                view.responseLanguageName()
+        );
+    }
+
+    @Override
     public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));

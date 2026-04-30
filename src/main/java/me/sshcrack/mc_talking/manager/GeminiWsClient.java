@@ -15,6 +15,8 @@ import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,7 +50,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     // AudioProvider creates channels/decoders so this client can be tested/mockable
-    public GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
+    protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
         super(CONFIG.geminiApiKey.get());
         this.audioProvider = audioProvider;
         this.entity = entity;
@@ -114,14 +116,26 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     protected abstract String getSystemPrompt();
-    protected abstract void onStreamPause();
 
-    // Event hooks implemented by concrete clients
-    protected abstract void onConversationEnded();
-    protected abstract void onGenerationStarted();
-    protected abstract void onGenerationPaused();
+    protected void onStreamPause() {
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+    }
+
+    protected void onConversationEnded() {
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+    }
+
+    protected void onGenerationStarted() {
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
+    }
+
+    protected void onGenerationPaused() {
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+    }
+
     protected abstract void onQuotaExceededEvent(String message);
     protected abstract void onErrorEvent(Exception ex);
+
 
     private String currMsg = "";
 
@@ -319,6 +333,39 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!isSetupComplete() || this.isClosed()) {
             synchronized (pendingPrompt) {
                 pendingPrompt.add(audio);
+            }
+
+            if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
+                if (shouldReconnect) {
+                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                        return;
+
+                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                    lastReconnectTime = System.currentTimeMillis();
+                    reconnect();
+                } else {
+                    connect();
+                    shouldReconnect = true;
+                }
+
+                isInitiatingConnection = true;
+            }
+            return;
+        }
+
+        send(ClientMessages.input(input));
+    }
+
+    public void addPromptText(String text) {
+        var input = new RealtimeInput();
+        input.text = text;
+
+        if (sentGeneratingStatus)
+            onGenerationPaused();
+
+        if (!isSetupComplete() || this.isClosed()) {
+            synchronized (pendingSystemText) {
+                pendingSystemText.add(text);
             }
 
             if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {

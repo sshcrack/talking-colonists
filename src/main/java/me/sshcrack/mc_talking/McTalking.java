@@ -18,8 +18,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.handling.DirectionalPayloadHandler;
 /*?}*/
 import org.slf4j.Logger;
 
@@ -40,7 +38,6 @@ public class McTalking {
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
         ModItems.register(modEventBus);
-        AiStatusPayload.registerMessages();
     }
     *//*?}*/
 
@@ -51,22 +48,10 @@ public class McTalking {
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
         modContainer.registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
         ModItems.register(modEventBus);
-        modEventBus.addListener(this::registerPayloadHandlers);
     }
     /*?}*/
 
     private void initialize() {
         AITools.register();
     }
-
-    /*? if neoforge {*/
-    public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        final var registrar = event.registrar("1");
-        registrar.playToClient(AiStatusPayload.TYPE, AiStatusPayload.STREAM_CODEC, new DirectionalPayloadHandler<>(
-                (payload, ctx) -> ctx.enqueueWork(() -> ConversationManager.updateAiStatus(payload.citizen(), payload.status())),
-                (a, b) -> {
-                }
-        ));
-    }
-    /*?}*/
 }
