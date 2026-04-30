@@ -14,7 +14,7 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -177,7 +177,7 @@ public final class CitizenPromptViewFactory {
         return "visitor";
     }
 
-    private static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {
+    public static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {
         if (status == null) {
             return null;
         }

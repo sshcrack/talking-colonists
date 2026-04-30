@@ -6,7 +6,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 import net.minecraft.server.MinecraftServer;

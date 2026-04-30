@@ -5,7 +5,7 @@ import com.minecolonies.core.colony.CitizenData;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.core.HolderLookup;

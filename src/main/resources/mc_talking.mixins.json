@@ -7,6 +7,7 @@
     "CitizenDataAccessor",
     "CitizenDataMixin",
     "EventDescriptionManagerMixin",
+    "ServerEntityMixin",
     "SoundUtilsMixin"
   ],
   "injectors": {
