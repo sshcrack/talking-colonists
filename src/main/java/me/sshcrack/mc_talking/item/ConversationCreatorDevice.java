@@ -6,7 +6,6 @@ import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.network.AiStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
@@ -20,6 +19,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public class ConversationCreatorDevice extends Item {
     public ConversationCreatorDevice() {
@@ -57,6 +58,11 @@ public class ConversationCreatorDevice extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Player player, @NotNull InteractionHand usedHand) {
         if (level.isClientSide()) {
+            return InteractionResultHolder.pass(player.getItemInHand(usedHand));
+        }
+
+        if (!CONFIG.enableCitizenToCitizenConversation.get()) {
+            player.sendSystemMessage(Component.literal("Citizen-to-citizen conversations are disabled in the config").withStyle(ChatFormatting.RED));
             return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }
 

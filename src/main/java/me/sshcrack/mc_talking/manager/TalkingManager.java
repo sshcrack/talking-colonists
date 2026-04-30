@@ -47,7 +47,7 @@ public class TalkingManager {
 
         channel.setCategory(McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG);
         channel.setWhispering(true);
-        client = new GeminiWsClient(this, initialPlayer);
+        client = new PlayerToCitizenClient(this, initialPlayer);
         decoder = vcApi.createDecoder();
     }
 
@@ -67,5 +67,6 @@ public class TalkingManager {
     }
 
     public void promptSystemText(String newStatusPrompt) {
+        //TODO
     }
 }

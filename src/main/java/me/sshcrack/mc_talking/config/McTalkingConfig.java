@@ -49,7 +49,10 @@ public class McTalkingConfig {
     public final Supplier<Double> maxConversationDistance;
     public final Supplier<ModalityModes> modality;
     public final Supplier<List<? extends String>> disabledTools;
+
+    // Citizen - Citizen Interaction
     public final Supplier<Boolean> enableCitizenMemory;
+    public final Supplier<Boolean> enableCitizenToCitizenConversation;
 
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
@@ -92,10 +95,15 @@ public class McTalkingConfig {
                 .comment("Distance at which the player can talk to when looking at them the citizen")
                 .define("activation_distance", 3.0);
 
+        // Citizen - Citizen Interaction (Conversations between them)
 
         enableCitizenMemory = requireRestart(builder)
                 .comment("If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
-                .define("enable_citizen_memory", true);
+                .define("enable_citizen_memory", false);
+
+        enableCitizenToCitizenConversation = requireRestart(builder)
+                .comment("If true, citizens will be able to start conversations with each other without player involvement. Only recommended for paid tiers, as there are only at max 10 conversations per day available for the free tier")
+                .define("enable_citizen_to_citizen_conversation", false);
 
         // Resource Management
         maxConcurrentAgents = requireRestart(builder)

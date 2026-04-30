@@ -8,7 +8,6 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -28,7 +27,7 @@ import java.util.UUID;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
-public class GeminiWsClient extends GeminiLiveClient {
+public abstract class GeminiWsClient extends GeminiLiveClient {
     /**
      * This variable is used to track if the quota has been exceeded
      */
@@ -44,12 +43,16 @@ public class GeminiWsClient extends GeminiLiveClient {
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
 
 
+    public TalkingManager getTalkingManager() {
+        return manager;
+    }
+
     //TODO: Don't send packets to all players
     public GeminiWsClient(TalkingManager manager, ServerPlayer player) {
         super(CONFIG.geminiApiKey.get());
         this.manager = manager;
         stream = new GeminiStream(manager.channel);
-        stream.setOnPause(() -> Objects.requireNonNull(player.getServer()).execute(() -> AiStatusPayload.sendToAll(new AiStatusPayload(manager.entity.getUUID(), AiStatus.LISTENING))));
+        stream.setOnPause(this::onStreamPause);
 
         var isFemale = manager.entity.getCitizenData().isFemale();
         var isChild = manager.entity.getCitizenData().isChild();
@@ -103,9 +106,7 @@ public class GeminiWsClient extends GeminiLiveClient {
         Map<UUID, String> interestedParties = new HashMap<>();
         interestedParties.put(initialPlayer.getUUID(), initialPlayer.getName().getString());
 
-        var promptView = CitizenPromptViewFactory.create(manager.entity.getCitizenData(), interestedParties, initialPlayer);
-        var prompt = CitizenPromptService.generateCitizenRoleplayPrompt(promptView);
-        var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
+        var p = new BidiGenerateContentSetup.SystemInstruction.Part(getPrompt());
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
@@ -113,6 +114,9 @@ public class GeminiWsClient extends GeminiLiveClient {
 
         return setup;
     }
+
+    protected abstract String getSystemPrompt();
+    protected abstract void onStreamPause();
 
     private String currMsg = "";
 
