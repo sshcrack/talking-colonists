@@ -1,11 +1,13 @@
 package me.sshcrack.mc_talking.manager.tools;
 
 import com.google.gson.JsonObject;
+import com.minecolonies.api.colony.ICivilianData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.EnumProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
+import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import org.jetbrains.annotations.NotNull;
@@ -13,17 +15,16 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.stream.Collectors;
 
 public class RecordRelationshipChange extends FunctionAction {
     public RecordRelationshipChange() {
         super("record_relationship_change", """
-                        Updates your emotional feelings and relationship to the given citizen in your memory,
+                        Updates your emotional feelings and relationship in your memory targeting a citizen or the player you are talking to. Leave the citizen name, if you want to update the memory to the player (or manager)
                         so you can remember it later.
                         The change must be between -1.0 and 1.0.
                         """,
                 new ObjectProperty(new HashMap<>() {{
-                    put("citizen_name", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
+                    put("citizen_name", new PrimitiveProperty(PrimitiveProperty.Type.STRING, false));
                     put("change", new PrimitiveProperty(PrimitiveProperty.Type.NUMBER, true));
                     put("type", new EnumProperty(Arrays.stream(CitizenRelationshipChangeType.values())
                             .map(Enum::name)
@@ -37,13 +38,14 @@ public class RecordRelationshipChange extends FunctionAction {
     @Override
     public JsonObject execute(AbstractEntityCitizen citizen, IColony colony, @Nullable JsonObject parameters) {
         var obj = new JsonObject();
-        if (parameters == null || !parameters.has("event")) {
+        if (parameters == null) {
             obj.addProperty("success", false);
-            obj.addProperty("error", "Missing or invalid parameters.");
+            obj.addProperty("error", "Missing parameters.");
             return obj;
         }
 
-        var citizenName = parameters.get("citizen_name").getAsString();
+        @Nullable
+        var citizenName = parameters.has("citizen_name") ? parameters.get("citizen_name").getAsString() : null;
         var change = parameters.get("change").getAsFloat();
         var typeStr = parameters.get("type").getAsString();
 
@@ -65,20 +67,21 @@ public class RecordRelationshipChange extends FunctionAction {
             return obj;
         }
 
-        var target = colony.getCitizenManager().getCitizens().stream()
+        var targetUUID = colony.getCitizenManager().getCitizens().stream()
                 .filter(c -> c.getName().equals(citizenName))
-                .findFirst();
-
-        if (target.isEmpty()) {
+                .findFirst()
+                .map(ICivilianData::getUUID)
+                .orElseGet(() -> ConversationManager.getPlayerForEntity(citizen.getUUID()));
+        if (targetUUID == null) {
             obj.addProperty("success", false);
-            obj.addProperty("error", "Target citizen not found.");
+            obj.addProperty("error", "Target citizen and player not found.");
             return obj;
         }
 
 
         var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
 
-        memory.addRelationshipChange(target.get().getUUID(), type, change);
+        memory.addRelationshipChange(targetUUID, type, change);
         return obj;
     }
 }
