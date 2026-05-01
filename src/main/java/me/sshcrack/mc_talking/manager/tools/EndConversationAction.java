@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 public class EndConversationAction extends FunctionAction {
     public EndConversationAction() {
         super("end_conversation", """
-                Ends the conversation between you and another fellow citizen. Not usable if talking to a player. Use this when you want to stop the current conversation
+                This will end the conversation between you and your peer. Your peer isn't able to respond after this tool has been called.
                 """);
     }
 
@@ -27,7 +27,8 @@ public class EndConversationAction extends FunctionAction {
             return obj;
         }
 
-        liveClient.forceConversationEnd();
+
+        liveClient.endConversationWhenPossible();
         obj.addProperty("success", true);
 
         return obj;

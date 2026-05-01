@@ -20,6 +20,8 @@ public interface CitizenPromptProvider {
      */
     String generateCitizenRoleplayPrompt(@NotNull CitizenPromptView view);
 
+    String getDetailedCitizenInfoPrompt(@NotNull CitizenPromptView view);
+
     String generateConversationalInfoPrompt(@NotNull CitizenPromptView view);
 
     /**

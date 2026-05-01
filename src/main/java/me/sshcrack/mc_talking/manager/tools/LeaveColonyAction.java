@@ -12,6 +12,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.core.colony.buildings.modules.TavernBuildingModule;
 import com.minecolonies.core.colony.interactionhandling.RecruitmentInteraction;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.core.BlockPos;
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
@@ -40,7 +42,7 @@ public class LeaveColonyAction extends FunctionAction {
     private static final String TAG_RECRUIT_COST_QTY = "rcostqty";
 
     public LeaveColonyAction() {
-        super("leave_colony", "You leave the colony and become a visitor. Use this ONLY if you are REALLY unhappy and the manager doesn't care about you.");
+        super("leave_colony", "You leave the colony and become a visitor. Use this ONLY if you are REALLY unhappy and the manager doesn't care about you. CHILDREN ARE NOT ABLE TO LEAVE THE COLONY");
     }
 
     @Override
@@ -66,6 +68,7 @@ public class LeaveColonyAction extends FunctionAction {
         var data = citizen.getCitizenData();
         var level = citizen.level();
         var pos = citizen.blockPosition();
+        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
 
         // First, serialize all citizen data to NBT
         /*? if forge {*/
@@ -139,6 +142,7 @@ public class LeaveColonyAction extends FunctionAction {
 
         var obj = new JsonObject();
         obj.addProperty("success", true);
+
 
         return obj;
     }

@@ -63,8 +63,10 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
     private volatile boolean holdAudio = false;
     private final List<AudioChunk> heldAudioChunks = new ArrayList<>();
+    private boolean shouldEndConversation;
 
-    private record AudioChunk(byte[] data, int sampleRate) {}
+    private record AudioChunk(byte[] data, int sampleRate) {
+    }
 
     // -------------------------------------------------------------------------
 
@@ -129,6 +131,15 @@ public class LiveConversationWsClient extends GeminiWsClient {
         return prompt;
     }
 
+
+    public void endConversationWhenPossible() {
+        shouldEndConversation = true;
+        if (peer != null) {
+            peer.endConversationWhenPossible();
+        }
+
+    }
+
     @Nullable
     public LiveConversationWsClient getPeer() {
         return peer;
@@ -155,10 +166,6 @@ public class LiveConversationWsClient extends GeminiWsClient {
         onEnded.accept(this);
     }
 
-    public void forceConversationEnd() {
-        onEnded.accept(this);
-    }
-
     /**
      * Called when text + audio generation for this turn is fully complete (audio
      * may still be playing back locally).
@@ -177,13 +184,20 @@ public class LiveConversationWsClient extends GeminiWsClient {
     public void onTurnComplete() {
         super.onTurnComplete();
 
+        if (shouldEndConversation) {
+            McTalking.LOGGER.info("[LiveConvWs] Ending conversation as requested by {}", citizen.getCitizenData().getName());
+            onEnded.accept(this);
+            return;
+        }
+
         if (peer != null && !peer.isClosed() && !currentTurnTranscript.isBlank()) {
-            McTalking.LOGGER.info("[LiveConvWs] Turn complete – holding peer audio and forwarding transcript to {} ({})",
+            McTalking.LOGGER.info("[LiveConvWs] Turn complete - holding peer audio and forwarding transcript to {} ({})",
                     peer.getEntity().getCitizenData().getName(), currentTurnTranscript.trim());
             // Hold peer's audio so it doesn't play while we're still speaking.
             peer.holdAudio();
             // Send text immediately so peer starts generating right now.
             peer.addPromptTextImmediate(currentTurnTranscript.trim());
+            currentTurnTranscript = "";
         }
     }
 

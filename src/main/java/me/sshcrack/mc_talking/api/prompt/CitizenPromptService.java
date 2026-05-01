@@ -48,6 +48,10 @@ public final class CitizenPromptService {
         return getProvider().getBasicCitizenInfoPrompt(view, false);
     }
 
+    public static String getDetailedCitizenInfoPrompt(@NotNull CitizenPromptView view) {
+        return getProvider().getDetailedCitizenInfoPrompt(view);
+    }
+
     public static String formatStatus(CitizenStatusView status) {
         return getProvider().formatStatus(status);
     }

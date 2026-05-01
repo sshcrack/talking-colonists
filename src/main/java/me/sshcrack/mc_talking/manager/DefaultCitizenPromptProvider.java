@@ -179,6 +179,11 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     @Override
+    public String getDetailedCitizenInfoPrompt(@NotNull CitizenPromptView view) {
+        return getGeneralCitizenPrompt(view, false);
+    }
+
+    @Override
     public String generateConversationalInfoPrompt(@NotNull CitizenPromptView view) {
         return getGeneralCitizenPrompt(view, false);
     }

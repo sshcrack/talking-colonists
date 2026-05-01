@@ -50,7 +50,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      */
     protected String currentTurnTranscript = "";
 
-    private final GeminiStream stream;
+    protected final GeminiStream stream;
     private final AbstractEntityCitizen entity;
     private final AudioChannel channel;
     private final OpusDecoder decoder;
@@ -365,8 +365,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return null;
         }
 
-        McTalking.LOGGER.info("Entity {} has called tool {}", entity.getStringUUID(), name);
-        return action.execute(this.entity, colony, args);
+        McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {}", entity.getStringUUID(), name);
+        JsonObject result = null;
+        try {
+            result = action.execute(this.entity, colony, args);
+        } catch (Exception e) {
+            McTalking.LOGGER.error("[TOOL-CALL] Tool threw an unexpected exception", e);
+            var error = new JsonObject();
+            error.addProperty("error", "A fatal error occurred. Don't call this tool again.");
+
+            return error;
+        }
+
+        McTalking.LOGGER.info("[TOOL-CALL] Result of {}: {}", name, result);
+        return result;
     }
 
     @Override
@@ -380,7 +392,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onClose(int code, String reason, boolean remote) {
         super.onClose(code, reason, remote);
 
-        if (reason.contains("BidiGenerateContent session not found")) {
+        if (reason.contains("BidiGenerateContent session")) {
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
             new Thread(() -> {

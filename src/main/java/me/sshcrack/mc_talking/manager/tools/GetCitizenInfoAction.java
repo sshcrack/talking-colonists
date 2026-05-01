@@ -5,6 +5,8 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -46,13 +48,12 @@ public class GetCitizenInfoAction extends FunctionAction {
         }
 
         var found = foundOpt.get();
-        /*? if forge {*/
-        /*var tag = found.serializeNBT();
-        *//*?}*/
-        /*? if neoforge {*/
-        var tag = found.serializeNBT(level.registryAccess());
-        /*?}*/
+        var view = CitizenPromptViewFactory.create(found, new HashMap<>(), null);
+        var generalPrompt = CitizenPromptService.getDetailedCitizenInfoPrompt(view);
 
-        return tagToJson(tag);
+        var obj = new JsonObject();
+        obj.addProperty("info", generalPrompt);
+
+        return obj;
     }
 }
