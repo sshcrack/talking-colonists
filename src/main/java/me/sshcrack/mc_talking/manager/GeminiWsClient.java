@@ -35,14 +35,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      */
     private static boolean quotaExceeded;
 
-    private boolean shouldReconnect = false;
     private boolean isInitiatingConnection = false;
     private boolean generationComplete = false;
-    /** Whether the AI has started generating audio at least once (used to gate onGenerationPaused). */
+    /**
+     * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
+     */
     private boolean sentGeneratingStatus = false;
     private long lastReconnectTime = 0;
 
-    /** Accumulates AI-generated text/transcription for the current turn to display in chat. */
+    /**
+     * Accumulates AI-generated text/transcription for the current turn to display in chat.
+     */
     private String currentTurnTranscript = "";
 
     private final GeminiStream stream;
@@ -329,7 +332,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             mem.setSessionToken("");
             new Thread(() -> {
                 if (!isOpen() || !isInitiatingConnection) {
-                    isInitiatingConnection = true; // set before reconnect to prevent double-reconnect
                     reconnect();
                 }
             }).start();
@@ -369,19 +371,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
 
             if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (shouldReconnect) {
-                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                        return;
+                if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                    return;
 
-                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                    lastReconnectTime = System.currentTimeMillis();
-                    reconnect();
-                } else {
-                    connect();
-                    shouldReconnect = true;
-                }
-
-                isInitiatingConnection = true;
+                McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                lastReconnectTime = System.currentTimeMillis();
+                reconnect();
             }
             return;
         }
@@ -402,24 +397,29 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
 
             if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (shouldReconnect) {
-                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                        return;
+                if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                    return;
 
-                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                    lastReconnectTime = System.currentTimeMillis();
-                    reconnect();
-                } else {
-                    connect();
-                    shouldReconnect = true;
-                }
-
-                isInitiatingConnection = true;
+                McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                lastReconnectTime = System.currentTimeMillis();
+                reconnect();
             }
             return;
         }
 
         pendingTextAfterTalking.add(text);
+    }
+
+    @Override
+    public void connect() {
+        isInitiatingConnection = true;
+        super.connect();
+    }
+
+    @Override
+    public void reconnect() {
+        isInitiatingConnection = true;
+        super.reconnect();
     }
 
     public void promptAudioOpus(byte[] audio) {
@@ -431,6 +431,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void close() {
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         super.close();
         stream.close();
     }
