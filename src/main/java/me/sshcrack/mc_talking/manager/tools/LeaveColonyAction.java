@@ -63,10 +63,21 @@ public class LeaveColonyAction extends FunctionAction {
             return invalidReturn;
         }
 
+        var client = me.sshcrack.mc_talking.ConversationManager.getClientForEntity(citizen.getUUID());
+        if (client == null) {
+            var invalidReturn = new JsonObject();
+            invalidReturn.addProperty("error", "No active conversation found.");
+            return invalidReturn;
+        }
+
         var data = citizen.getCitizenData();
         var level = citizen.level();
         var pos = citizen.blockPosition();
-        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
+
+        client.addOnCloseAction(() -> {
+            if (level.getServer() != null) {
+                level.getServer().execute(() -> {
+                    AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
 
         // First, serialize all citizen data to NBT
         /*? if forge {*/
@@ -131,12 +142,17 @@ public class LeaveColonyAction extends FunctionAction {
         // Add to tavern's external citizens list - critical for recruitment to work
         module.getExternalCitizens().add(visitorData.getId());
 
-        // Add recruitment interaction
-        visitorData.triggerInteraction(new RecruitmentInteraction(
-                Component.translatable("com.minecolonies.coremod.gui.chat.recruitstory" +
-                                (level.random.nextInt(5) + 1),
-                        visitorData.getName().split(" ")[0]),
-                ChatPriority.IMPORTANT));
+                    // Add recruitment interaction
+                    visitorData.triggerInteraction(new RecruitmentInteraction(
+                            Component.translatable("com.minecolonies.coremod.gui.chat.recruitstory" +
+                                            (level.random.nextInt(5) + 1),
+                                    visitorData.getName().split(" ")[0]),
+                            ChatPriority.IMPORTANT));
+                });
+            }
+        });
+
+        client.endConversationWhenPossible();
 
         var obj = new JsonObject();
         obj.addProperty("success", true);

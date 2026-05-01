@@ -44,6 +44,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      */
     private boolean sentGeneratingStatus = false;
     private long lastReconnectTime = 0;
+    protected boolean shouldEndConversation = false;
 
     /**
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
@@ -57,6 +58,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
+    private final List<Runnable> onCloseActions = new ArrayList<>();
 
     @Nullable
     private VisibleCitizenStatus lastStatus;
@@ -91,6 +93,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     public void setLastStatus(@Nullable VisibleCitizenStatus lastStatus) {
         this.lastStatus = lastStatus;
+    }
+
+    public void addOnCloseAction(Runnable action) {
+        onCloseActions.add(action);
+    }
+
+    public void endConversationWhenPossible() {
+        this.shouldEndConversation = true;
     }
 
     /**
@@ -276,6 +286,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onTurnComplete() {
         McTalking.LOGGER.info("Gemini turn complete");
         generationComplete = true;
+        if (shouldEndConversation) {
+            var playerUUID = ConversationManager.getPlayerForEntity(entity.getUUID());
+            if (playerUUID != null) {
+                ConversationManager.endConversation(playerUUID, false);
+            } else {
+                close();
+            }
+        }
     }
 
     @Override
@@ -504,6 +522,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         super.close();
         stream.close();
+
+        for (Runnable action : onCloseActions) {
+            try {
+                action.run();
+            } catch (Exception e) {
+                McTalking.LOGGER.error("Error executing onClose action", e);
+            }
+        }
     }
 
     /**

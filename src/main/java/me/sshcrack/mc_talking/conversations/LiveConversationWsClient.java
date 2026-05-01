@@ -63,7 +63,6 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
     private volatile boolean holdAudio = false;
     private final List<AudioChunk> heldAudioChunks = new ArrayList<>();
-    private boolean shouldEndConversation;
 
     private record AudioChunk(byte[] data, int sampleRate) {
     }
@@ -132,12 +131,13 @@ public class LiveConversationWsClient extends GeminiWsClient {
     }
 
 
+    @Override
     public void endConversationWhenPossible() {
-        shouldEndConversation = true;
+        if (this.shouldEndConversation) return;
+        super.endConversationWhenPossible();
         if (peer != null) {
             peer.endConversationWhenPossible();
         }
-
     }
 
     @Nullable
