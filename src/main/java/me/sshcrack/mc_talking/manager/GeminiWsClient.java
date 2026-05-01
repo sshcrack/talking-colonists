@@ -12,6 +12,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
@@ -27,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
@@ -192,8 +194,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         generationComplete = false;
     }
 
-    private String currMsg = "";
-
     @Override
     public void onUsageMetadata(JsonObject obj) {
         //McTalking.LOGGER.info("Gemini usage metadata: {}", obj.toString());
@@ -295,7 +295,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
                 for (short[] data : audioToProcess) {
                     var input = new RealtimeInput();
-                    var byteAudio = audioProvider.shortsToBytes(data);
+                    var byteAudio = vcApi.getAudioConverter().shortsToBytes(data);
                     input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
                     send(ClientMessages.input(input));
                 }
@@ -358,7 +358,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void addPromptAudio(short[] audio) {
         var input = new RealtimeInput();
-        var byteAudio = audioProvider.shortsToBytes(audio);
+        var byteAudio = vcApi.getAudioConverter().shortsToBytes(audio);
         input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
 
         if (sentGeneratingStatus)
@@ -385,9 +385,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     public void addPromptTextAfterTalkingComplete(String text) {
-        var input = new RealtimeInput();
-        input.text = text;
-
         if (sentGeneratingStatus)
             onGenerationPaused();
 

@@ -42,10 +42,4 @@ public class CitzienEntityAudioProvider implements AudioProvider {
         if (McTalkingVoicechatPlugin.vcApi == null) return null;
         return McTalkingVoicechatPlugin.vcApi.createDecoder();
     }
-
-    @Override
-    public byte[] shortsToBytes(short[] data) {
-        if (McTalkingVoicechatPlugin.vcApi == null) return new byte[0];
-        return McTalkingVoicechatPlugin.vcApi.getAudioConverter().shortsToBytes(data);
-    }
 }

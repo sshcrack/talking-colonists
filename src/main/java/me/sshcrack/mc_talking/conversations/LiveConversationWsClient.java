@@ -18,6 +18,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
+
 /**
  * A {@link GeminiWsClient} that represents one participant in a Live-WebSocket
  * citizen-to-citizen conversation.
@@ -31,23 +34,35 @@ import java.util.function.Consumer;
  */
 public class LiveConversationWsClient extends GeminiWsClient {
 
-    /** Maximum number of speaking turns (across both participants) before the session closes. */
+    /**
+     * Maximum number of speaking turns (across both participants) before the session closes.
+     */
     private static final int MAX_TOTAL_TURNS = 10;
 
-    /** Peer client that will receive our generated audio as its input. */
+    /**
+     * Peer client that will receive our generated audio as its input.
+     */
     @Nullable
     private LiveConversationWsClient peer;
 
-    /** Shared turn counter so both clients can agree when to stop. */
+    /**
+     * Shared turn counter so both clients can agree when to stop.
+     */
     private final AtomicInteger sharedTurnCounter;
 
-    /** Callback invoked when this client's session ends (either naturally or on error). */
+    /**
+     * Callback invoked when this client's session ends (either naturally or on error).
+     */
     private final Consumer<LiveConversationWsClient> onEnded;
 
-    /** The citizen entity this client represents. */
+    /**
+     * The citizen entity this client represents.
+     */
     private final AbstractEntityCitizen citizen;
 
-    /** Accumulated PCM that was generated during the last AI turn. */
+    /**
+     * Accumulated PCM that was generated during the last AI turn.
+     */
     private volatile short[] lastGeneratedPcm = new short[0];
 
     // -------------------------------------------------------------------------
@@ -67,8 +82,10 @@ public class LiveConversationWsClient extends GeminiWsClient {
     // Peer wiring
     // -------------------------------------------------------------------------
 
-    /** Sets the other participant who will receive this client's audio output. */
-    public void setPeer(LiveConversationWsClient peer) {
+    /**
+     * Sets the other participant who will receive this client's audio output.
+     */
+    public void setPeer(@Nullable LiveConversationWsClient peer) {
         this.peer = peer;
     }
 
@@ -145,12 +162,14 @@ public class LiveConversationWsClient extends GeminiWsClient {
      */
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
-        // Accumulate raw PCM (int16 little-endian) for peer forwarding
-        // The parent converts byte[] → short[] internally; we do it here too.
-        short[] chunk = AudioHelper.bytesToShorts(data);
-        short[] combined = new short[lastGeneratedPcm.length + chunk.length];
+        // Gemini gives us a different sample rate than the onGeneratedAudio expects
+        short[] chunk = vcApi.getAudioConverter().bytesToShorts(data);
+        short[] chunkResampled = AudioHelper.resampleAudio(chunk, sampleRate, TARGET_SAMPLE_RATE);
+
+        short[] combined = new short[lastGeneratedPcm.length + chunkResampled.length];
+
         System.arraycopy(lastGeneratedPcm, 0, combined, 0, lastGeneratedPcm.length);
-        System.arraycopy(chunk, 0, combined, lastGeneratedPcm.length, chunk.length);
+        System.arraycopy(chunkResampled, 0, combined, lastGeneratedPcm.length, chunkResampled.length);
         lastGeneratedPcm = combined;
 
         // Let parent play the audio in-world

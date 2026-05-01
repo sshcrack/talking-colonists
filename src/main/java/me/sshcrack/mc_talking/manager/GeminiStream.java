@@ -4,6 +4,7 @@ import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
@@ -105,7 +106,7 @@ public class GeminiStream implements Supplier<short[]> {
             incomingData.clear();
         }
 
-        short[] samples = AudioHelper.bytesToShorts(combined);
+        short[] samples = vcApi.getAudioConverter().bytesToShorts(combined);
 
         samples = AudioHelper.changePitch(samples, sampleRate, pitchFactor);
         // Apply sample rate conversion if needed

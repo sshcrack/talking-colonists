@@ -44,49 +44,6 @@ public class AudioHelper {
     }
 
     /**
-     * Time-stretches audio without changing pitch
-     *
-     * @param input         Original audio samples
-     * @param stretchFactor Factor by which to stretch (>1 = longer, <1 = shorter)
-     * @return Time-stretched audio data
-     */
-    private static short[] timeStretch(short[] input, float stretchFactor) {
-        int outputLength = (int) (input.length * stretchFactor);
-        short[] output = new short[outputLength];
-
-        for (int i = 0; i < outputLength; i++) {
-            float sourcePos = i / stretchFactor;
-            int index = (int) sourcePos;
-            float fraction = sourcePos - index;
-
-            if (index >= input.length - 1) {
-                output[i] = input[input.length - 1];
-            } else {
-                // Linear interpolation
-                short sample1 = input[index];
-                short sample2 = input[index + 1];
-                output[i] = (short) (sample1 + fraction * (sample2 - sample1));
-            }
-        }
-
-        return output;
-    }
-
-    /**
-     * Converts a little-endian signed 16-bit PCM byte array to a short array.
-     *
-     * @param bytes Raw PCM bytes (must have even length)
-     * @return Decoded samples
-     */
-    public static short[] bytesToShorts(byte[] bytes) {
-        short[] out = new short[bytes.length / 2];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (short) ((bytes[i * 2] & 0xFF) | (bytes[i * 2 + 1] << 8));
-        }
-        return out;
-    }
-
-    /**
      * Linear interpolation-based audio resampling for changing sample rate
      *
      * @param input            Original audio samples

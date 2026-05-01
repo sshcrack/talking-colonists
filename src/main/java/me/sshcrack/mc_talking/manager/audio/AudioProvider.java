@@ -7,6 +7,4 @@ public interface AudioProvider {
     AudioChannel createChannel();
 
     OpusDecoder createDecoder();
-
-    byte[] shortsToBytes(short[] data);
 }
