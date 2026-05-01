@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking.mixin;
 
-import com.ibm.icu.impl.breakiter.LSTMBreakEngine;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.core.colony.CitizenData;
 import me.sshcrack.mc_talking.ConversationManager;
