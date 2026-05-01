@@ -63,7 +63,9 @@ public class AITools {
                 new GetColonyAction(),
                 new DropItemAction(),
                 new DescribeSurroundingsAction(),
-                new EndConversationAction()
+                new EndConversationAction(),
+                new RecordRelationshipChange(),
+                new AddEventToMemory()
 //                new JobSpecificAction()
         ));
     }
