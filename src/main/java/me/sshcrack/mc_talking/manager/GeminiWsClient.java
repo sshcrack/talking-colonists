@@ -51,7 +51,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private String currentTurnTranscript = "";
 
     private final GeminiStream stream;
-    private final AudioProvider audioProvider;
     private final AbstractEntityCitizen entity;
     private final AudioChannel channel;
     private final OpusDecoder decoder;
@@ -69,7 +68,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     // AudioProvider creates channels/decoders so this client can be tested/mockable
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
         super(CONFIG.geminiApiKey.get());
-        this.audioProvider = audioProvider;
         this.entity = entity;
         this.channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
@@ -80,6 +78,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var isChild = entity.getCitizenData().isChild();
         if (isChild && !isFemale)
             stream.setPitch(1.2f); // Increase pitch
+    }
+
+    public boolean shouldResumeAndSaveSession() {
+        return true;
     }
 
     @Nullable
@@ -112,7 +114,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             var sessionToken = mem.getSessionToken();
-            if (!sessionToken.isBlank()) {
+            if (!sessionToken.isBlank() && shouldResumeAndSaveSession()) {
                 setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
             }
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
@@ -201,7 +203,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onSessionResumptionUpdate(String newHandle, boolean resumable) {
-        if (!resumable)
+        if (!resumable || !shouldResumeAndSaveSession())
             return;
 
         var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();

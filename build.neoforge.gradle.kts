@@ -35,6 +35,10 @@ platform {
             curseforge = "simple-voice-chat"
             forgeLikeVersionRange = "[${voicechat_version},)"
         }
+        required("yet_another_config_lib_v3") {
+            curseforge = "yacl"
+            forgeLikeVersionRange = "[${prop("deps.yacl_version")},)"
+        }
     }
 }
 
@@ -112,6 +116,15 @@ repositories {
         name = "sshcrackRepositoryReleases"
         url = uri("https://maven.sshcrack.me/releases")
     }
+
+    maven("https://maven.isxander.dev/releases") {
+        name = "Xander Maven"
+    }
+
+    maven {
+        name = "Kotlin for Forge"
+        setUrl("https://thedarkcolour.github.io/KotlinForForge/")
+    }
 }
 
 var loader = sc.current.component1().split("-")[1];
@@ -154,6 +167,8 @@ dependencies {
     runtimeOnly("com.ldtteam:domum-ornamentum:${prop("deps.domum_version")}")
     runtimeOnly("com.ldtteam:structurize:${prop("deps.structurize_version")}")
     runtimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
+
+    implementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+1.21.1-neoforge")
 }
 
 tasks.named("createMinecraftArtifacts") {

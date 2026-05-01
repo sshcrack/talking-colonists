@@ -37,6 +37,10 @@ platform {
             curseforge = "simple-voice-chat"
             forgeLikeVersionRange = "[${voicechat_version},)"
         }
+        required("yet_another_config_lib_v3") {
+            curseforge = "yacl"
+            forgeLikeVersionRange = "[${prop("deps.yacl_version")},)"
+        }
     }
 }
 
@@ -114,6 +118,15 @@ repositories {
         name = "sshcrackRepositoryReleases"
         url = uri("https://maven.sshcrack.me/releases")
     }
+
+    maven("https://maven.isxander.dev/releases") {
+        name = "Xander Maven"
+    }
+
+    maven {
+        name = "Kotlin for Forge"
+        setUrl("https://thedarkcolour.github.io/KotlinForForge/")
+    }
 }
 
 var loader = sc.current.component1().split("-")[1];
@@ -158,6 +171,8 @@ dependencies {
     modRuntimeOnly("com.ldtteam:domum_ornamentum:${prop("deps.domum_version")}:universal")
     modRuntimeOnly("com.ldtteam:structurize:${prop("deps.structurize_version")}")
     modRuntimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
+
+    modImplementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+${prop("deps.minecraft")}-forge")
 }
 
 sourceSets {

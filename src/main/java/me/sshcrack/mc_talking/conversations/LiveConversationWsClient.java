@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.conversations;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
@@ -146,10 +147,20 @@ public class LiveConversationWsClient extends GeminiWsClient {
             short[] audio = lastGeneratedPcm;
             if (audio.length > 0) {
                 peer.addPromptAudio(audio);
+                // Add 5 seconds of silence to trigger the AI to respond
+
+                short[] ambientAudio = McTalkingVoicechatPlugin.generateAmbientNoise((int) (960 * 5000 / McTalkingVoicechatPlugin.SILENCE_INTERVAL_MS));
+                peer.addPromptAudio(ambientAudio);
             }
         }
 
         lastGeneratedPcm = new short[0];
+    }
+
+    @Override
+    public boolean shouldResumeAndSaveSession() {
+        // Disabling session resumptions for now, so the AI doesn't confuse the player with the actual peer
+        return false;
     }
 
     // -------------------------------------------------------------------------
