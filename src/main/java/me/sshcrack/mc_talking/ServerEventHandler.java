@@ -203,6 +203,7 @@ public class ServerEventHandler {
 
         for (AbstractEntityCitizen citizen : citizens) {
             if (citizen instanceof VisitorCitizen) continue;
+            if(citizen.isSleeping()) continue;
             // Skip if this citizen already has any kind of active session
             if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
             // Skip if this citizen is still within their post-session cooldown
