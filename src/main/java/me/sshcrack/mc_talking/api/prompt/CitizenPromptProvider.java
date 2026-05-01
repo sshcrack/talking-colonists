@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
  * through {@link CitizenPromptService#setProvider(CitizenPromptProvider)}.
  */
 public interface CitizenPromptProvider {
+    String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson);
 
     /**
      * Builds the initial roleplay/system prompt for a citizen conversation.

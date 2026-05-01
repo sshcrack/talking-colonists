@@ -44,6 +44,10 @@ public final class CitizenPromptService {
         return getProvider().generateConversationalInfoPrompt(view);
     }
 
+    public static String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view) {
+        return getProvider().getBasicCitizenInfoPrompt(view, false);
+    }
+
     public static String formatStatus(CitizenStatusView status) {
         return getProvider().formatStatus(status);
     }

@@ -15,7 +15,8 @@ import java.util.stream.Collectors;
  * Default implementation for citizen prompt generation.
  */
 public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
-    private String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
+    @Override
+    public String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
         StringBuilder prompt = new StringBuilder();
         String name = view.name();
         String citizenType = (view.child() ? "Child" : "Adult") + " " + (view.female() ? "woman" : "man");
@@ -44,13 +45,19 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         prompt.append(".\n\n");
+        return prompt.toString();
+    }
+
+    private String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append(getBasicCitizenInfoPrompt(view, firstPerson));
 
         if (view.skills() != null && !view.skills().isEmpty()) {
             appendCondensedSkills(view.skills(), prompt);
         }
 
         addRelationships(view, prompt);
-        addCurrentState(view, prompt, sick);
+        addCurrentState(view, prompt, view.sick());
         addMemory(view, prompt);
 
         prompt.append("\n## EMOTIONAL PROFILE\n");
@@ -75,7 +82,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- May refuse requests or be uncooperative\n");
         }
 
-        if (sick) {
+        if (view.sick()) {
             prompt.append("- Occasionally mentions symptoms or discomfort\n");
         }
 
@@ -188,11 +195,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         - YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES
                         - DO NOT start conversations with generic greetings if unhappy or in distress
                         - Do not use markdown, speak in plain text.
-                        - If a player begins speaking to you directly, seamlessly continue the conversation as if you were naturally interrupted from your thoughts. Do not restart or re-introduce yourself.
-                        Stay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.
                         REMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.
                         Start by speaking in the language %s and ONLY switch if the user is speaking in another language
                         """,
+                /*
+
+                        - If a player begins speaking to you directly, seamlessly continue the conversation as if you were naturally interrupted from your thoughts. Do not restart or re-introduce yourself.
+                        Stay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.
+                 */
                 getGeneralCitizenPrompt(view, true),
                 view.responseLanguageName()
         );

@@ -39,6 +39,8 @@ public class LiveConversationWsClient extends GeminiWsClient {
      * Maximum number of speaking turns (across both participants) before the session closes.
      */
     private static final int MAX_TOTAL_TURNS = 10;
+    @Nullable
+    private final String systemPromptAddition;
 
     /**
      * Peer client that will receive our generated audio as its input.
@@ -73,10 +75,20 @@ public class LiveConversationWsClient extends GeminiWsClient {
             AbstractEntityCitizen citizen,
             AtomicInteger sharedTurnCounter,
             Consumer<LiveConversationWsClient> onEnded) {
+        this(audioProvider, citizen, sharedTurnCounter, onEnded, null);
+    }
+
+    public LiveConversationWsClient(
+            AudioProvider audioProvider,
+            AbstractEntityCitizen citizen,
+            AtomicInteger sharedTurnCounter,
+            Consumer<LiveConversationWsClient> onEnded,
+            @Nullable String systemPromptAddition) {
         super(audioProvider, citizen);
         this.citizen = citizen;
         this.sharedTurnCounter = sharedTurnCounter;
         this.onEnded = onEnded;
+        this.systemPromptAddition = systemPromptAddition;
     }
 
     // -------------------------------------------------------------------------
@@ -101,7 +113,12 @@ public class LiveConversationWsClient extends GeminiWsClient {
             others.put(peer.citizen.getUUID(), peer.citizen.getCitizenData().getName());
         }
         var view = CitizenPromptViewFactory.create(citizen.getCitizenData(), others, null);
-        return CitizenPromptService.generateSystemControlledRoleplayPrompt(view);
+        var prompt = CitizenPromptService.generateSystemControlledRoleplayPrompt(view);
+        if (systemPromptAddition != null) {
+            prompt += "\n\n" + systemPromptAddition;
+        }
+
+        return prompt;
     }
 
     @Override
@@ -160,6 +177,11 @@ public class LiveConversationWsClient extends GeminiWsClient {
     @Override
     public boolean shouldResumeAndSaveSession() {
         // Disabling session resumptions for now, so the AI doesn't confuse the player with the actual peer
+        return false;
+    }
+
+    @Override
+    public boolean sendStatusUpdates() {
         return false;
     }
 

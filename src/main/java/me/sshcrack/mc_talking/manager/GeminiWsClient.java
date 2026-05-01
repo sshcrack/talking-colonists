@@ -12,7 +12,6 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
@@ -38,6 +37,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private static boolean quotaExceeded;
 
     private boolean isInitiatingConnection = false;
+    private boolean hasMadeInitialConnection = false;
     private boolean generationComplete = false;
     /**
      * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
@@ -373,12 +373,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
 
             if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                    return;
+                if (!hasMadeInitialConnection) {
+                    connect();
+                } else {
+                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                        return;
 
-                McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                lastReconnectTime = System.currentTimeMillis();
-                reconnect();
+                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                    reconnect();
+                }
             }
             return;
         }
@@ -396,12 +399,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
 
             if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                    return;
+                if (!hasMadeInitialConnection) {
+                    connect();
+                } else {
+                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                        return;
 
-                McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                lastReconnectTime = System.currentTimeMillis();
-                reconnect();
+                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                    reconnect();
+                }
             }
             return;
         }
@@ -412,12 +418,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void connect() {
         isInitiatingConnection = true;
+        hasMadeInitialConnection = true;
         super.connect();
     }
 
     @Override
     public void reconnect() {
         isInitiatingConnection = true;
+        lastReconnectTime = System.currentTimeMillis();
         super.reconnect();
     }
 
@@ -433,5 +441,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         super.close();
         stream.close();
+    }
+
+    /**
+     * If set to true, avoids to send new status updates while the conversation is active, which can be used to reduce status update spam when the AI is generating multiple turns in a row.
+      *
+     * @return false, if new status updates should NOT be sent
+     */
+    public boolean sendStatusUpdates() {
+        return true;
     }
 }

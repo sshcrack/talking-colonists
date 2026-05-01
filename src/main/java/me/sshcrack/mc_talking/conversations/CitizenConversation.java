@@ -5,13 +5,16 @@ import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.ConversationMode;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -38,10 +41,14 @@ public class CitizenConversation {
     private final MinecraftServer server;
     private final ConversationMode mode;
 
-    /** Only used in FLASH_TTS mode. */
+    /**
+     * Only used in FLASH_TTS mode.
+     */
     private GeminiStream stream;
 
-    /** Only used in LIVE_WEBSOCKETS mode. */
+    /**
+     * Only used in LIVE_WEBSOCKETS mode.
+     */
     private List<LiveConversationWsClient> liveClients;
 
     private Consumer<ConversationState> onStateChanged;
@@ -172,13 +179,22 @@ public class CitizenConversation {
             }
         };
 
+        var citizenDataA = citizenA.getCitizenData();
+        var viewA = CitizenPromptViewFactory.create(citizenDataA, new HashMap<>(), null);
+
+        var basicPromptB = """
+                You are about to start a conversation with the citizen %s.
+                This is some basic information about them. Talk naturally and according to your feelings.
+                %s
+                """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
+
         LiveConversationWsClient clientA = new LiveConversationWsClient(
                 new CitzienEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
                 citizenA, sharedTurnCounter, onClientEnded);
 
         LiveConversationWsClient clientB = new LiveConversationWsClient(
                 new CitzienEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                citizenB, sharedTurnCounter, onClientEnded);
+                citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
 
         clientA.setPeer(clientB);
         clientB.setPeer(clientA);
@@ -193,8 +209,11 @@ public class CitizenConversation {
         clientB.connect();
 
         // Kick off the dialogue from A's side
+
+        var citizenDataB = citizenB.getCitizenData();
+        var view = CitizenPromptViewFactory.create(citizenDataB, new HashMap<>(), null);
         clientA.addPromptTextAfterTalkingComplete(
-                "Start the conversation! Greet your fellow citizen and say something relevant to your current situation or needs.");
+                "Start the conversation! You are talking to the citizen " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
 
         setState(ConversationState.PLAYING_AUDIO);
     }

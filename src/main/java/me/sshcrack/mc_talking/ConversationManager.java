@@ -7,10 +7,13 @@ import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomModelData;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -22,8 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
 /*? if neoforge {*/
-import net.minecraft.world.item.component.CustomModelData;
-import net.minecraft.core.component.DataComponents;
 /*? }*/
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
@@ -167,7 +168,9 @@ public class ConversationManager {
         return (free + evictable) >= slotsNeeded;
     }
 
-    /** The oldest non-player entity in the queue that can be evicted, or {@code null}. */
+    /**
+     * The oldest non-player entity in the queue that can be evicted, or {@code null}.
+     */
     private static UUID findEvictableNonPlayerSlot() {
         for (UUID id : addedEntities) {
             if (getPlayerForEntity(id) == null) return id;
@@ -175,7 +178,9 @@ public class ConversationManager {
         return null;
     }
 
-    /** Closes and removes the client for {@code entityId}. */
+    /**
+     * Closes and removes the client for {@code entityId}.
+     */
     private static void evict(UUID entityId) {
         if (entityId == null) return;
         GeminiWsClient client = clients.remove(entityId);
@@ -252,8 +257,7 @@ public class ConversationManager {
                     // Record cooldown so this citizen won't be immediately re-selected
                     recordCooldown(citizenId);
                 });
-        client.addPromptTextAfterTalkingComplete(
-                me.sshcrack.mc_talking.util.MumblingTopicHelper.buildPrompt(citizen));
+        client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildPrompt(citizen));
         clients.put(citizenId, client);
     }
 
@@ -357,7 +361,9 @@ public class ConversationManager {
         return activeEntity.get(playerId);
     }
 
-    /** Returns the player UUID that is actively conversing with the given citizen, or {@code null}. */
+    /**
+     * Returns the player UUID that is actively conversing with the given citizen, or {@code null}.
+     */
     public static UUID getPlayerForEntity(UUID entityId) {
         return citizenToPlayer.get(entityId);
     }
