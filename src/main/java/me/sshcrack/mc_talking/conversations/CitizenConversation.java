@@ -165,6 +165,9 @@ public class CitizenConversation {
                 }
                 ConversationManager.unregisterExternalClient(idA);
                 ConversationManager.unregisterExternalClient(idB);
+                // Record per-citizen cooldowns so they aren't immediately re-selected
+                ConversationManager.recordCooldown(idA);
+                ConversationManager.recordCooldown(idB);
                 setState(ConversationState.ENDED);
             }
         };

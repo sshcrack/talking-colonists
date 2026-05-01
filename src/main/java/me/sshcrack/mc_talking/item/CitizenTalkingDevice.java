@@ -173,7 +173,7 @@ public class CitizenTalkingDevice extends Item {
         }
 
         // If there was a previously focused entity, remove its glowing effect
-        LivingEntity previousEntity = ConversationManager.getActiveEntity(playerId);
+        LivingEntity previousEntity = ConversationManager.getActiveEntityForPlayer(playerId);
         if (previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
             citizen.getNavigation().stop();
             citizen.getLookControl().setLookAt(player);

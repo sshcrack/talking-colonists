@@ -198,6 +198,8 @@ public class ServerEventHandler {
             if (citizen instanceof VisitorCitizen) continue;
             // Skip if this citizen already has any kind of active session
             if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
+            // Skip if this citizen is still within their post-session cooldown
+            if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
             if (Math.random() < CONFIG.mumblingChance.get()) {
                 ConversationManager.startMumbling(citizen);
                 break; // Only trigger one mumbling citizen per player per check
@@ -229,6 +231,8 @@ public class ServerEventHandler {
                 if (citizen instanceof VisitorCitizen) continue;
                 // Skip if this citizen already has any kind of active session
                 if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
+                // Skip if this citizen is still within their post-session cooldown
+                if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
 
                 if (Math.random() >= CONFIG.randomConversationChance.get()) continue;
 
@@ -239,6 +243,8 @@ public class ServerEventHandler {
                     if (candidate instanceof VisitorCitizen) continue;
                     // Skip if this candidate already has any kind of active session
                     if (ConversationManager.isCitizenBusy(candidate.getUUID())) continue;
+                    // Skip if this candidate is still within their post-session cooldown
+                    if (ConversationManager.isCitizenOnCooldown(candidate.getUUID())) continue;
                     partners.add(candidate);
                 }
 

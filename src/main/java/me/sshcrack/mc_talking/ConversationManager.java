@@ -17,6 +17,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
 
@@ -62,6 +63,13 @@ public class ConversationManager {
 
     // citizenId → playerId reverse map for O(1) getPlayerForEntity lookups
     private static final Map<UUID, UUID> citizenToPlayer = new HashMap<>();
+
+    /**
+     * citizenId → System.currentTimeMillis() at which their last automatic session ended.
+     * Used to enforce the per-citizen cooldown configured in
+     * {@link me.sshcrack.mc_talking.config.McTalkingConfig#citizenCooldownSeconds}.
+     */
+    private static final Map<UUID, Long> lastSessionEndTime = new ConcurrentHashMap<>();
 
     /**
      * Insertion-ordered queue of all occupied citizen slots.
@@ -188,6 +196,26 @@ public class ConversationManager {
         return clients.containsKey(citizenId);
     }
 
+    /**
+     * Records that the citizen's automatic session just ended, starting their cooldown timer.
+     * Call this whenever a mumbling or citizen-to-citizen session concludes naturally
+     * (not when a session is evicted to make room for a player).
+     */
+    public static void recordCooldown(UUID citizenId) {
+        lastSessionEndTime.put(citizenId, System.currentTimeMillis());
+    }
+
+    /**
+     * Returns {@code true} if the citizen is still within their cooldown period and
+     * should not be selected for a new automatic (mumble / citizen-to-citizen) session.
+     */
+    public static boolean isCitizenOnCooldown(UUID citizenId) {
+        Long lastEnd = lastSessionEndTime.get(citizenId);
+        if (lastEnd == null) return false;
+        long cooldownMs = CONFIG.citizenCooldownSeconds.get() * 1000L;
+        return (System.currentTimeMillis() - lastEnd) < cooldownMs;
+    }
+
     // -------------------------------------------------------------------------
     // Public conversation API
     // -------------------------------------------------------------------------
@@ -221,10 +249,11 @@ public class ConversationManager {
                             releaseSlot(citizenId);
                         }
                     }
+                    // Record cooldown so this citizen won't be immediately re-selected
+                    recordCooldown(citizenId);
                 });
         client.addPromptTextAfterTalkingComplete(
-                "You feel the urge to mutter something under your breath. " +
-                        "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.");
+                me.sshcrack.mc_talking.util.MumblingTopicHelper.buildPrompt(citizen));
         clients.put(citizenId, client);
     }
 
@@ -349,5 +378,6 @@ public class ConversationManager {
         playerConversationPartners.clear();
         citizenToPlayer.clear();
         addedEntities.clear();
+        lastSessionEndTime.clear();
     }
 }

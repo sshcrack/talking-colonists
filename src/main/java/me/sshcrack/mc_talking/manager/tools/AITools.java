@@ -61,7 +61,8 @@ public class AITools {
                 new ListCitizenAction(),
                 new GetInventoryAction(),
                 new GetColonyAction(),
-                new DropItemAction()
+                new DropItemAction(),
+                new DescribeSurroundingsAction()
 //                new JobSpecificAction()
         ));
     }

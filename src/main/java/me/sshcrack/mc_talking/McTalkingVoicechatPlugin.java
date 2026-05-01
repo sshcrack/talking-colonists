@@ -161,7 +161,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         }
 
         var player = (ServerPlayer) vcPlayer.getPlayer();
-        LivingEntity entity = ConversationManager.getActiveEntity(player.getUUID());
+        LivingEntity entity = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         if (entity == null) {
             return;
         }

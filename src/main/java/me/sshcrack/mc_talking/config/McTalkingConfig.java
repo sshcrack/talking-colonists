@@ -64,6 +64,9 @@ public class McTalkingConfig {
     public final Supplier<Double> mumblingDetectionRange;
     public final Supplier<Integer> mumblingCheckIntervalTicks;
 
+    // Per-citizen automatic-session cooldown
+    public final Supplier<Integer> citizenCooldownSeconds;
+
     /*? if forge {*/
     /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
         *//*?}*/
@@ -184,6 +187,12 @@ public class McTalkingConfig {
         mumblingCheckIntervalTicks = builder
                 .comment("How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
                 .define("mumbling_check_interval_ticks", 200, e -> e == null || (int) e > 0);
+
+        // Per-citizen cooldown
+        citizenCooldownSeconds = builder
+                .comment("Per-Citizen Cooldown")
+                .comment("Minimum number of seconds that must pass after a citizen's automatic session (mumble or citizen-to-citizen) ends before they can be selected for another one. Set to 0 to disable.")
+                .define("citizen_cooldown_seconds", 120, e -> e == null || (int) e >= 0);
     }
 
     static {
