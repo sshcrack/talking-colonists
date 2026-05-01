@@ -20,8 +20,9 @@ public class AbstractEntityCitizenMixin implements AbstractEntityCitizenAiStatus
 
     @Override
     public void mc_talking$setStatus(AiStatus status) {
+        boolean isDirty = status != mc_talking$status;
         this.mc_talking$status = status;
-        mc_talking$isStatusDirty = true;
+        mc_talking$isStatusDirty = mc_talking$isStatusDirty || isDirty;
     }
 
     @Override
