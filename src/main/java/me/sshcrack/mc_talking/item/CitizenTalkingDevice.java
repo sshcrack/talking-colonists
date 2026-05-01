@@ -163,6 +163,15 @@ public class CitizenTalkingDevice extends Item {
             return true; // Still prevent attack
         }
 
+        if (citizen.isSleeping()) {
+            serverPlayer.sendSystemMessage(
+                    Component.literal("This citizen is sleeping. You can't talk to them right now.")
+                            .withStyle(ChatFormatting.RED)
+            );
+
+            return true; // Prevent attack on sleeping citizens);
+        }
+
         // Check if voice chat API is initialized
         if (vcApi == null) {
             serverPlayer.sendSystemMessage(

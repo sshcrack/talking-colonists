@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.mixin;
 
+import com.ibm.icu.impl.breakiter.LSTMBreakEngine;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.core.colony.CitizenData;
 import me.sshcrack.mc_talking.ConversationManager;
@@ -40,11 +41,25 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
         }
 
         if (client.getLastStatus() == null) {
+            if (status == VisibleCitizenStatus.SLEEP) {
+                var sleepPrompt = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
+                client.setLastStatus(status);
+                McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
+                client.addPromptTextAfterTalkingComplete(sleepPrompt);
+            }
+
             client.setLastStatus(status);
         }
 
         if (client.getLastStatus() != null && client.getLastStatus().equals(status)) {
             return;
+        }
+
+        if (status == VisibleCitizenStatus.SLEEP) {
+            var sleepPrompt = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
+            client.setLastStatus(status);
+            McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
+            client.addPromptTextAfterTalkingComplete(sleepPrompt);
         }
 
         if (!client.sendStatusUpdates()) {

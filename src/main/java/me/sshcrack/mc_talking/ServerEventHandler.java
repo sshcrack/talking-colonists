@@ -7,23 +7,33 @@ import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
-/*? if forge {*/
-/*import net.minecraft.nbt.CompoundTag;
- *//*?}*/
-/*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
-        /*?}*/
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-/*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
-        /*?}*/
-
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+
+/*? if forge {*/
+/*import net.minecraft.nbt.CompoundTag;
+ */
+/*?}*/
+/*? if neoforge {*/
+/*?}*/
+/*? if neoforge {*/
+/*?}*/
 /*? if forge {*/
 /*import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -35,19 +45,10 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-*//*?}*/
-/*? if neoforge {*/
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+*/
 /*?}*/
-
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+/*? if neoforge {*/
+/*?}*/
 
 /**
  * Handler for server-side events related to player-citizen interactions.
@@ -245,6 +246,7 @@ public class ServerEventHandler {
                 if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
                 // Skip if this citizen is still within their post-session cooldown
                 if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
+                if (citizen.isSleeping()) continue;
 
                 if (Math.random() >= CONFIG.randomConversationChance.get()) continue;
 
@@ -253,6 +255,7 @@ public class ServerEventHandler {
                 for (AbstractEntityCitizen candidate : citizens) {
                     if (candidate == citizen) continue;
                     if (candidate instanceof VisitorCitizen) continue;
+                    if (candidate.isSleeping()) continue;
                     // Skip if this candidate already has any kind of active session
                     if (ConversationManager.isCitizenBusy(candidate.getUUID())) continue;
                     // Skip if this candidate is still within their post-session cooldown
