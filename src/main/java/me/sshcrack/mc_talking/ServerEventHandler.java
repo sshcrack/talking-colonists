@@ -194,6 +194,12 @@ public class ServerEventHandler {
         var aabb = player.getBoundingBox().inflate(range);
         var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
+        // If ANY citizen in range is already in a session, skip mumbling entirely for
+        // this player this tick – two conversations near the same player at once is jarring.
+        boolean anyBusy = citizens.stream()
+                .anyMatch(c -> ConversationManager.isCitizenBusy(c.getUUID()));
+        if (anyBusy) return;
+
         for (AbstractEntityCitizen citizen : citizens) {
             if (citizen instanceof VisitorCitizen) continue;
             // Skip if this citizen already has any kind of active session
@@ -226,6 +232,12 @@ public class ServerEventHandler {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             var nearbyBox = player.getBoundingBox().inflate(range);
             var citizens = player.serverLevel().getEntitiesOfClass(AbstractEntityCitizen.class, nearbyBox);
+
+            // If ANY citizen in range is already in a session, skip starting a new
+            // conversation near this player – overlapping sessions are disruptive.
+            boolean anyBusy = citizens.stream()
+                    .anyMatch(c -> ConversationManager.isCitizenBusy(c.getUUID()));
+            if (anyBusy) continue;
 
             for (AbstractEntityCitizen citizen : citizens) {
                 if (citizen instanceof VisitorCitizen) continue;

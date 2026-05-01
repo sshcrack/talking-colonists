@@ -56,7 +56,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     // Silence duration in milliseconds
     private static final long SILENCE_DURATION_MS = 2000;
     // Interval at which to send silence packets (ms)
-    public static final long SILENCE_INTERVAL_MS = 20;
+    private static final long SILENCE_INTERVAL_MS = 20;
     // Threshold for voice inactivity before sending silence (ms)
     private static final long VOICE_INACTIVITY_THRESHOLD_MS = 150;
     // Number of consecutive silent packets before considering speech ended
@@ -267,7 +267,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
      * @param length The length of the audio buffer to generate
      * @return A short array containing the generated audio
      */
-    public static short[] generateAmbientNoise(int length) {
+    private static short[] generateAmbientNoise(int length) {
         short[] audio = new short[length];
         Random random = new Random();
 

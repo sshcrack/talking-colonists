@@ -38,7 +38,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     private boolean isInitiatingConnection = false;
     private boolean hasMadeInitialConnection = false;
-    private boolean generationComplete = false;
+    protected boolean generationComplete = false;
     /**
      * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
      */
@@ -48,7 +48,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     /**
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
      */
-    private String currentTurnTranscript = "";
+    protected String currentTurnTranscript = "";
 
     private final GeminiStream stream;
     private final AbstractEntityCitizen entity;
@@ -93,11 +93,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         this.lastStatus = lastStatus;
     }
 
+    /**
+     * Returns the effective modality for this client.
+     * Subclasses may override to force a specific modality regardless of the global config.
+     * Defaults to the globally configured modality.
+     */
+    protected ModalityModes getEffectiveModality() {
+        return CONFIG.modality.get();
+    }
+
     @Override
     public BidiGenerateContentSetup getSetup() {
         var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
 
-        var modality = CONFIG.modality.get();
+        var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
 
         if (modality == ModalityModes.TEXT_AND_AUDIO) {
@@ -167,6 +176,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected void onConversationEnded() {
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+        flushPendingText();
+    }
+
+    /**
+     * Immediately sends any buffered {@link #pendingTextAfterTalking} to the API.
+     *
+     * <p>Called internally by {@link #onConversationEnded()} and may also be
+     * invoked externally (e.g. by the peer in a citizen-to-citizen conversation)
+     * to release text that was queued early — before the peer's own audio stream
+     * had a chance to drain.
+     */
+    protected void flushPendingText() {
         if (!pendingTextAfterTalking.isEmpty()) {
             String message = String.join("\n", pendingTextAfterTalking);
             pendingTextAfterTalking.clear();
@@ -218,7 +239,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var sPlayer = resolveActivePlayer();
         if (sPlayer == null || currentTurnTranscript.isBlank())
             return;
-        if (CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO) {
+        if (getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO) {
             sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
         }
 
@@ -239,7 +260,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onGeneratedText(String text) {
-        var hasTextEnabled = CONFIG.modality.get() == ModalityModes.TEXT || CONFIG.modality.get() == ModalityModes.TEXT_AND_AUDIO;
+        var hasTextEnabled = getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO;
         if (!hasTextEnabled)
             return;
 
@@ -269,6 +290,35 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!isJustStarted)
             return;
         onGenerationStarted();
+    }
+
+    /**
+     * Sends a text prompt directly to the Gemini API right now, bypassing the
+     * "after talking" buffer. If the connection is not yet ready the text is
+     * queued and sent as soon as setup completes, just like audio prompts.
+     */
+    public void addPromptTextImmediate(String text) {
+        if (!isSetupComplete() || this.isClosed()) {
+            synchronized (pendingSystemText) {
+                pendingSystemText.add(text);
+            }
+
+            if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
+                if (!hasMadeInitialConnection) {
+                    connect();
+                } else {
+                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
+                        return;
+                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+                    reconnect();
+                }
+            }
+            return;
+        }
+
+        var input = new RealtimeInput();
+        input.text = text;
+        send(ClientMessages.input(input));
     }
 
     @Override
