@@ -1,8 +1,6 @@
 package me.sshcrack.mc_talking.manager.tools;
 
 import com.google.gson.JsonObject;
-import com.minecolonies.api.colony.ICitizenData;
-import com.minecolonies.api.colony.ICivilianData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IVisitorData;
 import com.minecolonies.api.colony.buildings.IBuilding;
@@ -42,7 +40,7 @@ public class LeaveColonyAction extends FunctionAction {
     private static final String TAG_RECRUIT_COST_QTY = "rcostqty";
 
     public LeaveColonyAction() {
-        super("leave_colony", "You leave the colony and become a visitor. Use this ONLY if you are REALLY unhappy and the manager doesn't care about you. CHILDREN ARE NOT ABLE TO LEAVE THE COLONY");
+        super("leave_colony", "You leave the colony and become a visitor. Use this ONLY if you are REALLY unhappy and the manager doesn't care about you. THIS IS YOUR LAST RESORT. THIS IS A FINAL DECISION. YOU CAN'T GO BACK AFTER THIS");
     }
 
     @Override
