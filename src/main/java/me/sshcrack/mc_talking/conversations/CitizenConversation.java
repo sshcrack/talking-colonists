@@ -183,7 +183,7 @@ public class CitizenConversation {
         var viewA = CitizenPromptViewFactory.create(citizenDataA, new HashMap<>(), null);
 
         var basicPromptB = """
-                You are about to start a conversation with the citizen %s.
+                You are about to start a conversation with a fellow citizen %s.
                 This is some basic information about them. Talk naturally and according to your feelings.
                 %s
                 """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
@@ -213,7 +213,7 @@ public class CitizenConversation {
         var citizenDataB = citizenB.getCitizenData();
         var view = CitizenPromptViewFactory.create(citizenDataB, new HashMap<>(), null);
         clientA.addPromptTextAfterTalkingComplete(
-                "Start the conversation! You are talking to the citizen " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
+                "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
 
         setState(ConversationState.PLAYING_AUDIO);
     }

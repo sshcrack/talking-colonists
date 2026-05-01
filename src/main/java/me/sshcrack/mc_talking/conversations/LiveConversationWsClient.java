@@ -121,6 +121,11 @@ public class LiveConversationWsClient extends GeminiWsClient {
         return prompt;
     }
 
+    @Nullable
+    public LiveConversationWsClient getPeer() {
+        return peer;
+    }
+
     @Override
     @Nullable
     protected ServerPlayer resolveActivePlayer() {
@@ -139,6 +144,10 @@ public class LiveConversationWsClient extends GeminiWsClient {
     protected void onErrorEvent(Exception ex) {
         McTalking.LOGGER.error("[LiveConvWs] Error for {}: {}", citizen.getCitizenData().getName(), ex.getMessage());
         AiStatusHelper.setAiStatusOnServerThread(citizen, AiStatus.ERROR);
+        onEnded.accept(this);
+    }
+
+    public void forceConversationEnd() {
         onEnded.accept(this);
     }
 

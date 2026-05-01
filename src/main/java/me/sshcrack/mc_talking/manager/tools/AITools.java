@@ -62,7 +62,8 @@ public class AITools {
                 new GetInventoryAction(),
                 new GetColonyAction(),
                 new DropItemAction(),
-                new DescribeSurroundingsAction()
+                new DescribeSurroundingsAction(),
+                new EndConversationAction()
 //                new JobSpecificAction()
         ));
     }

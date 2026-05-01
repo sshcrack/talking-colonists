@@ -315,6 +315,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return null;
         }
 
+        McTalking.LOGGER.info("Entity {} has called tool {}", entity.getStringUUID(), name);
         return action.execute(this.entity, colony, args);
     }
 
@@ -445,7 +446,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     /**
      * If set to true, avoids to send new status updates while the conversation is active, which can be used to reduce status update spam when the AI is generating multiple turns in a row.
-      *
+     *
      * @return false, if new status updates should NOT be sent
      */
     public boolean sendStatusUpdates() {
