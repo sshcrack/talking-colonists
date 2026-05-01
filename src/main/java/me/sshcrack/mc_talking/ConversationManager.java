@@ -35,7 +35,7 @@ import net.minecraft.world.item.component.CustomModelData;
  * Manages conversations between players and citizens, including tracking
  * active conversations, entity focus, and handling conversation lifecycle.
  *
- * <h3>Slot priority</h3>
+ * <h2>Slot priority</h2>
  * <ul>
  *   <li><b>High-priority (player conversations)</b>: always succeed. When all
  *       {@code maxConcurrentAgents} slots are full they evict the oldest
@@ -45,7 +45,7 @@ import net.minecraft.world.item.component.CustomModelData;
  *       displace a player.</li>
  * </ul>
  *
- * <h3>"Already busy" guard</h3>
+ * <h2>"Already busy" guard</h2>
  * Every entry point checks {@link #isCitizenBusy} before creating a new
  * session, so a citizen that is already mumbling, in a player conversation, or
  * in a citizen-to-citizen conversation will never be started again.

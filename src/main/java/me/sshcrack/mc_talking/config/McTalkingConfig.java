@@ -104,13 +104,13 @@ public class McTalkingConfig {
                 .define("enable_citizen_memory", false);
 
         enableCitizenToCitizenConversation = requireRestart(builder)
-                .comment("If true, citizens will be able to start conversations with each other without player involvement. Only recommended for paid tiers, as there are only at max 10 conversations per day available for the free tier")
-                .define("enable_citizen_to_citizen_conversation", false);
+                .comment("If true, citizens will be able to start conversations with each other without player involvement.")
+                .define("enable_citizen_to_citizen_conversation", true);
 
         conversationMode = requireRestart(builder)
                 .comment("How citizen-to-citizen conversations are generated.")
-                .comment("LIVE_WEBSOCKETS (default/cheaper): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.")
-                .comment("FLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio.")
+                .comment("LIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.")
+                .comment("FLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
                 .defineEnum("conversation_mode", ConversationMode.LIVE_WEBSOCKETS);
 
         // Random citizen-to-citizen conversations
