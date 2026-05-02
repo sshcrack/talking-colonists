@@ -57,55 +57,55 @@ public class McTalkingConfig {
     public String language = "en-US";
 
     // Interaction Configuration
-    @AutoGen(category = "general")
+    @AutoGen(category = "general", group = "interaction")
     @TickBox
     @SerialEntry(comment = "Whether the citizens should respond if the player is in a group or not.")
     public boolean respondInGroups = false;
 
     // Citizen - Citizen Interaction (Conversations between them)
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @TickBox
     @SerialEntry(comment = "If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
     public boolean enableCitizenMemory = false;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @TickBox
     @SerialEntry(comment = "If true, citizens will be able to start conversations with each other without player involvement.")
     public boolean enableCitizenToCitizenConversation = true;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @EnumCycler
     @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
     public ConversationMode conversationMode = ConversationMode.LIVE_WEBSOCKETS;
 
     // Random citizen-to-citizen conversations
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "random_conversations")
     @TickBox
     @SerialEntry(comment = "If true, citizens will randomly start conversations with each other based on the chance below. Requires enableCitizenToCitizenConversation to be true.")
     public boolean enableRandomConversations = true;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "random_conversations")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Chance (0.0-1.0) that a pair of nearby citizens start a random conversation per check interval")
     public double randomConversationChance = 0.05;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "random_conversations")
     @IntField(min = 1, max = 10000)
     @SerialEntry(comment = "How often (in server ticks) to check for random citizen conversations. 20 ticks = 1 second")
     public int randomConversationCheckIntervalTicks = 400;
 
     // Resource Management
-    @AutoGen(category = "general")
+    @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)
     @SerialEntry(comment = "Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
     public int maxConcurrentAgents = 3;
 
-    @AutoGen(category = "general")
+    @AutoGen(category = "general", group = "interaction")
     @DoubleField(min = 1.0, max = 100.0)
     @SerialEntry(comment = "Maximum distance the player can be from a citizen before the conversation is ended")
     public double maxConversationDistance = 8.0;
 
-    @AutoGen(category = "general")
+    @AutoGen(category = "general", group = "interaction")
     @EnumCycler
     @SerialEntry(comment = "In which format the AI should respond. This can be text, audio or both.")
     public ModalityModes modality = ModalityModes.AUDIO;
@@ -121,33 +121,33 @@ public class McTalkingConfig {
     public boolean sendErrorsToPlayers = true;
 
     // Proximity Mumbling
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "mumbling")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
     public double mumblingChance = 0.05;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "mumbling")
     @DoubleField(min = 1.0, max = 100.0)
     @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
     public double mumblingDetectionRange = 10.0;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "mumbling")
     @IntField(min = 1, max = 10000)
     @SerialEntry(comment = "How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
     public int mumblingCheckIntervalTicks = 200;
 
     // Citizen-Initiated Contact
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "citizen_contact")
     @TickBox
     @SerialEntry(comment = "If true, citizens with urgent needs will proactively speak to nearby players.")
     public boolean enableCitizenInitiatedContact = true;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "citizen_contact")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
     public double citizenContactBaseChance = 0.02;
 
-    @AutoGen(category = "citizens")
+    @AutoGen(category = "citizens", group = "citizen_contact")
     @IntField(min = 1, max = 10000)
     @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
     public int citizenContactCheckIntervalTicks = 400;

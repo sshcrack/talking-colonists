@@ -54,6 +54,13 @@
   "yacl3.config.mc_talking:config.category.general": "General",
   "yacl3.config.mc_talking:config.category.citizens": "Citizens",
 
+  "yacl3.config.mc_talking:config.category.general.group.interaction": "Interaction",
+  "yacl3.config.mc_talking:config.category.general.group.resource_management": "Resource Management",
+  "yacl3.config.mc_talking:config.category.citizens.group.citizen_to_citizen": "Citizen-to-Citizen Conversations",
+  "yacl3.config.mc_talking:config.category.citizens.group.random_conversations": "Random Conversations",
+  "yacl3.config.mc_talking:config.category.citizens.group.mumbling": "Mumbling",
+  "yacl3.config.mc_talking:config.category.citizens.group.citizen_contact": "Citizen-Initiated Contact",
+
   "yacl3.config.mc_talking:config.geminiApiKey": "API Key",
   "yacl3.config.mc_talking:config.geminiApiKey.desc": "Gemini API key used to authenticate all AI requests. If empty, all functionality is disabled.",
   "yacl3.config.mc_talking:config.currentAiModel": "AI Model",
