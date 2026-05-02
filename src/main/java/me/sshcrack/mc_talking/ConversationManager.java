@@ -296,7 +296,8 @@ public class ConversationManager {
         client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
         clients.put(citizenId, client);
     }
-     *
+
+    /**
      * <p>If the citizen is already mumbling the existing session is reused
      * (no reconnect). If the citizen is in a different active session (citizen-to-
      * citizen) it is closed first so the player always wins.</p>

@@ -53,7 +53,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
                       {"target": "%s", "type": "trust", "change": 0.1}
                     ],
                     "facts": [
-                      "Player %s is the colony manager"
+                      "Player %s is a good leader who cares about the colony's well-being."
                     ],
                     "events": [
                       "Had a conversation with %s about colony supplies"

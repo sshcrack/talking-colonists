@@ -66,6 +66,8 @@ public class CitizenMemoryGenerator extends Thread {
         this.conversation = input;
         this.participants = Collections.unmodifiableList(participants);
         this.server = server;
+        setDaemon(true);
+        setName(String.format("citizen-memory-generator-%s", participants.stream().map(e -> e.getCitizenData().getName()).collect(Collectors.joining("_"))));
     }
 
     @Override
