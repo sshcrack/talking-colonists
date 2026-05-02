@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.config;
 
+import com.ibm.icu.impl.breakiter.LSTMBreakEngine;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.controller.ControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
@@ -186,25 +187,45 @@ public class McTalkingConfig {
                     }
 
                     switch (key) {
-                        case "gemini_key": INSTANCE.instance().geminiApiKey = val; break;
-                        case "ai_model": 
-                            try { INSTANCE.instance().currentAiModel = AvailableAI.valueOf(val); } catch (Exception ignored) {} 
+                        case "gemini_key":
+                            INSTANCE.instance().geminiApiKey = val;
                             break;
-                        case "language": INSTANCE.instance().language = val; break;
-                        case "respond_in_group": INSTANCE.instance().respondInGroups = java.lang.Boolean.parseBoolean(val); break;
-                        case "max_conversation_distance": INSTANCE.instance().maxConversationDistance = Double.parseDouble(val); break;
-                        case "ai_modality": 
-                            try { INSTANCE.instance().modality = ModalityModes.valueOf(val); } catch (Exception ignored) {} 
+                        case "ai_model":
+                            try {
+                                INSTANCE.instance().currentAiModel = AvailableAI.valueOf(val);
+                            } catch (Exception ignored) {
+                            }
                             break;
-                        case "send_errors_to_players": INSTANCE.instance().sendErrorsToPlayers = java.lang.Boolean.parseBoolean(val); break;
-                        case "enable_citizen_memory": INSTANCE.instance().enableCitizenMemory = java.lang.Boolean.parseBoolean(val); break;
-                        case "enable_citizen_to_citizen_conversation": INSTANCE.instance().enableCitizenToCitizenConversation = java.lang.Boolean.parseBoolean(val); break;
-                        case "disabled_tools": 
+                        case "language":
+                            INSTANCE.instance().language = val;
+                            break;
+                        case "respond_in_group":
+                            INSTANCE.instance().respondInGroups = java.lang.Boolean.parseBoolean(val);
+                            break;
+                        case "max_conversation_distance":
+                            INSTANCE.instance().maxConversationDistance = Double.parseDouble(val);
+                            break;
+                        case "ai_modality":
+                            try {
+                                INSTANCE.instance().modality = ModalityModes.valueOf(val);
+                            } catch (Exception ignored) {
+                            }
+                            break;
+                        case "send_errors_to_players":
+                            INSTANCE.instance().sendErrorsToPlayers = java.lang.Boolean.parseBoolean(val);
+                            break;
+                        case "enable_citizen_memory":
+                            INSTANCE.instance().enableCitizenMemory = java.lang.Boolean.parseBoolean(val);
+                            break;
+                        case "enable_citizen_to_citizen_conversation":
+                            INSTANCE.instance().enableCitizenToCitizenConversation = java.lang.Boolean.parseBoolean(val);
+                            break;
+                        case "disabled_tools":
                             if (!val.equals("[]")) {
                                 String toolsStr = val.replaceAll("[\\[\\]\"]", "");
                                 String[] tools = toolsStr.split(",");
                                 List<String> disabledTools = new ArrayList<>();
-                                for(String t : tools) {
+                                for (String t : tools) {
                                     if (!t.trim().isEmpty()) {
                                         disabledTools.add(t.trim());
                                     }
@@ -213,22 +234,49 @@ public class McTalkingConfig {
                             }
                             break;
                         case "conversation_mode":
-                            try { INSTANCE.instance().conversationMode = ConversationMode.valueOf(val); } catch (Exception ignored) {} 
+                            try {
+                                INSTANCE.instance().conversationMode = ConversationMode.valueOf(val);
+                            } catch (Exception ignored) {
+                            }
                             break;
-                        case "enable_random_conversations": INSTANCE.instance().enableRandomConversations = java.lang.Boolean.parseBoolean(val); break;
-                        case "random_conversation_chance": INSTANCE.instance().randomConversationChance = Double.parseDouble(val); break;
-                        case "random_conversation_check_interval_ticks": INSTANCE.instance().randomConversationCheckIntervalTicks = Integer.parseInt(val); break;
-                        case "max_concurrent_agents": INSTANCE.instance().maxConcurrentAgents = Integer.parseInt(val); break;
-                        case "mumbling_chance": INSTANCE.instance().mumblingChance = Double.parseDouble(val); break;
-                        case "mumbling_detection_range": INSTANCE.instance().mumblingDetectionRange = Double.parseDouble(val); break;
-                        case "mumbling_check_interval_ticks": INSTANCE.instance().mumblingCheckIntervalTicks = Integer.parseInt(val); break;
-                        case "enable_citizen_initiated_contact": INSTANCE.instance().enableCitizenInitiatedContact = java.lang.Boolean.parseBoolean(val); break;
-                        case "citizen_contact_base_chance": INSTANCE.instance().citizenContactBaseChance = Double.parseDouble(val); break;
-                        case "citizen_contact_check_interval_ticks": INSTANCE.instance().citizenContactCheckIntervalTicks = Integer.parseInt(val); break;
-                        case "citizen_cooldown_seconds": INSTANCE.instance().citizenCooldownSeconds = Integer.parseInt(val); break;
+                        case "enable_random_conversations":
+                            INSTANCE.instance().enableRandomConversations = java.lang.Boolean.parseBoolean(val);
+                            break;
+                        case "random_conversation_chance":
+                            INSTANCE.instance().randomConversationChance = Double.parseDouble(val);
+                            break;
+                        case "random_conversation_check_interval_ticks":
+                            INSTANCE.instance().randomConversationCheckIntervalTicks = Integer.parseInt(val);
+                            break;
+                        case "max_concurrent_agents":
+                            INSTANCE.instance().maxConcurrentAgents = Integer.parseInt(val);
+                            break;
+                        case "mumbling_chance":
+                            INSTANCE.instance().mumblingChance = Double.parseDouble(val);
+                            break;
+                        case "mumbling_detection_range":
+                            INSTANCE.instance().mumblingDetectionRange = Double.parseDouble(val);
+                            break;
+                        case "mumbling_check_interval_ticks":
+                            INSTANCE.instance().mumblingCheckIntervalTicks = Integer.parseInt(val);
+                            break;
+                        case "enable_citizen_initiated_contact":
+                            INSTANCE.instance().enableCitizenInitiatedContact = java.lang.Boolean.parseBoolean(val);
+                            break;
+                        case "citizen_contact_base_chance":
+                            INSTANCE.instance().citizenContactBaseChance = Double.parseDouble(val);
+                            break;
+                        case "citizen_contact_check_interval_ticks":
+                            INSTANCE.instance().citizenContactCheckIntervalTicks = Integer.parseInt(val);
+                            break;
+                        case "citizen_cooldown_seconds":
+                            INSTANCE.instance().citizenCooldownSeconds = Integer.parseInt(val);
+                            break;
+                        default:
+                            McTalking.LOGGER.info("Unknown config key in old TOML config: " + key);
                     }
                 }
-                
+
                 INSTANCE.save();
                 Files.deleteIfExists(oldConfig);
                 McTalking.LOGGER.info("Successfully migrated old TOML config.");
