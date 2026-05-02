@@ -33,7 +33,7 @@ public class AITools {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
 
         var tool = new BidiGenerateContentSetup.Tool();
-        var rawToolsDisabled = McTalkingConfig.CONFIG.disabledTools.get();
+        var rawToolsDisabled = McTalkingConfig.INSTANCE.instance().disabledTools;
 
         tool.functionDeclarations.addAll(
                 registeredFunctions

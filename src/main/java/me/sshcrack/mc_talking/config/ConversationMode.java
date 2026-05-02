@@ -1,5 +1,8 @@
 package me.sshcrack.mc_talking.config;
 
+import dev.isxander.yacl3.api.NameableEnum;
+import net.minecraft.network.chat.Component;
+
 /**
  * Selects how citizen-to-citizen conversations are generated.
  *
@@ -11,7 +14,7 @@ package me.sshcrack.mc_talking.config;
  *       a script, then Gemini TTS renders the multi-speaker audio.</li>
  * </ul>
  */
-public enum ConversationMode {
+public enum ConversationMode implements NameableEnum {
     /**
      * Two Gemini Live WebSocket sessions feed each other.
      * Cheaper and faster; no separate Flash or TTS call.
@@ -22,5 +25,10 @@ public enum ConversationMode {
      * Flash generates the script; Gemini TTS renders multi-speaker audio.
      * Higher quality but uses more API quota.
      */
-    FLASH_TTS
+    FLASH_TTS;
+
+    @Override
+    public Component getDisplayName() {
+        return Component.literal(name());
+    }
 }

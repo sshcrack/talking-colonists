@@ -4,7 +4,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-public enum AvailableAI {
+import dev.isxander.yacl3.api.NameableEnum;
+import net.minecraft.network.chat.Component;
+
+public enum AvailableAI implements NameableEnum {
     //Voice 'Fenir' isn't available for the API IDK why
 
     @SuppressWarnings("unused")
@@ -33,5 +36,10 @@ public enum AvailableAI {
 
         random.setSeed(uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits());
         return availableVoices.get(random.nextInt(availableVoices.size()));
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.literal(name());
     }
 }

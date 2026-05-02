@@ -20,7 +20,7 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
@@ -98,7 +98,7 @@ public class ConversationManager {
     public static synchronized boolean claimSlot(UUID entityId, boolean isPlayerConversation) {
         if (addedEntities.contains(entityId)) return true; // already registered
 
-        int max = CONFIG.maxConcurrentAgents.get();
+        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
 
         if (addedEntities.size() < max) {
             addedEntities.add(entityId);
@@ -157,7 +157,7 @@ public class ConversationManager {
      * at low priority (free slots + evictable non-player slots ≥ slotsNeeded).
      */
     public static synchronized boolean hasLowPriorityCapacity(int slotsNeeded) {
-        int max = CONFIG.maxConcurrentAgents.get();
+        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
         int free = max - addedEntities.size();
         if (free >= slotsNeeded) return true;
 
@@ -217,7 +217,7 @@ public class ConversationManager {
     public static boolean isCitizenOnCooldown(UUID citizenId) {
         Long lastEnd = lastSessionEndTime.get(citizenId);
         if (lastEnd == null) return false;
-        long cooldownMs = CONFIG.citizenCooldownSeconds.get() * 1000L;
+        long cooldownMs = McTalkingConfig.INSTANCE.instance().citizenCooldownSeconds * 1000L;
         return (System.currentTimeMillis() - lastEnd) < cooldownMs;
     }
 
@@ -232,7 +232,7 @@ public class ConversationManager {
      * slot is available (pool is full of player conversations).</p>
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
-        if (CONFIG.geminiApiKey.get().isEmpty()) return;
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
 
         UUID citizenId = citizen.getUUID();
 
@@ -271,7 +271,7 @@ public class ConversationManager {
      * is already busy, on cooldown, or no low-priority slot is available.</p>
      */
     public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
-        if (CONFIG.geminiApiKey.get().isEmpty()) return;
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
 
         UUID citizenId = citizen.getUUID();
 
@@ -303,7 +303,7 @@ public class ConversationManager {
      * citizen) it is closed first so the player always wins.</p>
      */
     public static void startConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
-        if (CONFIG.geminiApiKey.get().isEmpty()) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.no_key")
                             .withStyle(ChatFormatting.RED));

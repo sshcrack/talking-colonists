@@ -1,244 +1,240 @@
 package me.sshcrack.mc_talking.config;
 
-import me.sshcrack.mc_talking.manager.tools.AITools;
-/*? if forge {*/
-/*import net.minecraftforge.common.ForgeConfigSpec;
-        *//*?}*/
-/*? if neoforge {*/
-import net.neoforged.neoforge.common.ModConfigSpec;
-/*?}*/
-import org.apache.commons.lang3.tuple.Pair;
+import dev.isxander.yacl3.api.Option;
+import dev.isxander.yacl3.api.controller.ControllerBuilder;
+import dev.isxander.yacl3.api.controller.StringControllerBuilder;
+import dev.isxander.yacl3.config.v2.api.ConfigClassHandler;
+import dev.isxander.yacl3.config.v2.api.ConfigField;
+import dev.isxander.yacl3.config.v2.api.SerialEntry;
+import dev.isxander.yacl3.config.v2.api.autogen.*;
+import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
+import dev.isxander.yacl3.platform.YACLPlatform;
+import me.sshcrack.mc_talking.McTalking;
 
-import java.util.Collections;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 /**
  * Configuration class for the McTalking mod.
  * Handles loading and managing configuration options.
  */
 public class McTalkingConfig {
-    public static final McTalkingConfig CONFIG;
     public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
-    /*? if forge {*/
-    /*public static final ForgeConfigSpec CONFIG_SPEC;
-    *//*?}*/
-    /*? if neoforge {*/
-    public static final ModConfigSpec CONFIG_SPEC;
-    /*?}*/
+    public static final ConfigClassHandler<McTalkingConfig> INSTANCE = ConfigClassHandler.createBuilder(McTalkingConfig.class)
+            .id(YACLPlatform.rl("mc_talking", "config"))
+            .serializer(config -> GsonConfigSerializerBuilder.create(config)
+                    .setPath(YACLPlatform.getConfigDir().resolve("yacl-mc_talking.json5"))
+                    .setJson5(true)
+                    .build())
+            .build();
 
     // API Configuration
-    public final Supplier<String> geminiApiKey;
-    public final Supplier<AvailableAI> currentAiModel;
+    @AutoGen(category = "api")
+    @StringField
+    @SerialEntry(comment = "This key is used to authenticate with the Gemini API. You can get one at https://aistudio.google.com/apikey")
+    public String geminiApiKey = "";
+
+    @AutoGen(category = "api")
+    @EnumCycler
+    @SerialEntry(comment = "What kind of AI model to use. Right now, this is the only one Google offers")
+    public AvailableAI currentAiModel = AvailableAI.Flash3;
 
     // Language Configuration
-    public final Supplier<String> language;
+    @AutoGen(category = "general")
+    @StringField
+    @SerialEntry(comment = "The language the AI should use to speak")
+    public String language = "en-US";
 
     // Interaction Configuration
-    public final Supplier<Boolean> respondInGroups;
-    public final Supplier<Boolean> sendErrorsToPlayers;
+    @AutoGen(category = "general")
+    @TickBox
+    @SerialEntry(comment = "Whether the citizens should respond if the player is in a group or not.")
+    public boolean respondInGroups = false;
 
-    // Resource Management
-    public final Supplier<Integer> maxConcurrentAgents;
-    public final Supplier<Double> maxConversationDistance;
-    public final Supplier<ModalityModes> modality;
-    public final Supplier<List<? extends String>> disabledTools;
+    // Citizen - Citizen Interaction (Conversations between them)
+    @AutoGen(category = "citizens")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
+    public boolean enableCitizenMemory = false;
 
-    // Citizen - Citizen Interaction
-    public final Supplier<Boolean> enableCitizenMemory;
-    public final Supplier<Boolean> enableCitizenToCitizenConversation;
+    @AutoGen(category = "citizens")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will be able to start conversations with each other without player involvement.")
+    public boolean enableCitizenToCitizenConversation = true;
 
-    // Citizen-to-Citizen conversation mode
-    public final Supplier<ConversationMode> conversationMode;
+    @AutoGen(category = "citizens")
+    @EnumCycler
+    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
+    public ConversationMode conversationMode = ConversationMode.LIVE_WEBSOCKETS;
 
     // Random citizen-to-citizen conversations
-    public final Supplier<Boolean> enableRandomConversations;
-    public final Supplier<Double> randomConversationChance;
-    public final Supplier<Integer> randomConversationCheckIntervalTicks;
+    @AutoGen(category = "citizens")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will randomly start conversations with each other based on the chance below. Requires enableCitizenToCitizenConversation to be true.")
+    public boolean enableRandomConversations = true;
+
+    @AutoGen(category = "citizens")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
+    @SerialEntry(comment = "Chance (0.0-1.0) that a pair of nearby citizens start a random conversation per check interval")
+    public double randomConversationChance = 0.05;
+
+    @AutoGen(category = "citizens")
+    @IntField(min = 1, max = 10000)
+    @SerialEntry(comment = "How often (in server ticks) to check for random citizen conversations. 20 ticks = 1 second")
+    public int randomConversationCheckIntervalTicks = 400;
+
+    // Resource Management
+    @AutoGen(category = "general")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
+    public int maxConcurrentAgents = 3;
+
+    @AutoGen(category = "general")
+    @DoubleField(min = 1.0, max = 100.0)
+    @SerialEntry(comment = "Maximum distance the player can be from a citizen before the conversation is ended")
+    public double maxConversationDistance = 8.0;
+
+    @AutoGen(category = "general")
+    @EnumCycler
+    @SerialEntry(comment = "In which format the AI should respond. This can be text, audio or both.")
+    public ModalityModes modality = ModalityModes.AUDIO;
+
+    @AutoGen(category = "general")
+    @ListGroup(valueFactory = ToolListFactory.class, controllerFactory = ToolListFactory.class)
+    @SerialEntry(comment = "List of disabled tools for the AI. These tools can't be used by the AI to perform actions. Use the /list_tools command to see a list of the available tools.")
+    public List<String> disabledTools = new ArrayList<>();
+
+    @AutoGen(category = "general")
+    @TickBox
+    @SerialEntry(comment = "If true, errors will be sent to players that have OP permissions. If false, errors will only be logged to the console.")
+    public boolean sendErrorsToPlayers = true;
 
     // Proximity Mumbling
-    public final Supplier<Double> mumblingChance;
-    public final Supplier<Double> mumblingDetectionRange;
-    public final Supplier<Integer> mumblingCheckIntervalTicks;
+    @AutoGen(category = "citizens")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
+    @SerialEntry(comment = "Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
+    public double mumblingChance = 0.05;
+
+    @AutoGen(category = "citizens")
+    @DoubleField(min = 1.0, max = 100.0)
+    @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
+    public double mumblingDetectionRange = 10.0;
+
+    @AutoGen(category = "citizens")
+    @IntField(min = 1, max = 10000)
+    @SerialEntry(comment = "How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
+    public int mumblingCheckIntervalTicks = 200;
 
     // Citizen-Initiated Contact
-    public final Supplier<Boolean> enableCitizenInitiatedContact;
-    public final Supplier<Double> citizenContactBaseChance;
-    public final Supplier<Integer> citizenContactCheckIntervalTicks;
+    @AutoGen(category = "citizens")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens with urgent needs will proactively speak to nearby players.")
+    public boolean enableCitizenInitiatedContact = true;
+
+    @AutoGen(category = "citizens")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
+    @SerialEntry(comment = "Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
+    public double citizenContactBaseChance = 0.02;
+
+    @AutoGen(category = "citizens")
+    @IntField(min = 1, max = 10000)
+    @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
+    public int citizenContactCheckIntervalTicks = 400;
 
     // Per-citizen automatic-session cooldown
-    public final Supplier<Integer> citizenCooldownSeconds;
+    @AutoGen(category = "citizens")
+    @IntField(min = 0, max = 10000)
+    @SerialEntry(comment = "Minimum number of seconds that must pass after a citizen's automatic session (mumble or citizen-to-citizen) ends before they can be selected for another one. Set to 0 to disable.")
+    public int citizenCooldownSeconds = 120;
 
-    /*? if forge {*/
-    /*public McTalkingConfig(ForgeConfigSpec.Builder builder) {
-        *//*?}*/
-        /*? if neoforge {*/
-        public McTalkingConfig(ModConfigSpec.Builder builder) {
-         /*?}*/
+    public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
+        @Override
+        public String provideNewValue() {
+            return "";
+        }
 
-        // API Configuration
-        geminiApiKey = requireRestart(builder)
-                .comment("API Configuration")
-                .comment("This key is used to authenticate with the Gemini API. You can get one at https://aistudio.google.com/apikey")
-                .define("gemini_key", "");
+        @Override
+        public ControllerBuilder<String> createController(ListGroup annotation, ConfigField<List<String>> field, dev.isxander.yacl3.config.v2.api.autogen.OptionAccess storage, Option<String> option) {
+            return StringControllerBuilder.create(option);
+        }
+    }
 
-        currentAiModel = requireRestart(builder)
-                .comment("What kind of AI model to use. Right now, this is the only one Google offers")
-                .defineEnum("ai_model", AvailableAI.Flash3);
+    public static void loadConfig() {
+        Path oldConfig = YACLPlatform.getConfigDir().resolve("mc_talking-common.toml");
+        Path newConfig = YACLPlatform.getConfigDir().resolve("yacl-mc_talking.json5");
 
-        // Language Configuration
-        language = requireRestart(builder)
-                .comment("Language Configuration")
-                .comment("The language the AI should use to speak")
-                .define("language", "en-US");
+        INSTANCE.load();
 
-        // Interaction Configuration
-        respondInGroups = requireRestart(builder)
-                .comment("Interaction Configuration")
-                .comment("Whether the citizens should respond if the player is in a group or not.")
-                .define("respond_in_group", false);
+        if (Files.exists(oldConfig) && !Files.exists(newConfig)) {
+            McTalking.LOGGER.info("Migrating old TOML config to YACL JSON5 config...");
+            try {
+                List<String> lines = Files.readAllLines(oldConfig);
+                for (String line : lines) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    String[] parts = line.split("=", 2);
+                    if (parts.length != 2) continue;
+                    String key = parts[0].trim();
+                    String val = parts[1].trim();
 
-
-        // Citizen - Citizen Interaction (Conversations between them)
-
-        enableCitizenMemory = requireRestart(builder)
-                .comment("If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
-                .define("enable_citizen_memory", false);
-
-        enableCitizenToCitizenConversation = requireRestart(builder)
-                .comment("If true, citizens will be able to start conversations with each other without player involvement.")
-                .define("enable_citizen_to_citizen_conversation", true);
-
-        conversationMode = requireRestart(builder)
-                .comment("How citizen-to-citizen conversations are generated.")
-                .comment("LIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.")
-                .comment("FLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
-                .defineEnum("conversation_mode", ConversationMode.LIVE_WEBSOCKETS);
-
-        // Random citizen-to-citizen conversations
-        enableRandomConversations = requireRestart(builder)
-                .comment("Random Citizen Conversations")
-                .comment("If true, citizens will randomly start conversations with each other based on the chance below. Requires enable_citizen_to_citizen_conversation to be true.")
-                .define("enable_random_conversations", true);
-
-        randomConversationChance = builder
-                .comment("Chance (0.0-1.0) that a pair of nearby citizens start a random conversation per check interval")
-                .define("random_conversation_chance", 0.05);
-
-        randomConversationCheckIntervalTicks = builder
-                .comment("How often (in server ticks) to check for random citizen conversations. 20 ticks = 1 second")
-                .define("random_conversation_check_interval_ticks", 400, e -> e == null || (int) e > 0);
-
-        // Resource Management
-        maxConcurrentAgents = requireRestart(builder)
-                .comment("Resource Management")
-                .comment("Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
-                .define("max_concurrent_agents", 3, e -> e == null || (int) e > 0);
-
-        maxConversationDistance = requireRestart(builder)
-                .comment("Maximum distance the player can be from a citizen before the conversation is ended")
-                .define("max_conversation_distance", 8.0);
-
-        modality = requireRestart(builder)
-                .comment("In which format the AI should respond. This can be text, audio or both.")
-                .defineEnum("ai_modality", ModalityModes.AUDIO);
-
-        var disabledToolsBuilder = requireRestart(builder)
-                .comment("List of enabled tools for the AI. These tools can be used by the AI to perform actions. Use the /list_tools command to see a list of the available tools.");
-
-
-        /*? if forge {*/
-        /*disabledTools = disabledToolsBuilder
-                .defineList("disabled_tools", Collections::emptyList, e -> {
-                    if (e instanceof String str) {
-                        return AITools.getRegisteredFunctionNames().contains(str);
+                    if (val.startsWith("\"") && val.endsWith("\"")) {
+                        val = val.substring(1, val.length() - 1);
                     }
 
-                    return false;
-                });
-        *//*?}*/
-        /*? if neoforge {*/
-		AtomicInteger currIndex = new AtomicInteger();
-		disabledTools = disabledToolsBuilder
-				.defineList("disabled_tools", Collections::emptyList, () -> {
-					var l = AITools.getRegisteredFunctionNames();
-					return l.get((currIndex.incrementAndGet() - 1) % l.size());
-				}, e -> {
-					if (e instanceof String str) {
-						return AITools.getRegisteredFunctionNames().contains(str);
-					}
-
-					return false;
-				});
-		/*?}*/
-
-        sendErrorsToPlayers = builder
-                .comment("If true, errors will be sent to players that have OP permissions. If false, errors will only be logged to the console.")
-                .define("send_errors_to_players", true);
-
-        // Proximity Mumbling
-        mumblingChance = builder
-                .comment("Proximity Mumbling")
-                .comment("Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
-                .define("mumbling_chance", 0.05);
-
-        mumblingDetectionRange = builder
-                .comment("Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
-                .define("mumbling_detection_range", 10.0);
-
-        mumblingCheckIntervalTicks = builder
-                .comment("How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
-                .define("mumbling_check_interval_ticks", 200, e -> e == null || (int) e > 0);
-
-        // Citizen-Initiated Contact
-        enableCitizenInitiatedContact = requireRestart(builder)
-                .comment("Citizen-Initiated Contact")
-                .comment("If true, citizens with urgent needs will proactively speak to nearby players.")
-                .define("enable_citizen_initiated_contact", true);
-
-        citizenContactBaseChance = builder
-                .comment("Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. " +
-                        "Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
-                .define("citizen_contact_base_chance", 0.02);
-
-        citizenContactCheckIntervalTicks = builder
-                .comment("How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
-                .define("citizen_contact_check_interval_ticks", 400, e -> e == null || (int) e > 0);
-
-        // Per-citizen cooldown
-        citizenCooldownSeconds = builder
-                .comment("Per-Citizen Cooldown")
-                .comment("Minimum number of seconds that must pass after a citizen's automatic session (mumble or citizen-to-citizen) ends before they can be selected for another one. Set to 0 to disable.")
-                .define("citizen_cooldown_seconds", 120, e -> e == null || (int) e >= 0);
+                    switch (key) {
+                        case "gemini_key": INSTANCE.instance().geminiApiKey = val; break;
+                        case "ai_model": 
+                            try { INSTANCE.instance().currentAiModel = AvailableAI.valueOf(val); } catch (Exception ignored) {} 
+                            break;
+                        case "language": INSTANCE.instance().language = val; break;
+                        case "respond_in_group": INSTANCE.instance().respondInGroups = java.lang.Boolean.parseBoolean(val); break;
+                        case "max_conversation_distance": INSTANCE.instance().maxConversationDistance = Double.parseDouble(val); break;
+                        case "ai_modality": 
+                            try { INSTANCE.instance().modality = ModalityModes.valueOf(val); } catch (Exception ignored) {} 
+                            break;
+                        case "send_errors_to_players": INSTANCE.instance().sendErrorsToPlayers = java.lang.Boolean.parseBoolean(val); break;
+                        case "enable_citizen_memory": INSTANCE.instance().enableCitizenMemory = java.lang.Boolean.parseBoolean(val); break;
+                        case "enable_citizen_to_citizen_conversation": INSTANCE.instance().enableCitizenToCitizenConversation = java.lang.Boolean.parseBoolean(val); break;
+                        case "disabled_tools": 
+                            if (!val.equals("[]")) {
+                                String toolsStr = val.replaceAll("[\\[\\]\"]", "");
+                                String[] tools = toolsStr.split(",");
+                                List<String> disabledTools = new ArrayList<>();
+                                for(String t : tools) {
+                                    if (!t.trim().isEmpty()) {
+                                        disabledTools.add(t.trim());
+                                    }
+                                }
+                                INSTANCE.instance().disabledTools = disabledTools;
+                            }
+                            break;
+                        case "conversation_mode":
+                            try { INSTANCE.instance().conversationMode = ConversationMode.valueOf(val); } catch (Exception ignored) {} 
+                            break;
+                        case "enable_random_conversations": INSTANCE.instance().enableRandomConversations = java.lang.Boolean.parseBoolean(val); break;
+                        case "random_conversation_chance": INSTANCE.instance().randomConversationChance = Double.parseDouble(val); break;
+                        case "random_conversation_check_interval_ticks": INSTANCE.instance().randomConversationCheckIntervalTicks = Integer.parseInt(val); break;
+                        case "max_concurrent_agents": INSTANCE.instance().maxConcurrentAgents = Integer.parseInt(val); break;
+                        case "mumbling_chance": INSTANCE.instance().mumblingChance = Double.parseDouble(val); break;
+                        case "mumbling_detection_range": INSTANCE.instance().mumblingDetectionRange = Double.parseDouble(val); break;
+                        case "mumbling_check_interval_ticks": INSTANCE.instance().mumblingCheckIntervalTicks = Integer.parseInt(val); break;
+                        case "enable_citizen_initiated_contact": INSTANCE.instance().enableCitizenInitiatedContact = java.lang.Boolean.parseBoolean(val); break;
+                        case "citizen_contact_base_chance": INSTANCE.instance().citizenContactBaseChance = Double.parseDouble(val); break;
+                        case "citizen_contact_check_interval_ticks": INSTANCE.instance().citizenContactCheckIntervalTicks = Integer.parseInt(val); break;
+                        case "citizen_cooldown_seconds": INSTANCE.instance().citizenCooldownSeconds = Integer.parseInt(val); break;
+                    }
+                }
+                
+                INSTANCE.save();
+                Files.deleteIfExists(oldConfig);
+                McTalking.LOGGER.info("Successfully migrated old TOML config.");
+            } catch (Exception e) {
+                McTalking.LOGGER.error("Failed to migrate old TOML config", e);
+            }
+        }
     }
-
-    static {
-        /*? if forge {*/
-        /*Pair<McTalkingConfig, ForgeConfigSpec> pair =
-                new ForgeConfigSpec.Builder().configure(McTalkingConfig::new);
-        *//*?}*/
-        /*? if neoforge {*/
-		Pair<McTalkingConfig, ModConfigSpec> pair =
-				new ModConfigSpec.Builder().configure(McTalkingConfig::new);
-		/*?}*/
-
-        //Store the resulting values
-        CONFIG = pair.getLeft();
-        CONFIG_SPEC = pair.getRight();
-    }
-
-    /*? if neoforge {*/
-	private static ModConfigSpec.Builder requireRestart(ModConfigSpec.Builder builder) {
-		return builder.gameRestart();
-	}
-	/*?}*/
-
-    /*? if forge {*/
-    /*private static ForgeConfigSpec.Builder requireRestart(ForgeConfigSpec.Builder builder) {
-        return builder.worldRestart();
-    }
-    *//*?}*/
 }

@@ -39,7 +39,6 @@ public class McTalking {
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
         ModItems.register(modEventBus);
     }
     *//*?}*/
@@ -49,7 +48,6 @@ public class McTalking {
         initialize();
 
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
-        modContainer.registerConfig(ModConfig.Type.COMMON, McTalkingConfig.CONFIG_SPEC);
         ModItems.register(modEventBus);
         modEventBus.addListener(this::registerPayloadHandlers);
     }
@@ -57,6 +55,7 @@ public class McTalking {
 
     private void initialize() {
         AITools.register();
+        McTalkingConfig.loadConfig();
     }
 
 

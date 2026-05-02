@@ -18,7 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
  * Generates and saves memories for a citizen after a conversation with a player.
@@ -93,7 +93,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
         String citizenName = citizen.getCitizenData().getName();
         McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
 
-        String apiKey = CONFIG.geminiApiKey.get();
+        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         String allowedTypes = Arrays.stream(CitizenRelationshipChangeType.values())
                 .map(Enum::name)
                 .collect(Collectors.joining(", "));

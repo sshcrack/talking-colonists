@@ -19,7 +19,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
  * Unified WebSocket client for citizen AI conversations.
@@ -193,7 +193,7 @@ public class CitizenWsClient extends GeminiWsClient {
         if (player != null) {
             Objects.requireNonNull(player.getServer()).execute(() -> {
                 AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
-                if (player.hasPermissions(4) && Boolean.TRUE.equals(CONFIG.sendErrorsToPlayers.get()))
+                if (player.hasPermissions(4) && Boolean.TRUE.equals(McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers))
                     player.sendSystemMessage(Component.literal(
                             "An error occurred in GeminiWsClient: " + ex.getMessage()));
             });
@@ -212,7 +212,7 @@ public class CitizenWsClient extends GeminiWsClient {
         ServerPlayer closingPlayer = player;
         super.close();
 
-        if (closingPlayer == null || !CONFIG.enableCitizenMemory.get()) return;
+        if (closingPlayer == null || !McTalkingConfig.INSTANCE.instance().enableCitizenMemory) return;
         if (!startedInSystemMode) {
             // Direct player conversation — generate memory of this interaction
             triggerPlayerMemoryGeneration(closingPlayer);

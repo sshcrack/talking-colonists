@@ -30,7 +30,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 @SuppressWarnings("unused")
 @ForgeVoicechatPlugin
@@ -158,7 +158,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             return;
         }
         var vcPlayer = sender.getPlayer();
-        if (sender.isInGroup() && !CONFIG.respondInGroups.get()) {
+        if (sender.isInGroup() && !McTalkingConfig.INSTANCE.instance().respondInGroups) {
             return;
         }
 

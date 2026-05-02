@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
  * Orchestrates a citizen-to-citizen conversation.
@@ -66,7 +66,7 @@ public class CitizenConversation {
 
         this.participants = participants;
         this.server = server;
-        this.mode = CONFIG.conversationMode.get();
+        this.mode = McTalkingConfig.INSTANCE.instance().conversationMode;
 
         McTalking.LOGGER.info("Starting conversation [{}] for participants: {}", mode,
                 participants.stream().map(c -> c.getName().getString()).toList());

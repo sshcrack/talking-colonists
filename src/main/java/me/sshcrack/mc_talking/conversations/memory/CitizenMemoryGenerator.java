@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenMemoryGenerator extends Thread {
     private static final String PROMPT = ("""
@@ -73,7 +73,7 @@ public class CitizenMemoryGenerator extends Thread {
     @Override
     public void run() {
         McTalking.LOGGER.debug("Starting memories generation for conversation: {}", conversation);
-        String apiKey = CONFIG.geminiApiKey.get();
+        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         String memoryString;
         try {
             memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);

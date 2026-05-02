@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     /**
@@ -69,7 +69,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     // AudioProvider creates channels/decoders so this client can be tested/mockable
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
-        super(CONFIG.geminiApiKey.get());
+        super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
@@ -109,7 +109,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * Defaults to the globally configured modality.
      */
     protected ModalityModes getEffectiveModality() {
-        return CONFIG.modality.get();
+        return McTalkingConfig.INSTANCE.instance().modality;
     }
 
     /**
@@ -120,18 +120,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
+        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
 
         var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
 
-        if (modality == ModalityModes.TEXT_AND_AUDIO || CONFIG.enableCitizenMemory.get()) {
+        if (modality == ModalityModes.TEXT_AND_AUDIO || McTalkingConfig.INSTANCE.instance().enableCitizenMemory) {
             setup.outputAudioTranscription = new JsonObject();
         }
 
         if (modality != ModalityModes.TEXT) {
             setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
-            setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
+            setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
             var entity = this.entity;
             var female = entity.getCitizenData().isFemale();
             var uuid = entity.getUUID();
@@ -144,7 +144,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = CONFIG.currentAiModel.get().getRandomVoice(uuid, female);
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
 
         }
 

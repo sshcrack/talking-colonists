@@ -42,7 +42,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
 import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -167,7 +167,7 @@ public final class CitizenPromptViewFactory {
                 skills,
                 blockingMessages,
                 relation,
-                getLanguageNameFromCode(CONFIG.language.get()),
+                getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
                 ((CitizenDataMemoryExtended) data).mc_talking$getMemory(),
                 interestedParties,
                 colonyName,
