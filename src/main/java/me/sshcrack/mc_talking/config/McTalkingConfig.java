@@ -273,7 +273,7 @@ public class McTalkingConfig {
                             INSTANCE.instance().citizenCooldownSeconds = Integer.parseInt(val);
                             break;
                         default:
-                            McTalking.LOGGER.info("Unknown config key in old TOML config: " + key);
+                            McTalking.LOGGER.info("Unknown config key in old TOML config: {}", key);
                     }
                 }
 
