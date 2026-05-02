@@ -18,8 +18,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.RenderNameTagEvent;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
 /*?}*/
@@ -56,7 +54,6 @@ public class McTalkingClient {
     /*? if neoforge {*/
     public McTalkingClient(ModContainer container) {
         NeoForge.EVENT_BUS.register(this);
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
     /*?}*/
 

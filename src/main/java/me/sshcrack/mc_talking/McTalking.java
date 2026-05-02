@@ -16,8 +16,10 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 /*? if neoforge {*/
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.DirectionalPayloadHandler;
@@ -46,6 +48,11 @@ public class McTalking {
     /*? if neoforge {*/
     public McTalking(IEventBus modEventBus, ModContainer modContainer) {
         initialize();
+
+        ModLoadingContext.get().registerExtensionPoint(
+                IConfigScreenFactory.class,
+                () -> (client, parent) -> McTalkingConfig.INSTANCE.generateGui().generateScreen(parent)
+        );
 
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
         ModItems.register(modEventBus);
