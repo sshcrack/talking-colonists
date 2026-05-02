@@ -1,13 +1,19 @@
 package me.sshcrack.mc_talking.config;
 
-import com.ibm.icu.impl.breakiter.LSTMBreakEngine;
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.controller.ControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.isxander.yacl3.config.v2.api.ConfigClassHandler;
 import dev.isxander.yacl3.config.v2.api.ConfigField;
 import dev.isxander.yacl3.config.v2.api.SerialEntry;
-import dev.isxander.yacl3.config.v2.api.autogen.*;
+import dev.isxander.yacl3.config.v2.api.autogen.AutoGen;
+import dev.isxander.yacl3.config.v2.api.autogen.DoubleField;
+import dev.isxander.yacl3.config.v2.api.autogen.DoubleSlider;
+import dev.isxander.yacl3.config.v2.api.autogen.EnumCycler;
+import dev.isxander.yacl3.config.v2.api.autogen.IntField;
+import dev.isxander.yacl3.config.v2.api.autogen.ListGroup;
+import dev.isxander.yacl3.config.v2.api.autogen.StringField;
+import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
@@ -168,9 +174,10 @@ public class McTalkingConfig {
         Path oldConfig = YACLPlatform.getConfigDir().resolve("mc_talking-common.toml");
         Path newConfig = YACLPlatform.getConfigDir().resolve("yacl-mc_talking.json5");
 
+        boolean shouldMigrate = Files.exists(oldConfig) && !Files.exists(newConfig);
         INSTANCE.load();
 
-        if (Files.exists(oldConfig) && !Files.exists(newConfig)) {
+        if (shouldMigrate) {
             McTalking.LOGGER.info("Migrating old TOML config to YACL JSON5 config...");
             try {
                 List<String> lines = Files.readAllLines(oldConfig);
@@ -212,13 +219,7 @@ public class McTalkingConfig {
                             }
                             break;
                         case "send_errors_to_players":
-                            INSTANCE.instance().sendErrorsToPlayers = java.lang.Boolean.parseBoolean(val);
-                            break;
-                        case "enable_citizen_memory":
-                            INSTANCE.instance().enableCitizenMemory = java.lang.Boolean.parseBoolean(val);
-                            break;
-                        case "enable_citizen_to_citizen_conversation":
-                            INSTANCE.instance().enableCitizenToCitizenConversation = java.lang.Boolean.parseBoolean(val);
+                            INSTANCE.instance().sendErrorsToPlayers = Boolean.parseBoolean(val);
                             break;
                         case "disabled_tools":
                             if (!val.equals("[]")) {
@@ -232,45 +233,6 @@ public class McTalkingConfig {
                                 }
                                 INSTANCE.instance().disabledTools = disabledTools;
                             }
-                            break;
-                        case "conversation_mode":
-                            try {
-                                INSTANCE.instance().conversationMode = ConversationMode.valueOf(val);
-                            } catch (Exception ignored) {
-                            }
-                            break;
-                        case "enable_random_conversations":
-                            INSTANCE.instance().enableRandomConversations = java.lang.Boolean.parseBoolean(val);
-                            break;
-                        case "random_conversation_chance":
-                            INSTANCE.instance().randomConversationChance = Double.parseDouble(val);
-                            break;
-                        case "random_conversation_check_interval_ticks":
-                            INSTANCE.instance().randomConversationCheckIntervalTicks = Integer.parseInt(val);
-                            break;
-                        case "max_concurrent_agents":
-                            INSTANCE.instance().maxConcurrentAgents = Integer.parseInt(val);
-                            break;
-                        case "mumbling_chance":
-                            INSTANCE.instance().mumblingChance = Double.parseDouble(val);
-                            break;
-                        case "mumbling_detection_range":
-                            INSTANCE.instance().mumblingDetectionRange = Double.parseDouble(val);
-                            break;
-                        case "mumbling_check_interval_ticks":
-                            INSTANCE.instance().mumblingCheckIntervalTicks = Integer.parseInt(val);
-                            break;
-                        case "enable_citizen_initiated_contact":
-                            INSTANCE.instance().enableCitizenInitiatedContact = java.lang.Boolean.parseBoolean(val);
-                            break;
-                        case "citizen_contact_base_chance":
-                            INSTANCE.instance().citizenContactBaseChance = Double.parseDouble(val);
-                            break;
-                        case "citizen_contact_check_interval_ticks":
-                            INSTANCE.instance().citizenContactCheckIntervalTicks = Integer.parseInt(val);
-                            break;
-                        case "citizen_cooldown_seconds":
-                            INSTANCE.instance().citizenCooldownSeconds = Integer.parseInt(val);
                             break;
                         default:
                             McTalking.LOGGER.info("Unknown config key in old TOML config: {}", key);
