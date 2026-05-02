@@ -29,6 +29,10 @@
   "mc_talking.configuration.mumbling_detection_range": "Mumbling Detection Range",
   "mc_talking.configuration.mumbling_check_interval_ticks": "Mumbling Check Interval (Ticks)",
   "mc_talking.configuration.citizen_cooldown_seconds": "Citizen Cooldown (Seconds)",
+  "mc_talking.configuration.enable_citizen_initiated_contact": "Enable Citizen-Initiated Contact",
+  "mc_talking.configuration.citizen_contact_base_chance": "Base chance for contact",
+  "mc_talking.configuration.citizen_contact_check_interval_ticks": "Citizen contact check interval (ticks)",
+
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
   "mc_talking.ai_status.listening": "Listening",
   "mc_talking.ai_status.thinking": "Thinking",
