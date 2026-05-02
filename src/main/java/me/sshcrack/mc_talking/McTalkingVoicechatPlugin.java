@@ -10,6 +10,7 @@ import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
+import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -77,6 +78,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public void onStop(VoicechatServerStoppedEvent event) {
         executor.shutdownNow();
         CitizenMemoryGenerator.stopAllGenerators();
+        PlayerConversationMemoryGenerator.stopAllGenerators();
     }
 
     public void onServerStarted(VoicechatServerStartedEvent event) {

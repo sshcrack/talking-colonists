@@ -33,6 +33,11 @@ public record CitizenPromptView(
         @Nullable PlayerRelationView playerRelation,
         String responseLanguageName,
         @Nullable CitizenMemories memories,
-        Map<UUID, String> interestedParties
+        Map<UUID, String> interestedParties,
+        String colonyName,
+        @Nullable String homeBuildingDisplayName,
+        int homeBuildingLevel,
+        @Nullable String workBuildingDisplayName,
+        int workBuildingLevel
 ) {
 }

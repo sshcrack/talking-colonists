@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
@@ -136,6 +137,16 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        String colonyName = data.getColony().getName();
+
+        IBuilding homeBuilding = data.getHomeBuilding();
+        String homeBuildingDisplayName = homeBuilding != null ? homeBuilding.getBuildingDisplayName() : null;
+        int homeBuildingLevel = homeBuilding != null ? homeBuilding.getBuildingLevel() : 0;
+
+        IBuilding workBuilding = data.getWorkBuilding();
+        String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
+        int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -158,7 +169,12 @@ public final class CitizenPromptViewFactory {
                 relation,
                 getLanguageNameFromCode(CONFIG.language.get()),
                 ((CitizenDataMemoryExtended) data).mc_talking$getMemory(),
-                interestedParties
+                interestedParties,
+                colonyName,
+                homeBuildingDisplayName,
+                homeBuildingLevel,
+                workBuildingDisplayName,
+                workBuildingLevel
         );
     }
 

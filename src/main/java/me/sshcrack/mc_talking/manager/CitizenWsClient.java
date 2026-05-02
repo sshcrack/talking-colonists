@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -199,5 +200,51 @@ public class CitizenWsClient extends GeminiWsClient {
         } else {
             AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
         }
+    }
+
+    /**
+     * Overrides close to trigger player-memory generation when a real player conversation ends.
+     * Memory is generated only when {@code enableCitizenMemory} is true and a player was attached.
+     */
+    @Override
+    public void close() {
+        // Capture the player reference before calling super.close() which might clear state.
+        ServerPlayer closingPlayer = player;
+        super.close();
+
+        if (closingPlayer == null || !CONFIG.enableCitizenMemory.get()) return;
+        if (!startedInSystemMode) {
+            // Direct player conversation — generate memory of this interaction
+            triggerPlayerMemoryGeneration(closingPlayer);
+        }
+    }
+
+    private void triggerPlayerMemoryGeneration(ServerPlayer closingPlayer) {
+        var entity = getEntity();
+        var data = entity.getCitizenData();
+        if (data == null) return;
+
+        var server = closingPlayer.getServer();
+        if (server == null) return;
+
+        String transcript = sessionTranscript.toString();
+
+        // Resolve the player's colony rank name (visitor / manager / leader / enemy)
+        String rankName = "visitor";
+        var perms = data.getColony().getPermissions().getPlayers().get(closingPlayer.getUUID());
+        if (perms != null) {
+            var rank = perms.getRank();
+            if (rank.isHostile()) rankName = "enemy";
+            else if (rank.isColonyManager()) rankName = "manager";
+            else if (rank.isInitial()) rankName = "leader";
+        }
+
+        PlayerConversationMemoryGenerator.generateAndSave(
+                entity,
+                closingPlayer.getUUID(),
+                closingPlayer.getName().getString(),
+                rankName,
+                transcript,
+                server);
     }
 }

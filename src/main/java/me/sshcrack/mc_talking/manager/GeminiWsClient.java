@@ -112,6 +112,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         return CONFIG.modality.get();
     }
 
+    /**
+     * Accumulates the AI-generated text across all turns in this session, used for memory generation.
+     * Only populated when audio transcription is enabled (i.e. when citizen memory is enabled).
+     */
+    protected final StringBuilder sessionTranscript = new StringBuilder();
+
     @Override
     public BidiGenerateContentSetup getSetup() {
         var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
@@ -119,7 +125,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
 
-        if (modality == ModalityModes.TEXT_AND_AUDIO) {
+        if (modality == ModalityModes.TEXT_AND_AUDIO || CONFIG.enableCitizenMemory.get()) {
             setup.outputAudioTranscription = new JsonObject();
         }
 
@@ -246,9 +252,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("Gemini generation complete");
 
         stream.flushAudio();
+
+        if (!currentTurnTranscript.isBlank()) {
+            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
+            sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
+        }
+
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currentTurnTranscript.isBlank())
+        if (sPlayer == null || currentTurnTranscript.isBlank()) {
+            currentTurnTranscript = "";
             return;
+        }
         if (getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO) {
             sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
         }
@@ -261,9 +275,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("Gemini generation interrupted");
         stream.stop();
 
+        if (!currentTurnTranscript.isBlank()) {
+            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
+            sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
+        }
+
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currentTurnTranscript.isBlank())
+        if (sPlayer == null || currentTurnTranscript.isBlank()) {
+            currentTurnTranscript = "";
             return;
+        }
         sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
         currentTurnTranscript = "";
     }

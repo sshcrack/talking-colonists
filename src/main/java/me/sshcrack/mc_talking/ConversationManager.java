@@ -262,7 +262,40 @@ public class ConversationManager {
     }
 
     /**
-     * Starts a conversation between a player and a citizen (high-priority).
+     * Starts a citizen speaking urgently to a nearby player when the citizen has pressing needs
+     * (low-priority, spatial audio — the player hears it positionally and can choose to respond
+     * by using the Citizen Communication Device).
+     *
+     * <p>The prompt instructs the citizen to address the player by name rather than muttering
+     * to themselves, distinguishing this from ordinary mumbling. Silently returns if the citizen
+     * is already busy, on cooldown, or no low-priority slot is available.</p>
+     */
+    public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
+        if (CONFIG.geminiApiKey.get().isEmpty()) return;
+
+        UUID citizenId = citizen.getUUID();
+
+        if (isCitizenBusy(citizenId)) return;
+
+        if (!claimSlot(citizenId, false)) {
+            McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for citizen-initiated contact {}", citizenId);
+            return;
+        }
+
+        var client = new CitizenWsClient(citizen,
+                c -> {
+                    c.close();
+                    synchronized (ConversationManager.class) {
+                        if (clients.get(citizenId) == c) {
+                            clients.remove(citizenId);
+                            releaseSlot(citizenId);
+                        }
+                    }
+                    recordCooldown(citizenId);
+                });
+        client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
+        clients.put(citizenId, client);
+    }
      *
      * <p>If the citizen is already mumbling the existing session is reused
      * (no reconnect). If the citizen is in a different active session (citizen-to-

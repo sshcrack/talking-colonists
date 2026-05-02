@@ -64,6 +64,11 @@ public class McTalkingConfig {
     public final Supplier<Double> mumblingDetectionRange;
     public final Supplier<Integer> mumblingCheckIntervalTicks;
 
+    // Citizen-Initiated Contact
+    public final Supplier<Boolean> enableCitizenInitiatedContact;
+    public final Supplier<Double> citizenContactBaseChance;
+    public final Supplier<Integer> citizenContactCheckIntervalTicks;
+
     // Per-citizen automatic-session cooldown
     public final Supplier<Integer> citizenCooldownSeconds;
 
@@ -187,6 +192,21 @@ public class McTalkingConfig {
         mumblingCheckIntervalTicks = builder
                 .comment("How often (in server ticks) to check for citizens to trigger mumbling near players. 20 ticks = 1 second")
                 .define("mumbling_check_interval_ticks", 200, e -> e == null || (int) e > 0);
+
+        // Citizen-Initiated Contact
+        enableCitizenInitiatedContact = requireRestart(builder)
+                .comment("Citizen-Initiated Contact")
+                .comment("If true, citizens with urgent needs will proactively speak to nearby players.")
+                .define("enable_citizen_initiated_contact", true);
+
+        citizenContactBaseChance = builder
+                .comment("Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. " +
+                        "Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
+                .define("citizen_contact_base_chance", 0.02);
+
+        citizenContactCheckIntervalTicks = builder
+                .comment("How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
+                .define("citizen_contact_check_interval_ticks", 400, e -> e == null || (int) e > 0);
 
         // Per-citizen cooldown
         citizenCooldownSeconds = builder

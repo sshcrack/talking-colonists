@@ -119,4 +119,69 @@ public final class MumblingTopicHelper {
     private static boolean contains(String key, String fragment) {
         return key.toLowerCase().contains(fragment);
     }
+
+    /**
+     * Builds a prompt for a citizen who is proactively initiating contact with a nearby player
+     * because they have an urgent need. The citizen will address the player directly by name.
+     *
+     * @param citizen    the citizen initiating contact
+     * @param playerName the name of the nearby player to address
+     * @return the prompt string
+     */
+    public static String buildUrgentContactPrompt(AbstractEntityCitizen citizen, String playerName) {
+        if (citizen.getCitizenData() == null) return buildGenericUrgentPrompt(playerName);
+
+        var data = citizen.getCitizenData();
+
+        // Determine the most pressing issue
+        if (data.getCitizenDiseaseHandler().isSick()) {
+            return String.format(
+                    "You notice %s nearby. You are sick and feeling terrible. Urgently call out to them, " +
+                    "address them by name, and beg for medicine or help. Keep it brief — two or three sentences.",
+                    playerName);
+        }
+
+        double saturation = data.getSaturation();
+        if (saturation <= 1) {
+            return String.format(
+                    "You notice %s nearby. You are desperately hungry and weak. Call out to them urgently by name " +
+                    "and beg for food. Keep it brief — two or three sentences.",
+                    playerName);
+        }
+
+        if (data.getHomeBuilding() == null) {
+            return String.format(
+                    "You notice %s nearby. You have nowhere to sleep and are very distressed. Call out to them by name " +
+                    "and urgently plead for housing. Keep it brief — two or three sentences.",
+                    playerName);
+        }
+
+        double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
+        if (happiness < 3.0) {
+            return String.format(
+                    "You notice %s nearby. You are miserable and can't hold back any longer. " +
+                    "Call out to them urgently by name and voice your most pressing concern. Keep it brief — two or three sentences.",
+                    playerName);
+        }
+
+        var entity = data.getEntity();
+        if (entity.isPresent()) {
+            double healthPercent = (entity.get().getHealth() / Math.max(1.0, entity.get().getMaxHealth())) * 100.0;
+            if (healthPercent < 25.0) {
+                return String.format(
+                        "You notice %s nearby. You are severely injured and in intense pain. Call out to them urgently by name " +
+                        "and ask for help. Keep it brief — two or three sentences.",
+                        playerName);
+            }
+        }
+
+        return buildGenericUrgentPrompt(playerName);
+    }
+
+    private static String buildGenericUrgentPrompt(String playerName) {
+        return String.format(
+                "You notice %s nearby and feel the need to speak to them. " +
+                "Call out to them by name and share whatever is on your mind. Keep it brief — two or three sentences.",
+                playerName);
+    }
 }

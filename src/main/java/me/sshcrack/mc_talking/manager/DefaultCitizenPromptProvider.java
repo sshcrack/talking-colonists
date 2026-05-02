@@ -31,6 +31,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         if (view.jobName() != null) {
             prompt.append(", **").append(view.jobName()).append("**");
+            if (view.workBuildingDisplayName() != null) {
+                prompt.append(" at ").append(view.workBuildingDisplayName())
+                        .append(" (level ").append(view.workBuildingLevel()).append(")");
+            }
         } else {
             prompt.append(", **unemployed**");
         }
@@ -44,7 +48,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append(", homeless");
         }
 
-        prompt.append(".\n\n");
+        prompt.append(".\n");
+        prompt.append("Colony: **").append(view.colonyName()).append("**");
+        if (view.homeBuildingDisplayName() != null && !view.homeless()) {
+            prompt.append(" | Home: ").append(view.homeBuildingDisplayName())
+                    .append(" (level ").append(view.homeBuildingLevel()).append(")");
+        }
+        prompt.append("\n\n");
         return prompt.toString();
     }
 
