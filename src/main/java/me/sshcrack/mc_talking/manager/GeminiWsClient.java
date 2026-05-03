@@ -1,8 +1,10 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
+import cpw.mods.modlauncher.log.MLClassLoaderContextSelector;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
@@ -28,7 +30,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     /**
@@ -69,7 +71,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     // AudioProvider creates channels/decoders so this client can be tested/mockable
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
-        super(CONFIG.geminiApiKey.get());
+        super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
@@ -109,23 +111,29 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * Defaults to the globally configured modality.
      */
     protected ModalityModes getEffectiveModality() {
-        return CONFIG.modality.get();
+        return McTalkingConfig.INSTANCE.instance().modality;
     }
+
+    /**
+     * Accumulates the AI-generated text across all turns in this session, used for memory generation.
+     * Only populated when audio transcription is enabled (i.e. when citizen memory is enabled).
+     */
+    protected final StringBuilder sessionTranscript = new StringBuilder();
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + CONFIG.currentAiModel.get().getName());
+        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
 
         var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
 
-        if (modality == ModalityModes.TEXT_AND_AUDIO) {
+        if (modality == ModalityModes.TEXT_AND_AUDIO || McTalkingConfig.INSTANCE.instance().enableCitizenMemory) {
             setup.outputAudioTranscription = new JsonObject();
         }
 
         if (modality != ModalityModes.TEXT) {
             setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
-            setup.generationConfig.speechConfig.language_code = CONFIG.language.get();
+            setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
             var entity = this.entity;
             var female = entity.getCitizenData().isFemale();
             var uuid = entity.getUUID();
@@ -138,7 +146,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = CONFIG.currentAiModel.get().getRandomVoice(uuid, female);
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
 
         }
 
@@ -157,7 +165,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
-        setup.tools.addAll(AITools.getEnabledTools());
+
+        boolean isPlayer = resolveActivePlayer() != null;
+        McTalking.LOGGER.info("Adding tools (player enabled {})", isPlayer);
+        setup.tools.addAll(AITools.getEnabledTools(isPlayer));
 
         return setup;
     }
@@ -246,14 +257,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("Gemini generation complete");
 
         stream.flushAudio();
-        var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currentTurnTranscript.isBlank())
-            return;
-        if (getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO) {
-            sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
+
+        if (!currentTurnTranscript.isBlank()) {
+            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
+            sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
         }
 
-        currentTurnTranscript = "";
+        // NOTE: Do NOT clear currentTurnTranscript here.
+        // onTurnComplete() fires after onGenerationComplete() and subclasses
+        // (e.g. LiveConversationWsClient) need the transcript to forward it to
+        // the peer.  Clearing and chat-sending is done in onTurnComplete instead.
+
+        generationComplete = true;
     }
 
     @Override
@@ -261,11 +276,40 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("Gemini generation interrupted");
         stream.stop();
 
+        if (!currentTurnTranscript.isBlank()) {
+            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
+            sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
+        }
+
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currentTurnTranscript.isBlank())
+        if (currentTurnTranscript.isBlank()) {
             return;
-        sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
+        }
+
+        sendTranscriptToChat(sPlayer);
         currentTurnTranscript = "";
+    }
+
+    private void sendTranscriptToChat(@Nullable ServerPlayer sPlayer) {
+        var modality = getEffectiveModality();
+        var hasTextEnabled = modality == ModalityModes.TEXT || modality == ModalityModes.TEXT_AND_AUDIO;
+        if (!hasTextEnabled) return;
+
+        var message = entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim()));
+
+        if (sPlayer != null) {
+            sPlayer.sendSystemMessage(message);
+        } else if (McTalkingConfig.INSTANCE.instance().sendMumblingAndConversationsToChat) {
+            var server = entity.level().getServer();
+            if (server != null) {
+                double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    if (player.level() == entity.level() && player.distanceTo(entity) <= range) {
+                        player.sendSystemMessage(message);
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -286,6 +330,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onTurnComplete() {
         McTalking.LOGGER.info("Gemini turn complete");
         generationComplete = true;
+
+        // Send the transcript to chat and notify subclasses before clearing.
+        // This is done here (not in onGenerationComplete) so that subclasses
+        // can still act on the transcript via the onTranscriptComplete hook.
+        var sPlayer = resolveActivePlayer();
+        if (!currentTurnTranscript.isBlank()) {
+            sendTranscriptToChat(sPlayer);
+            onTranscriptComplete(currentTurnTranscript.trim());
+            currentTurnTranscript = "";
+        }
+
         if (shouldEndConversation) {
             var playerUUID = ConversationManager.getPlayerForEntity(entity.getUUID());
             if (playerUUID != null) {
@@ -294,6 +349,19 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 close();
             }
         }
+    }
+
+    /**
+     * Called from {@link #onTurnComplete()} with the completed transcript text,
+     * right before {@link #currentTurnTranscript} is cleared.
+     *
+     * <p>The default implementation is a no-op. Subclasses may override this
+     * to act on the finished transcript (e.g. forwarding it to a peer).
+     *
+     * @param transcript the non-empty, trimmed transcript for the just-completed turn
+     */
+    protected void onTranscriptComplete(String transcript) {
+        // no-op by default
     }
 
     @Override
@@ -388,7 +456,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         try {
             result = action.execute(this.entity, colony, args);
         } catch (Exception e) {
-            McTalking.LOGGER.error("[TOOL-CALL] Tool threw an unexpected exception", e);
+            McTalking.LOGGER.error("[TOOL-CALL] Tool threw an unexpected exception. Params are {}.", (new Gson()).toJson(args), e);
             var error = new JsonObject();
             error.addProperty("error", "A fatal error occurred. Don't call this tool again.");
 

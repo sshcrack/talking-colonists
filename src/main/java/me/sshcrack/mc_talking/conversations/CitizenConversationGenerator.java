@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenConversationGenerator {
     private static final String CONVERSATION_SYSTEM_PROMPT = """
@@ -41,7 +41,7 @@ public class CitizenConversationGenerator {
             - Accent (e.g., British RP, American Gen, regional, etc.)
 
             ## Scene:
-            Describe the environment and atmosphere in 1–2 sentences.
+            Describe the environment and atmosphere in 1-2 sentences.
 
             ## Sample Context:
             Define genre, tone, pacing behavior, and emotional tension.
@@ -53,7 +53,7 @@ public class CitizenConversationGenerator {
             - Use character names exactly as given (e.g., "Tomas Reed:")
             - Include emotional/action cues in square brackets before or within lines (e.g., [shouting], [weakly], [suspicion])
             - Keep dialogue concise but expressive
-            - Reflect each character’s emotional state, needs, and personality
+            - Reflect each character's emotional state, needs, and personality
             - Escalate tension naturally toward the end if appropriate
             - Ensure characters reference their personal conditions, needs, and relationships when relevant
             - Maintain immersive, roleplay-style dialogue
@@ -165,7 +165,7 @@ public class CitizenConversationGenerator {
             citizenInfo.append(CitizenPromptService.generateConversationalInfoPrompt(view)).append("\n-----\n");
 
             var isFemale = view.female();
-            var voiceName = CONFIG.currentAiModel.get().getRandomVoice(entity.getUUID(), isFemale);
+            var voiceName = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(entity.getUUID(), isFemale);
 
             var config = new GeminiTTS.RequestPayload.SpeakerVoiceConfig();
 
@@ -179,7 +179,7 @@ public class CitizenConversationGenerator {
 
         RawConversation conversation = generateConversationAndMemory(conversationEntities, citizenInfo, server);
 
-        String apiKey = CONFIG.geminiApiKey.get();
+        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         try {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
             GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation.conversation(), speakerVoiceConfigs), chunkConsumer);
@@ -202,7 +202,7 @@ public class CitizenConversationGenerator {
 
     @NotNull
     private static RawConversation generateConversationAndMemory(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo, MinecraftServer server) throws ConversationGenerationException {
-        String apiKey = CONFIG.geminiApiKey.get();
+        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         String rawConversationOutput;
         try {
             McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
@@ -215,7 +215,7 @@ public class CitizenConversationGenerator {
         }
 
         CitizenMemoryGenerator generator = null;
-        if (CONFIG.enableCitizenMemory.get()) {
+        if (McTalkingConfig.INSTANCE.instance().enableCitizenMemory) {
             generator = CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
         }
         return new RawConversation(rawConversationOutput, generator);

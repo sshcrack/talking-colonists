@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenTalkingDevice extends Item {
     /*? if forge {*/
@@ -155,7 +155,7 @@ public class CitizenTalkingDevice extends Item {
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
         UUID playerId = serverPlayer.getUUID();        // Check if API key is set
-        if (CONFIG.geminiApiKey.get().isEmpty()) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
             serverPlayer.sendSystemMessage(
                     Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
                             .withStyle(ChatFormatting.RED)

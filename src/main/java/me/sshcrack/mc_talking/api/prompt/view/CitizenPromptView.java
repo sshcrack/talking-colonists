@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.api.prompt.view;
 
+import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,6 +34,18 @@ public record CitizenPromptView(
         @Nullable PlayerRelationView playerRelation,
         String responseLanguageName,
         @Nullable CitizenMemories memories,
-        Map<UUID, String> interestedParties
+        Map<UUID, String> interestedParties,
+        String colonyName,
+        @Nullable String homeBuildingDisplayName,
+        int homeBuildingLevel,
+        @Nullable String workBuildingDisplayName,
+        int workBuildingLevel,
+        /** MineColonies colony ID — used for raid-trauma and personality lookups */
+        int colonyId,
+        /** Built-in personality archetype, or {@code null} if a custom one is active */
+        @Nullable PersonalityArchetype personality,
+        /** Freeform custom personality text, or {@code null} if a built-in is active */
+        @Nullable String customPersonalityText
 ) {
 }
+

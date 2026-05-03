@@ -5,6 +5,8 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.util.RaidTraumaTracker;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -31,6 +33,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         if (view.jobName() != null) {
             prompt.append(", **").append(view.jobName()).append("**");
+            if (view.workBuildingDisplayName() != null) {
+                prompt.append(" at ").append(view.workBuildingDisplayName())
+                        .append(" (level ").append(view.workBuildingLevel()).append(")");
+            }
         } else {
             prompt.append(", **unemployed**");
         }
@@ -44,7 +50,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append(", homeless");
         }
 
-        prompt.append(".\n\n");
+        prompt.append(".\n");
+        prompt.append("Colony: **").append(view.colonyName()).append("**");
+        if (view.homeBuildingDisplayName() != null && !view.homeless()) {
+            prompt.append(" | Home: ").append(view.homeBuildingDisplayName())
+                    .append(" (level ").append(view.homeBuildingLevel()).append(")");
+        }
+        prompt.append("\n\n");
         return prompt.toString();
     }
 
@@ -91,6 +103,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             for (var message : view.blockingInteractionMessages()) {
                 prompt.append("- ").append(message);
             }
+        }
+
+        // Personality archetype
+        if (view.personality() != null) {
+            prompt.append("\n## PERSONALITY\n");
+            prompt.append(view.personality().getPromptLines()).append("\n");
+        } else if (view.customPersonalityText() != null) {
+            prompt.append("\n## PERSONALITY\n");
+            prompt.append(view.customPersonalityText()).append("\n");
         }
 
         return prompt.toString();
@@ -147,9 +168,29 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         if (status != null) {
             prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
         }
+
+        // Post-raid trauma
+        int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
+        if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(view.colonyId(), traumaDuration)) {
+            long sinceMs = RaidTraumaTracker.millisSinceRaid(view.colonyId());
+            int lost = RaidTraumaTracker.getLostCitizens(view.colonyId());
+            prompt.append("\n## POST-RAID TRAUMA\n");
+            if (sinceMs < 5 * 60_000L) {
+                prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
+            } else if (sinceMs < 15 * 60_000L) {
+                prompt.append("- The recent raid is still fresh in your mind. You're on edge and jumpy.\n");
+            } else {
+                prompt.append("- You're slowly calming down after the raid, but still feel uneasy.\n");
+            }
+            if (lost > 0) {
+                prompt.append("- Tragically, ").append(lost)
+                      .append(" of your fellow colonists didn't survive.")
+                      .append("\n");
+            }
+        }
     }
 
-    private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder pprompt) {
+    private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder relationshipPrompt = new StringBuilder();
 
         if (view.parentNames() != null && !view.parentNames().isEmpty()) {
@@ -173,8 +214,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         if (!relationshipPrompt.isEmpty()) {
-            pprompt.append("\n## RELATIONSHIPS\n");
-            pprompt.append(relationshipPrompt);
+            prompt.append("\n## RELATIONSHIPS\n");
+            prompt.append(relationshipPrompt);
         }
     }
 

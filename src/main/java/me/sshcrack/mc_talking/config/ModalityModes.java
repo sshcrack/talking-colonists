@@ -2,7 +2,10 @@ package me.sshcrack.mc_talking.config;
 
 import java.util.List;
 
-public enum ModalityModes {
+import dev.isxander.yacl3.api.NameableEnum;
+import net.minecraft.network.chat.Component;
+
+public enum ModalityModes implements NameableEnum {
     TEXT,
     AUDIO,
     TEXT_AND_AUDIO;
@@ -12,5 +15,10 @@ public enum ModalityModes {
             case TEXT -> List.of("TEXT");
             case AUDIO, TEXT_AND_AUDIO -> List.of("AUDIO");
         };
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.literal(name());
     }
 }

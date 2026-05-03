@@ -20,7 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class ConversationCreatorDevice extends Item {
     public ConversationCreatorDevice() {
@@ -61,7 +61,7 @@ public class ConversationCreatorDevice extends Item {
             return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }
 
-        if (!CONFIG.enableCitizenToCitizenConversation.get()) {
+        if (!McTalkingConfig.INSTANCE.instance().enableCitizenToCitizenConversation) {
             player.sendSystemMessage(Component.literal("Citizen-to-citizen conversations are disabled in the config").withStyle(ChatFormatting.RED));
             return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }

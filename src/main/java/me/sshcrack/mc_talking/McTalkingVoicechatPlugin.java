@@ -10,6 +10,7 @@ import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
+import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -29,7 +30,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 @SuppressWarnings("unused")
 @ForgeVoicechatPlugin
@@ -77,6 +78,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public void onStop(VoicechatServerStoppedEvent event) {
         executor.shutdownNow();
         CitizenMemoryGenerator.stopAllGenerators();
+        PlayerConversationMemoryGenerator.stopAllGenerators();
     }
 
     public void onServerStarted(VoicechatServerStartedEvent event) {
@@ -156,7 +158,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             return;
         }
         var vcPlayer = sender.getPlayer();
-        if (sender.isInGroup() && !CONFIG.respondInGroups.get()) {
+        if (sender.isInGroup() && !McTalkingConfig.INSTANCE.instance().respondInGroups) {
             return;
         }
 

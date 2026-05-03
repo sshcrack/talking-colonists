@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
@@ -56,7 +56,7 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
-        if (!CONFIG.geminiApiKey.get().isEmpty()) {
+        if (!McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
             return;
         }
 
@@ -115,12 +115,14 @@ public class ServerEventHandler {
         tickCounter++;
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);
-        boolean doMumblingCheck = (tickCounter % CONFIG.mumblingCheckIntervalTicks.get() == 0);
-        boolean doRandomConvCheck = CONFIG.enableCitizenToCitizenConversation.get()
-                && CONFIG.enableRandomConversations.get()
-                && (tickCounter % CONFIG.randomConversationCheckIntervalTicks.get() == 0);
+        boolean doMumblingCheck = (tickCounter % McTalkingConfig.INSTANCE.instance().mumblingCheckIntervalTicks == 0);
+        boolean doRandomConvCheck = McTalkingConfig.INSTANCE.instance().enableCitizenToCitizenConversation
+                && McTalkingConfig.INSTANCE.instance().enableRandomConversations
+                && (tickCounter % McTalkingConfig.INSTANCE.instance().randomConversationCheckIntervalTicks == 0);
+        boolean doContactCheck = McTalkingConfig.INSTANCE.instance().enableCitizenInitiatedContact
+                && (tickCounter % McTalkingConfig.INSTANCE.instance().citizenContactCheckIntervalTicks == 0);
 
-        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck) {
+        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck && !doContactCheck) {
             return;
         }
 
@@ -149,6 +151,11 @@ public class ServerEventHandler {
             // Mumbling: only if this player is NOT in a conversation
             if (doMumblingCheck && !ConversationManager.isPlayerInConversation(playerId)) {
                 checkForMumblingCitizens(player);
+            }
+
+            // Citizen-initiated contact: only if this player is NOT already in a conversation
+            if (doContactCheck && !ConversationManager.isPlayerInConversation(playerId)) {
+                checkForCitizenInitiatedContact(player);
             }
         }
 
@@ -184,13 +191,13 @@ public class ServerEventHandler {
         }
 
         double distanceSquared = player.distanceToSqr(activeEntity);
-        if (distanceSquared > CONFIG.maxConversationDistance.get() * CONFIG.maxConversationDistance.get()) {
+        if (distanceSquared > McTalkingConfig.INSTANCE.instance().maxConversationDistance * McTalkingConfig.INSTANCE.instance().maxConversationDistance) {
             ConversationManager.endConversation(player.getUUID(), true);
         }
     }
 
     private void checkForMumblingCitizens(ServerPlayer player) {
-        double range = CONFIG.mumblingDetectionRange.get();
+        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
         var aabb = player.getBoundingBox().inflate(range);
         var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
@@ -207,11 +214,95 @@ public class ServerEventHandler {
             if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
             // Skip if this citizen is still within their post-session cooldown
             if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
-            if (Math.random() < CONFIG.mumblingChance.get()) {
+            if (Math.random() < McTalkingConfig.INSTANCE.instance().mumblingChance) {
                 ConversationManager.startMumbling(citizen);
                 break; // Only trigger one mumbling citizen per player per check
             }
         }
+    }
+
+    /**
+     * Checks nearby citizens for urgent needs and, based on a weighted random roll, has them
+     * proactively speak to the given player (spatial audio, like mumbling but directed).
+     *
+     * <p>Only one citizen initiates contact per player per check to avoid audio overlap.</p>
+     */
+    private void checkForCitizenInitiatedContact(ServerPlayer player) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+
+        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+        var aabb = player.getBoundingBox().inflate(range);
+        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
+
+        boolean anyBusy = citizens.stream()
+                .anyMatch(c -> ConversationManager.isCitizenBusy(c.getUUID()));
+        if (anyBusy) return;
+
+        double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
+
+        for (AbstractEntityCitizen citizen : citizens) {
+            if (citizen instanceof VisitorCitizen) continue;
+            if (citizen.isSleeping()) continue;
+            if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
+            if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
+            if (citizen.getCitizenData() == null) continue;
+
+            double urgencyWeight = calculateUrgencyWeight(citizen);
+            if (urgencyWeight <= 0) continue;
+
+            if (Math.random() < baseChance * urgencyWeight) {
+                McTalking.LOGGER.info("[CitizenContact] Citizen {} initiating contact with player {}",
+                        citizen.getCitizenData().getName(), player.getName().getString());
+                ConversationManager.startUrgentContact(citizen, player);
+                break; // Only one citizen per player per check
+            }
+        }
+    }
+
+    /**
+     * Calculates an urgency weight for a citizen based on their current state.
+     * A higher weight means the citizen is more likely to initiate contact with a player.
+     * Returns 0 if the citizen has no pressing concerns.
+     */
+    private double calculateUrgencyWeight(AbstractEntityCitizen citizen) {
+        var data = citizen.getCitizenData();
+        if (data == null) return 0;
+
+        double weight = 0;
+
+        double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
+        if (happiness < 3.0) {
+            weight += 1.5;
+        } else if (happiness < 5.0) {
+            weight += 0.6;
+        }
+
+        if (data.getCitizenDiseaseHandler().isSick()) {
+            weight += 0.8;
+        }
+
+        if (data.getHomeBuilding() == null) {
+            weight += 0.7;
+        }
+
+        double saturation = data.getSaturation();
+        if (saturation <= 1) {
+            weight += 1.0;
+        } else if (saturation <= 3) {
+            weight += 0.4;
+        }
+
+        var entityOpt = data.getEntity();
+        if (entityOpt.isPresent()) {
+            double healthPercent = (entityOpt.get().getHealth() / Math.max(1.0, entityOpt.get().getMaxHealth())) * 100.0;
+            if (healthPercent < 25.0) {
+                weight += 1.0;
+            } else if (healthPercent < 50.0) {
+                weight += 0.4;
+            }
+        }
+
+        return weight;
     }
 
     /**
@@ -226,9 +317,9 @@ public class ServerEventHandler {
      * interrupting ongoing player conversations.</p>
      */
     private void checkForRandomConversations(MinecraftServer server) {
-        if (CONFIG.geminiApiKey.get().isEmpty()) return;
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
 
-        double range = CONFIG.mumblingDetectionRange.get() * 2;
+        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             var nearbyBox = player.getBoundingBox().inflate(range);
@@ -248,7 +339,7 @@ public class ServerEventHandler {
                 if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
                 if (citizen.isSleeping()) continue;
 
-                if (Math.random() >= CONFIG.randomConversationChance.get()) continue;
+                if (Math.random() >= McTalkingConfig.INSTANCE.instance().randomConversationChance) continue;
 
                 // Find a nearby partner from the same proximity list (no second query needed)
                 List<AbstractEntityCitizen> partners = new ArrayList<>();

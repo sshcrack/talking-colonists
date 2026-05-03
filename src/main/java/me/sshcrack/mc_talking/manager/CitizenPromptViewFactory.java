@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
@@ -14,7 +15,9 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
+import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,7 +44,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
 import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
-import static me.sshcrack.mc_talking.config.McTalkingConfig.CONFIG;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -136,6 +139,22 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        String colonyName = data.getColony().getName();
+
+        IBuilding homeBuilding = data.getHomeBuilding();
+        String homeBuildingDisplayName = homeBuilding != null ? homeBuilding.getBuildingDisplayName() : null;
+        int homeBuildingLevel = homeBuilding != null ? homeBuilding.getBuildingLevel() : 0;
+
+        IBuilding workBuilding = data.getWorkBuilding();
+        String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
+        int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
+
+        // Personality — lazy assignment on first prompt generation
+        var personalityExt = (CitizenDataPersonalityExtended) data;
+        personalityExt.mc_talking$assignPersonality();
+        PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
+        String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -156,9 +175,17 @@ public final class CitizenPromptViewFactory {
                 skills,
                 blockingMessages,
                 relation,
-                getLanguageNameFromCode(CONFIG.language.get()),
+                getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
                 ((CitizenDataMemoryExtended) data).mc_talking$getMemory(),
-                interestedParties
+                interestedParties,
+                colonyName,
+                homeBuildingDisplayName,
+                homeBuildingLevel,
+                workBuildingDisplayName,
+                workBuildingLevel,
+                data.getColony().getID(),
+                personality,
+                customPersonalityText
         );
     }
 

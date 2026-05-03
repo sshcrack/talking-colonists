@@ -13,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.HashMap;
 
 public class DropItemAction extends FunctionAction {
+
     public DropItemAction() {
         super("drop_item", "Drops an item with the given count at the specified slot in your inventory. Use -1 to drop the entire stack (maximum count).",
                 new ObjectProperty(new HashMap<>() {{
