@@ -118,6 +118,11 @@
   "yacl3.config.mc_talking:config.enablePersonalityArchetypes": "Enable Personality Archetypes",
   "yacl3.config.mc_talking:config.enablePersonalityArchetypes.desc": "If enabled, each citizen is randomly assigned a personality archetype (e.g. Optimist, Grump, Gossip) that persistently shapes how they speak.",
   "yacl3.config.mc_talking:config.customPersonalityArchetypes": "Custom Personality Archetypes",
-  "yacl3.config.mc_talking:config.customPersonalityArchetypes.desc": "Freeform personality descriptions added to the assignment pool. Each entry is a plain-English instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'"
+  "yacl3.config.mc_talking:config.customPersonalityArchetypes.desc": "Freeform personality descriptions added to the assignment pool. Each entry is a plain-English instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'",
 
+  "yacl3.config.mc_talking:config.category.citizens.group.voice_chat": "Voice Chat",
+  "yacl3.config.mc_talking:config.citizenVoiceWhisper": "Citizen Voice Whisper",
+  "yacl3.config.mc_talking:config.citizenVoiceWhisper.desc": "Marks the citizens voice channel as a whisper, which has a smaller default radius",
+  "yacl3.config.mc_talking:config.citizenVoiceDistance": "Citizen Voice Distance",
+  "yacl3.config.mc_talking:config.citizenVoiceDistance.desc": "The distance at which the citizen's voice can be heard. Only applies if the value is non 0."
 }

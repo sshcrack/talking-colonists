@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.colony.jobs.ModJobs;
+import com.minecolonies.api.colony.jobs.registry.JobEntry;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import net.minecraft.network.chat.Component;
@@ -40,7 +41,7 @@ public final class MumblingTopicHelper {
         }
 
         if (statusTopic != null) return compose(statusTopic);
-        if (jobTopic != null)    return compose(jobTopic);
+        if (jobTopic != null) return compose(jobTopic);
 
         return FALLBACK;
     }
@@ -51,7 +52,9 @@ public final class MumblingTopicHelper {
                 "Keep it very brief — one or two sentences at most, as if absent-mindedly talking to yourself.";
     }
 
-    /** Returns true for statuses that are emotionally dominant and should not be blended. */
+    /**
+     * Returns true for statuses that are emotionally dominant and should not be blended.
+     */
     private static boolean isCriticalStatus(AbstractEntityCitizen citizen) {
         var data = citizen.getCitizenData();
         var status = data.getStatus();
@@ -75,7 +78,7 @@ public final class MumblingTopicHelper {
         return applyMoodTint(base, happiness);
     }
 
-    private static String buildJobThought(var job) {
+    private static String buildJobThought(JobEntry job) {
 
         // ── Mining ────────────────────────────────────────────────────────────
         if (job == ModJobs.miner.get()) {
