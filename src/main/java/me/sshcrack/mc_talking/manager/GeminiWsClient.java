@@ -259,14 +259,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currentTurnTranscript.isBlank()) {
-            currentTurnTranscript = "";
+        if (currentTurnTranscript.isBlank()) {
             return;
         }
-        if (getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO) {
-            sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
-        }
 
+        sendTranscriptToChat(sPlayer);
         currentTurnTranscript = "";
     }
 
@@ -281,12 +278,34 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         var sPlayer = resolveActivePlayer();
-        if (sPlayer == null || currentTurnTranscript.isBlank()) {
-            currentTurnTranscript = "";
+        if (currentTurnTranscript.isBlank()) {
             return;
         }
-        sPlayer.sendSystemMessage(entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim())));
+
+        sendTranscriptToChat(sPlayer);
         currentTurnTranscript = "";
+    }
+
+    private void sendTranscriptToChat(@Nullable ServerPlayer sPlayer) {
+        var modality = getEffectiveModality();
+        var hasTextEnabled = modality == ModalityModes.TEXT || modality == ModalityModes.TEXT_AND_AUDIO;
+        if (!hasTextEnabled) return;
+
+        var message = entity.getDisplayName().copy().append(": ").append(Component.literal(currentTurnTranscript.trim()));
+
+        if (sPlayer != null) {
+            sPlayer.sendSystemMessage(message);
+        } else if (McTalkingConfig.INSTANCE.instance().sendMumblingAndConversationsToChat) {
+            var server = entity.level().getServer();
+            if (server != null) {
+                double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    if (player.level() == entity.level() && player.distanceTo(entity) <= range) {
+                        player.sendSystemMessage(message);
+                    }
+                }
+            }
+        }
     }
 
     @Override

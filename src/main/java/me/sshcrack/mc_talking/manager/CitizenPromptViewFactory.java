@@ -15,7 +15,9 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
+import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -147,6 +149,12 @@ public final class CitizenPromptViewFactory {
         String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
         int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
 
+        // Personality — lazy assignment on first prompt generation
+        var personalityExt = (CitizenDataPersonalityExtended) data;
+        personalityExt.mc_talking$assignPersonality();
+        PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
+        String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -174,7 +182,10 @@ public final class CitizenPromptViewFactory {
                 homeBuildingDisplayName,
                 homeBuildingLevel,
                 workBuildingDisplayName,
-                workBuildingLevel
+                workBuildingLevel,
+                data.getColony().getID(),
+                personality,
+                customPersonalityText
         );
     }
 

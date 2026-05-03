@@ -5,11 +5,15 @@ import com.minecolonies.core.colony.CitizenData;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,15 +21,23 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/*? if neoforge {*/
-/*? }*/
+import java.util.List;
+
 
 @Mixin(value = CitizenData.class, remap = false)
-public class CitizenDataMixin implements CitizenDataMemoryExtended {
+public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended {
     @Unique
     private static final String TAG_MEMORY_KEY = "mc_talking_memory";
     @Unique
+    private static final String TAG_PERSONALITY_KEY = "mc_talking_personality";
+    @Unique
     private CitizenMemories mc_talking$memory;
+    @Unique
+    @Nullable
+    private PersonalityArchetype mc_talking$personality;
+    @Unique
+    @Nullable
+    private String mc_talking$customPersonality;
 
     @Inject(method = "setVisibleStatus", at = @At("HEAD"))
     private void mc_talking$onSetVisibleStatus(VisibleCitizenStatus status, CallbackInfo ci) {
@@ -101,10 +113,15 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
         if (mc_talking$memory != null) {
             if (tag.contains(TAG_MEMORY_KEY)) {
                 McTalking.LOGGER.error("Memory data conflict found for citizen {}, not overwriting.", CitizenData.class.cast(this).getUUID());
-                return;
+            } else {
+                tag.put(TAG_MEMORY_KEY, mc_talking$memory.serializeNbt());
             }
-
-            tag.put(TAG_MEMORY_KEY, mc_talking$memory.serializeNbt());
+        }
+        // Personality
+        if (mc_talking$personality != null) {
+            tag.putString(TAG_PERSONALITY_KEY, mc_talking$personality.name());
+        } else if (mc_talking$customPersonality != null) {
+            tag.putString(TAG_PERSONALITY_KEY, "custom:" + mc_talking$customPersonality);
         }
     }
 
@@ -113,6 +130,20 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
         if (nbtTagCompound.contains(TAG_MEMORY_KEY)) {
             mc_talking$memory = new CitizenMemories();
             mc_talking$memory.deserializeNbt(nbtTagCompound.getCompound(TAG_MEMORY_KEY));
+        }
+        if (nbtTagCompound.contains(TAG_PERSONALITY_KEY)) {
+            String raw = nbtTagCompound.getString(TAG_PERSONALITY_KEY);
+            if (raw.startsWith("custom:")) {
+                mc_talking$customPersonality = raw.substring(7);
+                mc_talking$personality = null;
+            } else {
+                try {
+                    mc_talking$personality = PersonalityArchetype.valueOf(raw);
+                    mc_talking$customPersonality = null;
+                } catch (IllegalArgumentException ignored) {
+                    // Unknown enum value (e.g. old save) — will be re-assigned lazily
+                }
+            }
         }
     }
 
@@ -126,7 +157,41 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended {
         if (mc_talking$memory == null) {
             mc_talking$memory = new CitizenMemories();
         }
-
         return mc_talking$memory;
+    }
+
+    // -------------------------------------------------------------------------
+    // CitizenDataPersonalityExtended
+    // -------------------------------------------------------------------------
+
+    @Override
+    @Nullable
+    public PersonalityArchetype mc_talking$getPersonality() {
+        return mc_talking$personality;
+    }
+
+    @Override
+    @Nullable
+    public String mc_talking$getCustomPersonality() {
+        return mc_talking$customPersonality;
+    }
+
+    @Override
+    public void mc_talking$assignPersonality() {
+        // Already assigned?
+        if (mc_talking$personality != null || mc_talking$customPersonality != null) return;
+
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (!config.enablePersonalityArchetypes) return;
+
+        List<String> customs = config.customPersonalityArchetypes;
+        int totalPool = PersonalityArchetype.values().length + customs.size();
+        int pick = (int) (Math.random() * totalPool);
+
+        if (pick < PersonalityArchetype.values().length) {
+            mc_talking$personality = PersonalityArchetype.values()[pick];
+        } else {
+            mc_talking$customPersonality = customs.get(pick - PersonalityArchetype.values().length);
+        }
     }
 }

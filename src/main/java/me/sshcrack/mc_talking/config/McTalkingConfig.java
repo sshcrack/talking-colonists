@@ -62,6 +62,11 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Whether the citizens should respond if the player is in a group or not.")
     public boolean respondInGroups = false;
 
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "If true, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.")
+    public boolean sendMumblingAndConversationsToChat = false;
+
     // Citizen - Citizen Interaction (Conversations between them)
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @TickBox
@@ -157,6 +162,23 @@ public class McTalkingConfig {
     @IntField(min = 0, max = 10000)
     @SerialEntry(comment = "Minimum number of seconds that must pass after a citizen's automatic session (mumble or citizen-to-citizen) ends before they can be selected for another one. Set to 0 to disable.")
     public int citizenCooldownSeconds = 120;
+
+    // Post-Raid Trauma
+    @AutoGen(category = "citizens", group = "raid_trauma")
+    @IntField(min = 0, max = 7200)
+    @SerialEntry(comment = "How long (in seconds) citizens express post-raid trauma in their prompts after a raid ends. Set to 0 to disable.")
+    public int raidTraumaDurationSeconds = 1200;
+
+    // Personality Archetypes
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, each citizen is randomly assigned a personality archetype that influences their speech style and tone.")
+    public boolean enablePersonalityArchetypes = true;
+
+    @AutoGen(category = "citizens")
+    @ListGroup(valueFactory = ToolListFactory.class, controllerFactory = ToolListFactory.class)
+    @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
+    public List<String> customPersonalityArchetypes = new ArrayList<>();
 
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
         @Override

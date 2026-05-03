@@ -70,6 +70,8 @@
   "yacl3.config.mc_talking:config.language.desc": "Preferred response language. If players ask to speak in another language, the AI will for their session.",
   "yacl3.config.mc_talking:config.respondInGroups": "Respond in Groups",
   "yacl3.config.mc_talking:config.respondInGroups.desc": "If disabled, citizens ignore your microphone while you are in a voice chat group.",
+  "yacl3.config.mc_talking:config.sendMumblingAndConversationsToChat": "Send Mumbling to Chat",
+  "yacl3.config.mc_talking:config.sendMumblingAndConversationsToChat.desc": "If enabled, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.",
   "yacl3.config.mc_talking:config.maxConcurrentAgents": "Max Concurrent Agents",
   "yacl3.config.mc_talking:config.maxConcurrentAgents.desc": "Maximum number of simultaneous citizen AI sessions. Player conversations have priority and can evict non-player sessions when full.",
   "yacl3.config.mc_talking:config.maxConversationDistance": "Max Conversation Distance",
@@ -106,6 +108,16 @@
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks": "Citizen Contact Check Interval (ticks)",
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks.desc": "How often the server checks whether urgent citizens should initiate contact. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.citizenCooldownSeconds": "Citizen Cooldown (seconds)",
-  "yacl3.config.mc_talking:config.citizenCooldownSeconds.desc": "Cooldown after an automatic session ends before that citizen can be auto-selected again (mumbling, urgent contact, or citizen-to-citizen). Set to 0 to disable."
+  "yacl3.config.mc_talking:config.citizenCooldownSeconds.desc": "Cooldown after an automatic session ends before that citizen can be auto-selected again (mumbling, urgent contact, or citizen-to-citizen). Set to 0 to disable.",
+
+  "yacl3.config.mc_talking:config.category.citizens.group.raid_trauma": "Post-Raid Trauma",
+  "yacl3.config.mc_talking:config.raidTraumaDurationSeconds": "Raid Trauma Duration (seconds)",
+  "yacl3.config.mc_talking:config.raidTraumaDurationSeconds.desc": "How long citizens express trauma in their prompts after a raid ends. During this window their speech reflects distress and memories of the attack. Set to 0 to disable.",
+
+  "yacl3.config.mc_talking:config.category.citizens.group.personality": "Personality Archetypes",
+  "yacl3.config.mc_talking:config.enablePersonalityArchetypes": "Enable Personality Archetypes",
+  "yacl3.config.mc_talking:config.enablePersonalityArchetypes.desc": "If enabled, each citizen is randomly assigned a personality archetype (e.g. Optimist, Grump, Gossip) that persistently shapes how they speak.",
+  "yacl3.config.mc_talking:config.customPersonalityArchetypes": "Custom Personality Archetypes",
+  "yacl3.config.mc_talking:config.customPersonalityArchetypes.desc": "Freeform personality descriptions added to the assignment pool. Each entry is a plain-English instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'"
 
 }

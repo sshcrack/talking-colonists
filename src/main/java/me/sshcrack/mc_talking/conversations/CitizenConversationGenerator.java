@@ -41,7 +41,7 @@ public class CitizenConversationGenerator {
             - Accent (e.g., British RP, American Gen, regional, etc.)
 
             ## Scene:
-            Describe the environment and atmosphere in 1–2 sentences.
+            Describe the environment and atmosphere in 1-2 sentences.
 
             ## Sample Context:
             Define genre, tone, pacing behavior, and emotional tension.
@@ -53,7 +53,7 @@ public class CitizenConversationGenerator {
             - Use character names exactly as given (e.g., "Tomas Reed:")
             - Include emotional/action cues in square brackets before or within lines (e.g., [shouting], [weakly], [suspicion])
             - Keep dialogue concise but expressive
-            - Reflect each character’s emotional state, needs, and personality
+            - Reflect each character's emotional state, needs, and personality
             - Escalate tension naturally toward the end if appropriate
             - Ensure characters reference their personal conditions, needs, and relationships when relevant
             - Maintain immersive, roleplay-style dialogue

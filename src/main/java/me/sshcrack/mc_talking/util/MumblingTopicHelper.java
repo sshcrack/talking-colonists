@@ -1,7 +1,9 @@
 package me.sshcrack.mc_talking.util;
 
+import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -51,6 +53,7 @@ public final class MumblingTopicHelper {
         if (data.getJob() == null) return null;
 
         String jobKey = data.getJob().getJobRegistryEntry().getTranslationKey();
+        data.getJob().getJobRegistryEntry() == ModJobs.alchemist.get()
         String jobName = Component.translatable(jobKey).getString().toLowerCase();
 
         // Match on translation-key fragments for resilience across mod versions
@@ -93,13 +96,13 @@ public final class MumblingTopicHelper {
     private static String buildStatusTopic(AbstractEntityCitizen citizen) {
         var data = citizen.getCitizenData();
         var status = data.getStatus();
-        if (status == null) return null;
 
         if (status == VisibleCitizenStatus.MOURNING)   return "You're grieving quietly, whispering the name of someone you lost.";
         if (status == VisibleCitizenStatus.SICK)        return "You're feeling awful — muttering about your symptoms and hoping to feel better soon.";
         if (status == VisibleCitizenStatus.RAIDED)      return "You're still shaken from the raid, muttering nervously about staying safe.";
         if (status == VisibleCitizenStatus.BAD_WEATHER) return "You're grumbling about the dreadful weather and how it's slowing everything down.";
         if (status == VisibleCitizenStatus.EAT)         return "You're muttering to yourself about how hungry you were and how good this food tastes.";
+        if (status == VisibleCitizenStatus.WORKING)     return buildWorkingStatusTopic(citizen);
 
         if (data.getCitizenDiseaseHandler().isSick()) {
             return "You feel terrible and mutter about your aches and how you need medicine.";
@@ -113,7 +116,72 @@ public final class MumblingTopicHelper {
         if (saturation <= 1) return "Your stomach growls and you mutter about how desperately hungry you are.";
         if (saturation <= 3) return "You're thinking about food — muttering about what you'd love to eat right now.";
 
+        // Trauma fallback — even without RAIDED status, citizens mutter about a recent raid
+        if (data.getColony() != null) {
+            int colonyId = data.getColony().getID();
+            int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
+            if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(colonyId, traumaDuration)) {
+                long sinceMs = RaidTraumaTracker.millisSinceRaid(colonyId);
+                if (sinceMs < 5 * 60_000L) {
+                    return "You're muttering to yourself, heart still pounding from the raid that just ended.";
+                } else {
+                    return "You can't stop thinking about the recent raid, muttering about what happened and whether it's truly over.";
+                }
+            }
+        }
+
         return null; // No override; fall through to job topic
+    }
+
+    /**
+     * Builds a present-tense, activity-specific mumble for a citizen that is actively working.
+     * Unlike the generic {@link #buildJobTopic}, this emphasises what they are doing *right now*.
+     */
+    private static String buildWorkingStatusTopic(AbstractEntityCitizen citizen) {
+        var data = citizen.getCitizenData();
+        if (data.getJob() == null) return "You're hard at work, muttering about the task in front of you.";
+
+        String jobKey = data.getJob().getJobRegistryEntry().getTranslationKey();
+
+        if (contains(jobKey, "miner"))
+            return "You're mid-swing with your pickaxe, muttering about the vein of ore you're chasing deeper underground.";
+        if (contains(jobKey, "farmer"))
+            return "Your hands are in the soil right now — you're muttering about whether this crop will be ready in time.";
+        if (contains(jobKey, "lumberjack"))
+            return "You're mid-chop on a tree, grunting a few words about how heavy this log is going to be.";
+        if (contains(jobKey, "builder"))
+            return "You're placing blocks and muttering under your breath about whether this wall is going to line up properly.";
+        if (contains(jobKey, "guard") || contains(jobKey, "knight") || contains(jobKey, "ranger"))
+            return "You're patrolling right now, eyes scanning the treeline, muttering about something you thought you saw move.";
+        if (contains(jobKey, "cook") || contains(jobKey, "tavern"))
+            return "You're stirring the pot, muttering about the seasoning and whether there'll be enough for everyone tonight.";
+        if (contains(jobKey, "fisher"))
+            return "You're watching your line intently, muttering about how the fish aren't biting like they should be.";
+        if (contains(jobKey, "shepherd"))
+            return "You're herding your animals right now, clicking your tongue and muttering about one that keeps wandering off.";
+        if (contains(jobKey, "smelter") || contains(jobKey, "blacksmith"))
+            return "The furnace is roaring and you're muttering about whether the metal has reached the right temperature yet.";
+        if (contains(jobKey, "enchanter") || contains(jobKey, "wizard") || contains(jobKey, "mage"))
+            return "You're mid-enchantment, whispering the incantation under your breath, frowning at a part that doesn't quite sound right.";
+        if (contains(jobKey, "healer") || contains(jobKey, "doctor"))
+            return "You're treating a patient right now, muttering about their symptoms and whether the remedy is working.";
+        if (contains(jobKey, "teacher") || contains(jobKey, "school"))
+            return "You're in the middle of a lesson, mouthing the words of what you're about to say next.";
+        if (contains(jobKey, "fletcher"))
+            return "You're carefully fletching an arrow right now, muttering about getting the feathers perfectly aligned.";
+        if (contains(jobKey, "courier") || contains(jobKey, "deliveryman"))
+            return "You're on a delivery run, muttering to yourself about which building you're heading to next.";
+        if (contains(jobKey, "composter") || contains(jobKey, "florist"))
+            return "Your hands are in the compost right now, and you're muttering about how the mix smells today.";
+        if (contains(jobKey, "stone") || contains(jobKey, "quarry") || contains(jobKey, "crusher"))
+            return "You're pounding stone right now, muttering through the noise about how your arms are going to ache tonight.";
+        if (contains(jobKey, "planter") || contains(jobKey, "forester"))
+            return "You're digging a hole for a sapling right now, muttering about where you want the next tree to go.";
+        if (contains(jobKey, "library") || contains(jobKey, "student"))
+            return "You're deep into a page right now, mouthing a particularly tricky sentence under your breath.";
+
+        String jobName = Component.translatable(jobKey).getString().toLowerCase();
+        return "You're right in the middle of your work as a " + jobName + ", muttering to yourself about what you're doing.";
     }
 
     private static boolean contains(String key, String fragment) {
