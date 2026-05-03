@@ -1,28 +1,23 @@
 package me.sshcrack.mc_talking.util;
 
-import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.network.chat.Component;
 
-/**
- * Builds a job- and status-aware mumbling prompt for a citizen so they
- * mutter something relevant to what they are actually doing, rather than a
- * generic "mutter under your breath" instruction.
- */
+// ⚠️ You must import your ModJobs class
+import com.minecolonies.core.entity.ai.job.ModJobs;
+
+import java.util.concurrent.ThreadLocalRandom;
+
 public final class MumblingTopicHelper {
 
     private MumblingTopicHelper() {}
 
     private static final String FALLBACK =
             "You feel the urge to mutter something under your breath. " +
-            "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.";
+                    "Speak your thought aloud briefly, as if absent-mindedly talking to yourself.";
 
-    /**
-     * Returns a short system instruction that tells the citizen what to mutter
-     * about based on their current job and visible status.
-     */
     public static String buildPrompt(AbstractEntityCitizen citizen) {
         if (citizen.getCitizenData() == null) return FALLBACK;
 
@@ -36,7 +31,7 @@ public final class MumblingTopicHelper {
 
         if (statusTopic != null) {
             sb.append(statusTopic).append(" ");
-        } else {
+        } else if (jobTopic != null) {
             sb.append(jobTopic).append(" ");
         }
 
@@ -46,210 +41,204 @@ public final class MumblingTopicHelper {
         return sb.toString();
     }
 
-    // ── Job-specific topics ───────────────────────────────────────────────────
+    // ── Job-specific thoughts (typed, grouped, varied) ───────────
 
     private static String buildJobTopic(AbstractEntityCitizen citizen) {
         var data = citizen.getCitizenData();
         if (data.getJob() == null) return null;
 
-        String jobKey = data.getJob().getJobRegistryEntry().getTranslationKey();
-        data.getJob().getJobRegistryEntry() == ModJobs.alchemist.get()
-        String jobName = Component.translatable(jobKey).getString().toLowerCase();
+        var job = data.getJob().getJobRegistryEntry();
 
-        // Match on translation-key fragments for resilience across mod versions
-        if (contains(jobKey, "miner"))      return "You're thinking about the ore vein you spotted earlier, or wondering how deep to dig next.";
-        if (contains(jobKey, "farmer"))     return "You're thinking about the crops — whether it's time to harvest or if there's been enough rain.";
-        if (contains(jobKey, "lumberjack")) return "You're muttering about which trees to chop next or how heavy today's load of logs was.";
-        if (contains(jobKey, "builder"))    return "You're puzzling over your current construction project — materials, measurements, or a tricky wall section.";
-        if (contains(jobKey, "guard") || contains(jobKey, "knight") || contains(jobKey, "ranger"))
-                                            return "You're scanning your patrol area and muttering about any security concerns or suspicious things you noticed.";
-        if (contains(jobKey, "cook") || contains(jobKey, "tavern"))
-                                            return "You're thinking about today's meal — what ingredients you have, or what the colonists might want to eat.";
-        if (contains(jobKey, "fisher"))     return "You're muttering about the fish — whether they're biting today or which spot has the best catch.";
-        if (contains(jobKey, "shepherd"))   return "You're thinking about your animals — their health, or how much wool you've collected lately.";
-        if (contains(jobKey, "smelter") || contains(jobKey, "blacksmith"))
-                                            return "You're muttering about the furnace — whether the temperature is right or what you're forging next.";
-        if (contains(jobKey, "enchanter") || contains(jobKey, "wizard") || contains(jobKey, "mage"))
-                                            return "You're quietly reciting an incantation or puzzling over an enchantment formula.";
-        if (contains(jobKey, "healer") || contains(jobKey, "doctor"))
-                                            return "You're thinking about your patients — their symptoms, or whether you have enough medicine.";
-        if (contains(jobKey, "teacher") || contains(jobKey, "school"))
-                                            return "You're thinking about today's lessons or wondering if the children are paying attention.";
-        if (contains(jobKey, "fletcher"))   return "You're muttering about arrow shafts — whether the feathers are aligned properly or if you need more materials.";
-        if (contains(jobKey, "courier") || contains(jobKey, "deliveryman"))
-                                            return "You're going over your delivery list in your head, wondering if you've forgotten anything.";
-        if (contains(jobKey, "composter") || contains(jobKey, "florist"))
-                                            return "You're thinking about the plants — which ones need tending or what compost mix works best.";
-        if (contains(jobKey, "stone") || contains(jobKey, "quarry") || contains(jobKey, "crusher"))
-                                            return "You're thinking about stone blocks — how many you've processed today and how sore your arms are.";
-        if (contains(jobKey, "planter") || contains(jobKey, "forester"))
-                                            return "You're thinking about where to plant the next saplings or how the forest is coming along.";
-        if (contains(jobKey, "library") || contains(jobKey, "student"))
-                                            return "You're quietly reciting something you read recently or mulling over a topic you're studying.";
+        // ── Mining / stone ─────────────────────────────
+        if (job == ModJobs.miner.get() || job == ModJobs.quarrier.get()) {
+            return pick(
+                    "You're thinking about what you might uncover next.",
+                    "You're wondering if the effort will pay off.",
+                    "You're focused, a bit concerned about going deeper."
+            );
+        }
 
-        // Generic fallback using the translated job name
+        if (job == ModJobs.crusher.get() || job == ModJobs.stonemason.get()) {
+            return pick(
+                    "You're thinking about the materials you're working with.",
+                    "You're focused on getting things processed properly.",
+                    "You're working steadily, feeling the strain a bit."
+            );
+        }
+
+        // ── Farming / nature ───────────────────────────
+        if (job == ModJobs.farmer.get() || job == ModJobs.planter.get() || job == ModJobs.florist.get()) {
+            return pick(
+                    "You're thinking about how everything is growing.",
+                    "You're hoping the work pays off soon.",
+                    "You're keeping an eye on how things are coming along."
+            );
+        }
+
+        if (job == ModJobs.druid.get() || job == ModJobs.beekeeper.get()) {
+            return pick(
+                    "You're thinking about nature and how it's behaving.",
+                    "You're paying close attention to the environment.",
+                    "You're quietly observing how things are developing."
+            );
+        }
+
+        // ── Animal handling ────────────────────────────
+        if (job == ModJobs.shepherd.get() || job == ModJobs.cowboy.get() ||
+                job == ModJobs.swineherder.get() || job == ModJobs.chickenherder.get() ||
+                job == ModJobs.rabbitherder.get()) {
+
+            return pick(
+                    "You're thinking about your animals and how they're doing.",
+                    "You're keeping track of everything under your care.",
+                    "You're a bit concerned something might wander off."
+            );
+        }
+
+        // ── Crafting / production ─────────────────────
+        if (job == ModJobs.blacksmith.get() || job == ModJobs.smelter.get() ||
+                job == ModJobs.glassblower.get() || job == ModJobs.dyer.get() ||
+                job == ModJobs.fletcher.get() || job == ModJobs.mechanic.get() ||
+                job == ModJobs.concretemixer.get()) {
+
+            return pick(
+                    "You're focused on getting the details right.",
+                    "You're thinking about how everything fits together.",
+                    "You're working carefully, hoping for a solid result."
+            );
+        }
+
+        // ── Food ──────────────────────────────────────
+        if (job == ModJobs.cook.get() || job == ModJobs.chef.get() || job == ModJobs.baker.get()) {
+            return pick(
+                    "You're thinking about the food you're preparing.",
+                    "You're hoping everything turns out well.",
+                    "You're focused on making something worthwhile."
+            );
+        }
+
+        // ── Combat / guards ───────────────────────────
+        if (job == ModJobs.knight.get() || job == ModJobs.ranger.get()) {
+            return pick(
+                    "You're alert, watching for anything unusual.",
+                    "You're thinking about keeping things safe.",
+                    "You're slightly on edge, just in case."
+            );
+        }
+
+        // ── Delivery / logistics ──────────────────────
+        if (job == ModJobs.deliveryman.get()) {
+            return pick(
+                    "You're thinking about where you need to go next.",
+                    "You're trying to keep everything organized.",
+                    "You're hoping you haven't missed anything."
+            );
+        }
+
+        // ── Knowledge / magic ─────────────────────────
+        if (job == ModJobs.enchanter.get() || job == ModJobs.alchemist.get() ||
+                job == ModJobs.researcher.get()) {
+
+            return pick(
+                    "You're thinking about something complex you're working on.",
+                    "You're trying to make sense of a difficult idea.",
+                    "You're focused, but not entirely confident yet."
+            );
+        }
+
+        if (job == ModJobs.teacher.get() || job == ModJobs.student.get() || job == ModJobs.pupil.get()) {
+            return pick(
+                    "You're thinking about what you're learning or teaching.",
+                    "You're trying to stay focused on the material.",
+                    "You're mulling over something you don't fully understand yet."
+            );
+        }
+
+        // ── Medical / death ───────────────────────────
+        if (job == ModJobs.healer.get()) {
+            return pick(
+                    "You're thinking about someone's condition.",
+                    "You're hoping your efforts are helping.",
+                    "You're focused on what needs to be done next."
+            );
+        }
+
+        if (job == ModJobs.undertaker.get()) {
+            return pick(
+                    "You're thinking about those who have passed.",
+                    "You're feeling the weight of your work.",
+                    "You're quiet, focused on your responsibility."
+            );
+        }
+
+        // ── Exotic ────────────────────────────────────
+        if (job == ModJobs.netherworker.get()) {
+            return pick(
+                    "You're thinking about the dangers you've faced.",
+                    "You're uneasy about where your work takes you.",
+                    "You're focused, but wary."
+            );
+        }
+
+        // ── Fallback ──────────────────────────────────
+        String jobName = Component.translatable(job.getTranslationKey()).getString().toLowerCase();
         return "You're lost in thought about your work as a " + jobName + ".";
     }
 
-    // ── Status-specific overrides (higher priority than job) ─────────────────
+    // ── Status logic (unchanged improvements) ─────────
 
     private static String buildStatusTopic(AbstractEntityCitizen citizen) {
         var data = citizen.getCitizenData();
         var status = data.getStatus();
 
-        if (status == VisibleCitizenStatus.MOURNING)   return "You're grieving quietly, whispering the name of someone you lost.";
-        if (status == VisibleCitizenStatus.SICK)        return "You're feeling awful — muttering about your symptoms and hoping to feel better soon.";
-        if (status == VisibleCitizenStatus.RAIDED)      return "You're still shaken from the raid, muttering nervously about staying safe.";
-        if (status == VisibleCitizenStatus.BAD_WEATHER) return "You're grumbling about the dreadful weather and how it's slowing everything down.";
-        if (status == VisibleCitizenStatus.EAT)         return "You're muttering to yourself about how hungry you were and how good this food tastes.";
-        if (status == VisibleCitizenStatus.WORKING)     return buildWorkingStatusTopic(citizen);
+        if (status == VisibleCitizenStatus.MOURNING)
+            return "You're grieving quietly, your thoughts returning to someone you lost.";
 
-        if (data.getCitizenDiseaseHandler().isSick()) {
-            return "You feel terrible and mutter about your aches and how you need medicine.";
-        }
+        if (status == VisibleCitizenStatus.SICK || data.getCitizenDiseaseHandler().isSick())
+            return pick(
+                    "You feel awful and can't ignore it.",
+                    "You're unwell and distracted.",
+                    "You're trying to push through, but it's hard."
+            );
 
-        if (data.getHomeBuilding() == null) {
-            return "You murmur quietly about not having a proper place to sleep and how uncomfortable that is.";
-        }
+        if (status == VisibleCitizenStatus.RAIDED)
+            return pick(
+                    "You're still shaken by what happened.",
+                    "You can't fully relax yet.",
+                    "You're replaying recent events in your mind."
+            );
 
-        double saturation = data.getSaturation();
-        if (saturation <= 1) return "Your stomach growls and you mutter about how desperately hungry you are.";
-        if (saturation <= 3) return "You're thinking about food — muttering about what you'd love to eat right now.";
+        if (status == VisibleCitizenStatus.WORKING && chance(0.4))
+            return buildWorkingThought();
 
-        // Trauma fallback — even without RAIDED status, citizens mutter about a recent raid
-        if (data.getColony() != null) {
-            int colonyId = data.getColony().getID();
-            int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-            if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(colonyId, traumaDuration)) {
-                long sinceMs = RaidTraumaTracker.millisSinceRaid(colonyId);
-                if (sinceMs < 5 * 60_000L) {
-                    return "You're muttering to yourself, heart still pounding from the raid that just ended.";
-                } else {
-                    return "You can't stop thinking about the recent raid, muttering about what happened and whether it's truly over.";
-                }
-            }
-        }
+        if (status == VisibleCitizenStatus.BAD_WEATHER && chance(0.5))
+            return "You're annoyed by the weather.";
 
-        return null; // No override; fall through to job topic
-    }
-
-    /**
-     * Builds a present-tense, activity-specific mumble for a citizen that is actively working.
-     * Unlike the generic {@link #buildJobTopic}, this emphasises what they are doing *right now*.
-     */
-    private static String buildWorkingStatusTopic(AbstractEntityCitizen citizen) {
-        var data = citizen.getCitizenData();
-        if (data.getJob() == null) return "You're hard at work, muttering about the task in front of you.";
-
-        String jobKey = data.getJob().getJobRegistryEntry().getTranslationKey();
-
-        if (contains(jobKey, "miner"))
-            return "You're mid-swing with your pickaxe, muttering about the vein of ore you're chasing deeper underground.";
-        if (contains(jobKey, "farmer"))
-            return "Your hands are in the soil right now — you're muttering about whether this crop will be ready in time.";
-        if (contains(jobKey, "lumberjack"))
-            return "You're mid-chop on a tree, grunting a few words about how heavy this log is going to be.";
-        if (contains(jobKey, "builder"))
-            return "You're placing blocks and muttering under your breath about whether this wall is going to line up properly.";
-        if (contains(jobKey, "guard") || contains(jobKey, "knight") || contains(jobKey, "ranger"))
-            return "You're patrolling right now, eyes scanning the treeline, muttering about something you thought you saw move.";
-        if (contains(jobKey, "cook") || contains(jobKey, "tavern"))
-            return "You're stirring the pot, muttering about the seasoning and whether there'll be enough for everyone tonight.";
-        if (contains(jobKey, "fisher"))
-            return "You're watching your line intently, muttering about how the fish aren't biting like they should be.";
-        if (contains(jobKey, "shepherd"))
-            return "You're herding your animals right now, clicking your tongue and muttering about one that keeps wandering off.";
-        if (contains(jobKey, "smelter") || contains(jobKey, "blacksmith"))
-            return "The furnace is roaring and you're muttering about whether the metal has reached the right temperature yet.";
-        if (contains(jobKey, "enchanter") || contains(jobKey, "wizard") || contains(jobKey, "mage"))
-            return "You're mid-enchantment, whispering the incantation under your breath, frowning at a part that doesn't quite sound right.";
-        if (contains(jobKey, "healer") || contains(jobKey, "doctor"))
-            return "You're treating a patient right now, muttering about their symptoms and whether the remedy is working.";
-        if (contains(jobKey, "teacher") || contains(jobKey, "school"))
-            return "You're in the middle of a lesson, mouthing the words of what you're about to say next.";
-        if (contains(jobKey, "fletcher"))
-            return "You're carefully fletching an arrow right now, muttering about getting the feathers perfectly aligned.";
-        if (contains(jobKey, "courier") || contains(jobKey, "deliveryman"))
-            return "You're on a delivery run, muttering to yourself about which building you're heading to next.";
-        if (contains(jobKey, "composter") || contains(jobKey, "florist"))
-            return "Your hands are in the compost right now, and you're muttering about how the mix smells today.";
-        if (contains(jobKey, "stone") || contains(jobKey, "quarry") || contains(jobKey, "crusher"))
-            return "You're pounding stone right now, muttering through the noise about how your arms are going to ache tonight.";
-        if (contains(jobKey, "planter") || contains(jobKey, "forester"))
-            return "You're digging a hole for a sapling right now, muttering about where you want the next tree to go.";
-        if (contains(jobKey, "library") || contains(jobKey, "student"))
-            return "You're deep into a page right now, mouthing a particularly tricky sentence under your breath.";
-
-        String jobName = Component.translatable(jobKey).getString().toLowerCase();
-        return "You're right in the middle of your work as a " + jobName + ", muttering to yourself about what you're doing.";
-    }
-
-    private static boolean contains(String key, String fragment) {
-        return key.toLowerCase().contains(fragment);
-    }
-
-    /**
-     * Builds a prompt for a citizen who is proactively initiating contact with a nearby player
-     * because they have an urgent need. The citizen will address the player directly by name.
-     *
-     * @param citizen    the citizen initiating contact
-     * @param playerName the name of the nearby player to address
-     * @return the prompt string
-     */
-    public static String buildUrgentContactPrompt(AbstractEntityCitizen citizen, String playerName) {
-        if (citizen.getCitizenData() == null) return buildGenericUrgentPrompt(playerName);
-
-        var data = citizen.getCitizenData();
-
-        // Determine the most pressing issue
-        if (data.getCitizenDiseaseHandler().isSick()) {
-            return String.format(
-                    "You notice %s nearby. You are sick and feeling terrible. Urgently call out to them, " +
-                    "address them by name, and beg for medicine or help. Keep it brief — two or three sentences.",
-                    playerName);
-        }
+        if (status == VisibleCitizenStatus.EAT && chance(0.6))
+            return "You're focused on your meal.";
 
         double saturation = data.getSaturation();
-        if (saturation <= 1) {
-            return String.format(
-                    "You notice %s nearby. You are desperately hungry and weak. Call out to them urgently by name " +
-                    "and beg for food. Keep it brief — two or three sentences.",
-                    playerName);
-        }
+        if (saturation <= 1) return "You're extremely hungry.";
+        if (saturation <= 3 && chance(0.5)) return "You're thinking about food.";
 
-        if (data.getHomeBuilding() == null) {
-            return String.format(
-                    "You notice %s nearby. You have nowhere to sleep and are very distressed. Call out to them by name " +
-                    "and urgently plead for housing. Keep it brief — two or three sentences.",
-                    playerName);
-        }
-
-        double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
-        if (happiness < 3.0) {
-            return String.format(
-                    "You notice %s nearby. You are miserable and can't hold back any longer. " +
-                    "Call out to them urgently by name and voice your most pressing concern. Keep it brief — two or three sentences.",
-                    playerName);
-        }
-
-        var entity = data.getEntity();
-        if (entity.isPresent()) {
-            double healthPercent = (entity.get().getHealth() / Math.max(1.0, entity.get().getMaxHealth())) * 100.0;
-            if (healthPercent < 25.0) {
-                return String.format(
-                        "You notice %s nearby. You are severely injured and in intense pain. Call out to them urgently by name " +
-                        "and ask for help. Keep it brief — two or three sentences.",
-                        playerName);
-            }
-        }
-
-        return buildGenericUrgentPrompt(playerName);
+        return null;
     }
 
-    private static String buildGenericUrgentPrompt(String playerName) {
-        return String.format(
-                "You notice %s nearby and feel the need to speak to them. " +
-                "Call out to them by name and share whatever is on your mind. Keep it brief — two or three sentences.",
-                playerName);
+    private static String buildWorkingThought() {
+        return pick(
+                "You're focused on your work.",
+                "You're working steadily, thinking things through.",
+                "You're concentrating, your mind drifting slightly."
+        );
+    }
+
+    // ── Helpers ──────────────────────────────────────
+
+    private static boolean chance(double probability) {
+        return ThreadLocalRandom.current().nextDouble() < probability;
+    }
+
+    private static String pick(String... options) {
+        return options[ThreadLocalRandom.current().nextInt(options.length)];
     }
 }
