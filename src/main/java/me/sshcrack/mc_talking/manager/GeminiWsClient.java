@@ -1,8 +1,10 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
+import cpw.mods.modlauncher.log.MLClassLoaderContextSelector;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
@@ -163,7 +165,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         sys.parts.add(p);
 
         setup.systemInstruction = sys;
-        setup.tools.addAll(AITools.getEnabledTools());
+
+        boolean isPlayer = resolveActivePlayer() != null;
+        McTalking.LOGGER.info("Adding tools (player enabled {})", isPlayer);
+        setup.tools.addAll(AITools.getEnabledTools(isPlayer));
 
         return setup;
     }
@@ -258,13 +263,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
         }
 
-        var sPlayer = resolveActivePlayer();
-        if (currentTurnTranscript.isBlank()) {
-            return;
-        }
+        // NOTE: Do NOT clear currentTurnTranscript here.
+        // onTurnComplete() fires after onGenerationComplete() and subclasses
+        // (e.g. LiveConversationWsClient) need the transcript to forward it to
+        // the peer.  Clearing and chat-sending is done in onTurnComplete instead.
 
-        sendTranscriptToChat(sPlayer);
-        currentTurnTranscript = "";
+        generationComplete = true;
     }
 
     @Override
@@ -326,6 +330,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onTurnComplete() {
         McTalking.LOGGER.info("Gemini turn complete");
         generationComplete = true;
+
+        // Send the transcript to chat and notify subclasses before clearing.
+        // This is done here (not in onGenerationComplete) so that subclasses
+        // can still act on the transcript via the onTranscriptComplete hook.
+        var sPlayer = resolveActivePlayer();
+        if (!currentTurnTranscript.isBlank()) {
+            sendTranscriptToChat(sPlayer);
+            onTranscriptComplete(currentTurnTranscript.trim());
+            currentTurnTranscript = "";
+        }
+
         if (shouldEndConversation) {
             var playerUUID = ConversationManager.getPlayerForEntity(entity.getUUID());
             if (playerUUID != null) {
@@ -334,6 +349,19 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 close();
             }
         }
+    }
+
+    /**
+     * Called from {@link #onTurnComplete()} with the completed transcript text,
+     * right before {@link #currentTurnTranscript} is cleared.
+     *
+     * <p>The default implementation is a no-op. Subclasses may override this
+     * to act on the finished transcript (e.g. forwarding it to a peer).
+     *
+     * @param transcript the non-empty, trimmed transcript for the just-completed turn
+     */
+    protected void onTranscriptComplete(String transcript) {
+        // no-op by default
     }
 
     @Override
@@ -428,7 +456,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         try {
             result = action.execute(this.entity, colony, args);
         } catch (Exception e) {
-            McTalking.LOGGER.error("[TOOL-CALL] Tool threw an unexpected exception", e);
+            McTalking.LOGGER.error("[TOOL-CALL] Tool threw an unexpected exception. Params are {}.", (new Gson()).toJson(args), e);
             var error = new JsonObject();
             error.addProperty("error", "A fatal error occurred. Don't call this tool again.");
 

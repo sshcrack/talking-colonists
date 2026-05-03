@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class AITools {
     private AITools() {
@@ -14,14 +15,15 @@ public class AITools {
     }
 
     public static final Map<String, FunctionAction> registeredFunctions = new HashMap<>();
+    public static final Map<String, FunctionAction> playerConversationOnlyTools = new HashMap<>();
 
-    public static void add(FunctionAction action) {
-        registeredFunctions.put(action.getName(), action);
+    public static void add(Map<String, FunctionAction> map, FunctionAction action) {
+        map.put(action.getName(), action);
     }
 
-    public static void addAll(List<FunctionAction> actions) {
+    public static void addAll(Map<String, FunctionAction> map, List<FunctionAction> actions) {
         for (var action : actions) {
-            add(action);
+            add(map, action);
         }
     }
 
@@ -29,16 +31,22 @@ public class AITools {
         return new ArrayList<>(registeredFunctions.keySet());
     }
 
-    public static List<BidiGenerateContentSetup.Tool> getEnabledTools() {
+    public static List<BidiGenerateContentSetup.Tool> getEnabledTools(boolean isPlayerConversation) {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
 
         var tool = new BidiGenerateContentSetup.Tool();
         var rawToolsDisabled = McTalkingConfig.INSTANCE.instance().disabledTools;
 
+        var functions = registeredFunctions
+                .values()
+                .stream();
+
+        if (isPlayerConversation) {
+            functions = Stream.concat(functions, playerConversationOnlyTools.values().stream());
+        }
+
         tool.functionDeclarations.addAll(
-                registeredFunctions
-                        .values()
-                        .stream()
+                functions
                         .filter(e -> !rawToolsDisabled.contains(e.getName()))
                         .map(e -> {
                             var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(e.getName(), e.getDescription());
@@ -55,18 +63,20 @@ public class AITools {
     }
 
     public static void register() {
-        addAll(List.of(
-                new LeaveColonyAction(),
+        addAll(registeredFunctions, List.of(
                 new GetCitizenInfoAction(),
                 new ListCitizenAction(),
                 new GetInventoryAction(),
                 new GetColonyAction(),
-                new DropItemAction(),
                 new DescribeSurroundingsAction(),
                 new EndConversationAction(),
                 new RecordRelationshipChange(),
                 new AddEventToMemory()
 //                new JobSpecificAction()
+        ));
+        addAll(playerConversationOnlyTools, List.of(
+                new DropItemAction(),
+                new LeaveColonyAction()
         ));
     }
 }

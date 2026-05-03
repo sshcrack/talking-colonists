@@ -8,6 +8,7 @@ import me.sshcrack.gemini_live_lib.gson.properties.EnumProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
 import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import org.jetbrains.annotations.NotNull;
@@ -81,6 +82,7 @@ public class RecordRelationshipChange extends FunctionAction {
 
         var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
 
+        McTalking.LOGGER.info("Recording relationship change for citizen {}: target={}, type={}, change={}", citizen.getName(), targetUUID, type, change);
         memory.addRelationshipChange(targetUUID, type, change);
         return obj;
     }

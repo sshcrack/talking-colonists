@@ -181,23 +181,23 @@ public class LiveConversationWsClient extends GeminiWsClient {
      * fully played back, via {@link #onConversationEnded()}.
      */
     @Override
+    protected void onTranscriptComplete(String transcript) {
+        if (peer == null || peer.isClosed()) return;
+        McTalking.LOGGER.info("[LiveConvWs] Turn complete - holding peer audio and forwarding transcript to {} ({})",
+                peer.getEntity().getCitizenData().getName(), transcript);
+        // Hold peer's audio so it doesn't play while we're still speaking.
+        peer.holdAudio();
+        // Send text immediately so peer starts generating right now.
+        peer.addPromptTextImmediate(transcript);
+    }
+
+    @Override
     public void onTurnComplete() {
         super.onTurnComplete();
 
         if (shouldEndConversation) {
             McTalking.LOGGER.info("[LiveConvWs] Ending conversation as requested by {}", citizen.getCitizenData().getName());
             onEnded.accept(this);
-            return;
-        }
-
-        if (peer != null && !peer.isClosed() && !currentTurnTranscript.isBlank()) {
-            McTalking.LOGGER.info("[LiveConvWs] Turn complete - holding peer audio and forwarding transcript to {} ({})",
-                    peer.getEntity().getCitizenData().getName(), currentTurnTranscript.trim());
-            // Hold peer's audio so it doesn't play while we're still speaking.
-            peer.holdAudio();
-            // Send text immediately so peer starts generating right now.
-            peer.addPromptTextImmediate(currentTurnTranscript.trim());
-            currentTurnTranscript = "";
         }
     }
 

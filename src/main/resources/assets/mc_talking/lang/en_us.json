@@ -3,6 +3,8 @@
   "block.mc_talking.example_block": "Example Block",
   "item.mc_talking.example_item": "Example Item",
   "item.mc_talking.talking_device": "Citizen Communication Device",
+  "item.mc_talking.conversation_creator": "Conversation Creator",
+  "item.mc_talking.mumbling_trigger_device": "Mumbling Trigger Device",
   "item.mc_talking.talking_device.tooltip": "Left-click on a citizen to start talking with them",
   "mc_talking.configuration.gemini_key": "Gemini Key",
   "mc_talking.configuration.respond_in_group": "Reply when in group",
