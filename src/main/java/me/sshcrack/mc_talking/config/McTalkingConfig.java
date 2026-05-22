@@ -185,6 +185,11 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, each citizen is randomly assigned a personality archetype that influences their speech style and tone.")
     public boolean enablePersonalityArchetypes = true;
 
+    @AutoGen(category = "citizens", group = "personality")
+    @EnumCycler
+    @SerialEntry(comment = "Selects which built-in citizen prompt provider preset is used by default. Other mods can still override this at runtime via CitizenPromptService.setDefaultProvider.")
+    public PromptProviderPreset promptProviderPreset = PromptProviderPreset.DEFAULT;
+
     @AutoGen(category = "citizens")
     @ListGroup(valueFactory = ToolListFactory.class, controllerFactory = ToolListFactory.class)
     @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
