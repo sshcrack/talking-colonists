@@ -140,7 +140,7 @@ public class CitizenWsClient extends GeminiWsClient {
     @Override
     public void addPromptAudio(short[] audio) {
         if (startedInSystemMode && player != null && !playerInputStarted
-                && isSetupComplete() && !isClosed()) {
+                && isSessionReadyForInput()) {
             String citizenName = getEntity().getDisplayName().getString();
             String playerName = player.getName().getString();
             String antiJailbreak = String.format(

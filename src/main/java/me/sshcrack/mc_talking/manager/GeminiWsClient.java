@@ -33,19 +33,33 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
+    private enum WsSessionState {
+        NEW,
+        CONNECTING,
+        SETTING_UP,
+        ACTIVE,
+        RECONNECTING,
+        CLOSED,
+        TERMINAL_ERROR,
+        QUOTA_EXCEEDED
+    }
+
     /**
      * This variable is used to track if the quota has been exceeded
      */
     private static boolean quotaExceeded;
 
-    private boolean isInitiatingConnection = false;
     private boolean hasMadeInitialConnection = false;
+    private long nextReconnectAllowedAt = 0;
+    private int reconnectAttempts = 0;
+    private boolean reconnectScheduled = false;
+    private boolean intentionalClose = false;
+    private WsSessionState wsSessionState = WsSessionState.NEW;
     protected boolean generationComplete = false;
     /**
      * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
      */
     private boolean sentGeneratingStatus = false;
-    private long lastReconnectTime = 0;
     protected boolean shouldEndConversation = false;
 
     /**
@@ -103,6 +117,73 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     public void endConversationWhenPossible() {
         this.shouldEndConversation = true;
+    }
+
+    protected boolean isSessionReadyForInput() {
+        return wsSessionState == WsSessionState.ACTIVE && !this.isClosed();
+    }
+
+    private void setWsSessionState(WsSessionState state, String reason) {
+        if (this.wsSessionState == state) {
+            return;
+        }
+        McTalking.LOGGER.info("GeminiWsClient state {} -> {} ({})", this.wsSessionState, state, reason);
+        this.wsSessionState = state;
+    }
+
+    private long currentReconnectBackoffMs() {
+        // 1s, 2s, 4s, 8s (cap)
+        return Math.min(8000L, 1000L << Math.min(reconnectAttempts, 3));
+    }
+
+    private boolean canAttemptRecovery() {
+        return !intentionalClose && !quotaExceeded
+                && wsSessionState != WsSessionState.TERMINAL_ERROR
+                && wsSessionState != WsSessionState.CLOSED
+                && wsSessionState != WsSessionState.QUOTA_EXCEEDED;
+    }
+
+    private synchronized void ensureConnectionForQueuedInput(String source) {
+        if (!canAttemptRecovery()) {
+            return;
+        }
+        if (this.isOpen() || wsSessionState == WsSessionState.CONNECTING
+                || wsSessionState == WsSessionState.SETTING_UP
+                || wsSessionState == WsSessionState.RECONNECTING) {
+            return;
+        }
+
+        if (!hasMadeInitialConnection) {
+            McTalking.LOGGER.info("Starting initial websocket connection ({})", source);
+            connect();
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        long remaining = nextReconnectAllowedAt - now;
+        if (remaining > 0) {
+            if (!reconnectScheduled) {
+                reconnectScheduled = true;
+                Thread delayedReconnect = new Thread(() -> {
+                    try {
+                        Thread.sleep(remaining);
+                    } catch (InterruptedException ignored) {
+                    }
+                    synchronized (GeminiWsClient.this) {
+                        reconnectScheduled = false;
+                        if (!canAttemptRecovery() || GeminiWsClient.this.isOpen()) return;
+                        McTalking.LOGGER.warn("Connection lost, attempting delayed reconnect...");
+                        reconnect();
+                    }
+                }, "mc_talking_ws_reconnect");
+                delayedReconnect.setDaemon(true);
+                delayedReconnect.start();
+            }
+            return;
+        }
+
+        McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+        reconnect();
     }
 
     /**
@@ -190,13 +271,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected void onStreamPause() {
         if (generationComplete) {
             onConversationEnded();
-        } else {
+        } else if (wsSessionState == WsSessionState.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
         }
     }
 
     protected void onConversationEnded() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+        if (wsSessionState == WsSessionState.ACTIVE) {
+            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+        }
         flushPendingText();
     }
 
@@ -221,11 +304,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected void onGenerationStarted() {
         sentGeneratingStatus = true;
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
+        if (wsSessionState == WsSessionState.ACTIVE) {
+            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
+        }
     }
 
     protected void onGenerationPaused() {
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+        if (wsSessionState == WsSessionState.ACTIVE) {
+            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+        }
     }
 
     protected abstract void onQuotaExceededEvent(String message);
@@ -366,7 +453,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onOpen(ServerHandshake data) {
-        isInitiatingConnection = false;
+        setWsSessionState(WsSessionState.SETTING_UP, "websocket opened");
         super.onOpen(data);
     }
 
@@ -384,21 +471,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * queued and sent as soon as setup completes, just like audio prompts.
      */
     public void addPromptTextImmediate(String text) {
-        if (!isSetupComplete() || this.isClosed()) {
+        if (!isSessionReadyForInput()) {
             synchronized (pendingSystemText) {
                 pendingSystemText.add(text);
             }
-
-            if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (!hasMadeInitialConnection) {
-                    connect();
-                } else {
-                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                        return;
-                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                    reconnect();
-                }
-            }
+            ensureConnectionForQueuedInput("addPromptTextImmediate");
             return;
         }
 
@@ -409,6 +486,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
+        reconnectAttempts = 0;
+        reconnectScheduled = false;
+        nextReconnectAllowedAt = 0;
+        setWsSessionState(WsSessionState.ACTIVE, "setup complete");
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
 
         McTalking.LOGGER.info("Gemini setup complete");
@@ -471,6 +552,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
         quotaExceeded = true;
+        setWsSessionState(WsSessionState.QUOTA_EXCEEDED, "quota exceeded");
         onQuotaExceededEvent("Quota exceeded for Gemini API, please check your API key and usage limits.");
     }
 
@@ -478,32 +560,56 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onClose(int code, String reason, boolean remote) {
         super.onClose(code, reason, remote);
 
-        if (reason.contains("BidiGenerateContent session")) {
-            var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
-            mem.setSessionToken("");
-            new Thread(() -> {
-                if (!isOpen() || !isInitiatingConnection) {
-                    reconnect();
-                }
-            }).start();
+        if (intentionalClose) {
+            setWsSessionState(WsSessionState.CLOSED, "intentional close");
             return;
         }
 
-        if (code != 1000 && code != 1001) {
-            onErrorEvent(new RuntimeException("Close with code " + code + ": " + reason));
+        if (quotaExceeded) {
+            return;
+        }
+
+        if (reason.contains("BidiGenerateContent session")) {
+            var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
+            mem.setSessionToken("");
+            ensureConnectionForQueuedInput("session token invalidated");
+            return;
         }
 
         if (code == 1000) {
+            setWsSessionState(WsSessionState.CLOSED, "normal close");
             McTalking.LOGGER.info("GeminiWsClient closed normally: {}", reason);
+        } else if (code == 1001) {
+            setWsSessionState(WsSessionState.CLOSED, "going away");
+            McTalking.LOGGER.info("GeminiWsClient closed (going away): {}", reason);
         } else {
             McTalking.LOGGER.warn("GeminiWsClient closed: {} and code {}", reason, code);
+            ensureConnectionForQueuedInput("abnormal close code " + code);
+            if (wsSessionState != WsSessionState.RECONNECTING
+                    && wsSessionState != WsSessionState.CONNECTING
+                    && wsSessionState != WsSessionState.SETTING_UP) {
+                setWsSessionState(WsSessionState.TERMINAL_ERROR, "abnormal close without recover");
+                onErrorEvent(new RuntimeException("Close with code " + code + ": " + reason));
+            }
         }
     }
 
     @Override
     public void onError(Exception ex) {
-        onErrorEvent(ex);
         McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
+        if (intentionalClose || quotaExceeded) {
+            return;
+        }
+
+        ensureConnectionForQueuedInput("onError");
+        if (wsSessionState == WsSessionState.RECONNECTING
+                || wsSessionState == WsSessionState.CONNECTING
+                || wsSessionState == WsSessionState.SETTING_UP) {
+            return;
+        }
+
+        setWsSessionState(WsSessionState.TERMINAL_ERROR, "websocket error");
+        onErrorEvent(ex);
     }
 
     @Override
@@ -516,22 +622,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             onGenerationPaused();
 
 
-        if (!isSetupComplete() || this.isClosed()) {
+        if (!isSessionReadyForInput()) {
             synchronized (pendingPrompt) {
                 pendingPrompt.add(audio);
             }
-
-            if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (!hasMadeInitialConnection) {
-                    connect();
-                } else {
-                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                        return;
-
-                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                    reconnect();
-                }
-            }
+            ensureConnectionForQueuedInput("addPromptAudio");
             return;
         }
 
@@ -542,22 +637,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (sentGeneratingStatus)
             onGenerationPaused();
 
-        if (!isSetupComplete() || this.isClosed()) {
+        if (!isSessionReadyForInput()) {
             synchronized (pendingSystemText) {
                 pendingSystemText.add(text);
             }
-
-            if (!this.isOpen() && !isInitiatingConnection && !quotaExceeded) {
-                if (!hasMadeInitialConnection) {
-                    connect();
-                } else {
-                    if (System.currentTimeMillis() - lastReconnectTime < 5000)
-                        return;
-
-                    McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
-                    reconnect();
-                }
-            }
+            ensureConnectionForQueuedInput("addPromptTextAfterTalkingComplete");
             return;
         }
 
@@ -566,15 +650,22 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void connect() {
-        isInitiatingConnection = true;
+        intentionalClose = false;
         hasMadeInitialConnection = true;
+        setWsSessionState(WsSessionState.CONNECTING, "connect()");
         super.connect();
     }
 
     @Override
     public void reconnect() {
-        isInitiatingConnection = true;
-        lastReconnectTime = System.currentTimeMillis();
+        if (intentionalClose || quotaExceeded) {
+            return;
+        }
+        intentionalClose = false;
+        reconnectAttempts++;
+        nextReconnectAllowedAt = System.currentTimeMillis() + currentReconnectBackoffMs();
+        setWsSessionState(WsSessionState.RECONNECTING, "reconnect()");
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.RECONNECTING);
         super.reconnect();
     }
 
@@ -587,6 +678,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void close() {
+        intentionalClose = true;
+        reconnectScheduled = false;
+        setWsSessionState(WsSessionState.CLOSED, "close()");
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         super.close();
         stream.close();

@@ -14,7 +14,8 @@ public enum AiStatus {
     TALKING,
     IN_CONVERSATION,
     LISTENING,
-    NONE;
+    NONE,
+    RECONNECTING;
 
     public static AiStatus fromId(int id) {
         if (id < 0 || id >= values().length) {
