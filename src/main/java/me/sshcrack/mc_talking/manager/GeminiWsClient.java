@@ -33,6 +33,8 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
+    private static final int MAX_UNRECOGNIZED_CLOSE_RETRIES = 5;
+
     private enum WsSessionState {
         NEW,
         CONNECTING,
@@ -54,6 +56,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private int reconnectAttempts = 0;
     private boolean reconnectScheduled = false;
     private boolean intentionalClose = false;
+    private int unrecognizedCloseRetryCount = 0;
     private WsSessionState wsSessionState = WsSessionState.NEW;
     protected boolean generationComplete = false;
     /**
@@ -487,6 +490,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onSetupComplete() {
         reconnectAttempts = 0;
+        unrecognizedCloseRetryCount = 0;
         reconnectScheduled = false;
         nextReconnectAllowedAt = 0;
         setWsSessionState(WsSessionState.ACTIVE, "setup complete");
@@ -584,13 +588,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.info("GeminiWsClient closed (going away): {}", reason);
         } else {
             McTalking.LOGGER.warn("GeminiWsClient closed: {} and code {}", reason, code);
-            ensureConnectionForQueuedInput("abnormal close code " + code);
-            if (wsSessionState != WsSessionState.RECONNECTING
-                    && wsSessionState != WsSessionState.CONNECTING
-                    && wsSessionState != WsSessionState.SETTING_UP) {
-                setWsSessionState(WsSessionState.TERMINAL_ERROR, "abnormal close without recover");
+            if (unrecognizedCloseRetryCount >= MAX_UNRECOGNIZED_CLOSE_RETRIES) {
+                setWsSessionState(WsSessionState.TERMINAL_ERROR, "retry cap exceeded for close code " + code);
                 onErrorEvent(new RuntimeException("Close with code " + code + ": " + reason));
+                return;
             }
+
+            unrecognizedCloseRetryCount++;
+            McTalking.LOGGER.warn("Attempting reconnect after unrecognized close code {} (attempt {}/{})",
+                    code, unrecognizedCloseRetryCount, MAX_UNRECOGNIZED_CLOSE_RETRIES);
+            ensureConnectionForQueuedInput("abnormal close code " + code + " attempt " + unrecognizedCloseRetryCount);
         }
     }
 
