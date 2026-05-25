@@ -179,6 +179,28 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How long (in seconds) citizens express post-raid trauma in their prompts after a raid ends. Set to 0 to disable.")
     public int raidTraumaDurationSeconds = 1200;
 
+    // Complaint Fatigue
+    @AutoGen(category = "citizens", group = "complaint_fatigue")
+    @IntField(min = 1, max = 10)
+    @SerialEntry(comment = "How many times a citizen can repeat the same complaint topic inside the fatigue window before that topic is suppressed.")
+    public int complaintFatigueRepeatThreshold = 2;
+
+    @AutoGen(category = "citizens", group = "complaint_fatigue")
+    @IntField(min = 0, max = 72000)
+    @SerialEntry(comment = "Fatigue window in game ticks for repeated complaints of the same topic. 24000 ticks = 1 Minecraft day.")
+    public int complaintFatigueCooldownTicks = 12000;
+
+    @AutoGen(category = "citizens", group = "complaint_fatigue")
+    @IntField(min = 0, max = 10)
+    @SerialEntry(comment = "How much each complaint counter decays per in-game day. 0 disables daily decay.")
+    public int complaintFatigueDecayPerDay = 1;
+
+    // Positive mood events
+    @AutoGen(category = "citizens", group = "mood_events")
+    @IntField(min = 0, max = 10)
+    @SerialEntry(comment = "How many in-game days positive colony events should influence citizen mood prompts. 0 disables positive event mood boosts.")
+    public int positiveEventMoodDurationDays = 1;
+
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
     @TickBox

@@ -148,12 +148,16 @@ public final class CitizenPromptViewFactory {
         IBuilding workBuilding = data.getWorkBuilding();
         String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
         int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
+        int colonyDay = data.getColony().getDay();
+        long colonyGameTime = data.getColony().getWorld() != null ? data.getColony().getWorld().getDayTime() : 0L;
 
         // Personality — lazy assignment on first prompt generation
         var personalityExt = (CitizenDataPersonalityExtended) data;
         personalityExt.mc_talking$assignPersonality();
         PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
         String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
+        var memory = ((CitizenDataMemoryExtended) data).mc_talking$getOrInitializeMemory();
+        memory.decayComplaintCountersForDay(colonyDay, McTalkingConfig.INSTANCE.instance().complaintFatigueDecayPerDay);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -176,7 +180,7 @@ public final class CitizenPromptViewFactory {
                 blockingMessages,
                 relation,
                 getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
-                ((CitizenDataMemoryExtended) data).mc_talking$getMemory(),
+                memory,
                 interestedParties,
                 colonyName,
                 homeBuildingDisplayName,
@@ -184,6 +188,8 @@ public final class CitizenPromptViewFactory {
                 workBuildingDisplayName,
                 workBuildingLevel,
                 data.getColony().getID(),
+                colonyDay,
+                colonyGameTime,
                 personality,
                 customPersonalityText
         );

@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory.data;
 
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -7,6 +8,8 @@ import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,10 +19,16 @@ public class CitizenMemories {
     private static final String TAG_EVENTS_KEY = "events";
     private static final String TAG_RELATIONSHIPS_KEY = "relationships";
     private static final String TAG_SESSION_TOKEN = "gemini_session_token";
+    private static final String TAG_COMPLAINT_COUNTERS = "complaint_counters";
+    private static final String TAG_LAST_COMPLAINT_TIMES = "last_complaint_times";
+    private static final String TAG_LAST_COMPLAINT_DECAY_DAY = "last_complaint_decay_day";
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<CitizenRelationshipMemory> relationships = new ArrayList<>();
+    private final Map<HappinessModifierType, Integer> complaintCounters = new EnumMap<>(HappinessModifierType.class);
+    private final Map<HappinessModifierType, Long> lastComplaintGameTimes = new EnumMap<>(HappinessModifierType.class);
     private String sessionToken = "";
+    private int lastComplaintDecayDay = -1;
 
     public CitizenMemories() {
         // We do not initialize this memories because at first it is empty.
@@ -84,6 +93,26 @@ public class CitizenMemories {
         if (sessionToken != null && !sessionToken.isBlank()) {
             tag.putString(TAG_SESSION_TOKEN, sessionToken);
         }
+
+        if (!complaintCounters.isEmpty()) {
+            CompoundTag complaintTag = new CompoundTag();
+            for (Map.Entry<HappinessModifierType, Integer> entry : complaintCounters.entrySet()) {
+                complaintTag.putInt(entry.getKey().name(), entry.getValue());
+            }
+            tag.put(TAG_COMPLAINT_COUNTERS, complaintTag);
+        }
+
+        if (!lastComplaintGameTimes.isEmpty()) {
+            CompoundTag lastTimesTag = new CompoundTag();
+            for (Map.Entry<HappinessModifierType, Long> entry : lastComplaintGameTimes.entrySet()) {
+                lastTimesTag.putLong(entry.getKey().name(), entry.getValue());
+            }
+            tag.put(TAG_LAST_COMPLAINT_TIMES, lastTimesTag);
+        }
+
+        if (lastComplaintDecayDay >= 0) {
+            tag.putInt(TAG_LAST_COMPLAINT_DECAY_DAY, lastComplaintDecayDay);
+        }
         return tag;
     }
 
@@ -91,6 +120,9 @@ public class CitizenMemories {
         facts.clear();
         events.clear();
         relationships.clear();
+        complaintCounters.clear();
+        lastComplaintGameTimes.clear();
+        lastComplaintDecayDay = -1;
 
         ListTag factsNbt = tag.getList(TAG_FACTS_KEY, Tag.TAG_STRING);
         for (int i = 0; i < factsNbt.size(); i++) {
@@ -111,6 +143,32 @@ public class CitizenMemories {
         if (tag.contains(TAG_SESSION_TOKEN)) {
             sessionToken = tag.getString(TAG_SESSION_TOKEN);
         }
+
+        if (tag.contains(TAG_COMPLAINT_COUNTERS, Tag.TAG_COMPOUND)) {
+            CompoundTag complaintTag = tag.getCompound(TAG_COMPLAINT_COUNTERS);
+            for (String key : complaintTag.getAllKeys()) {
+                HappinessModifierType type = parseModifierType(key);
+                if (type == null) {
+                    continue;
+                }
+                complaintCounters.put(type, complaintTag.getInt(key));
+            }
+        }
+
+        if (tag.contains(TAG_LAST_COMPLAINT_TIMES, Tag.TAG_COMPOUND)) {
+            CompoundTag lastTimesTag = tag.getCompound(TAG_LAST_COMPLAINT_TIMES);
+            for (String key : lastTimesTag.getAllKeys()) {
+                HappinessModifierType type = parseModifierType(key);
+                if (type == null) {
+                    continue;
+                }
+                lastComplaintGameTimes.put(type, lastTimesTag.getLong(key));
+            }
+        }
+
+        if (tag.contains(TAG_LAST_COMPLAINT_DECAY_DAY, Tag.TAG_INT)) {
+            lastComplaintDecayDay = tag.getInt(TAG_LAST_COMPLAINT_DECAY_DAY);
+        }
     }
 
     public String getSessionToken() {
@@ -119,6 +177,84 @@ public class CitizenMemories {
 
     public void setSessionToken(String token) {
         this.sessionToken = token == null ? "" : token;
+    }
+
+    public void decayComplaintCountersForDay(int currentDay, int decayPerDay) {
+        if (currentDay < 0) {
+            return;
+        }
+
+        if (lastComplaintDecayDay < 0) {
+            lastComplaintDecayDay = currentDay;
+            return;
+        }
+
+        int dayDiff = currentDay - lastComplaintDecayDay;
+        if (dayDiff <= 0) {
+            return;
+        }
+
+        int totalDecay = Math.max(0, decayPerDay) * dayDiff;
+        if (totalDecay > 0) {
+            Iterator<Map.Entry<HappinessModifierType, Integer>> iterator = complaintCounters.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<HappinessModifierType, Integer> entry = iterator.next();
+                int decayed = entry.getValue() - totalDecay;
+                if (decayed <= 0) {
+                    iterator.remove();
+                    lastComplaintGameTimes.remove(entry.getKey());
+                } else {
+                    entry.setValue(decayed);
+                }
+            }
+        }
+
+        lastComplaintDecayDay = currentDay;
+    }
+
+    public boolean shouldSuppressComplaint(HappinessModifierType type, long currentGameTime, int repeatThreshold, long cooldownTicks) {
+        if (type == null || repeatThreshold <= 0 || cooldownTicks <= 0) {
+            return false;
+        }
+
+        int count = complaintCounters.getOrDefault(type, 0);
+        if (count < repeatThreshold) {
+            return false;
+        }
+
+        long lastComplaintTime = lastComplaintGameTimes.getOrDefault(type, Long.MIN_VALUE);
+        if (lastComplaintTime == Long.MIN_VALUE || currentGameTime < lastComplaintTime) {
+            return false;
+        }
+
+        return (currentGameTime - lastComplaintTime) <= cooldownTicks;
+    }
+
+    public void recordComplaintMention(HappinessModifierType type, long currentGameTime, long cooldownTicks) {
+        if (type == null) {
+            return;
+        }
+
+        long lastComplaintTime = lastComplaintGameTimes.getOrDefault(type, Long.MIN_VALUE);
+        int previous = complaintCounters.getOrDefault(type, 0);
+
+        int next;
+        if (lastComplaintTime == Long.MIN_VALUE || cooldownTicks <= 0 || currentGameTime < lastComplaintTime || (currentGameTime - lastComplaintTime) > cooldownTicks) {
+            next = 1;
+        } else {
+            next = previous + 1;
+        }
+
+        complaintCounters.put(type, next);
+        lastComplaintGameTimes.put(type, currentGameTime);
+    }
+
+    private static HappinessModifierType parseModifierType(String rawType) {
+        try {
+            return HappinessModifierType.valueOf(rawType);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     /**

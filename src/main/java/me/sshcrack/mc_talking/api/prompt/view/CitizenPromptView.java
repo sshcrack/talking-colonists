@@ -42,10 +42,13 @@ public record CitizenPromptView(
         int workBuildingLevel,
         /** MineColonies colony ID — used for raid-trauma and personality lookups */
         int colonyId,
+        /** MineColonies colony day — used for deterministic daily decay logic */
+        int colonyDay,
+        /** World absolute day-time ticks — used for complaint fatigue timing */
+        long colonyGameTime,
         /** Built-in personality archetype, or {@code null} if a custom one is active */
         @Nullable PersonalityArchetype personality,
         /** Freeform custom personality text, or {@code null} if a built-in is active */
         @Nullable String customPersonalityText
 ) {
 }
-

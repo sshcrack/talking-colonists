@@ -6,9 +6,12 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.util.ColonyMoodEventTracker;
 import me.sshcrack.mc_talking.util.RaidTraumaTracker;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -63,13 +66,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
         StringBuilder prompt = new StringBuilder();
         prompt.append(getBasicCitizenInfoPrompt(view, firstPerson));
+        List<String> activePositiveEvents = ColonyMoodEventTracker.getActivePositiveEvents(view.colonyId(), view.colonyDay());
+        boolean hasMoodLift = !activePositiveEvents.isEmpty();
 
         if (view.skills() != null && !view.skills().isEmpty()) {
             appendCondensedSkills(view.skills(), prompt);
         }
 
         addRelationships(view, prompt);
-        addCurrentState(view, prompt, view.sick());
+        addCurrentState(view, prompt, view.sick(), activePositiveEvents);
         addMemory(view, prompt);
 
         prompt.append("\n## EMOTIONAL PROFILE\n");
@@ -92,6 +97,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Deeply unhappy and possibly hostile\n");
             prompt.append("- Will openly complain and make demands\n");
             prompt.append("- May refuse requests or be uncooperative\n");
+        }
+
+        if (hasMoodLift) {
+            prompt.append("- Recent positive colony developments temporarily lift your spirits\n");
         }
 
         if (view.sick()) {
@@ -125,10 +134,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
-    private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick) {
+    private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick, List<String> activePositiveEvents) {
         prompt.append("\n## CURRENT STATE\n");
+        var memories = view.memories();
+        var config = McTalkingConfig.INSTANCE.instance();
+        boolean hasMoodLift = activePositiveEvents != null && !activePositiveEvents.isEmpty();
 
-        appendDetailedHappinessState(view, prompt);
+        appendDetailedHappinessState(view, prompt, memories, view.colonyGameTime(), config, hasMoodLift);
 
         double saturation = view.saturation();
         if (saturation <= 1) {
@@ -169,8 +181,17 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
         }
 
+        if (hasMoodLift) {
+            prompt.append("\n## RECENT COLONY GOOD NEWS\n");
+            for (String moodEvent : activePositiveEvents) {
+                prompt.append("- ").append(moodEvent).append("\n");
+            }
+            prompt.append("- Let this positive momentum color your tone before repeating old complaints.\n");
+            prompt.append("- If a repeated complaint topic comes to mind, pivot naturally to immediate surroundings, relationships, recent memories, or today's events.\n");
+        }
+
         // Post-raid trauma
-        int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
+        int traumaDuration = config.raidTraumaDurationSeconds;
         if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(view.colonyId(), traumaDuration)) {
             long sinceMs = RaidTraumaTracker.millisSinceRaid(view.colonyId());
             int lost = RaidTraumaTracker.getLostCitizens(view.colonyId());
@@ -287,7 +308,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         return prompt.toString();
     }
 
-    private static void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {
+    private static void appendDetailedHappinessState(
+            CitizenPromptView view,
+            StringBuilder prompt,
+            CitizenMemories memories,
+            long currentGameTime,
+            McTalkingConfig config,
+            boolean hasMoodLift
+    ) {
         double happiness = view.happiness();
 
         if (happiness > 8.0) {
@@ -300,6 +328,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Miserable (").append(String.format("%.1f", happiness)).append("/10)\n");
         }
 
+        List<String> suppressedTopics = new ArrayList<>();
         for (var modifier : view.happinessModifiers()) {
             HappinessModifierType modifierType = modifier.type();
             double factor = modifier.factor();
@@ -307,30 +336,90 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 switch (modifierType) {
                     case HOMELESSNESS:
                         if (factor < 0.8) {
-                            prompt.append("- Distressed about housing situation\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    hasMoodLift,
+                                    modifierType,
+                                    "- Distressed about housing situation\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case UNEMPLOYMENT:
                         if (factor < 0.8) {
-                            prompt.append("- Anxious about employment status\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    hasMoodLift,
+                                    modifierType,
+                                    "- Anxious about employment status\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case HEALTH:
                         if (factor < 0.8) {
-                            prompt.append("- Concerned about health issues\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    false,
+                                    modifierType,
+                                    "- Concerned about health issues\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case IDLEATJOB:
                         if (factor < 0.8) {
-                            prompt.append("- Frustrated by lack of work to do\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    hasMoodLift,
+                                    modifierType,
+                                    "- Frustrated by lack of work to do\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case SCHOOL:
                         if (factor < 0.8) {
                             if (view.hasSchool()) {
-                                prompt.append("- Disappointed by lack of school activities\n");
+                                appendComplaintLineWithFatigue(
+                                        view,
+                                        prompt,
+                                        memories,
+                                        currentGameTime,
+                                        config,
+                                        hasMoodLift,
+                                        modifierType,
+                                        "- Disappointed by lack of school activities\n",
+                                        suppressedTopics
+                                );
                             } else {
-                                prompt.append("- Disappointed by lack of school in the colony\n");
+                                appendComplaintLineWithFatigue(
+                                        view,
+                                        prompt,
+                                        memories,
+                                        currentGameTime,
+                                        config,
+                                        hasMoodLift,
+                                        modifierType,
+                                        "- Disappointed by lack of school in the colony\n",
+                                        suppressedTopics
+                                );
                             }
                         }
                         if (factor > 1.2) {
@@ -339,33 +428,83 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         break;
                     case MYSTICAL_SITE:
                         if (factor < 0.8) {
-                            prompt.append("- Disappointed by lack of mystical experiences\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    hasMoodLift,
+                                    modifierType,
+                                    "- Disappointed by lack of mystical experiences\n",
+                                    suppressedTopics
+                            );
                         } else {
                             prompt.append("- Enjoying mystical site visits\n");
                         }
                         break;
                     case SECURITY:
                         if (factor < 0.8) {
-                            prompt.append("- Feels unsafe in the colony\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    false,
+                                    modifierType,
+                                    "- Feels unsafe in the colony\n",
+                                    suppressedTopics
+                            );
                         } else {
                             prompt.append("- Feels very secure in the colony\n");
                         }
                         break;
                     case SOCIAL:
                         if (factor < 0.8) {
-                            prompt.append("- Feeling socially isolated\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    hasMoodLift,
+                                    modifierType,
+                                    "- Feeling socially isolated\n",
+                                    suppressedTopics
+                            );
                         } else {
                             prompt.append("- Enjoying colony social life\n");
                         }
                         break;
                     case DAMAGE:
                         if (factor < 0.8) {
-                            prompt.append("- Have been injured recently\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    false,
+                                    modifierType,
+                                    "- Have been injured recently\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case DEATH:
                         if (factor < 0.8) {
-                            prompt.append("- Distressed by recent death in the colony\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    false,
+                                    modifierType,
+                                    "- Distressed by recent death in the colony\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case RAIDWITHOUTDEATH:
@@ -375,14 +514,34 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         break;
                     case FOOD:
                         if (factor < 0.8) {
-                            prompt.append("- Unhappy with food quality/variety\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    hasMoodLift,
+                                    modifierType,
+                                    "- Unhappy with food quality/variety\n",
+                                    suppressedTopics
+                            );
                         } else {
                             prompt.append("- Very satisfied with food quality\n");
                         }
                         break;
                     case SLEPTTONIGHT:
                         if (factor < 0.8) {
-                            prompt.append("- Tired from lack of sleep\n");
+                            appendComplaintLineWithFatigue(
+                                    view,
+                                    prompt,
+                                    memories,
+                                    currentGameTime,
+                                    config,
+                                    false,
+                                    modifierType,
+                                    "- Tired from lack of sleep\n",
+                                    suppressedTopics
+                            );
                         }
                         break;
                     case UNKNOWN:
@@ -391,6 +550,68 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 }
             }
         }
+
+        if (!suppressedTopics.isEmpty()) {
+            prompt.append("- Avoid repeating the same complaint phrasing about: ")
+                    .append(String.join(", ", suppressedTopics))
+                    .append(".\n");
+            prompt.append("- Instead, speak organically about what feels most immediate right now (your surroundings, people nearby, recent memories, or current work).\n");
+        }
+    }
+
+    private static void appendComplaintLineWithFatigue(
+            CitizenPromptView view,
+            StringBuilder prompt,
+            CitizenMemories memories,
+            long currentGameTime,
+            McTalkingConfig config,
+            boolean suppressWhenMoodLifted,
+            HappinessModifierType modifierType,
+            String line,
+            List<String> suppressedTopics
+    ) {
+        if (memories == null) {
+            prompt.append(line);
+            return;
+        }
+
+        boolean suppressForFatigue = memories.shouldSuppressComplaint(
+                modifierType,
+                currentGameTime,
+                config.complaintFatigueRepeatThreshold,
+                config.complaintFatigueCooldownTicks
+        );
+
+        if (!suppressForFatigue && !suppressWhenMoodLifted) {
+            memories.recordComplaintMention(modifierType, currentGameTime, config.complaintFatigueCooldownTicks);
+            prompt.append(line);
+            return;
+        }
+
+        if (!suppressForFatigue && suppressWhenMoodLifted) {
+            suppressedTopics.add(formatModifierTopic(modifierType, view));
+            return;
+        }
+
+        suppressedTopics.add(formatModifierTopic(modifierType, view));
+    }
+
+    private static String formatModifierTopic(HappinessModifierType modifierType, CitizenPromptView view) {
+        return switch (modifierType) {
+            case HOMELESSNESS -> "housing";
+            case UNEMPLOYMENT -> "employment";
+            case IDLEATJOB -> "job idleness";
+            case SCHOOL -> view.hasSchool() ? "school activities" : "lack of school";
+            case MYSTICAL_SITE -> "mystical experiences";
+            case SOCIAL -> "social life";
+            case FOOD -> "food quality";
+            case HEALTH -> "health";
+            case SECURITY -> "security";
+            case DAMAGE -> "injuries";
+            case DEATH -> "recent deaths";
+            case SLEPTTONIGHT -> "sleep";
+            default -> modifierType.name().toLowerCase();
+        };
     }
 
     private static void appendCondensedSkills(List<SkillLevelView> skillLevels, StringBuilder prompt) {
