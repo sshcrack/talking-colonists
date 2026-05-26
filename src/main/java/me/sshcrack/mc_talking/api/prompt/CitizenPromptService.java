@@ -40,6 +40,10 @@ public final class CitizenPromptService {
         return getProvider().generateCitizenRoleplayPrompt(view);
     }
 
+    public static String generatePlayBackgroundNoisePrompt(@NotNull CitizenPromptView view) {
+        return getProvider().generatePlayBackgroundNoisePrompt(view);
+    }
+
     public static String generateConversationalInfoPrompt(@NotNull CitizenPromptView view) {
         return getProvider().generateConversationalInfoPrompt(view);
     }

@@ -129,7 +129,9 @@ public class CitizenWsClient extends GeminiWsClient {
                 interestedParties.put(player.getUUID(), player.getName().getString());
 
             var promptView = CitizenPromptViewFactory.create(getEntity().getCitizenData(), interestedParties, player);
-            return CitizenPromptService.generateCitizenRoleplayPrompt(promptView);
+            var musicPrompt = CitizenPromptService.generatePlayBackgroundNoisePrompt(promptView);
+
+            return CitizenPromptService.generateCitizenRoleplayPrompt(promptView) + "\n" + musicPrompt;
         }
     }
 

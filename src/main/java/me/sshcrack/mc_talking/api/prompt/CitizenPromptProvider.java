@@ -24,6 +24,8 @@ public interface CitizenPromptProvider {
 
     String generateConversationalInfoPrompt(@NotNull CitizenPromptView view);
 
+    String generatePlayBackgroundNoisePrompt(@NotNull CitizenPromptView view);
+
     /**
      * Formats a citizen status value into text used in prompt updates.
      *

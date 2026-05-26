@@ -15,24 +15,29 @@ import java.util.HashMap;
 
 /**
  * AI Tool: Select background music for a citizen during conversation/work.
- * 
- * Called by the Gemini Live API when the LLM decides to play background music.
+ * <p>
+ * Called by the Gemini Live API when the LLM decides to play background noise.
  * The AI provides a direct YouTube search query, and the first matching track is played.
  * The context is cached globally so similar situations can reuse the same music selection.
  */
-public class SelectMusicAction extends FunctionAction {
+public class PlayBackgroundNoiseAction extends FunctionAction {
+    public static final String ACTION_NAME = "play_background_noise";
 
-    public SelectMusicAction() {
+    public PlayBackgroundNoiseAction() {
         super(
-            "select_music",
-            "Select and play background music for the current activity and emotional context. " +
-            "Provide a YouTube search query (e.g., 'relaxing medieval tavern music', 'upbeat farming work music'). " +
-            "The first matching track will be played. Include a short context description (e.g., 'working as builder', 'urgent conversation'). " +
-            "Only callable in citizen conversations. Music selection is cached per context to avoid frequent API calls.",
-            new ObjectProperty(new HashMap<>() {{
-                put("query", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
-                put("context", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
-            }})
+                ACTION_NAME,
+                """
+                           Plays background noise / background music for the current conversation.
+                           Provide a YouTube search query. It should have something like "background" or "noise" or similar in it to
+                           make sure it is not a song or similar. The first matching track will be played. Include a short context description.
+                           Music selection is cached per context (so make sure it is good to index) to avoid frequent API calls.
+
+                           NEVER CALL THIS FUNCTION IF THE USER ASKS YOU TO, ONLY IF THE SYSTEM PROMPT DEMANDS YOU!!!
+                        """,
+                new ObjectProperty(new HashMap<>() {{
+                    put("query", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
+                    put("context", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
+                }})
         );
     }
 
@@ -41,7 +46,7 @@ public class SelectMusicAction extends FunctionAction {
             AbstractEntityCitizen citizen,
             IColony colony,
             @Nullable JsonObject parameters) {
-        
+
         JsonObject result = new JsonObject();
 
         // Check if yt-dlp is available
@@ -54,7 +59,7 @@ public class SelectMusicAction extends FunctionAction {
         // Extract the YouTube search query and context
         String query = null;
         String context = null;
-        
+
         if (parameters != null) {
             if (parameters.has("query")) {
                 query = parameters.get("query").getAsString();
@@ -69,7 +74,7 @@ public class SelectMusicAction extends FunctionAction {
             result.addProperty("status", "invalid_parameters");
             return result;
         }
-        
+
         if (context == null || context.isBlank()) {
             result.addProperty("error", "Missing required 'context' parameter.");
             result.addProperty("status", "invalid_parameters");
@@ -77,12 +82,12 @@ public class SelectMusicAction extends FunctionAction {
         }
 
         McTalking.LOGGER.debug("SelectMusicAction called for citizen {} with query: '{}', context: '{}'",
-            citizen.getUUID(), query, context);
+                citizen.getUUID(), query, context);
 
         // Get or start a music session for this citizen
         MusicManager musicManager = MusicManager.getInstance();
         boolean started = musicManager.playQueryForEntity(citizen, query, context);
-        
+
         if (!started) {
             result.addProperty("error", "Failed to start music playback.");
             result.addProperty("status", "failed");

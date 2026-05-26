@@ -12,7 +12,6 @@ import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
-import me.sshcrack.mc_talking.manager.music.MusicManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
@@ -205,11 +204,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
             // Cancel any existing silence tasks when there's new voice
             cancelSilenceTask(entityId);
-
-            // Duck music when speech starts
-            if (!wasSpeaking) {
-                handleSpeechStart(entityId);
-            }
         } else {
             // Increment consecutive silent packet counter
             int silentCount = consecutiveSilentPackets.getOrDefault(entityId, 0) + 1;
@@ -328,9 +322,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                 // Mark the entity as no longer speaking
                 isSpeaking.put(entityId, false);
 
-                // Restore music volume when speech ends
-                handleSpeechEnd(entityId);
-
                 // Clean up the speech end detection entry
                 speechEndDetections.remove(entityId);
 
@@ -358,9 +349,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                     // Mark the entity as no longer speaking
                     isSpeaking.put(entityId, false);
 
-                    // Restore music volume when speech ends
-                    handleSpeechEnd(entityId);
-
                     // Get the talking manager for this entity
                     var manager = ConversationManager.getClientForEntity(entityId);
                     if (manager != null) {
@@ -372,29 +360,4 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         }
     }
 
-    /**
-     * Handle speech start for a citizen.
-     * Applies auto-ducking to background music.
-     */
-    private void handleSpeechStart(UUID entityId) {
-        try {
-            MusicManager musicManager = MusicManager.getInstance();
-            musicManager.duckMusicForEntity(entityId);
-        } catch (IllegalStateException e) {
-            // MusicManager not initialized; music disabled
-        }
-    }
-
-    /**
-     * Handle speech end for a citizen.
-     * Restores background music volume after speech ends.
-     */
-    private void handleSpeechEnd(UUID entityId) {
-        try {
-            MusicManager musicManager = MusicManager.getInstance();
-            musicManager.restoreMusicForEntity(entityId);
-        } catch (IllegalStateException e) {
-            // MusicManager not initialized; music disabled
-        }
-    }
 }

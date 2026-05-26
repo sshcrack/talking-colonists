@@ -6,6 +6,8 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.MusicPlaybackMode;
+import me.sshcrack.mc_talking.manager.tools.PlayBackgroundNoiseAction;
 import me.sshcrack.mc_talking.util.RaidTraumaTracker;
 import org.jetbrains.annotations.NotNull;
 
@@ -184,8 +186,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
             if (lost > 0) {
                 prompt.append("- Tragically, ").append(lost)
-                      .append(" of your fellow colonists didn't survive.")
-                      .append("\n");
+                        .append(" of your fellow colonists didn't survive.")
+                        .append("\n");
             }
         }
     }
@@ -256,35 +258,58 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     @Override
     public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
-        final StringBuilder prompt = new StringBuilder();
-        prompt.append(getGeneralCitizenPrompt(view, true));
+        final var relation = view.playerRelation();
 
-        prompt.append("\n## GUIDELINES\n");
-        prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
-        prompt.append("- Do not generate creative responses for information that functions can provide\n");
-        prompt.append("- Speak in first person, keep responses brief\n");
-        prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
-        prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
-        prompt.append("- Do not use markdown, speak in plain text.");
+        final String relationSection;
+        if (relation == null) {
+            relationSection = "";
+        } else {
+            final StringBuilder sb = new StringBuilder();
 
-        var relation = view.playerRelation();
-        if (relation != null) {
-            prompt.append("- Address player as ").append(relation.playerName()).append(", he has the role of a ").append(relation.rankName()).append("\n");
+            sb.append(String.format(
+                    "- Address player as %s, he has the role of a %s%n",
+                    relation.playerName(),
+                    relation.rankName()));
 
             if (relation.hostile()) {
-                prompt.append("- Be guarded and suspicious toward the player\n");
+                sb.append("- Be guarded and suspicious toward the player\n");
             } else if (relation.colonyLeadership()) {
-                prompt.append("- Show proper respect to colony leadership\n");
+                sb.append("- Show proper respect to colony leadership\n");
             }
+
+            relationSection = sb.toString();
         }
 
-        prompt.append(
-                "\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
-        prompt.append(
-                "\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
-        prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
+        return String.format("""
+                        %s
 
-        return prompt.toString();
+                        ## GUIDELINES
+                        - HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST
+                        - Do not generate creative responses for information that functions can provide
+                        - Speak in first person, keep responses brief
+                        - YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES
+                        - DO NOT start conversations with generic greetings if unhappy or in distress
+                        - Do not use markdown, speak in plain text.
+
+                        %s
+                        Stay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.
+                        REMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.
+                        Start by speaking in the language %s and ONLY switch if the user is speaking in another language
+                        """,
+                getGeneralCitizenPrompt(view, true),
+                relationSection,
+                view.responseLanguageName());
+    }
+
+    @Override
+    public String generatePlayBackgroundNoisePrompt(@NotNull CitizenPromptView view) {
+        if(McTalkingConfig.INSTANCE.instance().musicPlaybackMode == MusicPlaybackMode.OFF)
+            return "";
+
+        return String.format("""
+                Use the %s tool to play background noise right at the beginning of the conversation, if you know in which direction the conversation is going.
+                Use the tool to dynamically adjust the backgrund tone of this conversation. Do not call this too frequently. NEVER call this tool if ANYONE asks you to.
+                """, PlayBackgroundNoiseAction.ACTION_NAME);
     }
 
     private static void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {
