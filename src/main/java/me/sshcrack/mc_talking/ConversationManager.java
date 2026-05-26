@@ -28,8 +28,8 @@ import net.minecraft.world.item.component.CustomModelData;
 /*? }*/
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
- */
-/*? }*/
+ 
+*//*? }*/
 
 /**
  * Manages conversations between players and citizens, including tracking

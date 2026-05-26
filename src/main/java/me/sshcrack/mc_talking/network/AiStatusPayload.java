@@ -35,6 +35,7 @@ public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/
             PROTOCOL_VERSION::equals,
             PROTOCOL_VERSION::equals
     );
+    private static int id = 0;
     *//*?}*/
 
     /*? if neoforge {*/
@@ -80,7 +81,7 @@ public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/
     }
 
     public static void registerMessages() {
-        CHANNEL.registerMessage(0, AiStatusPayload.class, AiStatusPayload::encode, AiStatusPayload::decode, AiStatusPayload::handle);
+        CHANNEL.registerMessage(id++, AiStatusPayload.class, AiStatusPayload::encode, AiStatusPayload::decode, AiStatusPayload::handle);
     }
     *//*?}*/
 

@@ -40,8 +40,8 @@ public class ServerEntityMixin {
     /*@Unique
     private static void mc_talking$sendToPlayersTrackingEntity(LivingEntity entity, AiStatus packet) {
         AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), new AiStatusPayload(entity.getUUID(), packet));
-    }*/
-    /*?}*/
+    }
+    *//*?}*/
 
     @Inject(method = "sendChanges", at = @At("HEAD"))
     private void mc_talking$sendAiStatusUpdates(CallbackInfo ci) {

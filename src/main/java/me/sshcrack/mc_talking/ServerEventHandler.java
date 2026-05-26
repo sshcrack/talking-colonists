@@ -40,8 +40,8 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-*/
-/*?}*/
+
+*//*?}*/
 /*? if neoforge {*/
 /*?}*/
 
