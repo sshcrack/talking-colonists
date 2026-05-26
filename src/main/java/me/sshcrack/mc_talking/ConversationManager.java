@@ -246,6 +246,14 @@ public class ConversationManager {
             return;
         }
 
+        // Start background music if configured
+        try {
+            MusicManager musicManager = MusicManager.getInstance();
+            musicManager.startForEntity(citizen, "mumbling");
+        } catch (IllegalStateException e) {
+            // MusicManager not initialized; music disabled
+        }
+
         var client = new CitizenWsClient(citizen,
                 c -> {
                     c.close();
@@ -254,6 +262,13 @@ public class ConversationManager {
                             clients.remove(citizenId);
                             releaseSlot(citizenId);
                         }
+                    }
+                    // Stop background music when mumbling ends
+                    try {
+                        MusicManager musicManager = MusicManager.getInstance();
+                        musicManager.stopForEntity(citizenId);
+                    } catch (IllegalStateException e) {
+                        // MusicManager not initialized; music disabled
                     }
                     // Record cooldown so this citizen won't be immediately re-selected
                     recordCooldown(citizenId);

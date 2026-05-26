@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking.manager.tools;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
@@ -12,27 +11,27 @@ import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 /**
  * AI Tool: Select background music for a citizen during conversation/work.
  * 
  * Called by the Gemini Live API when the LLM decides to play background music.
- * Returns a list of YouTube music tracks that fit the current context.
+ * The AI provides a direct YouTube search query, and the first matching track is played.
+ * The context is cached globally so similar situations can reuse the same music selection.
  */
 public class SelectMusicAction extends FunctionAction {
 
     public SelectMusicAction() {
         super(
             "select_music",
-            "Select background music appropriate for the current activity and emotional context. " +
-            "Returns a list of music tracks with metadata. Only callable in citizen conversations. " +
-            "Ensures music reflects the citizen's current job, mood, and surroundings.",
+            "Select and play background music for the current activity and emotional context. " +
+            "Provide a YouTube search query (e.g., 'relaxing medieval tavern music', 'upbeat farming work music'). " +
+            "The first matching track will be played. Include a short context description (e.g., 'working as builder', 'urgent conversation'). " +
+            "Only callable in citizen conversations. Music selection is cached per context to avoid frequent API calls.",
             new ObjectProperty(new HashMap<>() {{
                 put("query", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
-                put("context", new PrimitiveProperty(PrimitiveProperty.Type.STRING, false));
+                put("context", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
             }})
         );
     }
@@ -52,51 +51,55 @@ public class SelectMusicAction extends FunctionAction {
             return result;
         }
 
-        // Extract the requested YouTube search query
+        // Extract the YouTube search query and context
         String query = null;
-        if (parameters != null && parameters.has("query")) {
-            query = parameters.get("query").getAsString();
-        } else if (parameters != null && parameters.has("context")) {
-            query = parameters.get("context").getAsString();
+        String context = null;
+        
+        if (parameters != null) {
+            if (parameters.has("query")) {
+                query = parameters.get("query").getAsString();
+            }
+            if (parameters.has("context")) {
+                context = parameters.get("context").getAsString();
+            }
         }
 
         if (query == null || query.isBlank()) {
-            result.addProperty("error", "Missing query parameter.");
+            result.addProperty("error", "Missing required 'query' parameter.");
+            result.addProperty("status", "invalid_parameters");
+            return result;
+        }
+        
+        if (context == null || context.isBlank()) {
+            result.addProperty("error", "Missing required 'context' parameter.");
             result.addProperty("status", "invalid_parameters");
             return result;
         }
 
-        McTalking.LOGGER.debug("SelectMusicAction called for citizen {} with query: {}",
-            citizen.getUUID(), query);
+        McTalking.LOGGER.debug("SelectMusicAction called for citizen {} with query: '{}', context: '{}'",
+            citizen.getUUID(), query, context);
 
         // Get or start a music session for this citizen
         MusicManager musicManager = MusicManager.getInstance();
-        var searchResult = YtDlpRunner.resolveSearchResult(query);
-        if (searchResult == null) {
-            result.addProperty("error", "No YouTube results found for query.");
-            result.addProperty("status", "not_found");
-            return result;
-        }
-
-        boolean started = musicManager.playQueryForEntity(citizen, query, "select_music");
+        boolean started = musicManager.playQueryForEntity(citizen, query, context);
+        
         if (!started) {
             result.addProperty("error", "Failed to start music playback.");
             result.addProperty("status", "failed");
             return result;
         }
 
-        JsonArray tracksArray = new JsonArray();
-        JsonObject trackObj = new JsonObject();
-        trackObj.addProperty("title", searchResult.title());
-        trackObj.addProperty("artist", searchResult.uploader());
-        trackObj.addProperty("url", searchResult.webpageUrl());
-        trackObj.addProperty("age_restricted", searchResult.ageRestricted());
-        tracksArray.add(trackObj);
+        // Get the track info that was just started
+        var status = musicManager.getStatus(citizen.getUUID());
+        if (status != null && status.has("title")) {
+            result.addProperty("title", status.get("title").getAsString());
+            result.addProperty("artist", status.get("artist").getAsString());
+            result.addProperty("url", status.get("url").getAsString());
+        }
 
         result.addProperty("query", query);
-        result.add("tracks", tracksArray);
+        result.addProperty("context", context);
         result.addProperty("status", "playing");
-        result.addProperty("selected_count", 1);
 
         return result;
     }

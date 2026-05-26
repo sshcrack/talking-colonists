@@ -43,6 +43,10 @@ public class MusicManager {
     // LRU cache for downloaded music files
     private final Map<String, CacheEntry> musicCache;
     
+    // Global cache: context -> YouTube query mapping
+    // This allows reusing successful music selections across similar contexts
+    private final Map<String, String> contextToQueryCache = new ConcurrentHashMap<>();
+    
     private final Path cacheDirectory;
     private final int cacheSizeMB;
     private long currentCacheUsageMB = 0;
@@ -116,20 +120,42 @@ public class MusicManager {
         activeSessions.put(entityId, session);
         
         McTalking.LOGGER.debug("Started music session for entity {} with context: {}", entityId, context);
-        
-        // In prototype: mock the LLM selection (would be triggered via SelectMusicAction tool call)
-        // This will be invoked via Live API tool call in the future
     }
 
     /**
      * Register or refresh a music session for a citizen entity.
+     * Checks the context cache and automatically resumes music if a matching context is found.
      */
     public synchronized void startForEntity(AbstractEntityCitizen citizen, String context) {
-        startForEntity(citizen.getUUID(), context);
+        UUID entityId = citizen.getUUID();
+        
+        if (activeSessions.containsKey(entityId)) {
+            McTalking.LOGGER.debug("Music already playing for entity {}, skipping start", entityId);
+            return;
+        }
+
+        // Create structured context
+        MusicContext musicContext = MusicContext.fromCitizen(citizen, context);
+        String cacheKey = musicContext.toCacheKey();
+        
+        // Check if we have a cached query for this context
+        String cachedQuery = contextToQueryCache.get(cacheKey);
+        
+        if (cachedQuery != null) {
+            McTalking.LOGGER.debug("Found cached music query for context '{}': {}", context, cachedQuery);
+            // Automatically play the cached music
+            playQueryForEntity(citizen, cachedQuery, context);
+        } else {
+            // No cached query, create session and wait for AI to select music
+            MusicSession session = new MusicSession(entityId, context);
+            activeSessions.put(entityId, session);
+            McTalking.LOGGER.debug("Started music session for entity {} with context: {} (waiting for AI selection)", entityId, context);
+        }
     }
 
     /**
      * Resolve a search query and stream the first matching track to the citizen's voice channel.
+     * Caches the query for this context to enable automatic music resumption.
      */
     public synchronized boolean playQueryForEntity(AbstractEntityCitizen citizen, String query, String triggerSource) {
         if (citizen == null || query == null || query.isBlank()) {
@@ -154,6 +180,12 @@ public class MusicManager {
         session.currentTrackArtist = searchResult.uploader();
         session.currentTrackUrl = searchResult.webpageUrl();
         session.isAgeRestricted = searchResult.ageRestricted();
+
+        // Cache the query for this context
+        MusicContext musicContext = MusicContext.fromCitizen(citizen, triggerSource);
+        String cacheKey = musicContext.toCacheKey();
+        contextToQueryCache.put(cacheKey, query);
+        McTalking.LOGGER.debug("Cached music query '{}' for context '{}'", query, cacheKey);
 
         try {
             AudioChannel channel = McTalkingVoicechatPlugin.vcApi.createEntityAudioChannel(
@@ -201,7 +233,25 @@ public class MusicManager {
         try (InputStream inputStream = pipeline.inputStream()) {
             int read;
             while (!Thread.currentThread().isInterrupted() && (read = inputStream.read(buffer)) != -1) {
+                // Apply volume scaling for auto-ducking
+                session.updateVolume();
+                float volume = session.getCurrentVolume();
+                
                 byte[] chunk = Arrays.copyOf(buffer, read);
+                
+                // Scale PCM samples by volume (assuming 16-bit signed PCM)
+                if (volume < 1.0f) {
+                    for (int i = 0; i < read - 1; i += 2) {
+                        // Read 16-bit sample (little-endian)
+                        short sample = (short) ((chunk[i] & 0xFF) | (chunk[i + 1] << 8));
+                        // Scale by volume
+                        sample = (short) (sample * volume);
+                        // Write back
+                        chunk[i] = (byte) (sample & 0xFF);
+                        chunk[i + 1] = (byte) ((sample >> 8) & 0xFF);
+                    }
+                }
+                
                 stream.addGeminiPcmWithPitch(chunk, McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE);
             }
             stream.flushAudio();
@@ -212,80 +262,6 @@ public class MusicManager {
             session.closePipeline();
             stream.close();
         }
-    }
-
-    /**
-     * Stream a YouTube track to a citizen's listeners via voice chat.
-     * Uses yt-dlp for chunked streaming without downloading the full video.
-     * 
-     * Streaming flow:
-     * 1. Check cache for existing download
-     * 2. If cached, stream from disk
-     * 3. If not cached, spawn yt-dlp process and pipe audio directly to voice chat
-     * 4. Optionally save chunks to cache for future plays
-     * 
-     * @param entityId UUID of the citizen
-     * @param youtubeUrl YouTube URL to stream
-     * @return true if streaming started successfully
-     */
-    public synchronized boolean streamTrackToEntity(UUID entityId, String youtubeUrl) {
-        MusicSession session = activeSessions.get(entityId);
-        if (session == null) {
-            McTalking.LOGGER.warn("No active music session for entity {}", entityId);
-            return false;
-        }
-
-        McTalking.LOGGER.info("Starting stream of {} for entity {}", youtubeUrl, entityId);
-        
-        // Generate cache key based on URL hash
-        String cacheKey = Integer.toHexString(youtubeUrl.hashCode());
-        Path cachePath = cacheDirectory.resolve(cacheKey + ".m4a");
-        
-        // Check if already cached
-        java.io.InputStream audioStream;
-        if (musicCache.containsKey(cacheKey) && Files.exists(cachePath)) {
-            try {
-                audioStream = Files.newInputStream(cachePath);
-                McTalking.LOGGER.debug("Using cached audio for: {}", youtubeUrl);
-            } catch (Exception e) {
-                McTalking.LOGGER.warn("Failed to open cached audio, falling back to streaming", e);
-                audioStream = YtDlpRunner.streamAudioWithCache(youtubeUrl, cachePath);
-            }
-        } else {
-            // Stream and cache simultaneously
-            audioStream = YtDlpRunner.streamAudioWithCache(youtubeUrl, cachePath);
-        }
-        
-        if (audioStream == null) {
-            McTalking.LOGGER.error("Failed to start audio stream from YouTube");
-            return false;
-        }
-        
-        // Update cache metadata
-        try {
-            if (!musicCache.containsKey(cacheKey) && Files.exists(cachePath)) {
-                long fileSizeBytes = Files.size(cachePath);
-                int fileSizeMB = (int) ((fileSizeBytes + 1024 * 1024 - 1) / (1024 * 1024));  // Ceiling division
-                
-                CacheEntry entry = new CacheEntry(cachePath, fileSizeMB);
-                musicCache.put(cacheKey, entry);
-                currentCacheUsageMB += fileSizeMB;
-                
-                McTalking.LOGGER.debug("Cached music: {} ({} MB, total: {} MB)", youtubeUrl, fileSizeMB, currentCacheUsageMB);
-            }
-        } catch (Exception e) {
-            McTalking.LOGGER.debug("Failed to update cache metadata", e);
-        }
-        
-        // TODO: Full implementation:
-        // 1. Fetch audio metadata from youtubeUrl
-        // 2. Pipe audioStream to McTalkingVoicechatPlugin.streamAudioToEntity(entityId, audioStream)
-        // 3. Convert audio chunks (likely PCM or M4A) to OPUS encoding for voice chat
-        // 4. Handle streaming errors gracefully (fallback to next track)
-        // 5. Update session with track metadata (title, artist, etc.)
-        
-        session.isStreaming = true;
-        return true;
     }
 
     /**
@@ -302,13 +278,14 @@ public class MusicManager {
 
     /**
      * Skip to next track for an entity.
-     * Prototype: no-op. Full implementation will trigger LLM to select new track.
+     * This will trigger the AI to select a new track via SelectMusicAction.
      */
     public synchronized void skip(UUID entityId) {
         MusicSession session = activeSessions.get(entityId);
         if (session != null) {
             McTalking.LOGGER.debug("Skipped track for entity {}", entityId);
-            // TODO: Trigger SelectMusicAction tool call to get next track
+            session.stopPlayback();
+            // The AI will call SelectMusicAction again to select a new track
         }
     }
 
@@ -333,6 +310,31 @@ public class MusicManager {
      */
     public static boolean isYtDlpAvailable() {
         return YtDlpRunner.isAvailable();
+    }
+
+    /**
+     * Duck (reduce) music volume for an entity when speech starts.
+     * Applies smooth volume transition.
+     */
+    public synchronized void duckMusicForEntity(UUID entityId) {
+        MusicSession session = activeSessions.get(entityId);
+        if (session != null && session.musicStream != null) {
+            double attenuation = me.sshcrack.mc_talking.config.McTalkingConfig.INSTANCE.instance().musicDuckingAttenuation;
+            session.setTargetVolume((float) attenuation);
+            McTalking.LOGGER.debug("Ducking music for entity {} to volume {}", entityId, attenuation);
+        }
+    }
+
+    /**
+     * Restore music volume for an entity when speech ends.
+     * Applies smooth volume transition.
+     */
+    public synchronized void restoreMusicForEntity(UUID entityId) {
+        MusicSession session = activeSessions.get(entityId);
+        if (session != null && session.musicStream != null) {
+            session.setTargetVolume(1.0f);
+            McTalking.LOGGER.debug("Restoring music volume for entity {}", entityId);
+        }
     }
 
     /**
@@ -393,6 +395,10 @@ public class MusicManager {
         @Nullable GeminiStream musicStream;
         @Nullable YtDlpRunner.PcmAudioPipeline pipeline;
         @Nullable Thread playbackThread;
+        
+        // Volume control for auto-ducking
+        private volatile float currentVolume = 1.0f;
+        private volatile float targetVolume = 1.0f;
 
         MusicSession(UUID entityId, String context) {
             this.entityId = entityId;
@@ -436,6 +442,38 @@ public class MusicManager {
 
         void stop() {
             stopPlayback();
+        }
+        
+        /**
+         * Set target volume for smooth crossfade.
+         */
+        void setTargetVolume(float volume) {
+            this.targetVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        }
+        
+        /**
+         * Get current volume (smoothly transitions to target).
+         */
+        float getCurrentVolume() {
+            return currentVolume;
+        }
+        
+        /**
+         * Update volume with smooth transition.
+         * Call this periodically during playback.
+         */
+        void updateVolume() {
+            if (Math.abs(currentVolume - targetVolume) < 0.01f) {
+                currentVolume = targetVolume;
+            } else {
+                // Smooth transition over time (adjust step size for crossfade duration)
+                float step = 0.05f; // Adjust based on musicCrossfadeDurationMs
+                if (currentVolume < targetVolume) {
+                    currentVolume = Math.min(currentVolume + step, targetVolume);
+                } else {
+                    currentVolume = Math.max(currentVolume - step, targetVolume);
+                }
+            }
         }
 
         JsonObject toJson() {

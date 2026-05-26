@@ -379,9 +379,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     private void handleSpeechStart(UUID entityId) {
         try {
             MusicManager musicManager = MusicManager.getInstance();
-            // TODO: Implement music volume ducking/attenuation
-            // Reduce music volume to musicDuckingAttenuation level
-            // with smooth crossfade over musicCrossfadeDurationMs milliseconds
+            musicManager.duckMusicForEntity(entityId);
         } catch (IllegalStateException e) {
             // MusicManager not initialized; music disabled
         }
@@ -394,9 +392,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     private void handleSpeechEnd(UUID entityId) {
         try {
             MusicManager musicManager = MusicManager.getInstance();
-            // TODO: Implement music volume restoration
-            // Restore music volume to 1.0 (full volume)
-            // with smooth crossfade over musicCrossfadeDurationMs milliseconds
+            musicManager.restoreMusicForEntity(entityId);
         } catch (IllegalStateException e) {
             // MusicManager not initialized; music disabled
         }

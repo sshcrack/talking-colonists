@@ -388,43 +388,4 @@ public class YtDlpRunner {
             }
         }
     }
-
-    /**
-     * Get metadata for a YouTube URL without downloading.
-     * Useful for checking age restrictions, availability, etc.
-     * 
-     * In prototype, returns mock metadata.
-     */
-    public static YtDlpMetadata getMetadata(String youtubeUrl) {
-        if (!isAvailable()) {
-            return null;
-        }
-
-        // Mock metadata for prototype
-        McTalking.LOGGER.debug("[MOCK] Fetching metadata for: {}", youtubeUrl);
-        
-        return new YtDlpMetadata(
-            "Sample Track Title",      // title
-            "Sample Artist",           // uploader
-            "Sample Description",      // description
-            false                      // age_restricted
-        );
-    }
-
-    /**
-     * Container for yt-dlp metadata about a video.
-     */
-    public static class YtDlpMetadata {
-        public final String title;
-        public final String uploader;
-        public final String description;
-        public final boolean ageRestricted;
-
-        public YtDlpMetadata(String title, String uploader, String description, boolean ageRestricted) {
-            this.title = title;
-            this.uploader = uploader;
-            this.description = description;
-            this.ageRestricted = ageRestricted;
-        }
-    }
 }
