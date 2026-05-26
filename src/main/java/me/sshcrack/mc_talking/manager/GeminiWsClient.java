@@ -445,7 +445,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public JsonObject onFunctionCall(String name, @Nullable JsonObject args) {
         var colony = this.entity.getCitizenColonyHandler().getColony();
 
-        var action = AITools.registeredFunctions.get(name);
+        var action = AITools.registeredFunctions.getOrDefault(name, AITools.playerConversationOnlyTools.get(name));
         if (action == null) {
             McTalking.LOGGER.warn("Unknown function call: {}", name);
             return null;
