@@ -331,9 +331,14 @@ public class ConversationManager {
 
             // High-priority claim (may evict an older non-player slot if at capacity)
             claimSlot(citizenId, true);
-            clients.put(citizenId, new CitizenWsClient(
+            var ws = new CitizenWsClient(
                     new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
-                    citizen, player));
+                    citizen, player);
+
+            clients.put(citizenId, ws);
+
+            McTalking.LOGGER.info("Starting initial websocket connection from outer...");
+            ws.connect();
         }
 
         playerConversationPartners.put(playerId, citizenId);

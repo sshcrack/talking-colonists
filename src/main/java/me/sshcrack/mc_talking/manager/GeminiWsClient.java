@@ -218,7 +218,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (modality != ModalityModes.TEXT) {
             setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
             setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
-            var entity = this.entity;
             var female = entity.getCitizenData().isFemale();
             var uuid = entity.getUUID();
 
