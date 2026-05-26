@@ -190,6 +190,32 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
     public List<String> customPersonalityArchetypes = new ArrayList<>();
 
+    // Background Music Configuration
+    @AutoGen(category = "music")
+    @EnumCycler
+    @SerialEntry(comment = "Background music playback mode. OFF = disabled (default). SERVER_SIDE = streams music via voice chat (requires yt-dlp). CLIENT_SIDE = future feature.")
+    public MusicPlaybackMode musicPlaybackMode = MusicPlaybackMode.OFF;
+
+    @AutoGen(category = "music", group = "music_advanced")
+    @IntField(min = 10, max = 1000)
+    @SerialEntry(comment = "Maximum cache size in MB for downloaded music tracks. Uses LRU eviction. Default: 100MB")
+    public int musicCacheSizeMB = 100;
+
+    @AutoGen(category = "music", group = "music_advanced")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.1)
+    @SerialEntry(comment = "Volume attenuation level (0.0-1.0) for music when citizens are speaking. 0.0 = silent, 1.0 = no ducking. Default: 0.3")
+    public double musicDuckingAttenuation = 0.3;
+
+    @AutoGen(category = "music", group = "music_advanced")
+    @IntField(min = 100, max = 5000)
+    @SerialEntry(comment = "Crossfade duration in milliseconds when switching tracks. Default: 500ms")
+    public int musicCrossfadeDurationMs = 500;
+
+    @AutoGen(category = "music", group = "music_advanced")
+    @TickBox
+    @SerialEntry(comment = "Enable music telemetry (anonymized, opt-in only). Helps improve track selection. Default: false")
+    public boolean musicTelemetryEnabled = false;
+
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
         @Override
         public String provideNewValue() {

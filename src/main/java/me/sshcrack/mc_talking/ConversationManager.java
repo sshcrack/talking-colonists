@@ -5,6 +5,7 @@ import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
+import me.sshcrack.mc_talking.manager.music.MusicManager;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
@@ -282,6 +283,14 @@ public class ConversationManager {
             return;
         }
 
+        // Start background music if configured
+        try {
+            MusicManager musicManager = MusicManager.getInstance();
+            musicManager.startForEntity(citizenId, "urgent contact");
+        } catch (IllegalStateException e) {
+            // MusicManager not initialized; music disabled
+        }
+
         var client = new CitizenWsClient(citizen,
                 c -> {
                     c.close();
@@ -316,6 +325,14 @@ public class ConversationManager {
         activeEntity.put(playerId, citizen);
         citizenToPlayer.put(citizenId, playerId);
 
+        // Start background music if configured
+        try {
+            MusicManager musicManager = MusicManager.getInstance();
+            musicManager.startForEntity(citizenId, "player conversation");
+        } catch (IllegalStateException e) {
+            // MusicManager not initialized; music disabled
+        }
+
         GeminiWsClient existingClient = clients.get(citizenId);
 
         if (existingClient instanceof CitizenWsClient cws && cws.isMumbling()) {
@@ -348,6 +365,14 @@ public class ConversationManager {
     public static void endConversation(UUID playerId, boolean sendMessage) {
         UUID citizenId = playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
+
+        // Stop background music for this citizen
+        try {
+            MusicManager musicManager = MusicManager.getInstance();
+            musicManager.stopForEntity(citizenId);
+        } catch (IllegalStateException e) {
+            // MusicManager not initialized; music disabled
+        }
 
         citizenToPlayer.remove(citizenId);
         GeminiWsClient client = clients.remove(citizenId);

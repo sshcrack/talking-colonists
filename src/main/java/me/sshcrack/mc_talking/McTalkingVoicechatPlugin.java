@@ -12,6 +12,7 @@ import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
+import me.sshcrack.mc_talking.manager.music.MusicManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.Nullable;
@@ -39,6 +40,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public static VoicechatServerApi vcApi;
     public static final String DIRECT_PLAYER_DIALOG = "ptc_dialog";
     public static final String CITIZEN_CONVERSATION = "ctc_dialog";
+    public static final String MUSIC = "music";
 
 
     // Map to track silence packet futures for each entity
@@ -100,11 +102,17 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                 .setName("C2CitizenDialog")
                 .setDescription("The volume of the citizens voice when talking in a conversation with other citizens (so not directly to the player)")
                 .build();
+        VolumeCategory music = vcApi.volumeCategoryBuilder()
+            .setId(MUSIC)
+            .setName("BackgroundMusic")
+            .setDescription("Background music for citizen work, player conversations, and ambient scenes")
+            .build();
 
         //TODO add icons here
 
         vcApi.registerVolumeCategory(directDialog);
         vcApi.registerVolumeCategory(citizenConversation);
+        vcApi.registerVolumeCategory(music);
     }
 
 
@@ -189,6 +197,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             consecutiveSilentPackets.put(entityId, 0);
 
             // Mark as speaking if not already
+            boolean wasSpeaking = isSpeaking.getOrDefault(entityId, false);
             isSpeaking.put(entityId, true);
 
             // Update last voice activity timestamp
@@ -196,6 +205,11 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
             // Cancel any existing silence tasks when there's new voice
             cancelSilenceTask(entityId);
+
+            // Duck music when speech starts
+            if (!wasSpeaking) {
+                handleSpeechStart(entityId);
+            }
         } else {
             // Increment consecutive silent packet counter
             int silentCount = consecutiveSilentPackets.getOrDefault(entityId, 0) + 1;
@@ -314,6 +328,9 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                 // Mark the entity as no longer speaking
                 isSpeaking.put(entityId, false);
 
+                // Restore music volume when speech ends
+                handleSpeechEnd(entityId);
+
                 // Clean up the speech end detection entry
                 speechEndDetections.remove(entityId);
 
@@ -341,6 +358,9 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                     // Mark the entity as no longer speaking
                     isSpeaking.put(entityId, false);
 
+                    // Restore music volume when speech ends
+                    handleSpeechEnd(entityId);
+
                     // Get the talking manager for this entity
                     var manager = ConversationManager.getClientForEntity(entityId);
                     if (manager != null) {
@@ -349,6 +369,36 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Handle speech start for a citizen.
+     * Applies auto-ducking to background music.
+     */
+    private void handleSpeechStart(UUID entityId) {
+        try {
+            MusicManager musicManager = MusicManager.getInstance();
+            // TODO: Implement music volume ducking/attenuation
+            // Reduce music volume to musicDuckingAttenuation level
+            // with smooth crossfade over musicCrossfadeDurationMs milliseconds
+        } catch (IllegalStateException e) {
+            // MusicManager not initialized; music disabled
+        }
+    }
+
+    /**
+     * Handle speech end for a citizen.
+     * Restores background music volume after speech ends.
+     */
+    private void handleSpeechEnd(UUID entityId) {
+        try {
+            MusicManager musicManager = MusicManager.getInstance();
+            // TODO: Implement music volume restoration
+            // Restore music volume to 1.0 (full volume)
+            // with smooth crossfade over musicCrossfadeDurationMs milliseconds
+        } catch (IllegalStateException e) {
+            // MusicManager not initialized; music disabled
         }
     }
 }

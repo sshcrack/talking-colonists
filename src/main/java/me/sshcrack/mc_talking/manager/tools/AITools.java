@@ -76,7 +76,8 @@ public class AITools {
         ));
         addAll(playerConversationOnlyTools, List.of(
                 new DropItemAction(),
-                new LeaveColonyAction()
+                new LeaveColonyAction(),
+                new SelectMusicAction()
         ));
     }
 }

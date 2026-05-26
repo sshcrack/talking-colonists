@@ -5,12 +5,16 @@ import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+import me.sshcrack.mc_talking.manager.music.MusicManager;
+import me.sshcrack.mc_talking.manager.music.YtDlpRunner;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -56,13 +60,39 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
-        if (!McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+        McTalkingConfig config = McTalkingConfig.INSTANCE.instance();
+        
+        if (config.geminiApiKey.isEmpty()) {
+            McTalking.LOGGER.error("======================");
+            McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
+            McTalking.LOGGER.error("======================");
             return;
         }
 
-        McTalking.LOGGER.error("======================");
-        McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
-        McTalking.LOGGER.error("======================");
+        // Initialize MusicManager if music playback is enabled
+        if (config.musicPlaybackMode != me.sshcrack.mc_talking.config.MusicPlaybackMode.OFF) {
+            try {
+                Object serverDir = event.getServer().getServerDirectory();
+                Path configDir;
+                if (serverDir instanceof Path) {
+                    configDir = ((Path) serverDir).resolve("config").resolve("mc_talking");
+                } else {
+                    // Handle File type (for older versions)
+                    configDir = Paths.get(serverDir.toString()).resolve("config").resolve("mc_talking");
+                }
+                MusicManager.initialize(configDir, config.musicCacheSizeMB);
+                
+                // Check if yt-dlp is available
+                if (!YtDlpRunner.isAvailable()) {
+                    McTalking.LOGGER.warn("========================================");
+                    McTalking.LOGGER.warn("yt-dlp not detected. Background music feature is DISABLED.");
+                    McTalking.LOGGER.warn("To enable music, install yt-dlp: https://github.com/yt-dlp/yt-dlp");
+                    McTalking.LOGGER.warn("========================================");
+                }
+            } catch (Exception e) {
+                McTalking.LOGGER.error("Failed to initialize MusicManager", e);
+            }
+        }
     }
 
     @SubscribeEvent
@@ -97,6 +127,20 @@ public class ServerEventHandler {
                 /*? if neoforge {*/
                 item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
                 /*?}*/
+            }
+        }
+
+        // Notify admin players if music is enabled but yt-dlp is missing
+        McTalkingConfig config = McTalkingConfig.INSTANCE.instance();
+        if (config.musicPlaybackMode != me.sshcrack.mc_talking.config.MusicPlaybackMode.OFF) {
+            if (!YtDlpRunner.isAvailable() && player.hasPermissions(4)) {  // 4 = OP level
+                player.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(
+                        "§c[McTalking] Background music is enabled but yt-dlp is not detected. " +
+                        "Music feature is DISABLED. Install yt-dlp to enable: https://github.com/yt-dlp/yt-dlp"
+                    ),
+                    false  // Chat message (not action bar)
+                );
             }
         }
     }

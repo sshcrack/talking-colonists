@@ -6,13 +6,16 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.MusicPlaybackMode;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.manager.music.MusicManager;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -81,6 +84,63 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
         var newStatusPrompt = String.format("You are now %s", CitizenPromptService.formatStatus(statusView));
         client.setLastStatus(status);
         client.addPromptTextAfterTalkingComplete(newStatusPrompt);
+
+        mc_talking$maybePlayStatusMusic(status, data);
+    }
+
+    @Unique
+    private void mc_talking$maybePlayStatusMusic(VisibleCitizenStatus status, CitizenData data) {
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (config.musicPlaybackMode != MusicPlaybackMode.SERVER_SIDE) {
+            return;
+        }
+
+        if (status == VisibleCitizenStatus.SLEEP
+                || status == VisibleCitizenStatus.MOURNING
+                || status == VisibleCitizenStatus.SICK
+                || status == VisibleCitizenStatus.RAIDED) {
+            return;
+        }
+
+        var entityOpt = data.getEntity();
+        if (entityOpt.isEmpty()) {
+            return;
+        }
+
+        double chance = 0.08;
+        if (status == VisibleCitizenStatus.WORKING) {
+            chance = 0.35;
+        } else if (status == VisibleCitizenStatus.HOUSE
+                || status == VisibleCitizenStatus.EAT
+                || status == VisibleCitizenStatus.BAD_WEATHER) {
+            chance = 0.18;
+        }
+
+        if (Math.random() > chance) {
+            return;
+        }
+
+        String query;
+        if (status == VisibleCitizenStatus.WORKING) {
+            String jobName = data.getJob() != null
+                    ? Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString()
+                    : "village work ambience";
+            query = jobName + " instrumental background music";
+        } else if (status == VisibleCitizenStatus.HOUSE) {
+            query = "cozy village background music";
+        } else if (status == VisibleCitizenStatus.EAT) {
+            query = "warm tavern background music";
+        } else if (status == VisibleCitizenStatus.BAD_WEATHER) {
+            query = "gentle rainy background music";
+        } else {
+            query = "peaceful medieval background music";
+        }
+
+        try {
+            MusicManager.getInstance().playQueryForEntity(entityOpt.get(), query, "status:" + status.toString().toLowerCase());
+        } catch (Exception e) {
+            McTalking.LOGGER.debug("Skipping background music trigger for {}", data.getUUID(), e);
+        }
     }
 
     /*? if neoforge {*/
