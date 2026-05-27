@@ -45,9 +45,9 @@ public class RaidManagerMixin {
 
     private static String buildRaidEventDescription(IColonyRaidEvent raidEvent, int lostCitizens) {
         if (lostCitizens > 0) {
-            return "Raid Event: " + lostCitizens + " " + (lostCitizens == 1 ? "citizen" : "citizens") + " lost in a raid. The colony defended but at great cost.";
+            return "Raid Event: " + lostCitizens + " " + (lostCitizens == 1 ? "citizen" : "citizens") + " lost in a raid.";
         } else {
-            return "Raid Event: The colony successfully defended against raiders without losing anyone, but the trauma remains.";
+            return "Raid Event: The colony successfully defended against raiders without losing anyone successfully! The guards fought bravely and protected the colony from harm.";
         }
     }
 }

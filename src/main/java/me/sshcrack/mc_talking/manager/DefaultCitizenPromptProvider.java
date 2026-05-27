@@ -340,8 +340,6 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         List<String> suppressedTopics = new ArrayList<>();
-        // Only suppress complaints if there's good news AND no bad news
-        boolean suppressComplaints = hasMoodLift && !hasMoodDrain;
         
         for (var modifier : view.happinessModifiers()) {
             HappinessModifierType modifierType = modifier.type();
@@ -356,7 +354,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    suppressComplaints,
+                                    hasMoodLift,
                                     modifierType,
                                     "- Distressed about housing situation\n",
                                     suppressedTopics
@@ -371,7 +369,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    suppressComplaints,
+                                    hasMoodLift,
                                     modifierType,
                                     "- Anxious about employment status\n",
                                     suppressedTopics
@@ -401,7 +399,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    suppressComplaints,
+                                    hasMoodLift,
                                     modifierType,
                                     "- Frustrated by lack of work to do\n",
                                     suppressedTopics
@@ -417,7 +415,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                         memories,
                                         currentGameTime,
                                         config,
-                                        suppressComplaints,
+                                        hasMoodLift,
                                         modifierType,
                                         "- Disappointed by lack of school activities\n",
                                         suppressedTopics
@@ -429,7 +427,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                         memories,
                                         currentGameTime,
                                         config,
-                                        suppressComplaints,
+                                        hasMoodLift,
                                         modifierType,
                                         "- Disappointed by lack of school in the colony\n",
                                         suppressedTopics
@@ -448,7 +446,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    suppressComplaints,
+                                    hasMoodLift,
                                     modifierType,
                                     "- Disappointed by lack of mystical experiences\n",
                                     suppressedTopics
@@ -482,7 +480,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    suppressComplaints,
+                                    hasMoodLift,
                                     modifierType,
                                     "- Feeling socially isolated\n",
                                     suppressedTopics
@@ -534,7 +532,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    suppressComplaints,
+                                    hasMoodLift,
                                     modifierType,
                                     "- Unhappy with food quality/variety\n",
                                     suppressedTopics
