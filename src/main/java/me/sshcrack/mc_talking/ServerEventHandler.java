@@ -227,16 +227,24 @@ public class ServerEventHandler {
 
                 double distSq = citizenOne.distanceToSqr(citizenTwo);
                 if (distSq < 25.0) {
+                    if (ConversationManager.isCitizenBusy(citizenOne.getUUID()) || ConversationManager.isCitizenBusy(citizenTwo.getUUID())) {
+                        continue;
+                    }
+
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
 
                     double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
                     if (distSq < triggerDist * triggerDist) {
                         if (PregenAudioCache.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
                             AudioChunk audio = PregenAudioCache.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
-                            PregenPlayback.playAudio(citizenOne, audio);
+                            if (audio != null && !PregenPlayback.playAudio(citizenOne, audio)) {
+                                PregenAudioCache.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
+                            }
                         } else if (PregenAudioCache.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
                             AudioChunk audio = PregenAudioCache.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
-                            PregenPlayback.playAudio(citizenTwo, audio);
+                            if (audio != null && !PregenPlayback.playAudio(citizenTwo, audio)) {
+                                PregenAudioCache.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
+                            }
                         }
                     }
                 }
@@ -429,19 +437,16 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
-    /*? if neoforge {*/
     public void onLivingTargetChange(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
         if (event.getNewAboutToBeSetTarget() instanceof AbstractEntityCitizen citizen) {
-    /*?}*/
-    /*? if forge {*/
-    /*public void onLivingTargetChange(LivingChangeTargetEvent event) {
-        if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
-        if (event.getNewTarget() instanceof AbstractEntityCitizen citizen) {*/
-    /*?}*/
             if (PregenAudioCache.hasThreat(citizen.getUUID())) {
                 AudioChunk audio = PregenAudioCache.popThreat(citizen.getUUID());
-                PregenPlayback.playAudio(citizen, audio);
+                if (audio != null && !PregenPlayback.playAudio(citizen, audio)) {
+                    PregenAudioCache.putThreat(citizen.getUUID(), audio);
+                }
+            } else {
+                PregenerationTaskService.playThreatNow(citizen);
             }
         }
     }

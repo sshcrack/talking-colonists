@@ -29,10 +29,15 @@ public class PregenerationTaskService {
             AbstractEntityCitizen c2 = findCitizen(server, pair.id2);
 
             if (c1 != null && c2 != null) {
+                if (ConversationManager.isCitizenBusy(c1.getUUID()) || ConversationManager.isCitizenBusy(c2.getUUID())) {
+                    continue;
+                }
+
                 // Check if we need greeting for c1 -> c2
                 if (!PregenAudioCache.hasGreeting(c1.getUUID(), c2.getUUID())) {
                     startPregen(c1, "Generate a brief 1-sentence passing greeting for your friend " + c2.getCitizenData().getName() + ".", (audio) -> {
                         PregenAudioCache.putGreeting(c1.getUUID(), c2.getUUID(), audio);
+                        ConversationManager.releaseSpeechClaim(c1.getUUID());
                         isGenerating = false;
                     });
                     return;
@@ -42,6 +47,7 @@ public class PregenerationTaskService {
                 if (!PregenAudioCache.hasGreeting(c2.getUUID(), c1.getUUID())) {
                     startPregen(c2, "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".", (audio) -> {
                         PregenAudioCache.putGreeting(c2.getUUID(), c1.getUUID(), audio);
+                        ConversationManager.releaseSpeechClaim(c2.getUUID());
                         isGenerating = false;
                     });
                     return;
@@ -53,9 +59,13 @@ public class PregenerationTaskService {
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity entity : level.getAllEntities()) {
                 if (entity instanceof AbstractEntityCitizen citizen) {
+                    if (ConversationManager.isCitizenBusy(citizen.getUUID())) {
+                        continue;
+                    }
                     if (!PregenAudioCache.hasThreat(citizen.getUUID())) {
                         startPregen(citizen, "Generate a brief 1-sentence panic or cry for help because you are being attacked by a monster.", (audio) -> {
                             PregenAudioCache.putThreat(citizen.getUUID(), audio);
+                            ConversationManager.releaseSpeechClaim(citizen.getUUID());
                             isGenerating = false;
                         });
                         return;
@@ -69,6 +79,10 @@ public class PregenerationTaskService {
         if (!ConversationManager.claimSlot(citizen.getUUID(), false)) {
             return;
         }
+        if (!ConversationManager.claimSpeech(citizen.getUUID(), false)) {
+            ConversationManager.releaseSlot(citizen.getUUID());
+            return;
+        }
         isGenerating = true;
         McTalking.LOGGER.info("[Pregeneration] Starting audio pregeneration for citizen {}", citizen.getUUID());
 
@@ -77,9 +91,35 @@ public class PregenerationTaskService {
             onComplete.accept(audio);
         }, () -> {
             isGenerating = false;
+            ConversationManager.releaseSpeechClaim(citizen.getUUID());
             ConversationManager.releaseSlot(citizen.getUUID());
         });
         client.connect();
+    }
+
+    public static void playThreatNow(AbstractEntityCitizen citizen) {
+        if (ConversationManager.isCitizenBusy(citizen.getUUID())) {
+            return;
+        }
+
+        AudioChunk cachedThreat = PregenAudioCache.popThreat(citizen.getUUID());
+        if (cachedThreat != null) {
+            if (!PregenPlayback.playAudio(citizen, cachedThreat)) {
+                PregenAudioCache.putThreat(citizen.getUUID(), cachedThreat);
+            }
+            return;
+        }
+
+        startPregen(citizen,
+                "Generate a brief 1-sentence panic or cry for help because you are being attacked by a monster.",
+                (audio) -> {
+                    PregenAudioCache.putThreat(citizen.getUUID(), audio);
+                    if (!PregenPlayback.playAudio(citizen, audio, true)) {
+                        PregenAudioCache.putThreat(citizen.getUUID(), audio);
+                        ConversationManager.releaseSpeechClaim(citizen.getUUID());
+                    }
+                    isGenerating = false;
+                });
     }
 
     private static AbstractEntityCitizen findCitizen(MinecraftServer server, java.util.UUID uuid) {

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
@@ -77,6 +78,11 @@ public class ConversationManager {
      * The head (oldest) is the first eviction candidate.
      */
     private static final Queue<UUID> addedEntities = new LinkedList<>();
+
+    /**
+     * Citizens currently reserved for speech playback or generation.
+     */
+    private static final Set<UUID> speechClaims = ConcurrentHashMap.newKeySet();
 
     // -------------------------------------------------------------------------
     // Slot management (priority-aware, synchronized)
@@ -154,6 +160,7 @@ public class ConversationManager {
     public static synchronized void unregisterExternalClient(UUID entityId) {
         clients.remove(entityId);
         releaseSlot(entityId);
+        releaseSpeechClaim(entityId);
     }
 
     /**
@@ -202,7 +209,28 @@ public class ConversationManager {
      * Use this before starting any new session to avoid duplicates.
      */
     public static synchronized boolean isCitizenBusy(UUID citizenId) {
-        return clients.containsKey(citizenId);
+        return clients.containsKey(citizenId) || speechClaims.contains(citizenId);
+    }
+
+    public static synchronized boolean claimSpeech(UUID citizenId, boolean force) {
+        if (!force && isCitizenBusy(citizenId)) {
+            return false;
+        }
+
+        if (force) {
+            GeminiWsClient existingClient = clients.remove(citizenId);
+            if (existingClient != null) {
+                existingClient.close();
+            }
+            speechClaims.remove(citizenId);
+        }
+
+        speechClaims.add(citizenId);
+        return true;
+    }
+
+    public static synchronized void releaseSpeechClaim(UUID citizenId) {
+        speechClaims.remove(citizenId);
     }
 
     /**
@@ -240,7 +268,6 @@ public class ConversationManager {
 
         UUID citizenId = citizen.getUUID();
 
-        // Busy guard: citizen already has any kind of active session
         if (isCitizenBusy(citizenId)) return;
 
         // Low-priority: refuse if doing so would evict a player session
@@ -249,20 +276,31 @@ public class ConversationManager {
             return;
         }
 
-        var client = new CitizenWsClient(citizen,
-                c -> {
-                    c.close();
-                    synchronized (ConversationManager.class) {
-                        if (clients.get(citizenId) == c) {
-                            clients.remove(citizenId);
-                            releaseSlot(citizenId);
+        if (!claimSpeech(citizenId, false)) {
+            releaseSlot(citizenId);
+            return;
+        }
+
+        try {
+            var client = new CitizenWsClient(citizen,
+                    c -> {
+                        c.close();
+                        synchronized (ConversationManager.class) {
+                            if (clients.get(citizenId) == c) {
+                                clients.remove(citizenId);
+                                releaseSlot(citizenId);
+                            }
                         }
-                    }
-                    // Record cooldown so this citizen won't be immediately re-selected
-                    recordCooldown(citizenId);
-                });
-        client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildPrompt(citizen));
-        clients.put(citizenId, client);
+                        // Record cooldown so this citizen won't be immediately re-selected
+                        recordCooldown(citizenId);
+                    });
+            client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildPrompt(citizen));
+            clients.put(citizenId, client);
+        } catch (RuntimeException e) {
+            releaseSpeechClaim(citizenId);
+            releaseSlot(citizenId);
+            throw e;
+        }
     }
 
     /**
@@ -286,19 +324,30 @@ public class ConversationManager {
             return;
         }
 
-        var client = new CitizenWsClient(citizen,
-                c -> {
-                    c.close();
-                    synchronized (ConversationManager.class) {
-                        if (clients.get(citizenId) == c) {
-                            clients.remove(citizenId);
-                            releaseSlot(citizenId);
+        if (!claimSpeech(citizenId, false)) {
+            releaseSlot(citizenId);
+            return;
+        }
+
+        try {
+            var client = new CitizenWsClient(citizen,
+                    c -> {
+                        c.close();
+                        synchronized (ConversationManager.class) {
+                            if (clients.get(citizenId) == c) {
+                                clients.remove(citizenId);
+                                releaseSlot(citizenId);
+                            }
                         }
-                    }
-                    recordCooldown(citizenId);
-                });
-        client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
-        clients.put(citizenId, client);
+                        recordCooldown(citizenId);
+                    });
+            client.addPromptTextAfterTalkingComplete(MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
+            clients.put(citizenId, client);
+        } catch (RuntimeException e) {
+            releaseSpeechClaim(citizenId);
+            releaseSlot(citizenId);
+            throw e;
+        }
     }
 
     /**
@@ -317,6 +366,11 @@ public class ConversationManager {
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
+        UUID existingPlayerId = citizenToPlayer.get(citizenId);
+        if (existingPlayerId != null && !existingPlayerId.equals(playerId)) {
+            endConversation(existingPlayerId, false);
+        }
+
         activeEntity.put(playerId, citizen);
         citizenToPlayer.put(citizenId, playerId);
 
@@ -333,11 +387,18 @@ public class ConversationManager {
                 // slot stays in addedEntities; claimSlot will see it already present
             }
 
+            claimSpeech(citizenId, true);
+
             // High-priority claim (may evict an older non-player slot if at capacity)
             claimSlot(citizenId, true);
-            clients.put(citizenId, new CitizenWsClient(
-                    new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
-                    citizen, player));
+            try {
+                clients.put(citizenId, new CitizenWsClient(
+                        new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
+                        citizen, player));
+            } catch (RuntimeException e) {
+                releaseSpeechClaim(citizenId);
+                throw e;
+            }
         }
 
         playerConversationPartners.put(playerId, citizenId);
@@ -357,6 +418,7 @@ public class ConversationManager {
         GeminiWsClient client = clients.remove(citizenId);
         if (client != null) client.close();
         releaseSlot(citizenId);
+        releaseSpeechClaim(citizenId);
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null && entity.isAlive()) {
@@ -422,6 +484,7 @@ public class ConversationManager {
         playerConversationPartners.clear();
         citizenToPlayer.clear();
         addedEntities.clear();
+        speechClaims.clear();
         lastSessionEndTime.clear();
     }
 }
