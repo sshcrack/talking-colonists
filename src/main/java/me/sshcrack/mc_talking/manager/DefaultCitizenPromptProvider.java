@@ -67,6 +67,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         StringBuilder prompt = new StringBuilder();
         prompt.append(getBasicCitizenInfoPrompt(view, firstPerson));
         List<String> activePositiveEvents = ColonyMoodEventTracker.getActivePositiveEvents(view.colonyId(), view.colonyDay());
+        List<String> activeNegativeEvents = ColonyMoodEventTracker.getActiveNegativeEvents(view.colonyId(), view.colonyDay());
         boolean hasMoodLift = !activePositiveEvents.isEmpty();
 
         if (view.skills() != null && !view.skills().isEmpty()) {
@@ -74,7 +75,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         addRelationships(view, prompt);
-        addCurrentState(view, prompt, view.sick(), activePositiveEvents);
+        addCurrentState(view, prompt, view.sick(), activePositiveEvents, activeNegativeEvents);
         addMemory(view, prompt);
 
         prompt.append("\n## EMOTIONAL PROFILE\n");
@@ -134,13 +135,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
-    private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick, List<String> activePositiveEvents) {
+    private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick, List<String> activePositiveEvents, List<String> activeNegativeEvents) {
         prompt.append("\n## CURRENT STATE\n");
         var memories = view.memories();
         var config = McTalkingConfig.INSTANCE.instance();
         boolean hasMoodLift = activePositiveEvents != null && !activePositiveEvents.isEmpty();
+        boolean hasMoodDrain = activeNegativeEvents != null && !activeNegativeEvents.isEmpty();
 
-        appendDetailedHappinessState(view, prompt, memories, view.colonyGameTime(), config, hasMoodLift);
+        appendDetailedHappinessState(view, prompt, memories, view.colonyGameTime(), config, hasMoodLift, hasMoodDrain);
 
         double saturation = view.saturation();
         if (saturation <= 1) {
@@ -179,6 +181,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         final CitizenStatusView status = view.status();
         if (status != null) {
             prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
+        }
+
+        if (hasMoodDrain) {
+            prompt.append("\n## RECENT COLONY CHALLENGES\n");
+            for (String moodEvent : activeNegativeEvents) {
+                prompt.append("- ").append(moodEvent).append("\n");
+            }
+            prompt.append("- These difficult times are weighing on everyone's morale.\n");
         }
 
         if (hasMoodLift) {
@@ -314,7 +324,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             CitizenMemories memories,
             long currentGameTime,
             McTalkingConfig config,
-            boolean hasMoodLift
+            boolean hasMoodLift,
+            boolean hasMoodDrain
     ) {
         double happiness = view.happiness();
 
@@ -329,6 +340,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         List<String> suppressedTopics = new ArrayList<>();
+        // Only suppress complaints if there's good news AND no bad news
+        boolean suppressComplaints = hasMoodLift && !hasMoodDrain;
+        
         for (var modifier : view.happinessModifiers()) {
             HappinessModifierType modifierType = modifier.type();
             double factor = modifier.factor();
@@ -342,7 +356,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    hasMoodLift,
+                                    suppressComplaints,
                                     modifierType,
                                     "- Distressed about housing situation\n",
                                     suppressedTopics
@@ -357,7 +371,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    hasMoodLift,
+                                    suppressComplaints,
                                     modifierType,
                                     "- Anxious about employment status\n",
                                     suppressedTopics
@@ -387,7 +401,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    hasMoodLift,
+                                    suppressComplaints,
                                     modifierType,
                                     "- Frustrated by lack of work to do\n",
                                     suppressedTopics
@@ -403,7 +417,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                         memories,
                                         currentGameTime,
                                         config,
-                                        hasMoodLift,
+                                        suppressComplaints,
                                         modifierType,
                                         "- Disappointed by lack of school activities\n",
                                         suppressedTopics
@@ -415,7 +429,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                         memories,
                                         currentGameTime,
                                         config,
-                                        hasMoodLift,
+                                        suppressComplaints,
                                         modifierType,
                                         "- Disappointed by lack of school in the colony\n",
                                         suppressedTopics
@@ -434,7 +448,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    hasMoodLift,
+                                    suppressComplaints,
                                     modifierType,
                                     "- Disappointed by lack of mystical experiences\n",
                                     suppressedTopics
@@ -468,7 +482,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    hasMoodLift,
+                                    suppressComplaints,
                                     modifierType,
                                     "- Feeling socially isolated\n",
                                     suppressedTopics
@@ -520,7 +534,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                     memories,
                                     currentGameTime,
                                     config,
-                                    hasMoodLift,
+                                    suppressComplaints,
                                     modifierType,
                                     "- Unhappy with food quality/variety\n",
                                     suppressedTopics

@@ -29,13 +29,24 @@ public class EventDescriptionManagerMixin {
             return;
         }
 
-        String line = buildPositiveMoodLine(event);
-        if (line == null) {
-            return;
-        }
+        String eventType = event.getEventTypeId().toString().toLowerCase();
+        String eventName = safeLower(event.getName());
+        String display = safeLower(event.toDisplayString());
+        String combined = eventType + " " + eventName + " " + display;
 
         int expiresAt = colony.getDay() + durationDays;
-        ColonyMoodEventTracker.recordPositiveEvent(colony.getID(), line, expiresAt);
+
+        if (looksPositive(combined)) {
+            String line = buildPositiveMoodLine(event);
+            if (line != null) {
+                ColonyMoodEventTracker.recordPositiveEvent(colony.getID(), line, expiresAt);
+            }
+        } else if (looksNegative(combined)) {
+            String line = buildNegativeMoodLine(event);
+            if (line != null) {
+                ColonyMoodEventTracker.recordNegativeEvent(colony.getID(), line, expiresAt);
+            }
+        }
     }
 
     private static String buildPositiveMoodLine(IColonyEventDescription event) {
@@ -67,6 +78,39 @@ public class EventDescriptionManagerMixin {
         return "The colony just had a positive development that people are still talking about.";
     }
 
+    private static String buildNegativeMoodLine(IColonyEventDescription event) {
+        String eventType = event.getEventTypeId().toString().toLowerCase();
+        String eventName = safeLower(event.getName());
+        String display = safeLower(event.toDisplayString());
+        String combined = eventType + " " + eventName + " " + display;
+
+        if (event instanceof IBuildingEventDescription buildingEvent) {
+            String buildingName = buildingEvent.getBuildingName();
+            if (buildingName != null && !buildingName.isBlank()) {
+                if (combined.contains("destroy") || combined.contains("burn")) {
+                    return "The " + buildingName + " was destroyed. The colony lost important infrastructure.";
+                } else if (combined.contains("fail")) {
+                    return "Work on the " + buildingName + " has failed. Materials and effort were wasted.";
+                }
+                return "Something went wrong with the " + buildingName + ".";
+            }
+        }
+
+        if (combined.contains("death") || combined.contains("died") || combined.contains("dead")) {
+            return "A citizen was lost. The colony grieves their passing.";
+        }
+
+        if (combined.contains("fail")) {
+            return "An important colony project failed. Citizens are discouraged.";
+        }
+
+        if (combined.contains("injur")) {
+            return "Some citizens were injured in an incident. The colony is concerned.";
+        }
+
+        return "The colony faced an unfortunate event that's weighing on everyone's mind.";
+    }
+
     private static boolean looksPositive(String text) {
         if (text == null || text.isBlank()) {
             return false;
@@ -93,6 +137,22 @@ public class EventDescriptionManagerMixin {
                 || text.contains("burn");
 
         return hasPositiveKeyword && !hasNegativeKeyword;
+    }
+
+    private static boolean looksNegative(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        return text.contains("fail")
+                || text.contains("failed")
+                || text.contains("death")
+                || text.contains("died")
+                || text.contains("dead")
+                || text.contains("lost")
+                || text.contains("injur")
+                || text.contains("destroy")
+                || text.contains("burn");
     }
 
     private static String safeLower(String value) {

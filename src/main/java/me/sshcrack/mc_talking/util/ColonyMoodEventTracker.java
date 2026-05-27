@@ -7,25 +7,42 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tracks short-lived positive colony events that should temporarily influence
+ * Tracks short-lived positive and negative colony events that should temporarily influence
  * citizen prompt mood for a limited number of in-game days.
  */
 public final class ColonyMoodEventTracker {
     private ColonyMoodEventTracker() {
     }
 
-    private static final Map<Integer, List<MoodEvent>> colonyEvents = new ConcurrentHashMap<>();
+    private static final Map<Integer, List<MoodEvent>> colonyPositiveEvents = new ConcurrentHashMap<>();
+    private static final Map<Integer, List<MoodEvent>> colonyNegativeEvents = new ConcurrentHashMap<>();
 
     public static void recordPositiveEvent(int colonyId, String promptLine, int expiresAtDay) {
         if (promptLine == null || promptLine.isBlank()) {
             return;
         }
-        colonyEvents.computeIfAbsent(colonyId, ignored -> new ArrayList<>())
+        colonyPositiveEvents.computeIfAbsent(colonyId, ignored -> new ArrayList<>())
+                .add(new MoodEvent(promptLine, expiresAtDay));
+    }
+
+    public static void recordNegativeEvent(int colonyId, String promptLine, int expiresAtDay) {
+        if (promptLine == null || promptLine.isBlank()) {
+            return;
+        }
+        colonyNegativeEvents.computeIfAbsent(colonyId, ignored -> new ArrayList<>())
                 .add(new MoodEvent(promptLine, expiresAtDay));
     }
 
     public static List<String> getActivePositiveEvents(int colonyId, int currentDay) {
-        List<MoodEvent> events = colonyEvents.get(colonyId);
+        return getActiveEvents(colonyPositiveEvents, colonyId, currentDay);
+    }
+
+    public static List<String> getActiveNegativeEvents(int colonyId, int currentDay) {
+        return getActiveEvents(colonyNegativeEvents, colonyId, currentDay);
+    }
+
+    private static List<String> getActiveEvents(Map<Integer, List<MoodEvent>> eventMap, int colonyId, int currentDay) {
+        List<MoodEvent> events = eventMap.get(colonyId);
         if (events == null || events.isEmpty()) {
             return List.of();
         }
@@ -42,7 +59,7 @@ public final class ColonyMoodEventTracker {
         }
 
         if (events.isEmpty()) {
-            colonyEvents.remove(colonyId);
+            eventMap.remove(colonyId);
         }
 
         return active;

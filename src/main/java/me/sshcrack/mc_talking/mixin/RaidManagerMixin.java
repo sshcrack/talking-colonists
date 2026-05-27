@@ -30,12 +30,24 @@ public class RaidManagerMixin {
         if (colony == null) return;
         int lostCitizens = ((RaidManager) (Object) this).getLostCitizen();
         RaidTraumaTracker.recordRaid(colony.getID(), lostCitizens);
+        
         int durationDays = McTalkingConfig.INSTANCE.instance().positiveEventMoodDurationDays;
-        if (durationDays > 0) {
-            String moodLine = lostCitizens <= 0
-                    ? "The colony just defeated raiders without losing anyone."
-                    : "The colony survived a raid and is rebuilding confidence together.";
-            ColonyMoodEventTracker.recordPositiveEvent(colony.getID(), moodLine, colony.getDay() + durationDays);
+        if (durationDays <= 0) {
+            return;
+        }
+
+        String raidDescription = buildRaidEventDescription(finishedRaid, lostCitizens);
+        
+        // Record raids as negative events since they're inherently stressful/traumatic,
+        // even if successfully defended against
+        ColonyMoodEventTracker.recordNegativeEvent(colony.getID(), raidDescription, colony.getDay() + durationDays);
+    }
+
+    private static String buildRaidEventDescription(IColonyRaidEvent raidEvent, int lostCitizens) {
+        if (lostCitizens > 0) {
+            return "Raid Event: " + lostCitizens + " " + (lostCitizens == 1 ? "citizen" : "citizens") + " lost in a raid. The colony defended but at great cost.";
+        } else {
+            return "Raid Event: The colony successfully defended against raiders without losing anyone, but the trauma remains.";
         }
     }
 }
