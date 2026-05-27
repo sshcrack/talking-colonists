@@ -110,6 +110,16 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Distance in blocks within which passing citizens will trigger their pregenerated greeting.")
     public double pregeneratedGreetingDistance = 3.0;
 
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 0, max = 60000)
+    @SerialEntry(comment = "Cooldown in milliseconds between threat pregeneration plays for a citizen. Set to 0 to disable.")
+    public int threatPlayCooldownMs = 15000;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 0, max = 100)
+    @SerialEntry(comment = "Maximum number of pregenerated greetings to store per citizen. Oldest greetings are discarded when limit is reached.")
+    public int maxPregeneratedGreetingsPerCitizen = 5;
+
     // Resource Management
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)

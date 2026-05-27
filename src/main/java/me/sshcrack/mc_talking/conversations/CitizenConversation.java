@@ -132,6 +132,12 @@ public class CitizenConversation {
         UUID idA = citizenA.getUUID();
         UUID idB = citizenB.getUUID();
 
+        if (citizenA.isSleeping() || citizenB.isSleeping()) {
+            McTalking.LOGGER.info("[LiveConv] One or both citizens are sleeping, aborting");
+            setState(ConversationState.ENDED);
+            return;
+        }
+
         // "Already busy" guard: abort if either citizen is already in any session
         if (ConversationManager.isCitizenBusy(idA) || ConversationManager.isCitizenBusy(idB)) {
             McTalking.LOGGER.info("[LiveConv] One or both citizens already busy, aborting");

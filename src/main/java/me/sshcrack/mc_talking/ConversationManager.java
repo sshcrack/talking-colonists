@@ -265,6 +265,7 @@ public class ConversationManager {
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (citizen.isSleeping()) return;
 
         UUID citizenId = citizen.getUUID();
 
@@ -314,6 +315,7 @@ public class ConversationManager {
      */
     public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (citizen.isSleeping()) return;
 
         UUID citizenId = citizen.getUUID();
 
@@ -362,6 +364,7 @@ public class ConversationManager {
                             .withStyle(ChatFormatting.RED));
             return;
         }
+        if (citizen.isSleeping()) return;
 
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();

@@ -128,6 +128,12 @@
   "yacl3.config.mc_talking:config.pregeneratedGreetingDistance": "Pregenerated Greeting Distance",
   "yacl3.config.mc_talking:config.pregeneratedGreetingDistance.desc": "Distance within which pregenerated greetings can be played. If a citizen has a pregenerated greeting and you come within this distance, the greeting will play automatically without needing to start a conversation.",
 
+  "yacl3.config.mc_talking:config.threatPlayCooldownMs": "Threat Play Cooldown (ms)",
+  "yacl3.config.mc_talking:config.threatPlayCooldownMs.desc": "Minimum time in milliseconds between automatic threat audio plays for the same citizen. Set to 0 to disable.",
+
+  "yacl3.config.mc_talking:config.maxPregeneratedGreetingsPerCitizen": "Max Pregenerated Greetings Per Citizen",
+  "yacl3.config.mc_talking:config.maxPregeneratedGreetingsPerCitizen.desc": "Maximum number of cached pregenerated greetings stored per citizen. Oldest greetings are discarded when this limit is reached.",
+
   "yacl3.config.mc_talking:config.category.citizens.group.voice_chat": "Voice Chat",
   "yacl3.config.mc_talking:config.citizenVoiceWhisper": "Citizen Voice Whisper",
   "yacl3.config.mc_talking:config.citizenVoiceWhisper.desc": "Marks the citizens voice channel as a whisper, which has a smaller default radius",

@@ -17,7 +17,6 @@ import java.util.UUID;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
-import me.sshcrack.mc_talking.pregen.PregenAudioCache;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenPlayback;
 
@@ -83,6 +82,7 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStop(ServerStoppingEvent event) {
+        PregenerationTaskService.cleanup();
         ConversationManager.cleanup();
     }
 
@@ -235,15 +235,16 @@ public class ServerEventHandler {
 
                     double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
                     if (distSq < triggerDist * triggerDist) {
-                        if (PregenAudioCache.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
-                            AudioChunk audio = PregenAudioCache.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
+                        if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
+                            AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
                             if (audio != null && !PregenPlayback.playAudio(citizenOne, audio)) {
-                                PregenAudioCache.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
+                                // put back if playback failed
+                                PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
                             }
-                        } else if (PregenAudioCache.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
-                            AudioChunk audio = PregenAudioCache.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
+                        } else if (PregenerationTaskService.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
+                            AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
                             if (audio != null && !PregenPlayback.playAudio(citizenTwo, audio)) {
-                                PregenAudioCache.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
+                                PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
                             }
                         }
                     }
@@ -437,17 +438,21 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
-    public void onLivingTargetChange(LivingChangeTargetEvent event) {
+    /*? if neoforge {*/
+    public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
-        if (event.getNewAboutToBeSetTarget() instanceof AbstractEntityCitizen citizen) {
-            if (PregenAudioCache.hasThreat(citizen.getUUID())) {
-                AudioChunk audio = PregenAudioCache.popThreat(citizen.getUUID());
-                if (audio != null && !PregenPlayback.playAudio(citizen, audio)) {
-                    PregenAudioCache.putThreat(citizen.getUUID(), audio);
-                }
-            } else {
-                PregenerationTaskService.playThreatNow(citizen);
-            }
-        }
+        if (!(event.getNewAboutToBeSetTarget() instanceof AbstractEntityCitizen citizen)) return;
+        if (citizen.isSleeping()) return;
+        // Pass the entity that just changed target (the attacker) so generated prompts can mention it
+        PregenerationTaskService.playThreatNow(citizen, event.getEntity());
     }
+    /*?}*/
+    /*? if forge {*/
+    /*public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
+        if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
+        if (!(event.getNewTarget() instanceof AbstractEntityCitizen citizen)) return;
+        if (citizen.isSleeping()) return;
+        PregenerationTaskService.playThreatNow(citizen);
+    }*/
+    /*?}*/
 }
