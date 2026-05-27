@@ -7,8 +7,10 @@ import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 
+import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+
 public class PregenPlayback {
-    public static void playAudio(AbstractEntityCitizen citizen, byte[] audioData) {
+    public static void playAudio(AbstractEntityCitizen citizen, AudioChunk audioData) {
         McTalking.LOGGER.info("Playing back pregenerated audio for {}", citizen.getCitizenData().getName());
         AudioProvider audioProvider = new CitzienEntityAudioProvider(citizen, null);
         AudioChannel channel = audioProvider.createChannel();
@@ -22,7 +24,7 @@ public class PregenPlayback {
             stream.setPitch(1.2f);
         }
 
-        stream.addGeminiPcmWithPitch(audioData, 48000);
+        stream.addGeminiPcmWithPitch(audioData.audioBytes(), audioData.sampleRate());
         stream.flushAudio();
 
         stream.setOnPause(stream::close);

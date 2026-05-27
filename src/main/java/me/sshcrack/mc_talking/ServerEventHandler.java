@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenAudioCache;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
@@ -231,10 +232,10 @@ public class ServerEventHandler {
                     double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
                     if (distSq < triggerDist * triggerDist) {
                         if (PregenAudioCache.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
-                            byte[] audio = PregenAudioCache.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
+                            AudioChunk audio = PregenAudioCache.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
                             PregenPlayback.playAudio(citizenOne, audio);
                         } else if (PregenAudioCache.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
-                            byte[] audio = PregenAudioCache.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
+                            AudioChunk audio = PregenAudioCache.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
                             PregenPlayback.playAudio(citizenTwo, audio);
                         }
                     }
@@ -439,7 +440,7 @@ public class ServerEventHandler {
         if (event.getNewTarget() instanceof AbstractEntityCitizen citizen) {*/
     /*?}*/
             if (PregenAudioCache.hasThreat(citizen.getUUID())) {
-                byte[] audio = PregenAudioCache.popThreat(citizen.getUUID());
+                AudioChunk audio = PregenAudioCache.popThreat(citizen.getUUID());
                 PregenPlayback.playAudio(citizen, audio);
             }
         }

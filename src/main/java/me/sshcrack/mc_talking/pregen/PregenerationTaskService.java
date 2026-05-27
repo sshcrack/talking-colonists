@@ -7,6 +7,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 
+import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+
 import java.util.List;
 
 public class PregenerationTaskService {
@@ -63,7 +65,7 @@ public class PregenerationTaskService {
         }
     }
 
-    private static void startPregen(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<byte[]> onComplete) {
+    private static void startPregen(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
         if (!ConversationManager.claimSlot(citizen.getUUID(), false)) {
             return;
         }

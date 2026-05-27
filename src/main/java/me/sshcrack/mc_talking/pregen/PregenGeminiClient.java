@@ -15,14 +15,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.function.Consumer;
 
+import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+import me.sshcrack.mc_talking.util.AudioHelper;
+
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
+
 public class PregenGeminiClient extends GeminiLiveClient {
     private final AbstractEntityCitizen entity;
     private final String promptText;
-    private final Consumer<byte[]> onComplete;
+    private final Consumer<AudioChunk> onComplete;
     private final Runnable onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
 
-    public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<byte[]> onComplete, Runnable onError) {
+    public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.promptText = promptText;
@@ -65,10 +71,20 @@ public class PregenGeminiClient extends GeminiLiveClient {
         send(ClientMessages.input(input));
     }
 
+    private byte[] resampleToTarget(byte[] data, int currentRate) {
+        if (currentRate == TARGET_SAMPLE_RATE) return data;
+
+        short[] shorts = vcApi.getAudioConverter().bytesToShorts(data);
+        short[] resampled = AudioHelper.resampleAudio(shorts, currentRate, TARGET_SAMPLE_RATE);
+
+        return vcApi.getAudioConverter().shortsToBytes(resampled);
+    }
+
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
+        byte[] processed = resampleToTarget(data, sampleRate);
         try {
-            audioBuffer.write(data);
+            audioBuffer.write(processed);
         } catch (IOException e) {
             McTalking.LOGGER.error("Failed to write pregenerated audio", e);
         }
@@ -78,7 +94,7 @@ public class PregenGeminiClient extends GeminiLiveClient {
     public void onTurnComplete() {
         byte[] audioData = audioBuffer.toByteArray();
         if (audioData.length > 0) {
-            onComplete.accept(audioData);
+            onComplete.accept(new AudioChunk(audioData, TARGET_SAMPLE_RATE));
         }
         close();
     }
