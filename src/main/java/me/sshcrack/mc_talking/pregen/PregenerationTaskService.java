@@ -1,6 +1,8 @@
 package me.sshcrack.mc_talking.pregen;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.McTalking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -33,7 +35,7 @@ public class PregenerationTaskService {
                     });
                     return;
                 }
-                
+
                 // Check if we need greeting for c2 -> c1
                 if (!PregenAudioCache.hasGreeting(c2.getUUID(), c1.getUUID())) {
                     startPregen(c2, "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".", (audio) -> {
@@ -62,16 +64,27 @@ public class PregenerationTaskService {
     }
 
     private static void startPregen(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<byte[]> onComplete) {
+        if (!ConversationManager.claimSlot(citizen.getUUID(), false)) {
+            return;
+        }
         isGenerating = true;
-        PregenGeminiClient client = new PregenGeminiClient(citizen, prompt, onComplete);
+        McTalking.LOGGER.info("[Pregeneration] Starting audio pregeneration for citizen {}", citizen.getUUID());
+
+        PregenGeminiClient client = new PregenGeminiClient(citizen, prompt, (audio) -> {
+            ConversationManager.releaseSlot(citizen.getUUID());
+            onComplete.accept(audio);
+        }, () -> {
+            isGenerating = false;
+            ConversationManager.releaseSlot(citizen.getUUID());
+        });
         client.connect();
     }
 
     private static AbstractEntityCitizen findCitizen(MinecraftServer server, java.util.UUID uuid) {
         for (ServerLevel level : server.getAllLevels()) {
             Entity entity = level.getEntity(uuid);
-            if (entity instanceof AbstractEntityCitizen) {
-                return (AbstractEntityCitizen) entity;
+            if (entity instanceof AbstractEntityCitizen citizen) {
+                return citizen;
             }
         }
         return null;

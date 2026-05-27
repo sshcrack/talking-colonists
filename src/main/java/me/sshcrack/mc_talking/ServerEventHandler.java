@@ -153,7 +153,7 @@ public class ServerEventHandler {
                 if (citizenId != null) {
                     checkConversationDistance(player, citizenId);
                 }
-                
+
                 if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
                     checkProximityAndGreetings(player);
                 }
@@ -217,25 +217,25 @@ public class ServerEventHandler {
         var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
         for (int i = 0; i < citizens.size(); i++) {
-            AbstractEntityCitizen c1 = citizens.get(i);
-            if (c1 instanceof VisitorCitizen || c1.isSleeping()) continue;
+            AbstractEntityCitizen citizenOne = citizens.get(i);
+            if (citizenOne instanceof VisitorCitizen || citizenOne.isSleeping()) continue;
 
             for (int j = i + 1; j < citizens.size(); j++) {
-                AbstractEntityCitizen c2 = citizens.get(j);
-                if (c2 instanceof VisitorCitizen || c2.isSleeping()) continue;
+                AbstractEntityCitizen citizenTwo = citizens.get(j);
+                if (citizenTwo instanceof VisitorCitizen || citizenTwo.isSleeping()) continue;
 
-                double distSq = c1.distanceToSqr(c2);
+                double distSq = citizenOne.distanceToSqr(citizenTwo);
                 if (distSq < 25.0) {
-                    HeatmapTracker.recordProximity(c1.getUUID(), c2.getUUID());
+                    HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
 
                     double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
                     if (distSq < triggerDist * triggerDist) {
-                        if (PregenAudioCache.hasGreeting(c1.getUUID(), c2.getUUID())) {
-                            byte[] audio = PregenAudioCache.popGreeting(c1.getUUID(), c2.getUUID());
-                            PregenPlayback.playAudio(c1, audio);
-                        } else if (PregenAudioCache.hasGreeting(c2.getUUID(), c1.getUUID())) {
-                            byte[] audio = PregenAudioCache.popGreeting(c2.getUUID(), c1.getUUID());
-                            PregenPlayback.playAudio(c2, audio);
+                        if (PregenAudioCache.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
+                            byte[] audio = PregenAudioCache.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
+                            PregenPlayback.playAudio(citizenOne, audio);
+                        } else if (PregenAudioCache.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
+                            byte[] audio = PregenAudioCache.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
+                            PregenPlayback.playAudio(citizenTwo, audio);
                         }
                     }
                 }

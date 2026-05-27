@@ -102,6 +102,7 @@ public class ConversationManager {
 
         if (addedEntities.size() < max) {
             addedEntities.add(entityId);
+            McTalking.LOGGER.info("[ConversationManager] Reserved slot for entity {} (Player: {})", entityId, isPlayerConversation);
             return true;
         }
 
@@ -122,6 +123,7 @@ public class ConversationManager {
 
         evict(victim);
         addedEntities.add(entityId);
+        McTalking.LOGGER.info("[ConversationManager] Reserved slot for entity {} after eviction (Player: {})", entityId, isPlayerConversation);
         return true;
     }
 
@@ -130,7 +132,9 @@ public class ConversationManager {
      * Use when the client is already closed externally.
      */
     public static synchronized void releaseSlot(UUID entityId) {
-        addedEntities.remove(entityId);
+        if (addedEntities.remove(entityId)) {
+            McTalking.LOGGER.info("[ConversationManager] Freed slot for entity {}", entityId);
+        }
     }
 
     /**

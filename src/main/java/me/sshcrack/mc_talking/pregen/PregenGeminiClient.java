@@ -19,13 +19,15 @@ public class PregenGeminiClient extends GeminiLiveClient {
     private final AbstractEntityCitizen entity;
     private final String promptText;
     private final Consumer<byte[]> onComplete;
+    private final Runnable onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
 
-    public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<byte[]> onComplete) {
+    public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<byte[]> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.promptText = promptText;
         this.onComplete = onComplete;
+        this.onError = onError;
     }
 
     @Override
@@ -99,12 +101,14 @@ public class PregenGeminiClient extends GeminiLiveClient {
     @Override
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded during audio pregeneration");
+        if (onError != null) onError.run();
         close();
     }
 
     @Override
     public void onError(Exception ex) {
         McTalking.LOGGER.error("Error during pregeneration", ex);
+        if (onError != null) onError.run();
         close();
     }
 
