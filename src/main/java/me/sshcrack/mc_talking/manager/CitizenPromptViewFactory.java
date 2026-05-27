@@ -24,6 +24,7 @@ import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
@@ -36,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
 import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
@@ -50,6 +52,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
 import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -178,11 +181,35 @@ public final class CitizenPromptViewFactory {
 
             if (armorValue > 0) {
                 int wornPieces = 0;
-                if (!speakingTo.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) wornPieces++;
-                if (!speakingTo.getItemBySlot(EquipmentSlot.CHEST).isEmpty()) wornPieces++;
-                if (!speakingTo.getItemBySlot(EquipmentSlot.LEGS).isEmpty()) wornPieces++;
-                if (!speakingTo.getItemBySlot(EquipmentSlot.FEET).isEmpty()) wornPieces++;
+                float bestToughness = 0;
+                String bestArmorName = "";
+
+                EquipmentSlot[] toCheck = {
+                        EquipmentSlot.HEAD,
+                        EquipmentSlot.BODY,
+                        EquipmentSlot.LEGS,
+                        EquipmentSlot.FEET
+                };
+
+                for (EquipmentSlot slot : toCheck) {
+                    ItemStack itemStack = speakingTo.getItemBySlot(slot);
+                    if (itemStack.isEmpty())
+                        continue;
+
+                    if (itemStack.getItem() instanceof ArmorItem armor) {
+                        float toughness = armor.getToughness();
+                        if (toughness > bestToughness) {
+                            bestToughness = toughness;
+                            bestArmorName = itemStack.getDisplayName().getString();
+                        }
+                    }
+
+                    wornPieces++;
+                }
+
                 ps.append(", wearing ").append(wornPieces).append(" armor pieces");
+                if (!bestArmorName.isEmpty())
+                    ps.append(String.format(" (best: %s)", bestArmorName));
             } else {
                 ps.append(", no armor");
             }
@@ -367,9 +394,9 @@ public final class CitizenPromptViewFactory {
     }
 
     private static String describeTime(long dayTime) {
-        if (dayTime < 1000)  return "early morning (sunrise)";
-        if (dayTime < 6000)  return "morning";
-        if (dayTime < 9000)  return "midday";
+        if (dayTime < 1000) return "early morning (sunrise)";
+        if (dayTime < 6000) return "morning";
+        if (dayTime < 9000) return "midday";
         if (dayTime < 12000) return "afternoon";
         if (dayTime < 13000) return "sunset";
         if (dayTime < 18000) return "night";
