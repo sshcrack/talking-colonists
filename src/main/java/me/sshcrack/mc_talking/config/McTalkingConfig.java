@@ -99,6 +99,17 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How often (in server ticks) to check for random citizen conversations. 20 ticks = 1 second")
     public int randomConversationCheckIntervalTicks = 400;
 
+    // Pregeneration
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @TickBox
+    @SerialEntry(comment = "If true, the mod will pregenerate audio for citizen greetings and threats in the background to reduce audio latency.")
+    public boolean enablePregeneration = true;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @DoubleField(min = 1.0, max = 20.0)
+    @SerialEntry(comment = "Distance in blocks within which passing citizens will trigger their pregenerated greeting.")
+    public double pregeneratedGreetingDistance = 3.0;
+
     // Resource Management
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)

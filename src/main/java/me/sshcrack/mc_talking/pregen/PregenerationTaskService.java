@@ -1,0 +1,79 @@
+package me.sshcrack.mc_talking.pregen;
+
+import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+
+import java.util.List;
+
+public class PregenerationTaskService {
+    private static boolean isGenerating = false;
+    private static int tickCounter = 0;
+
+    public static void tick(MinecraftServer server) {
+        tickCounter++;
+        if (tickCounter % 200 != 0) return; // Check every 10 seconds
+
+        HeatmapTracker.decayScores();
+
+        if (isGenerating) return;
+
+        List<HeatmapTracker.UUIDPair> topPairs = HeatmapTracker.getTopPairs(5);
+        for (HeatmapTracker.UUIDPair pair : topPairs) {
+            AbstractEntityCitizen c1 = findCitizen(server, pair.id1);
+            AbstractEntityCitizen c2 = findCitizen(server, pair.id2);
+
+            if (c1 != null && c2 != null) {
+                // Check if we need greeting for c1 -> c2
+                if (!PregenAudioCache.hasGreeting(c1.getUUID(), c2.getUUID())) {
+                    startPregen(c1, "Generate a brief 1-sentence passing greeting for your friend " + c2.getCitizenData().getName() + ".", (audio) -> {
+                        PregenAudioCache.putGreeting(c1.getUUID(), c2.getUUID(), audio);
+                        isGenerating = false;
+                    });
+                    return;
+                }
+                
+                // Check if we need greeting for c2 -> c1
+                if (!PregenAudioCache.hasGreeting(c2.getUUID(), c1.getUUID())) {
+                    startPregen(c2, "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".", (audio) -> {
+                        PregenAudioCache.putGreeting(c2.getUUID(), c1.getUUID(), audio);
+                        isGenerating = false;
+                    });
+                    return;
+                }
+            }
+        }
+
+        // Threat pregeneration: iterate through all active citizens
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof AbstractEntityCitizen citizen) {
+                    if (!PregenAudioCache.hasThreat(citizen.getUUID())) {
+                        startPregen(citizen, "Generate a brief 1-sentence panic or cry for help because you are being attacked by a monster.", (audio) -> {
+                            PregenAudioCache.putThreat(citizen.getUUID(), audio);
+                            isGenerating = false;
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private static void startPregen(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<byte[]> onComplete) {
+        isGenerating = true;
+        PregenGeminiClient client = new PregenGeminiClient(citizen, prompt, onComplete);
+        client.connect();
+    }
+
+    private static AbstractEntityCitizen findCitizen(MinecraftServer server, java.util.UUID uuid) {
+        for (ServerLevel level : server.getAllLevels()) {
+            Entity entity = level.getEntity(uuid);
+            if (entity instanceof AbstractEntityCitizen) {
+                return (AbstractEntityCitizen) entity;
+            }
+        }
+        return null;
+    }
+}

@@ -15,6 +15,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import me.sshcrack.mc_talking.pregen.HeatmapTracker;
+import me.sshcrack.mc_talking.pregen.PregenAudioCache;
+import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
+import me.sshcrack.mc_talking.pregen.PregenPlayback;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /*? if neoforge {*/
@@ -24,6 +29,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -34,6 +40,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
+import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
@@ -146,6 +153,10 @@ public class ServerEventHandler {
                 if (citizenId != null) {
                     checkConversationDistance(player, citizenId);
                 }
+                
+                if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
+                    checkProximityAndGreetings(player);
+                }
             }
 
             // Mumbling: only if this player is NOT in a conversation
@@ -162,6 +173,10 @@ public class ServerEventHandler {
         // Random citizen-to-citizen conversations (once per interval, not per player)
         if (doRandomConvCheck) {
             checkForRandomConversations(server);
+        }
+
+        if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
+            PregenerationTaskService.tick(server);
         }
     }
 
@@ -193,6 +208,38 @@ public class ServerEventHandler {
         double distanceSquared = player.distanceToSqr(activeEntity);
         if (distanceSquared > McTalkingConfig.INSTANCE.instance().maxConversationDistance * McTalkingConfig.INSTANCE.instance().maxConversationDistance) {
             ConversationManager.endConversation(player.getUUID(), true);
+        }
+    }
+
+    private void checkProximityAndGreetings(ServerPlayer player) {
+        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+        var aabb = player.getBoundingBox().inflate(range);
+        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
+
+        for (int i = 0; i < citizens.size(); i++) {
+            AbstractEntityCitizen c1 = citizens.get(i);
+            if (c1 instanceof VisitorCitizen || c1.isSleeping()) continue;
+
+            for (int j = i + 1; j < citizens.size(); j++) {
+                AbstractEntityCitizen c2 = citizens.get(j);
+                if (c2 instanceof VisitorCitizen || c2.isSleeping()) continue;
+
+                double distSq = c1.distanceToSqr(c2);
+                if (distSq < 25.0) {
+                    HeatmapTracker.recordProximity(c1.getUUID(), c2.getUUID());
+
+                    double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
+                    if (distSq < triggerDist * triggerDist) {
+                        if (PregenAudioCache.hasGreeting(c1.getUUID(), c2.getUUID())) {
+                            byte[] audio = PregenAudioCache.popGreeting(c1.getUUID(), c2.getUUID());
+                            PregenPlayback.playAudio(c1, audio);
+                        } else if (PregenAudioCache.hasGreeting(c2.getUUID(), c1.getUUID())) {
+                            byte[] audio = PregenAudioCache.popGreeting(c2.getUUID(), c1.getUUID());
+                            PregenPlayback.playAudio(c2, audio);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -376,6 +423,24 @@ public class ServerEventHandler {
 
                 // Only start one random conversation per check to keep API usage bounded
                 return;
+            }
+        }
+    }
+
+    @SubscribeEvent
+    /*? if neoforge {*/
+    public void onLivingTargetChange(LivingChangeTargetEvent event) {
+        if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
+        if (event.getNewAboutToBeSetTarget() instanceof AbstractEntityCitizen citizen) {
+    /*?}*/
+    /*? if forge {*/
+    /*public void onLivingTargetChange(LivingChangeTargetEvent event) {
+        if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
+        if (event.getNewTarget() instanceof AbstractEntityCitizen citizen) {*/
+    /*?}*/
+            if (PregenAudioCache.hasThreat(citizen.getUUID())) {
+                byte[] audio = PregenAudioCache.popThreat(citizen.getUUID());
+                PregenPlayback.playAudio(citizen, audio);
             }
         }
     }
