@@ -70,7 +70,17 @@ public class PregenerationTaskService {
         // stale attacker-specific messages and reduces storage of threat clips.
     }
 
+    private static boolean hasGeminiApiKey() {
+        return McTalkingConfig.geminiApiKey != null
+                && McTalkingConfig.geminiApiKey.get() != null
+                && !McTalkingConfig.geminiApiKey.get().trim().isEmpty();
+    }
+
     private static void startPregenIfPossible(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
+        if (!hasGeminiApiKey()) {
+            return;
+        }
+
         if (!ConversationManager.hasLowPriorityCapacity(1))
             return;
 
