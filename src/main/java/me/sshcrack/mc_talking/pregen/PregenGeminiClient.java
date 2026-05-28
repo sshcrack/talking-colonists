@@ -95,6 +95,9 @@ public class PregenGeminiClient extends GeminiLiveClient {
         byte[] audioData = audioBuffer.toByteArray();
         if (audioData.length > 0) {
             onComplete.accept(new AudioChunk(audioData, TARGET_SAMPLE_RATE));
+        } else {
+            McTalking.LOGGER.warn("Pregeneration completed without producing audio");
+            if (onError != null) onError.run();
         }
         close();
     }
