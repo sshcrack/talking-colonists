@@ -109,14 +109,25 @@ public class PregenerationTaskService {
             return;
         }
 
+        McTalking.LOGGER.info("Generating new threat audio for citizen {}, difference is {}", citizen.getUUID(), lastPlay == null ? "null" : now - lastPlay);
         // Build attacker-aware prompt
         String attackerName = (attacker != null) ? attacker.getName().getString() : null;
         String prompt;
-        if (attackerName != null && !attackerName.isEmpty()) {
-            prompt = "Generate a brief 1-sentence panic or cry for help because you are being attacked by " + attackerName + ".";
+        if (citizen.getCitizenData().getJob().isGuard()) {
+            if (attackerName != null && !attackerName.isEmpty()) {
+                prompt = "Generate a brief 1-sentence exclaim because you are fighting a " + attackerName + " as a guard right now and are helping your fellow colonists";
+            } else {
+                prompt = "Generate a brief 1-sentence exclaim because you are defending your fellow colonists as a guard from a monster";
+            }
         } else {
-            prompt = "Generate a brief 1-sentence panic or cry for help because you are being attacked by a monster.";
+            if (attackerName != null && !attackerName.isEmpty()) {
+                prompt = "Generate a brief 1-sentence panic or cry for help because you are being attacked by " + attackerName + ".";
+            } else {
+                prompt = "Generate a brief 1-sentence panic or cry for help because you are being attacked by a monster.";
+            }
         }
+
+        lastThreatPlayTime.put(citizen.getUUID(), System.currentTimeMillis());
 
         // Generate on-demand (no caching). On completion, attempt immediate playback and update cooldown.
         startPregenIfPossible(citizen, prompt, audio -> {
@@ -125,6 +136,8 @@ public class PregenerationTaskService {
             boolean played = PregenPlayback.playAudioIfPossible(citizen, audio);
             if (played) {
                 lastThreatPlayTime.put(citizen.getUUID(), playedAt);
+            } else {
+                lastThreatPlayTime.remove(citizen.getUUID());
             }
 
             isGenerating = false;
