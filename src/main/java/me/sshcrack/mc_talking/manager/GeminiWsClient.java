@@ -28,12 +28,21 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     private static final int MAX_UNRECOGNIZED_CLOSE_RETRIES = 5;
+    private static final ScheduledExecutorService RECONNECT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "mc_talking_ws_reconnect");
+        t.setDaemon(true);
+        return t;
+    });
 
     private enum WsSessionState {
         NEW,
@@ -54,10 +63,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private boolean hasMadeInitialConnection = false;
     private long nextReconnectAllowedAt = 0;
     private int reconnectAttempts = 0;
-    private boolean reconnectScheduled = false;
-    private boolean intentionalClose = false;
+    private volatile boolean reconnectScheduled = false;
+    private volatile boolean intentionalClose = false;
     private int unrecognizedCloseRetryCount = 0;
-    private WsSessionState wsSessionState = WsSessionState.NEW;
+    private volatile WsSessionState wsSessionState = WsSessionState.NEW;
+    @Nullable
+    private ScheduledFuture<?> reconnectFuture;
     protected boolean generationComplete = false;
     /**
      * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
@@ -167,20 +178,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (remaining > 0) {
             if (!reconnectScheduled) {
                 reconnectScheduled = true;
-                Thread delayedReconnect = new Thread(() -> {
-                    try {
-                        Thread.sleep(remaining);
-                    } catch (InterruptedException ignored) {
-                    }
+                reconnectFuture = RECONNECT_EXECUTOR.schedule(() -> {
                     synchronized (GeminiWsClient.this) {
                         reconnectScheduled = false;
+                        reconnectFuture = null;
                         if (!canAttemptRecovery() || GeminiWsClient.this.isOpen()) return;
                         McTalking.LOGGER.warn("Connection lost, attempting delayed reconnect...");
                         reconnect();
                     }
-                }, "mc_talking_ws_reconnect");
-                delayedReconnect.setDaemon(true);
-                delayedReconnect.start();
+                }, remaining, TimeUnit.MILLISECONDS);
             }
             return;
         }
@@ -490,8 +496,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onSetupComplete() {
         reconnectAttempts = 0;
         unrecognizedCloseRetryCount = 0;
-        reconnectScheduled = false;
-        nextReconnectAllowedAt = 0;
+        synchronized (this) {
+            reconnectScheduled = false;
+            if (reconnectFuture != null) {
+                reconnectFuture.cancel(false);
+                reconnectFuture = null;
+            }
+            nextReconnectAllowedAt = 0;
+        }
         setWsSessionState(WsSessionState.ACTIVE, "setup complete");
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
 
@@ -684,9 +696,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void close() {
-        intentionalClose = true;
-        reconnectScheduled = false;
-        setWsSessionState(WsSessionState.CLOSED, "close()");
+        synchronized (this) {
+            intentionalClose = true;
+            reconnectScheduled = false;
+            if (reconnectFuture != null) {
+                reconnectFuture.cancel(false);
+                reconnectFuture = null;
+            }
+            setWsSessionState(WsSessionState.CLOSED, "close()");
+        }
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         super.close();
         stream.close();
