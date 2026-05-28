@@ -52,7 +52,7 @@ public class PregenerationTaskService {
                         putGreeting(c1.getUUID(), c2.getUUID(), audio);
                         isGenerating = false;
                     });
-                    continue;
+                    return;
                 }
 
                 // Check if we need greeting for c2 -> c1
@@ -61,6 +61,7 @@ public class PregenerationTaskService {
                         putGreeting(c2.getUUID(), c1.getUUID(), audio);
                         isGenerating = false;
                     });
+                    return;
                 }
             }
         }
