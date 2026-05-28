@@ -238,7 +238,10 @@ public class ConversationManager {
     }
 
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, boolean isPlayerRequest) {
-        return !citizen.isSleeping() && !(citizen instanceof VisitorCitizen) && !isCitizenOnCooldown(citizen) && (isPlayerRequest || !isCitizenBusy(citizen));
+        return !citizen.isSleeping()
+                && !(citizen instanceof VisitorCitizen)
+                && (isPlayerRequest || !isCitizenOnCooldown(citizen))
+                && (isPlayerRequest || !isCitizenBusy(citizen));
     }
 
 
