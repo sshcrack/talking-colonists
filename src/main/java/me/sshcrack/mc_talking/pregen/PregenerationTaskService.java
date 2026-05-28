@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -101,6 +102,9 @@ public class PregenerationTaskService {
             return;
         }
 
+        if (citizen.getCitizenData() == null)
+            return;
+
         long now = System.currentTimeMillis();
         int cfg = McTalkingConfig.INSTANCE.instance().threatPlayCooldownMs;
         long cooldownMs = Math.max(0, cfg);
@@ -113,8 +117,7 @@ public class PregenerationTaskService {
         // Build attacker-aware prompt
         String attackerName = (attacker != null) ? attacker.getName().getString() : null;
         String prompt;
-        var job = citizen.getCitizenData().getJob();
-        if (job != null && job.isGuard()) {
+        if (CitizenHelper.isCitizenGuard(citizen)) {
             if (attackerName != null && !attackerName.isEmpty()) {
                 prompt = "Generate a brief 1-sentence exclaim because you are fighting a " + attackerName + " as a guard right now and are helping your fellow colonists";
             } else {

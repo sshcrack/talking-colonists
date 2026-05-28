@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -410,14 +411,6 @@ public class ServerEventHandler {
         }
     }
 
-    private boolean isCitizenGuard(AbstractEntityCitizen citizen) {
-        var job = citizen.getCitizenData().getJob();
-        if(job == null)
-            return false;
-
-        return job.isGuard();
-    }
-
     @SubscribeEvent
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
@@ -430,7 +423,7 @@ public class ServerEventHandler {
         /*?}*/
 
         if (newTarget instanceof AbstractEntityCitizen citizen
-                && !isCitizenGuard(citizen)) {
+                && !CitizenHelper.isCitizenGuard(citizen)) {
             // Pass the entity that just changed target (the attacker) so generated prompts can mention it
             PregenerationTaskService.playThreatNow(citizen, event.getEntity());
         }

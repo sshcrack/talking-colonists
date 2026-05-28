@@ -3,11 +3,13 @@ package me.sshcrack.mc_talking.mixin;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.ai.workers.guard.AbstractEntityAIGuard;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
+import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -23,7 +25,7 @@ public abstract class AbstractEntityAIGuardMixin {
         if (!canHelp(attacker.blockPosition()))
             return;
 
-        if(!shouldGuardRespondToThreat(attacker))
+        if (!mc_talking$shouldGuardRespondToThreat(attacker))
             return;
 
 
@@ -32,13 +34,15 @@ public abstract class AbstractEntityAIGuardMixin {
     }
 
 
-    private static boolean shouldGuardRespondToThreat(LivingEntity threat) {
+    @Unique
+    private static boolean mc_talking$shouldGuardRespondToThreat(LivingEntity threat) {
         if (!(threat instanceof Mob hostile)) {
             return false;
         }
 
         LivingEntity attackedTarget = hostile.getTarget();
-        return attackedTarget instanceof AbstractEntityCitizen attackedCitizen
-                && !attackedCitizen.getCitizenData().getJob().isGuard();
+        if (!(attackedTarget instanceof AbstractEntityCitizen attackedCitizen))
+            return false;
+        return !CitizenHelper.isCitizenGuard(attackedCitizen);
     }
 }
