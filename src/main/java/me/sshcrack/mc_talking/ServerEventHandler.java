@@ -410,6 +410,14 @@ public class ServerEventHandler {
         }
     }
 
+    private boolean isCitizenGuard(AbstractEntityCitizen citizen) {
+        var job = citizen.getCitizenData().getJob();
+        if(job == null)
+            return false;
+
+        return job.isGuard();
+    }
+
     @SubscribeEvent
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
@@ -421,27 +429,11 @@ public class ServerEventHandler {
         LivingEntity newTarget = event.getNewAboutToBeSetTarget();
         /*?}*/
 
-        if (event.getEntity() instanceof AbstractEntityCitizen guard
-                && guard.getCitizenData().getJob().isGuard()
-                && shouldGuardRespondToThreat(newTarget)) {
-            PregenerationTaskService.playThreatNow(guard, newTarget);
-            return;
-        }
-
         if (newTarget instanceof AbstractEntityCitizen citizen
-                && !citizen.getCitizenData().getJob().isGuard()) {
+                && !isCitizenGuard(citizen)) {
             // Pass the entity that just changed target (the attacker) so generated prompts can mention it
             PregenerationTaskService.playThreatNow(citizen, event.getEntity());
         }
     }
 
-    private static boolean shouldGuardRespondToThreat(LivingEntity threat) {
-        if (!(threat instanceof Mob hostile)) {
-            return false;
-        }
-
-        LivingEntity attackedTarget = hostile.getTarget();
-        return attackedTarget instanceof AbstractEntityCitizen attackedCitizen
-                && !attackedCitizen.getCitizenData().getJob().isGuard();
-    }
 }

@@ -113,7 +113,8 @@ public class PregenerationTaskService {
         // Build attacker-aware prompt
         String attackerName = (attacker != null) ? attacker.getName().getString() : null;
         String prompt;
-        if (citizen.getCitizenData().getJob().isGuard()) {
+        var job = citizen.getCitizenData().getJob();
+        if (job != null && job.isGuard()) {
             if (attackerName != null && !attackerName.isEmpty()) {
                 prompt = "Generate a brief 1-sentence exclaim because you are fighting a " + attackerName + " as a guard right now and are helping your fellow colonists";
             } else {
