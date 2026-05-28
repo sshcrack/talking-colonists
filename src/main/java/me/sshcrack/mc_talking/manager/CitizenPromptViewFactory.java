@@ -186,7 +186,7 @@ public final class CitizenPromptViewFactory {
 
                 EquipmentSlot[] toCheck = {
                         EquipmentSlot.HEAD,
-                        EquipmentSlot.BODY,
+                        EquipmentSlot.CHEST,
                         EquipmentSlot.LEGS,
                         EquipmentSlot.FEET
                 };
