@@ -45,7 +45,13 @@ public record CitizenPromptView(
         /** Built-in personality archetype, or {@code null} if a custom one is active */
         @Nullable PersonalityArchetype personality,
         /** Freeform custom personality text, or {@code null} if a built-in is active */
-        @Nullable String customPersonalityText
+        @Nullable String customPersonalityText,
+        /** Description of the speaking player's health and armor, e.g. "healthy (20/20 HP) wearing iron armor" */
+        @Nullable String playerState,
+        /** Description of the current environment, e.g. "It is midday and sunny." */
+        @Nullable String environment,
+        /** Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none */
+        @Nullable List<String> activeItemRequests
 ) {
 }
 

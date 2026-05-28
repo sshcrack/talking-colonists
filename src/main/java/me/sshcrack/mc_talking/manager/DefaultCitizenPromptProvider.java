@@ -70,6 +70,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         addRelationships(view, prompt);
         addCurrentState(view, prompt, view.sick());
+        addObservations(view, prompt);
         addMemory(view, prompt);
 
         prompt.append("\n## EMOTIONAL PROFILE\n");
@@ -125,6 +126,26 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
+    private void addObservations(@NotNull CitizenPromptView view, StringBuilder prompt) {
+        StringBuilder obs = new StringBuilder();
+
+        if (view.playerState() != null) {
+            obs.append("- The player you are speaking to appears ").append(view.playerState()).append("\n");
+        }
+
+        if (view.activeItemRequests() != null && !view.activeItemRequests().isEmpty()) {
+            obs.append("- You are currently waiting for:\n");
+            for (String req : view.activeItemRequests()) {
+                obs.append("  - ").append(req).append("\n");
+            }
+            obs.append("- Since you need these materials, naturally mention what you are waiting for if the player asks how you are doing.\n");
+        }
+
+        if (!obs.isEmpty()) {
+            prompt.append("\n## OBSERVATIONS\n").append(obs);
+        }
+    }
+
     private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick) {
         prompt.append("\n## CURRENT STATE\n");
 
@@ -167,6 +188,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         final CitizenStatusView status = view.status();
         if (status != null) {
             prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
+        }
+
+        if (view.environment() != null) {
+            prompt.append("- ").append(view.environment()).append("\n");
         }
 
         // Post-raid trauma
