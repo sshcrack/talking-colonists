@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -420,8 +421,27 @@ public class ServerEventHandler {
         LivingEntity newTarget = event.getNewAboutToBeSetTarget();
         /*?}*/
 
-        if (!(newTarget instanceof AbstractEntityCitizen citizen)) return;
-        // Pass the entity that just changed target (the attacker) so generated prompts can mention it
-        PregenerationTaskService.playThreatNow(citizen, event.getEntity());
+        if (event.getEntity() instanceof AbstractEntityCitizen guard
+                && guard.getCitizenData().getJob().isGuard()
+                && shouldGuardRespondToThreat(newTarget)) {
+            PregenerationTaskService.playThreatNow(guard, newTarget);
+            return;
+        }
+
+        if (newTarget instanceof AbstractEntityCitizen citizen
+                && !citizen.getCitizenData().getJob().isGuard()) {
+            // Pass the entity that just changed target (the attacker) so generated prompts can mention it
+            PregenerationTaskService.playThreatNow(citizen, event.getEntity());
+        }
+    }
+
+    private static boolean shouldGuardRespondToThreat(LivingEntity threat) {
+        if (!(threat instanceof Mob hostile)) {
+            return false;
+        }
+
+        LivingEntity attackedTarget = hostile.getTarget();
+        return attackedTarget instanceof AbstractEntityCitizen attackedCitizen
+                && !attackedCitizen.getCitizenData().getJob().isGuard();
     }
 }
