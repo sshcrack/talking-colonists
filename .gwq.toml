@@ -1,0 +1,3 @@
+[[repository_settings]]
+repository = "~/Documents/java/minecraft/talking-colonists"
+copy_files = ["versions/*/run"]
