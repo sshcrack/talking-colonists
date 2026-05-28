@@ -11,12 +11,16 @@ import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 
 public class PregenPlayback {
-    public static boolean playAudio(AbstractEntityCitizen citizen, AudioChunk audioData) {
-        return playAudio(citizen, audioData, false);
+    private PregenPlayback() {
+        /* This utility class should not be instantiated */
     }
 
-    public static boolean playAudio(AbstractEntityCitizen citizen, AudioChunk audioData, boolean alreadyClaimed) {
-        if (!alreadyClaimed && !ConversationManager.claimSpeech(citizen.getUUID(), false)) {
+    public static boolean playAudioIfPossible(AbstractEntityCitizen citizen, AudioChunk audioData) {
+        //NOTICE We are claiming a websocket slot here, even if we aren't using it to prevent the start of other conversations etc.
+        if (!ConversationManager.hasLowPriorityCapacity(1))
+            return false;
+
+        if (ConversationManager.claimSlot(citizen, false)) {
             return false;
         }
 
@@ -24,12 +28,12 @@ public class PregenPlayback {
         AudioProvider audioProvider = new CitzienEntityAudioProvider(citizen, null);
         AudioChannel channel = audioProvider.createChannel();
         if (channel == null) {
-            ConversationManager.releaseSpeechClaim(citizen.getUUID());
+            ConversationManager.releaseSlot(citizen);
             return false;
         }
 
         if (audioData == null || audioData.audioBytes().length == 0) {
-            ConversationManager.releaseSpeechClaim(citizen.getUUID());
+            ConversationManager.releaseSlot(citizen);
             return false;
         }
 
@@ -43,7 +47,7 @@ public class PregenPlayback {
 
         stream.setOnPause(() -> {
             stream.close();
-            ConversationManager.releaseSpeechClaim(citizen.getUUID());
+            ConversationManager.releaseSlot(citizen);
         });
 
         stream.addGeminiPcmWithPitch(audioData.audioBytes(), audioData.sampleRate());

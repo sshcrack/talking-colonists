@@ -17,6 +17,7 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -179,13 +180,13 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
     public int citizenContactCheckIntervalTicks = 400;
 
-    @AutoGen(category="citizens", group="voice_chat")
+    @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
-    @SerialEntry(comment= "If true, citizens will whisper when talking")
+    @SerialEntry(comment = "If true, citizens will whisper when talking")
     public boolean citizenVoiceWhisper = true;
 
-    @AutoGen(category="citizens", group="voice_chat")
-    @IntField(min=0)
+    @AutoGen(category = "citizens", group = "voice_chat")
+    @IntField(min = 0)
     @SerialEntry(comment = "Max voice distance of the citizen. Use 0 to use default distance")
     public int citizenVoiceDistance = 0;
 
@@ -222,6 +223,10 @@ public class McTalkingConfig {
         public ControllerBuilder<String> createController(ListGroup annotation, ConfigField<List<String>> field, dev.isxander.yacl3.config.v2.api.autogen.OptionAccess storage, Option<String> option) {
             return StringControllerBuilder.create(option);
         }
+    }
+
+    public double getActualVoiceDistance() {
+        return this.citizenVoiceDistance == 0 ? McTalkingVoicechatPlugin.vcApi.getVoiceChatDistance() : this.citizenVoiceDistance;
     }
 
     public static void loadConfig() {

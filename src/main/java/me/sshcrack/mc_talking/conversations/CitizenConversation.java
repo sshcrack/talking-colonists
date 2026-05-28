@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -132,15 +133,9 @@ public class CitizenConversation {
         UUID idA = citizenA.getUUID();
         UUID idB = citizenB.getUUID();
 
-        if (citizenA.isSleeping() || citizenB.isSleeping()) {
-            McTalking.LOGGER.info("[LiveConv] One or both citizens are sleeping, aborting");
-            setState(ConversationState.ENDED);
-            return;
-        }
-
         // "Already busy" guard: abort if either citizen is already in any session
-        if (ConversationManager.isCitizenBusy(idA) || ConversationManager.isCitizenBusy(idB)) {
-            McTalking.LOGGER.info("[LiveConv] One or both citizens already busy, aborting");
+        if (ConversationManager.canCitizenSpeak(citizenA) || ConversationManager.canCitizenSpeak(citizenB)) {
+            McTalking.LOGGER.info("[LiveConv] One or both citizens can't speak, aborting");
             setState(ConversationState.ENDED);
             return;
         }
@@ -162,22 +157,10 @@ public class CitizenConversation {
             return;
         }
 
-        if (!ConversationManager.claimSpeech(idA, false) || !ConversationManager.claimSpeech(idB, false)) {
-            ConversationManager.releaseSlot(idA);
-            ConversationManager.releaseSlot(idB);
-            ConversationManager.releaseSpeechClaim(idA);
-            ConversationManager.releaseSpeechClaim(idB);
-            McTalking.LOGGER.warn("[LiveConv] Failed to claim speech state, aborting");
-            setState(ConversationState.ENDED);
-            return;
-        }
-
         setState(ConversationState.GENERATING);
 
         AtomicInteger sharedTurnCounter = new AtomicInteger(0);
         AtomicInteger endedCount = new AtomicInteger(0);
-        LiveConversationWsClient clientA = null;
-        LiveConversationWsClient clientB = null;
 
         Consumer<LiveConversationWsClient> onClientEnded = client -> {
             int ended = endedCount.incrementAndGet();
@@ -188,64 +171,52 @@ public class CitizenConversation {
                         if (!c.isClosed()) c.close();
                     });
                 }
-                ConversationManager.unregisterExternalClient(idA);
-                ConversationManager.unregisterExternalClient(idB);
+                ConversationManager.unregisterExternalClient(citizenA);
+                ConversationManager.unregisterExternalClient(citizenB);
                 // Record per-citizen cooldowns so they aren't immediately re-selected
-                ConversationManager.recordCooldown(idA);
-                ConversationManager.recordCooldown(idB);
+                ConversationManager.recordCooldown(citizenA);
+                ConversationManager.recordCooldown(citizenA);
                 setState(ConversationState.ENDED);
             }
         };
 
-        try {
-            var citizenDataA = citizenA.getCitizenData();
-            var viewA = CitizenPromptViewFactory.create(citizenDataA, new HashMap<>(), null);
+        var citizenDataA = citizenA.getCitizenData();
+        var viewA = CitizenPromptViewFactory.create(citizenDataA, new HashMap<>(), null);
 
-            var basicPromptB = """
-                    You are about to start a conversation with a fellow citizen %s.
-                    This is some basic information about them. Talk naturally and according to your feelings.
-                    %s
-                    """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
+        var basicPromptB = """
+                You are about to start a conversation with a fellow citizen %s.
+                This is some basic information about them. Talk naturally and according to your feelings.
+                %s
+                """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
 
-            clientA = new LiveConversationWsClient(
-                    new CitzienEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                    citizenA, sharedTurnCounter, onClientEnded);
+        LiveConversationWsClient clientA = new LiveConversationWsClient(
+                new CitzienEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
+                citizenA, sharedTurnCounter, onClientEnded);
 
-            clientB = new LiveConversationWsClient(
-                    new CitzienEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                    citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
+        LiveConversationWsClient clientB = new LiveConversationWsClient(
+                new CitzienEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
+                citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
 
-            clientA.setPeer(clientB);
-            clientB.setPeer(clientA);
+        clientA.setPeer(clientB);
+        clientB.setPeer(clientA);
 
-            liveClients = List.of(clientA, clientB);
+        liveClients = List.of(clientA, clientB);
 
-            // Register in ConversationManager so "already busy" and slot queries work
-            ConversationManager.registerExternalClient(idA, clientA);
-            ConversationManager.registerExternalClient(idB, clientB);
+        // Register in ConversationManager so "already busy" and slot queries work
+        ConversationManager.registerExternalClient(citizenA, clientA);
+        ConversationManager.registerExternalClient(citizenB, clientB);
 
-            clientA.connect();
-            clientB.connect();
+        clientA.connect();
+        clientB.connect();
 
-            // Kick off the dialogue from A's side
-            var citizenDataB = citizenB.getCitizenData();
-            var view = CitizenPromptViewFactory.create(citizenDataB, new HashMap<>(), null);
-            clientA.addPromptTextAfterTalkingComplete(
-                    "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
+        // Kick off the dialogue from A's side
 
-            setState(ConversationState.PLAYING_AUDIO);
-        } catch (RuntimeException e) {
-            if (clientA != null && !clientA.isClosed()) clientA.close();
-            if (clientB != null && !clientB.isClosed()) clientB.close();
-            ConversationManager.unregisterExternalClient(idA);
-            ConversationManager.unregisterExternalClient(idB);
-            ConversationManager.releaseSpeechClaim(idA);
-            ConversationManager.releaseSpeechClaim(idB);
-            ConversationManager.releaseSlot(idA);
-            ConversationManager.releaseSlot(idB);
-            setState(ConversationState.ENDED);
-            throw e;
-        }
+        var citizenDataB = citizenB.getCitizenData();
+        var view = CitizenPromptViewFactory.create(citizenDataB, new HashMap<>(), null);
+        clientA.addPromptTextAfterTalkingComplete(
+                "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
+
+        setState(ConversationState.PLAYING_AUDIO);
     }
 
     // -------------------------------------------------------------------------

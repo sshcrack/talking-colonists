@@ -82,8 +82,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var isChild = entity.getCitizenData().isChild();
         if (isChild && !isFemale)
             stream.setPitch(1.2f); // Increase pitch
-
-        addOnCloseAction(() -> ConversationManager.releaseSpeechClaim(entity.getUUID()));
     }
 
     public boolean shouldResumeAndSaveSession() {

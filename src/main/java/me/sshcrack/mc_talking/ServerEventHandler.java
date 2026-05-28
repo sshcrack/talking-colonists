@@ -149,24 +149,28 @@ public class ServerEventHandler {
             if (conn != null && conn.isDisabled())
                 continue;
 
-            if (doDistanceCheck) {
-                UUID citizenId = ConversationManager.getPlayerConversationPartner(playerId);
-                if (citizenId != null) {
-                    checkConversationDistance(player, citizenId);
-                }
+            // Skip if any citizen is already busy nearby
+            if (ConversationManager.anyCitizensTalkingNearby(player, McTalkingConfig.INSTANCE.instance().getActualVoiceDistance()))
+                continue;
 
-                if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
-                    checkProximityAndGreetings(player);
-                }
+            if (doDistanceCheck) {
+                checkConversationDistance(player);
             }
 
+            if (ConversationManager.isPlayerInConversation(playerId))
+                continue;
+
+            if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enablePregeneration)
+                checkProximityAndGreetings(player);
+
+
             // Mumbling: only if this player is NOT in a conversation
-            if (doMumblingCheck && !ConversationManager.isPlayerInConversation(playerId)) {
+            if (doMumblingCheck) {
                 checkForMumblingCitizens(player);
             }
 
             // Citizen-initiated contact: only if this player is NOT already in a conversation
-            if (doContactCheck && !ConversationManager.isPlayerInConversation(playerId)) {
+            if (doContactCheck) {
                 checkForCitizenInitiatedContact(player);
             }
         }
@@ -199,7 +203,7 @@ public class ServerEventHandler {
     }
     /*?}*/
 
-    private void checkConversationDistance(ServerPlayer player, UUID citizenId) {
+    private void checkConversationDistance(ServerPlayer player) {
         AbstractEntityCitizen activeEntity = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         if (activeEntity == null || !activeEntity.isAlive()) {
             ConversationManager.endConversation(player.getUUID(), false);
@@ -219,34 +223,34 @@ public class ServerEventHandler {
 
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
-            if (citizenOne instanceof VisitorCitizen || citizenOne.isSleeping()) continue;
+            if (!ConversationManager.canCitizenSpeak(citizenOne))
+                continue;
 
             for (int j = i + 1; j < citizens.size(); j++) {
                 AbstractEntityCitizen citizenTwo = citizens.get(j);
-                if (citizenTwo instanceof VisitorCitizen || citizenTwo.isSleeping()) continue;
+                if (ConversationManager.canCitizenSpeak(citizenOne) || ConversationManager.canCitizenSpeak(citizenTwo)) {
+                    continue;
+                }
 
                 double distSq = citizenOne.distanceToSqr(citizenTwo);
-                if (distSq < 25.0) {
-                    if (ConversationManager.isCitizenBusy(citizenOne.getUUID()) || ConversationManager.isCitizenBusy(citizenTwo.getUUID())) {
-                        continue;
-                    }
-
+                if (distSq < HeatmapTracker.DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING) {
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
+                }
 
-                    double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
-                    if (distSq < triggerDist * triggerDist) {
-                        if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
-                            AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
-                            if (audio != null && !PregenPlayback.playAudio(citizenOne, audio)) {
-                                // put back if playback failed
-                                PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
-                            }
-                        } else if (PregenerationTaskService.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
-                            AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
-                            if (audio != null && !PregenPlayback.playAudio(citizenTwo, audio)) {
-                                PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
-                            }
-                        }
+                double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
+                if (distSq >= triggerDist * triggerDist)
+                    continue;
+
+                if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
+                    AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
+                    if (audio != null && !PregenPlayback.playAudioIfPossible(citizenOne, audio)) {
+                        // put back if playback failed
+                        PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
+                    }
+                } else if (PregenerationTaskService.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
+                    AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
+                    if (audio != null && !PregenPlayback.playAudioIfPossible(citizenTwo, audio)) {
+                        PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
                     }
                 }
             }
@@ -438,11 +442,10 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
-    /*? if neoforge {*/
+            /*? if neoforge {*/
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
         if (!(event.getNewAboutToBeSetTarget() instanceof AbstractEntityCitizen citizen)) return;
-        if (citizen.isSleeping()) return;
         // Pass the entity that just changed target (the attacker) so generated prompts can mention it
         PregenerationTaskService.playThreatNow(citizen, event.getEntity());
     }
@@ -451,7 +454,6 @@ public class ServerEventHandler {
     /*public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
         if (!(event.getNewTarget() instanceof AbstractEntityCitizen citizen)) return;
-        if (citizen.isSleeping()) return;
         PregenerationTaskService.playThreatNow(citizen);
     }*/
     /*?}*/
