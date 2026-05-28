@@ -225,18 +225,15 @@ public class ServerEventHandler {
     private void checkProximityAndGreetings(List<AbstractEntityCitizen> citizens) {
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
-            if (!ConversationManager.canCitizenSpeak(citizenOne))
-                continue;
-
             for (int j = i + 1; j < citizens.size(); j++) {
                 AbstractEntityCitizen citizenTwo = citizens.get(j);
-                if (ConversationManager.canCitizenSpeak(citizenOne) || ConversationManager.canCitizenSpeak(citizenTwo)) {
-                    continue;
-                }
-
                 double distSq = citizenOne.distanceToSqr(citizenTwo);
                 if (distSq < HeatmapTracker.DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING) {
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
+                }
+
+                if (!ConversationManager.canCitizenSpeak(citizenOne) || !ConversationManager.canCitizenSpeak(citizenTwo)) {
+                    continue;
                 }
 
                 double triggerDist = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
@@ -261,10 +258,8 @@ public class ServerEventHandler {
 
     private void checkForMumblingCitizens(List<AbstractEntityCitizen> citizens) {
         for (AbstractEntityCitizen citizen : citizens) {
-            if (citizen instanceof VisitorCitizen) continue;
-            if (citizen.isSleeping()) continue;
             // Skip if this citizen already has any kind of active session
-            if (ConversationManager.canCitizenSpeak(citizen)) continue;
+            if (!ConversationManager.canCitizenSpeak(citizen)) continue;
             // Skip if this citizen is still within their post-session cooldown
             if (Math.random() < McTalkingConfig.INSTANCE.instance().mumblingChance) {
                 ConversationManager.startMumbling(citizen);
@@ -284,8 +279,7 @@ public class ServerEventHandler {
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
 
         for (AbstractEntityCitizen citizen : citizens) {
-            if (ConversationManager.canCitizenSpeak(citizen)) continue;
-            if (ConversationManager.isCitizenOnCooldown(citizen)) continue;
+            if (!ConversationManager.canCitizenSpeak(citizen)) continue;
             if (citizen.getCitizenData() == null) continue;
 
             double urgencyWeight = calculateUrgencyWeight(citizen);
@@ -373,7 +367,7 @@ public class ServerEventHandler {
             if (anyBusy) continue;
 
             for (AbstractEntityCitizen citizen : citizens) {
-                if (ConversationManager.canCitizenSpeak(citizen)) continue;
+                if (!ConversationManager.canCitizenSpeak(citizen)) continue;
 
                 if (Math.random() >= McTalkingConfig.INSTANCE.instance().randomConversationChance) continue;
 
@@ -381,7 +375,7 @@ public class ServerEventHandler {
                 List<AbstractEntityCitizen> partners = new ArrayList<>();
                 for (AbstractEntityCitizen candidate : citizens) {
                     if (candidate == citizen) continue;
-                    if (ConversationManager.canCitizenSpeak(candidate)) continue;
+                    if (!ConversationManager.canCitizenSpeak(candidate)) continue;
                     partners.add(candidate);
                 }
 

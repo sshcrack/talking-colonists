@@ -134,7 +134,7 @@ public class CitizenConversation {
         UUID idB = citizenB.getUUID();
 
         // "Already busy" guard: abort if either citizen is already in any session
-        if (ConversationManager.canCitizenSpeak(citizenA) || ConversationManager.canCitizenSpeak(citizenB)) {
+        if (!ConversationManager.canCitizenSpeak(citizenA) || !ConversationManager.canCitizenSpeak(citizenB)) {
             McTalking.LOGGER.info("[LiveConv] One or both citizens can't speak, aborting");
             setState(ConversationState.ENDED);
             return;

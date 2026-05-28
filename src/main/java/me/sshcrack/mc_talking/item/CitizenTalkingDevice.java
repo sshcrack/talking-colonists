@@ -164,7 +164,7 @@ public class CitizenTalkingDevice extends Item {
             return true; // Still prevent attack
         }
 
-        if (ConversationManager.canCitizenSpeak(citizen, true)) {
+        if (!ConversationManager.canCitizenSpeak(citizen, true)) {
             serverPlayer.sendSystemMessage(
                     Component.literal("This citizen can't speak right now. They are either already talking or sleeping")
                             .withStyle(ChatFormatting.RED)

@@ -8,7 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class HeatmapTracker {
-    public static final int DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING = 5 * 5;
+    private HeatmapTracker() {
+        /* This utility class should not be instantiated */
+    }
+
+    public static final int DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING = 10 * 10;
     private static final Map<UUIDPair, Long> scores = new ConcurrentHashMap<>();
 
     public static void recordProximity(UUID uuid1, UUID uuid2) {
@@ -26,7 +30,7 @@ public class HeatmapTracker {
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .limit(limit)
                 .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public static class UUIDPair {
