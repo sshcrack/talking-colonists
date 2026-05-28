@@ -148,10 +148,10 @@ public class CitizenConversation {
         }
 
         // Claim both slots (low-priority) before creating any clients
-        if (!ConversationManager.claimSlot(idA, false) || !ConversationManager.claimSlot(idB, false)) {
+        if (!ConversationManager.claimSlot(citizenA, false) || !ConversationManager.claimSlot(citizenB, false)) {
             // Shouldn't happen after the capacity check above, but be safe
-            ConversationManager.releaseSlot(idA);
-            ConversationManager.releaseSlot(idB);
+            ConversationManager.releaseSlot(citizenA);
+            ConversationManager.releaseSlot(citizenB);
             McTalking.LOGGER.warn("[LiveConv] Failed to claim slots, aborting");
             setState(ConversationState.ENDED);
             return;

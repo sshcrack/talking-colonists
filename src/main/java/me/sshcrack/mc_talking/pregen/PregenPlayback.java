@@ -20,7 +20,7 @@ public class PregenPlayback {
         if (!ConversationManager.hasLowPriorityCapacity(1))
             return false;
 
-        if (ConversationManager.claimSlot(citizen, false)) {
+        if (!ConversationManager.claimSlot(citizen, false)) {
             return false;
         }
 

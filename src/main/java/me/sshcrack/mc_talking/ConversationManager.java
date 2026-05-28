@@ -157,7 +157,7 @@ public class ConversationManager {
      */
     public static synchronized void unregisterExternalClient(AbstractEntityCitizen citizen) {
         clients.remove(citizen.getUUID());
-        releaseSlot(citizen.getUUID());
+        releaseSlot(citizen);
     }
 
     /**
@@ -265,7 +265,7 @@ public class ConversationManager {
                     synchronized (ConversationManager.class) {
                         if (clients.get(citizenId) == c) {
                             clients.remove(citizenId);
-                            releaseSlot(citizenId);
+                            releaseSlot(citizen);
                         }
                     }
                     // Record cooldown so this citizen won't be immediately re-selected
@@ -300,7 +300,7 @@ public class ConversationManager {
                     synchronized (ConversationManager.class) {
                         if (clients.get(citizenId) == c) {
                             clients.remove(citizenId);
-                            releaseSlot(citizenId);
+                            releaseSlot(citizen);
                         }
                     }
                     recordCooldown(citizen);
@@ -372,9 +372,9 @@ public class ConversationManager {
         citizenToPlayer.remove(citizenId);
         GeminiWsClient client = clients.remove(citizenId);
         if (client != null) client.close();
-        releaseSlot(citizenId);
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
+        releaseSlot(entity);
         if (entity != null && entity.isAlive()) {
             ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
             if (player != null) {

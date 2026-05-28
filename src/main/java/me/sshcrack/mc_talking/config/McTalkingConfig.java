@@ -153,9 +153,9 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
     public double mumblingChance = 0.05;
 
-    @AutoGen(category = "citizens", group = "mumbling")
+    @AutoGen(category = "citizens")
     @DoubleField(min = 1.0, max = 100.0)
-    @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
+    @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble/start a conversation etc when a player is nearby")
     //TODO this is also used for greetings between citizens
     public double mumblingDetectionRange = 10.0;
 

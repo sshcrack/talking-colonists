@@ -9,6 +9,7 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -149,8 +150,11 @@ public class ServerEventHandler {
             if (conn != null && conn.isDisabled())
                 continue;
 
-            // Skip if any citizen is already busy nearby
-            if (ConversationManager.anyCitizensTalkingNearby(player, McTalkingConfig.INSTANCE.instance().getActualVoiceDistance()))
+            double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+            var aabb = player.getBoundingBox().inflate(range);
+            var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
+            var anyBusy = citizens.stream().anyMatch(ConversationManager::isCitizenBusy);
+            if (anyBusy)
                 continue;
 
             if (doDistanceCheck) {
@@ -161,17 +165,17 @@ public class ServerEventHandler {
                 continue;
 
             if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enablePregeneration)
-                checkProximityAndGreetings(player);
+                checkProximityAndGreetings(citizens);
 
 
             // Mumbling: only if this player is NOT in a conversation
             if (doMumblingCheck) {
-                checkForMumblingCitizens(player);
+                checkForMumblingCitizens(citizens);
             }
 
             // Citizen-initiated contact: only if this player is NOT already in a conversation
             if (doContactCheck) {
-                checkForCitizenInitiatedContact(player);
+                checkForCitizenInitiatedContact(player, citizens);
             }
         }
 
@@ -216,11 +220,7 @@ public class ServerEventHandler {
         }
     }
 
-    private void checkProximityAndGreetings(ServerPlayer player) {
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
-        var aabb = player.getBoundingBox().inflate(range);
-        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
-
+    private void checkProximityAndGreetings(List<AbstractEntityCitizen> citizens) {
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
             if (!ConversationManager.canCitizenSpeak(citizenOne))
@@ -257,24 +257,13 @@ public class ServerEventHandler {
         }
     }
 
-    private void checkForMumblingCitizens(ServerPlayer player) {
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
-        var aabb = player.getBoundingBox().inflate(range);
-        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
-
-        // If ANY citizen in range is already in a session, skip mumbling entirely for
-        // this player this tick – two conversations near the same player at once is jarring.
-        boolean anyBusy = citizens.stream()
-                .anyMatch(c -> ConversationManager.isCitizenBusy(c.getUUID()));
-        if (anyBusy) return;
-
+    private void checkForMumblingCitizens(List<AbstractEntityCitizen> citizens) {
         for (AbstractEntityCitizen citizen : citizens) {
             if (citizen instanceof VisitorCitizen) continue;
             if (citizen.isSleeping()) continue;
             // Skip if this citizen already has any kind of active session
-            if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
+            if (ConversationManager.canCitizenSpeak(citizen)) continue;
             // Skip if this citizen is still within their post-session cooldown
-            if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
             if (Math.random() < McTalkingConfig.INSTANCE.instance().mumblingChance) {
                 ConversationManager.startMumbling(citizen);
                 break; // Only trigger one mumbling citizen per player per check
@@ -288,24 +277,13 @@ public class ServerEventHandler {
      *
      * <p>Only one citizen initiates contact per player per check to avoid audio overlap.</p>
      */
-    private void checkForCitizenInitiatedContact(ServerPlayer player) {
+    private void checkForCitizenInitiatedContact(ServerPlayer player, List<AbstractEntityCitizen> citizens) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
-        var aabb = player.getBoundingBox().inflate(range);
-        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
-
-        boolean anyBusy = citizens.stream()
-                .anyMatch(c -> ConversationManager.isCitizenBusy(c.getUUID()));
-        if (anyBusy) return;
-
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
 
         for (AbstractEntityCitizen citizen : citizens) {
-            if (citizen instanceof VisitorCitizen) continue;
-            if (citizen.isSleeping()) continue;
-            if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
-            if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
+            if (ConversationManager.canCitizenSpeak(citizen)) continue;
+            if (ConversationManager.isCitizenOnCooldown(citizen)) continue;
             if (citizen.getCitizenData() == null) continue;
 
             double urgencyWeight = calculateUrgencyWeight(citizen);
@@ -389,16 +367,11 @@ public class ServerEventHandler {
             // If ANY citizen in range is already in a session, skip starting a new
             // conversation near this player – overlapping sessions are disruptive.
             boolean anyBusy = citizens.stream()
-                    .anyMatch(c -> ConversationManager.isCitizenBusy(c.getUUID()));
+                    .anyMatch(ConversationManager::isCitizenBusy);
             if (anyBusy) continue;
 
             for (AbstractEntityCitizen citizen : citizens) {
-                if (citizen instanceof VisitorCitizen) continue;
-                // Skip if this citizen already has any kind of active session
-                if (ConversationManager.isCitizenBusy(citizen.getUUID())) continue;
-                // Skip if this citizen is still within their post-session cooldown
-                if (ConversationManager.isCitizenOnCooldown(citizen.getUUID())) continue;
-                if (citizen.isSleeping()) continue;
+                if (ConversationManager.canCitizenSpeak(citizen)) continue;
 
                 if (Math.random() >= McTalkingConfig.INSTANCE.instance().randomConversationChance) continue;
 
@@ -406,12 +379,7 @@ public class ServerEventHandler {
                 List<AbstractEntityCitizen> partners = new ArrayList<>();
                 for (AbstractEntityCitizen candidate : citizens) {
                     if (candidate == citizen) continue;
-                    if (candidate instanceof VisitorCitizen) continue;
-                    if (candidate.isSleeping()) continue;
-                    // Skip if this candidate already has any kind of active session
-                    if (ConversationManager.isCitizenBusy(candidate.getUUID())) continue;
-                    // Skip if this candidate is still within their post-session cooldown
-                    if (ConversationManager.isCitizenOnCooldown(candidate.getUUID())) continue;
+                    if (ConversationManager.canCitizenSpeak(candidate)) continue;
                     partners.add(candidate);
                 }
 
@@ -442,19 +410,18 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
-            /*? if neoforge {*/
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
-        if (!(event.getNewAboutToBeSetTarget() instanceof AbstractEntityCitizen citizen)) return;
+        /*? if forge {*/
+        /*LivingEntity newTarget = event.getNewTarget();*/
+        /*?}*/
+
+        /*? if neoforge {*/
+        LivingEntity newTarget = event.getNewAboutToBeSetTarget();
+        /*?}*/
+
+        if (!(newTarget instanceof AbstractEntityCitizen citizen)) return;
         // Pass the entity that just changed target (the attacker) so generated prompts can mention it
         PregenerationTaskService.playThreatNow(citizen, event.getEntity());
     }
-    /*?}*/
-    /*? if forge {*/
-    /*public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
-        if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
-        if (!(event.getNewTarget() instanceof AbstractEntityCitizen citizen)) return;
-        PregenerationTaskService.playThreatNow(citizen);
-    }*/
-    /*?}*/
 }
