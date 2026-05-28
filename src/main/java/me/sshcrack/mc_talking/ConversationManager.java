@@ -206,7 +206,7 @@ public class ConversationManager {
      * Use this before starting any new session to avoid duplicates.
      */
     public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
-        return clients.containsKey(citizen.getUUID());
+        return clients.containsKey(citizen.getUUID()) || addedEntities.contains(citizen.getUUID());
     }
 
     /**
@@ -423,22 +423,6 @@ public class ConversationManager {
      */
     public static UUID getPlayerForEntity(UUID entityId) {
         return citizenToPlayer.get(entityId);
-    }
-
-    public static UUID getPlayerConversationPartner(UUID playerId) {
-        return playerConversationPartners.get(playerId);
-    }
-
-    public static boolean anyCitizensTalkingNearby(Player player, double range) {
-        var aabb = player.getBoundingBox().inflate(range);
-        var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
-
-        // If ANY citizen in range is already in a session, skip mumbling entirely for
-        // this player this tick – two conversations near the same player at once is jarring.
-
-        return citizens.stream()
-                .anyMatch(ConversationManager::isCitizenBusy);
-
     }
 
     public static void cleanup() {

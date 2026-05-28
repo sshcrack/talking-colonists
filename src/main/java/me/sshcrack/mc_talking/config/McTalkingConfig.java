@@ -225,8 +225,12 @@ public class McTalkingConfig {
         }
     }
 
-    public double getActualVoiceDistance() {
-        return this.citizenVoiceDistance == 0 ? McTalkingVoicechatPlugin.vcApi.getVoiceChatDistance() : this.citizenVoiceDistance;
+
+
+    public static boolean hasGeminiApiKey() {
+        String key = INSTANCE.instance().geminiApiKey;
+        return key != null
+                && !key.trim().isEmpty();
     }
 
     public static void loadConfig() {

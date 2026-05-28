@@ -71,14 +71,8 @@ public class PregenerationTaskService {
         // stale attacker-specific messages and reduces storage of threat clips.
     }
 
-    private static boolean hasGeminiApiKey() {
-        return McTalkingConfig.geminiApiKey != null
-                && McTalkingConfig.geminiApiKey.get() != null
-                && !McTalkingConfig.geminiApiKey.get().trim().isEmpty();
-    }
-
     private static void startPregenIfPossible(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
-        if (!hasGeminiApiKey()) {
+        if (!McTalkingConfig.hasGeminiApiKey()) {
             return;
         }
 
@@ -92,7 +86,7 @@ public class PregenerationTaskService {
         isGenerating = true;
         McTalking.LOGGER.info("[Pregeneration] Starting audio pregeneration for citizen {}", citizen.getUUID());
 
-        PregenGeminiClient client = new PregenGeminiClient(citizen, prompt, (audio) -> {
+        PregenGeminiClient client = new PregenGeminiClient(citizen, prompt, audio -> {
             ConversationManager.releaseSlot(citizen);
             onComplete.accept(audio);
         }, () -> {
@@ -108,7 +102,7 @@ public class PregenerationTaskService {
      * optionally starts a pregeneration that includes the attacker's name in the prompt.
      */
     public static void playThreatNow(AbstractEntityCitizen citizen, Entity attacker) {
-        if (ConversationManager.isCitizenBusy(citizen)) {
+        if (ConversationManager.isCitizenBusy(citizen) || ConversationManager.hasClaimedSlot(citizen)) {
             return;
         }
 
@@ -140,8 +134,6 @@ public class PregenerationTaskService {
                 prompt = "Generate a brief 1-sentence panic or cry for help because you are being attacked by a monster.";
             }
         }
-
-        lastThreatPlayTime.put(citizen.getUUID(), System.currentTimeMillis());
 
         // Generate on-demand (no caching). On completion, attempt immediate playback and update cooldown.
         startPregenIfPossible(citizen, prompt, audio -> {
