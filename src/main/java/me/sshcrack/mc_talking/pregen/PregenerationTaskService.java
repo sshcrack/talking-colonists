@@ -102,7 +102,7 @@ public class PregenerationTaskService {
      * optionally starts a pregeneration that includes the attacker's name in the prompt.
      */
     public static void playThreatNow(AbstractEntityCitizen citizen, Entity attacker) {
-        if (ConversationManager.isCitizenBusy(citizen) || ConversationManager.hasClaimedSlot(citizen)) {
+        if (ConversationManager.isCitizenBusy(citizen)) {
             return;
         }
 
