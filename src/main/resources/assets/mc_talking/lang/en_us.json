@@ -124,7 +124,7 @@
 
   "yacl3.config.mc_talking:config.category.citizens.group.pregeneration": "Voice Pregeneration",
   "yacl3.config.mc_talking:config.enablePregeneration": "Enable Pregeneration",
-  "yacl3.config.mc_talking:config.enablePregeneration.desc": "If true, enables pregeneration of citizen voices. That way AI will generate greetings / exaclaims in the background and dynamically play them",
+  "yacl3.config.mc_talking:config.enablePregeneration.desc": "If true, enables pregeneration of citizen voices. That way AI will generate greetings / exclaims in the background and dynamically play them",
   "yacl3.config.mc_talking:config.pregeneratedGreetingDistance": "Pregenerated Greeting Distance",
   "yacl3.config.mc_talking:config.pregeneratedGreetingDistance.desc": "Distance within which pregenerated greetings can be played. If a citizen has a pregenerated greeting and you come within this distance, the greeting will play automatically without needing to start a conversation.",
 
