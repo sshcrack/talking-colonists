@@ -37,7 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Consumer;
+
 
 import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
 import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
@@ -202,9 +202,9 @@ public final class CitizenPromptViewFactory {
                             bestToughness = toughness;
                             bestArmorName = itemStack.getDisplayName().getString();
                         }
-                    }
 
-                    wornPieces++;
+                        wornPieces++;
+                    }
                 }
 
                 ps.append(", wearing ").append(wornPieces).append(" armor pieces");
