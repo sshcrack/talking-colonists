@@ -121,7 +121,11 @@ public class CitizenConversation {
                 if (fallback != null) {
                     McTalking.LOGGER.info("[Auto] Flash/TTS failed, falling back to Live WebSockets");
                     fallback.run();
-                } else {
+                }
+            } finally {
+                // Ensure state is always cleaned up, even on unexpected runtime exceptions.
+                // When a fallback is running, it manages its own lifecycle state.
+                if (fallback == null) {
                     setState(ConversationState.ENDED);
                 }
             }
