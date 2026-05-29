@@ -82,12 +82,10 @@ public class CitizenConversation {
      * The conversation state will be updated via the {@link #setOnStateChanged} callback.
      */
     public void performConversation() {
-        if (McTalkingConfig.INSTANCE.instance().autoSwitchConversationMode) {
-            performAutoConversation();
-        } else if (mode == ConversationMode.FLASH_TTS) {
-            performFlashTtsConversation();
-        } else {
-            performLiveWebsocketConversation();
+        switch (mode) {
+            case AUTO -> performAutoConversation();
+            case FLASH_TTS -> performFlashTtsConversation();
+            case LIVE_WEBSOCKETS -> performLiveWebsocketConversation();
         }
     }
 

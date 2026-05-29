@@ -80,13 +80,8 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @EnumCycler
-    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
-    public ConversationMode conversationMode = ConversationMode.LIVE_WEBSOCKETS;
-
-    @AutoGen(category = "citizens", group = "citizen_to_citizen")
-    @TickBox
-    @SerialEntry(comment = "When enabled, overrides the selected mode: tries Flash+TTS first (higher quality), automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted). Disable to use the selected mode directly.")
-    public boolean autoSwitchConversationMode = true;
+    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS: Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS: Flash generates a script, then Gemini TTS renders multi-speaker audio. Higher quality but limited to ~10/day.\nAUTO (default): Tries Flash+TTS first; automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted).")
+    public ConversationMode conversationMode = ConversationMode.AUTO;
 
     // Random citizen-to-citizen conversations
     @AutoGen(category = "citizens", group = "random_conversations")
@@ -184,6 +179,9 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How long (in seconds) citizens express post-raid trauma in their prompts after a raid ends. Set to 0 to disable.")
     public int raidTraumaDurationSeconds = 1200;
 
+    @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
+    public int configVersion = 0;
+
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
     @TickBox
@@ -208,8 +206,6 @@ public class McTalkingConfig {
     }
 
     public static void loadConfig() {
-        // do NOT add config migration for autoSwitchConversationMode here.
-        // The field defaults to true, so YACL initialises it automatically for old configs.
         Path oldConfig = YACLPlatform.getConfigDir().resolve("mc_talking-common.toml");
         Path newConfig = YACLPlatform.getConfigDir().resolve("yacl-mc_talking.json5");
 
@@ -284,6 +280,16 @@ public class McTalkingConfig {
             } catch (Exception e) {
                 McTalking.LOGGER.error("Failed to migrate old TOML config", e);
             }
+        }
+
+        // One-time migration: LIVE_WEBSOCKETS → AUTO for existing JSON5 configs
+        if (INSTANCE.instance().configVersion < 1) {
+            if (INSTANCE.instance().conversationMode == ConversationMode.LIVE_WEBSOCKETS) {
+                INSTANCE.instance().conversationMode = ConversationMode.AUTO;
+                McTalking.LOGGER.info("[Config] Migrated conversationMode from LIVE_WEBSOCKETS to AUTO");
+            }
+            INSTANCE.instance().configVersion = 1;
+            INSTANCE.save();
         }
     }
 }
