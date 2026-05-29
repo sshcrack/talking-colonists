@@ -83,6 +83,11 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
     public ConversationMode conversationMode = ConversationMode.LIVE_WEBSOCKETS;
 
+    @AutoGen(category = "citizens", group = "citizen_to_citizen")
+    @TickBox
+    @SerialEntry(comment = "When enabled, overrides the selected mode: tries Flash+TTS first (higher quality), automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted). Disable to use the selected mode directly.")
+    public boolean autoSwitchConversationMode = true;
+
     // Random citizen-to-citizen conversations
     @AutoGen(category = "citizens", group = "random_conversations")
     @TickBox
@@ -203,6 +208,8 @@ public class McTalkingConfig {
     }
 
     public static void loadConfig() {
+        // do NOT add config migration for autoSwitchConversationMode here.
+        // The field defaults to true, so YACL initialises it automatically for old configs.
         Path oldConfig = YACLPlatform.getConfigDir().resolve("mc_talking-common.toml");
         Path newConfig = YACLPlatform.getConfigDir().resolve("yacl-mc_talking.json5");
 

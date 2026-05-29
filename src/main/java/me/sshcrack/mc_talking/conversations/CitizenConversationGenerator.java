@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.TtsQuotaManager;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.server.MinecraftServer;
@@ -21,8 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
-
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenConversationGenerator {
     private static final String CONVERSATION_SYSTEM_PROMPT = """
@@ -184,9 +183,11 @@ public class CitizenConversationGenerator {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
             GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation.conversation(), speakerVoiceConfigs), chunkConsumer);
         } catch (IOException | UnexpectedResponseException e) {
+            TtsQuotaManager.setTtsFailed(true);
             throw new ConversationGenerationException("Failed to generate conversation audio using Gemini TTS", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            TtsQuotaManager.setTtsFailed(true);
             throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
         }
 
@@ -208,9 +209,11 @@ public class CitizenConversationGenerator {
             McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
             rawConversationOutput = GeminiFlash.sendFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, getFlashPrompt(citizenInfo.toString()));
         } catch (IOException | UnexpectedResponseException e) {
+            TtsQuotaManager.setTtsFailed(true);
             throw new ConversationGenerationException("Failed to generate conversation using Gemini Flash", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            TtsQuotaManager.setTtsFailed(true);
             throw new ConversationGenerationException("Conversation generation was interrupted", e);
         }
 
