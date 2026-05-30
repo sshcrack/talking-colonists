@@ -53,7 +53,7 @@ Read ALL of these to match the codebase conventions:
 
 ### Code conventions
 
-- **NO comments** in Java code unless the existing pattern in the specific file uses them
+- Keep files under 400 lines if possible; split into multiple classes if needed
 - 4-space indent for Java
 - Single class imports only (import-on-demand threshold = 999)
 - Private constructor for utility classes
