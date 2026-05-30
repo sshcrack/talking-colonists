@@ -91,7 +91,7 @@
   "yacl3.config.mc_talking:config.enableCitizenToCitizenConversation": "Enable Citizen to Citizen Conversation",
   "yacl3.config.mc_talking:config.enableCitizenToCitizenConversation.desc": "Allows citizens to talk to each other without direct player speech input randomly.",
   "yacl3.config.mc_talking:config.conversationMode": "Conversation Mode",
-  "yacl3.config.mc_talking:config.conversationMode.desc": "How citizen-to-citizen conversations are generated: LIVE_WEBSOCKETS is cheaper and real-time (recommended for free tier), FLASH_TTS is higher quality but uses more quota (only makes sense for paid tier).",
+  "yacl3.config.mc_talking:config.conversationMode.desc": "LIVE_WEBSOCKETS: Two Gemini Live sessions feed audio to each other in real time — cheap but lower quality. FLASH_TTS: Flash generates a script, then TTS renders multi-speaker audio — higher quality but ~10/day limit. AUTO (default): Tries Flash+TTS first, automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted).",
   "yacl3.config.mc_talking:config.enableRandomConversations": "Enable Random Conversations",
   "yacl3.config.mc_talking:config.enableRandomConversations.desc": "If enabled, nearby citizen pairs can start autonomous conversations at intervals. Requires citizen-to-citizen conversations to be enabled. Also players must not have muted their sound.",
   "yacl3.config.mc_talking:config.randomConversationChance": "Random Conversation Chance",

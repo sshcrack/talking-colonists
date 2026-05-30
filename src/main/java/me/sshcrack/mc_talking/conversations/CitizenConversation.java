@@ -23,6 +23,7 @@ import java.util.function.Consumer;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.TtsQuotaManager;
 
 /**
  * Orchestrates a citizen-to-citizen conversation.
@@ -81,10 +82,10 @@ public class CitizenConversation {
      * The conversation state will be updated via the {@link #setOnStateChanged} callback.
      */
     public void performConversation() {
-        if (mode == ConversationMode.FLASH_TTS) {
-            performFlashTtsConversation();
-        } else {
-            performLiveWebsocketConversation();
+        switch (mode) {
+            case AUTO -> performAutoConversation();
+            case FLASH_TTS -> performFlashTtsConversation();
+            case LIVE_WEBSOCKETS -> performLiveWebsocketConversation();
         }
     }
 
@@ -97,6 +98,10 @@ public class CitizenConversation {
     // -------------------------------------------------------------------------
 
     private void performFlashTtsConversation() {
+        performFlashTtsConversation(null);
+    }
+
+    private void performFlashTtsConversation(Runnable fallback) {
         if (stream == null) {
             stream = new GeminiStream(constructLocationalAudioChannel());
         }
@@ -107,11 +112,24 @@ public class CitizenConversation {
                 CitizenConversationGenerator.generateConversation(
                         participants, server,
                         chunk -> stream.addGeminiPcmWithPitch(chunk.audioBytes(), chunk.sampleRate()));
+                setState(ConversationState.ENDED);
             } catch (ConversationGenerationException e) {
                 McTalking.LOGGER.error("Failed to generate Flash/TTS conversation: {}, cause: {}",
                         e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
+                if (fallback != null) {
+                    McTalking.LOGGER.info("[Auto] Flash/TTS failed, falling back to Live WebSockets");
+                    if (stream != null) {
+                        stream.stop();
+                        stream.close();
+                    }
+                    fallback.run();
+                }
             } finally {
-                setState(ConversationState.ENDED);
+                // Ensure state is always cleaned up, even on unexpected runtime exceptions.
+                // When a fallback is running, it manages its own lifecycle state.
+                if (fallback == null) {
+                    setState(ConversationState.ENDED);
+                }
             }
         }).start();
     }
@@ -216,6 +234,23 @@ public class CitizenConversation {
                 "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
 
         setState(ConversationState.PLAYING_AUDIO);
+    }
+
+    // -------------------------------------------------------------------------
+    // Auto mode (try Flash+TTS, fall back to Live WebSockets)
+    // -------------------------------------------------------------------------
+
+    private void performAutoConversation() {
+        if (TtsQuotaManager.isTtsFailed()) {
+            McTalking.LOGGER.info("[Auto] TTS previously failed, skipping directly to Live WebSockets");
+            performLiveWebsocketConversation();
+            return;
+        }
+
+        performFlashTtsConversation(() -> server.execute(() -> {
+            McTalking.LOGGER.info("[Auto] Running fallback Live WebSockets conversation");
+            performLiveWebsocketConversation();
+        }));
     }
 
     // -------------------------------------------------------------------------
