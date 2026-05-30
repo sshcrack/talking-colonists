@@ -2,6 +2,7 @@
 .gradle
 .kotlin
 .cache/
+**/.eclipse/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
