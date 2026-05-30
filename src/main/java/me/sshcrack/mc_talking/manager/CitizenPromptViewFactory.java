@@ -218,11 +218,13 @@ public final class CitizenPromptViewFactory {
 
         // ── Environment ────────────────────────────────────────────────────────
         String environment = null;
+        boolean peaceful = false;
         var entityOptEnv = data.getEntity();
         if (entityOptEnv.isPresent()) {
             Level level = entityOptEnv.get().level();
             long dayTime = level.getDayTime() % 24000L;
             environment = "It is " + describeTime(dayTime) + " and " + describeWeather(level) + ".";
+            peaceful = level.getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL;
         }
 
         // ── Active item requests ──────────────────────────────────────────────
@@ -273,6 +275,7 @@ public final class CitizenPromptViewFactory {
                 workBuildingDisplayName,
                 workBuildingLevel,
                 data.getColony().getID(),
+                peaceful,
                 personality,
                 customPersonalityText,
                 playerState,
