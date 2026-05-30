@@ -63,8 +63,7 @@ Read ALL of these to match the codebase conventions:
 ### MineColonies API access patterns
 
 - Access colony: `IColonyManager.getInstance().getColonyByPos(...)` or via citizen's `getCitizenColonyHandler().getColony()`
-- Access citizen data from entity: `((AbstractEntityCitizen) entity).getCitizenData()`
-- Access MineColonies EventBus: `IMinecoloniesAPI.getInstance().getEventBus().subscribe(EventClass.class, handler)`
+- Access citizen data from an `AbstractEntityCitizen` entity: `entity.getCitizenData()`
 - Access colony managers: `colony.getRaiderManager()`, `colony.getEventManager()`, `colony.getStatisticsManager()`, `colony.getEventDescriptionManager()`, `colony.getQuestManager()`, `colony.getVisitorManager()`, `colony.getWorkManager()`
 - Access citizen handlers: `citizenData.getCitizenHappinessHandler()`, `.getCitizenJobHandler()`, `.getCitizenDiseaseHandler()`, `.getCitizenSleepHandler()`, `.getCitizenMournHandler()`
 
