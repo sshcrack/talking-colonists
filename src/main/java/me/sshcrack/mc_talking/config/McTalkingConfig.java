@@ -81,8 +81,8 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @EnumCycler
-    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS (default/free): Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS (higher quality): Flash generates a script, then Gemini TTS renders multi-speaker audio. This sounds more natural and has higher quality, but is limited to only 10 per DAY, so only use this if in paid tier")
-    public ConversationMode conversationMode = ConversationMode.LIVE_WEBSOCKETS;
+    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS: Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS: Flash generates a script, then Gemini TTS renders multi-speaker audio. Higher quality but limited to ~10/day.\nAUTO (default): Tries Flash+TTS first; automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted).")
+    public ConversationMode conversationMode = ConversationMode.AUTO;
 
     // Random citizen-to-citizen conversations
     @AutoGen(category = "citizens", group = "random_conversations")
@@ -202,6 +202,9 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How long (in seconds) citizens express post-raid trauma in their prompts after a raid ends. Set to 0 to disable.")
     public int raidTraumaDurationSeconds = 1200;
 
+    @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
+    public int configVersion = 0;
+
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
     @TickBox
@@ -308,6 +311,16 @@ public class McTalkingConfig {
             } catch (Exception e) {
                 McTalking.LOGGER.error("Failed to migrate old TOML config", e);
             }
+        }
+
+        // One-time migration: LIVE_WEBSOCKETS → AUTO for existing JSON5 configs
+        if (INSTANCE.instance().configVersion < 1) {
+            if (INSTANCE.instance().conversationMode == ConversationMode.LIVE_WEBSOCKETS) {
+                INSTANCE.instance().conversationMode = ConversationMode.AUTO;
+                McTalking.LOGGER.info("[Config] Migrated conversationMode from LIVE_WEBSOCKETS to AUTO");
+            }
+            INSTANCE.instance().configVersion = 1;
+            INSTANCE.save();
         }
     }
 }

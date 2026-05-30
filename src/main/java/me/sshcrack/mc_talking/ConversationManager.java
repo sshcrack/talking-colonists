@@ -12,7 +12,6 @@ import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.HashMap;
@@ -354,9 +353,18 @@ public class ConversationManager {
 
             // High-priority claim (may evict an older non-player slot if at capacity)
             claimSlot(citizen, true);
-            clients.put(citizenId, new CitizenWsClient(
+            var ws = new CitizenWsClient(
                     new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
-                    citizen, player));
+                    citizen, player);
+
+            clients.put(citizenId, ws);
+
+            // Eagerly connect so the WebSocket is already establishing when the first
+            // input arrives.  ensureConnectionForQueuedInput() in GeminiWsClient also
+            // handles the initial-connection path (via hasMadeInitialConnection), so a
+            // lazy approach would also work — but eager connect reduces first-input latency.
+            McTalking.LOGGER.info("Starting initial websocket connection from outer...");
+            ws.connect();
         }
 
         playerConversationPartners.put(playerId, citizenId);
@@ -433,5 +441,6 @@ public class ConversationManager {
         citizenToPlayer.clear();
         addedEntities.clear();
         lastSessionEndTime.clear();
+        GeminiWsClient.shutdownExecutor();
     }
 }

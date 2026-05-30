@@ -5,6 +5,8 @@ import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
@@ -21,15 +23,21 @@ import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+
 
 import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
 import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
@@ -44,6 +52,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
 import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -155,6 +164,86 @@ public final class CitizenPromptViewFactory {
         PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
         String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
 
+        // ── Player state ──────────────────────────────────────────────────────
+        String playerState = null;
+        if (speakingTo != null) {
+            float health = speakingTo.getHealth();
+            float maxHealth = speakingTo.getMaxHealth();
+            int armorValue = speakingTo.getArmorValue();
+
+            StringBuilder ps = new StringBuilder();
+            float healthPct = health / Math.max(1.0f, maxHealth);
+            if (healthPct > 0.75f) ps.append("healthy");
+            else if (healthPct > 0.50f) ps.append("lightly wounded");
+            else if (healthPct > 0.25f) ps.append("wounded");
+            else ps.append("severely injured");
+            ps.append(" (").append(Math.round(health)).append("/").append(Math.round(maxHealth)).append(" HP)");
+
+            if (armorValue > 0) {
+                int wornPieces = 0;
+                float bestToughness = 0;
+                String bestArmorName = "";
+
+                EquipmentSlot[] toCheck = {
+                        EquipmentSlot.HEAD,
+                        EquipmentSlot.CHEST,
+                        EquipmentSlot.LEGS,
+                        EquipmentSlot.FEET
+                };
+
+                for (EquipmentSlot slot : toCheck) {
+                    ItemStack itemStack = speakingTo.getItemBySlot(slot);
+                    if (itemStack.isEmpty())
+                        continue;
+
+                    if (itemStack.getItem() instanceof ArmorItem armor) {
+                        float toughness = armor.getToughness();
+                        if (toughness > bestToughness) {
+                            bestToughness = toughness;
+                            bestArmorName = itemStack.getDisplayName().getString();
+                        }
+
+                        wornPieces++;
+                    }
+                }
+
+                ps.append(", wearing ").append(wornPieces).append(" armor pieces");
+                if (!bestArmorName.isEmpty())
+                    ps.append(String.format(" (best: %s)", bestArmorName));
+            } else {
+                ps.append(", no armor");
+            }
+            playerState = ps.toString();
+        }
+
+        // ── Environment ────────────────────────────────────────────────────────
+        String environment = null;
+        var entityOptEnv = data.getEntity();
+        if (entityOptEnv.isPresent()) {
+            Level level = entityOptEnv.get().level();
+            long dayTime = level.getDayTime() % 24000L;
+            environment = "It is " + describeTime(dayTime) + " and " + describeWeather(level) + ".";
+        }
+
+        // ── Active item requests ──────────────────────────────────────────────
+        List<String> activeItemRequests = null;
+        if (workBuilding != null) {
+            Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
+            if (openRequests != null && !openRequests.isEmpty()) {
+                activeItemRequests = new ArrayList<>();
+                for (IRequest<?> request : openRequests) {
+                    var requestable = request.getRequest();
+                    if (requestable instanceof Stack stackReq) {
+                        ItemStack itemStack = stackReq.getStack();
+                        int count = stackReq.getCount();
+                        activeItemRequests.add(count + "x " + itemStack.getDisplayName().getString());
+                    } else {
+                        activeItemRequests.add(request.getShortDisplayString().getString());
+                    }
+                }
+            }
+        }
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -185,7 +274,10 @@ public final class CitizenPromptViewFactory {
                 workBuildingLevel,
                 data.getColony().getID(),
                 personality,
-                customPersonalityText
+                customPersonalityText,
+                playerState,
+                environment,
+                activeItemRequests
         );
     }
 
@@ -299,5 +391,22 @@ public final class CitizenPromptViewFactory {
         }
 
         return HappinessModifierType.UNKNOWN;
+    }
+
+    private static String describeTime(long dayTime) {
+        if (dayTime < 1000) return "early morning (sunrise)";
+        if (dayTime < 6000) return "morning";
+        if (dayTime < 9000) return "midday";
+        if (dayTime < 12000) return "afternoon";
+        if (dayTime < 13000) return "sunset";
+        if (dayTime < 18000) return "night";
+        if (dayTime < 22000) return "late night";
+        return "pre-dawn";
+    }
+
+    private static String describeWeather(Level level) {
+        if (level.isThundering()) return "thundering";
+        if (level.isRaining()) return "rainy";
+        return "clear";
     }
 }
