@@ -42,6 +42,8 @@ public record CitizenPromptView(
         int workBuildingLevel,
         /** MineColonies colony ID — used for raid-trauma and personality lookups */
         int colonyId,
+        /** {@code true} when the colony's world is on peaceful difficulty — suppresses raid-related prompt content */
+        boolean peaceful,
         /** Built-in personality archetype, or {@code null} if a custom one is active */
         @Nullable PersonalityArchetype personality,
         /** Freeform custom personality text, or {@code null} if a built-in is active */

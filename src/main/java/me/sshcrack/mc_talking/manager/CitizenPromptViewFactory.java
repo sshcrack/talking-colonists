@@ -24,6 +24,7 @@ import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -218,11 +219,13 @@ public final class CitizenPromptViewFactory {
 
         // ── Environment ────────────────────────────────────────────────────────
         String environment = null;
+        boolean peaceful = false;
         var entityOptEnv = data.getEntity();
         if (entityOptEnv.isPresent()) {
             Level level = entityOptEnv.get().level();
             long dayTime = level.getDayTime() % 24000L;
             environment = "It is " + describeTime(dayTime) + " and " + describeWeather(level) + ".";
+            peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
         }
 
         // ── Active item requests ──────────────────────────────────────────────
@@ -273,6 +276,7 @@ public final class CitizenPromptViewFactory {
                 workBuildingDisplayName,
                 workBuildingLevel,
                 data.getColony().getID(),
+                peaceful,
                 personality,
                 customPersonalityText,
                 playerState,

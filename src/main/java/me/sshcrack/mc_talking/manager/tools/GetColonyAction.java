@@ -11,6 +11,7 @@ import com.minecolonies.api.util.constant.Constants;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.Difficulty;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,7 +34,7 @@ public class GetColonyAction extends FunctionAction {
      * @param colony the colony to get information from
      * @return JsonObject containing colony information
      */
-    public JsonObject getColonyInfoForRoleplaying(IColony colony) {
+    public JsonObject getColonyInfoForRoleplaying(IColony colony, boolean peaceful) {
         final JsonObject colonyInfo = new JsonObject();
 
         // Basic colony information
@@ -80,17 +81,19 @@ public class GetColonyAction extends FunctionAction {
 
         // Statistics information
         final JsonObject statsObj = new JsonObject();
-        statsObj.addProperty("raidCount", colony.getStatisticsManager().getStatTotal(Constants.MOD_ID + ".raids_total"));
+        if (!peaceful) {
+            statsObj.addProperty("raidCount", colony.getStatisticsManager().getStatTotal(Constants.MOD_ID + ".raids_total"));
 
-        // Add other useful statistics if available
-        for (String statType : colony.getStatisticsManager().getStatTypes()) {
-            // Filter out statistics that might be useful for roleplaying
-            if (statType.contains("raid") ||
-                    statType.contains("death") ||
-                    statType.contains("built") ||
-                    statType.contains("killed") ||
-                    statType.contains("produced")) {
-                statsObj.addProperty(statType, colony.getStatisticsManager().getStatTotal(statType));
+            // Add other useful statistics if available
+            for (String statType : colony.getStatisticsManager().getStatTypes()) {
+                // Filter out statistics that might be useful for roleplaying
+                if (statType.contains("raid") ||
+                        statType.contains("death") ||
+                        statType.contains("built") ||
+                        statType.contains("killed") ||
+                        statType.contains("produced")) {
+                    statsObj.addProperty(statType, colony.getStatisticsManager().getStatTotal(statType));
+                }
             }
         }
         colonyInfo.add("statistics", statsObj);
@@ -119,6 +122,8 @@ public class GetColonyAction extends FunctionAction {
             return errorResponse;
         }
 
-        return getColonyInfoForRoleplaying(colony);
+        var level = citizen.level();
+        boolean peaceful = level != null && level.getDifficulty() == Difficulty.PEACEFUL;
+        return getColonyInfoForRoleplaying(colony, peaceful);
     }
 }

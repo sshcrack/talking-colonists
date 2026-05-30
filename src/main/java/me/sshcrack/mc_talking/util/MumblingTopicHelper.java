@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.jobs.registry.JobEntry;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.Difficulty;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -61,7 +62,7 @@ public final class MumblingTopicHelper {
         return status == VisibleCitizenStatus.MOURNING
                 || status == VisibleCitizenStatus.SICK
                 || data.getCitizenDiseaseHandler().isSick()
-                || status == VisibleCitizenStatus.RAIDED
+                || (status == VisibleCitizenStatus.RAIDED && !isPeaceful(citizen))
                 || data.getSaturation() <= 1;
     }
 
@@ -426,7 +427,7 @@ public final class MumblingTopicHelper {
                     "You're trying to push through, but it's hard."
             );
 
-        if (status == VisibleCitizenStatus.RAIDED)
+        if (status == VisibleCitizenStatus.RAIDED && !isPeaceful(citizen))
             return pick(
                     "You're still shaken by what happened.",
                     "You can't fully relax yet.",
@@ -472,6 +473,11 @@ public final class MumblingTopicHelper {
 
     private static boolean chance(double probability) {
         return ThreadLocalRandom.current().nextDouble() < probability;
+    }
+
+    private static boolean isPeaceful(AbstractEntityCitizen citizen) {
+        var level = citizen.level();
+        return level != null && level.getDifficulty() == Difficulty.PEACEFUL;
     }
 
     private static String pick(String... options) {

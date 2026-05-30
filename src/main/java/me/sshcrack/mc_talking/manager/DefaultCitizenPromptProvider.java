@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
@@ -187,7 +188,11 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         final CitizenStatusView status = view.status();
         if (status != null) {
-            prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
+            if (view.peaceful() && status.type() == CitizenStatusType.RAIDED) {
+                prompt.append("- Currently: going about the day\n");
+            } else {
+                prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
+            }
         }
 
         if (view.environment() != null) {
@@ -195,22 +200,24 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         // Post-raid trauma
-        int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-        if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(view.colonyId(), traumaDuration)) {
-            long sinceMs = RaidTraumaTracker.millisSinceRaid(view.colonyId());
-            int lost = RaidTraumaTracker.getLostCitizens(view.colonyId());
-            prompt.append("\n## POST-RAID TRAUMA\n");
-            if (sinceMs < 5 * 60_000L) {
-                prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
-            } else if (sinceMs < 15 * 60_000L) {
-                prompt.append("- The recent raid is still fresh in your mind. You're on edge and jumpy.\n");
-            } else {
-                prompt.append("- You're slowly calming down after the raid, but still feel uneasy.\n");
-            }
-            if (lost > 0) {
-                prompt.append("- Tragically, ").append(lost)
-                      .append(" of your fellow colonists didn't survive.")
-                      .append("\n");
+        if (!view.peaceful()) {
+            int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
+            if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(view.colonyId(), traumaDuration)) {
+                long sinceMs = RaidTraumaTracker.millisSinceRaid(view.colonyId());
+                int lost = RaidTraumaTracker.getLostCitizens(view.colonyId());
+                prompt.append("\n## POST-RAID TRAUMA\n");
+                if (sinceMs < 5 * 60_000L) {
+                    prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
+                } else if (sinceMs < 15 * 60_000L) {
+                    prompt.append("- The recent raid is still fresh in your mind. You're on edge and jumpy.\n");
+                } else {
+                    prompt.append("- You're slowly calming down after the raid, but still feel uneasy.\n");
+                }
+                if (lost > 0) {
+                    prompt.append("- Tragically, ").append(lost)
+                            .append(" of your fellow colonists didn't survive.")
+                            .append("\n");
+                }
             }
         }
     }
@@ -394,7 +401,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         }
                         break;
                     case RAIDWITHOUTDEATH:
-                        if (factor > 1.2) {
+                        if (!view.peaceful() && factor > 1.2) {
                             prompt.append("- Feeling safe because the recent raid was without civilan deaths\n");
                         }
                         break;
