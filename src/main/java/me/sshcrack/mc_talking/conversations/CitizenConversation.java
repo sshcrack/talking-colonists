@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
 
@@ -151,8 +152,8 @@ public class CitizenConversation {
         UUID idB = citizenB.getUUID();
 
         // "Already busy" guard: abort if either citizen is already in any session
-        if (ConversationManager.isCitizenBusy(idA) || ConversationManager.isCitizenBusy(idB)) {
-            McTalking.LOGGER.info("[LiveConv] One or both citizens already busy, aborting");
+        if (!ConversationManager.canCitizenSpeak(citizenA) || !ConversationManager.canCitizenSpeak(citizenB)) {
+            McTalking.LOGGER.info("[LiveConv] One or both citizens can't speak, aborting");
             setState(ConversationState.ENDED);
             return;
         }
@@ -165,10 +166,10 @@ public class CitizenConversation {
         }
 
         // Claim both slots (low-priority) before creating any clients
-        if (!ConversationManager.claimSlot(idA, false) || !ConversationManager.claimSlot(idB, false)) {
+        if (!ConversationManager.claimSlot(citizenA, false) || !ConversationManager.claimSlot(citizenB, false)) {
             // Shouldn't happen after the capacity check above, but be safe
-            ConversationManager.releaseSlot(idA);
-            ConversationManager.releaseSlot(idB);
+            ConversationManager.releaseSlot(citizenA);
+            ConversationManager.releaseSlot(citizenB);
             McTalking.LOGGER.warn("[LiveConv] Failed to claim slots, aborting");
             setState(ConversationState.ENDED);
             return;
@@ -188,11 +189,11 @@ public class CitizenConversation {
                         if (!c.isClosed()) c.close();
                     });
                 }
-                ConversationManager.unregisterExternalClient(idA);
-                ConversationManager.unregisterExternalClient(idB);
+                ConversationManager.unregisterExternalClient(citizenA);
+                ConversationManager.unregisterExternalClient(citizenB);
                 // Record per-citizen cooldowns so they aren't immediately re-selected
-                ConversationManager.recordCooldown(idA);
-                ConversationManager.recordCooldown(idB);
+                ConversationManager.recordCooldown(citizenA);
+                ConversationManager.recordCooldown(citizenB);
                 setState(ConversationState.ENDED);
             }
         };
@@ -220,8 +221,8 @@ public class CitizenConversation {
         liveClients = List.of(clientA, clientB);
 
         // Register in ConversationManager so "already busy" and slot queries work
-        ConversationManager.registerExternalClient(idA, clientA);
-        ConversationManager.registerExternalClient(idB, clientB);
+        ConversationManager.registerExternalClient(citizenA, clientA);
+        ConversationManager.registerExternalClient(citizenB, clientB);
 
         clientA.connect();
         clientB.connect();

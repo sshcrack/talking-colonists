@@ -287,8 +287,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected void onConversationEnded() {
         if (wsSessionState == WsSessionState.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+            flushPendingText();
         }
-        flushPendingText();
     }
 
     /**

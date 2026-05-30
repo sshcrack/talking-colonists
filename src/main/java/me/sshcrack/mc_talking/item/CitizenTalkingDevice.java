@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenTalkingDevice extends Item {
@@ -163,9 +164,9 @@ public class CitizenTalkingDevice extends Item {
             return true; // Still prevent attack
         }
 
-        if (citizen.isSleeping()) {
+        if (!ConversationManager.canCitizenSpeak(citizen, true)) {
             serverPlayer.sendSystemMessage(
-                    Component.literal("This citizen is sleeping. You can't talk to them right now.")
+                    Component.literal("This citizen can't speak right now. They are either already talking or sleeping")
                             .withStyle(ChatFormatting.RED)
             );
 
@@ -190,7 +191,7 @@ public class CitizenTalkingDevice extends Item {
         }
 
         // Use the centralized startConversation method
-        ConversationManager.startConversation(serverPlayer, citizen);
+        ConversationManager.startPlayerConversation(serverPlayer, citizen);
 
         /*? if forge {*/
         /*CompoundTag tag = stack.getOrCreateTag();

@@ -17,6 +17,7 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -99,6 +100,27 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How often (in server ticks) to check for random citizen conversations. 20 ticks = 1 second")
     public int randomConversationCheckIntervalTicks = 400;
 
+    // Pregeneration
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @TickBox
+    @SerialEntry(comment = "If true, the mod will pregenerate audio for citizen greetings and threats in the background to reduce audio latency.")
+    public boolean enablePregeneration = true;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @DoubleField(min = 1.0, max = 20.0)
+    @SerialEntry(comment = "Distance in blocks within which passing citizens will trigger their pregenerated greeting.")
+    public double pregeneratedGreetingDistance = 3.0;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 0, max = 60000)
+    @SerialEntry(comment = "Cooldown in milliseconds between threat pregeneration plays for a citizen. Set to 0 to disable.")
+    public int threatPlayCooldownMs = 15000;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 0, max = 100)
+    @SerialEntry(comment = "Maximum number of pregenerated greetings to store per citizen. Oldest greetings are discarded when limit is reached.")
+    public int maxPregeneratedGreetingsPerCitizen = 5;
+
     // Resource Management
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)
@@ -131,9 +153,10 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Chance (0.0-1.0) that a nearby citizen starts mumbling to themselves per check interval")
     public double mumblingChance = 0.05;
 
-    @AutoGen(category = "citizens", group = "mumbling")
+    @AutoGen(category = "citizens")
     @DoubleField(min = 1.0, max = 100.0)
-    @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble when a player is nearby")
+    @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble/start a conversation etc when a player is nearby")
+    //TODO this is also used for greetings between citizens
     public double mumblingDetectionRange = 10.0;
 
     @AutoGen(category = "citizens", group = "mumbling")
@@ -157,13 +180,13 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
     public int citizenContactCheckIntervalTicks = 400;
 
-    @AutoGen(category="citizens", group="voice_chat")
+    @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
-    @SerialEntry(comment= "If true, citizens will whisper when talking")
+    @SerialEntry(comment = "If true, citizens will whisper when talking")
     public boolean citizenVoiceWhisper = true;
 
-    @AutoGen(category="citizens", group="voice_chat")
-    @IntField(min=0)
+    @AutoGen(category = "citizens", group = "voice_chat")
+    @IntField(min = 0)
     @SerialEntry(comment = "Max voice distance of the citizen. Use 0 to use default distance")
     public int citizenVoiceDistance = 0;
 
@@ -203,6 +226,14 @@ public class McTalkingConfig {
         public ControllerBuilder<String> createController(ListGroup annotation, ConfigField<List<String>> field, dev.isxander.yacl3.config.v2.api.autogen.OptionAccess storage, Option<String> option) {
             return StringControllerBuilder.create(option);
         }
+    }
+
+
+
+    public static boolean hasGeminiApiKey() {
+        String key = INSTANCE.instance().geminiApiKey;
+        return key != null
+                && !key.trim().isEmpty();
     }
 
     public static void loadConfig() {
