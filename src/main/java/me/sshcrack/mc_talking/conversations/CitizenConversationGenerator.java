@@ -116,7 +116,7 @@ public class CitizenConversationGenerator {
         GeminiTTS.RequestPayload.GenerationConfig generationConfig =
                 new GeminiTTS.RequestPayload.GenerationConfig();
 
-        generationConfig.responseModalities = List.of("audio");
+        generationConfig.responseModalities = List.of("AUDIO");
         generationConfig.temperature = 1.0;
 
         GeminiTTS.RequestPayload.SpeechConfig speechConfig = new GeminiTTS.RequestPayload.SpeechConfig();
@@ -184,10 +184,12 @@ public class CitizenConversationGenerator {
             GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation.conversation(), speakerVoiceConfigs), chunkConsumer);
             TtsQuotaManager.reportSuccess();
         } catch (IOException | UnexpectedResponseException e) {
+            McTalking.LOGGER.error("Failed to generate conversation audio using Gemini TTS", e);
             TtsQuotaManager.reportFailure(e);
             throw new ConversationGenerationException("Failed to generate conversation audio using Gemini TTS", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            McTalking.LOGGER.error("Conversation audio generation was interrupted", e);
             TtsQuotaManager.reportFailure(e);
             throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
         }
@@ -210,10 +212,12 @@ public class CitizenConversationGenerator {
             McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", conversationEntities.size());
             rawConversationOutput = GeminiFlash.sendFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, getFlashPrompt(citizenInfo.toString()));
         } catch (IOException | UnexpectedResponseException e) {
+            McTalking.LOGGER.error("Failed to generate conversation using Gemini Flash", e);
             TtsQuotaManager.reportFailure(e);
             throw new ConversationGenerationException("Failed to generate conversation using Gemini Flash", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            McTalking.LOGGER.error("Conversation generation was interrupted", e);
             TtsQuotaManager.reportFailure(e);
             throw new ConversationGenerationException("Conversation generation was interrupted", e);
         }

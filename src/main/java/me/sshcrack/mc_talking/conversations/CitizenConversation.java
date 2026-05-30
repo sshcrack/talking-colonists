@@ -118,6 +118,10 @@ public class CitizenConversation {
                         e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
                 if (fallback != null) {
                     McTalking.LOGGER.info("[Auto] Flash/TTS failed, falling back to Live WebSockets");
+                    if (stream != null) {
+                        stream.stop();
+                        stream.close();
+                    }
                     fallback.run();
                 }
             } finally {

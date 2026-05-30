@@ -1,12 +1,16 @@
 package me.sshcrack.mc_talking.config;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 public class TtsQuotaManager {
     private static final long QUOTA_RETRY_INTERVAL_MS = 3_600_000;
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
 
-    private static boolean ttsFailed = false;
-    private static long lastFailureTime = 0;
-    private static int consecutiveFailures = 0;
+    private static final AtomicBoolean ttsFailed = new AtomicBoolean(false);
+    private static final AtomicLong lastFailureTime = new AtomicLong(0);
+    private static final AtomicInteger consecutiveFailures = new AtomicInteger(0);
 
     private static boolean isQuotaError(Exception e) {
         String msg = e.getMessage();
@@ -20,22 +24,23 @@ public class TtsQuotaManager {
     }
 
     public static boolean isTtsFailed() {
-        if (ttsFailed && System.currentTimeMillis() - lastFailureTime > QUOTA_RETRY_INTERVAL_MS) {
-            ttsFailed = false;
-            consecutiveFailures = 0;
+        if (ttsFailed.get() && System.currentTimeMillis() - lastFailureTime.get() > QUOTA_RETRY_INTERVAL_MS) {
+            ttsFailed.set(false);
+            consecutiveFailures.set(0);
         }
-        return ttsFailed;
+        return ttsFailed.get();
     }
 
     public static void reportFailure(Exception e) {
-        consecutiveFailures++;
-        if (isQuotaError(e) || consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-            ttsFailed = true;
-            lastFailureTime = System.currentTimeMillis();
+        consecutiveFailures.incrementAndGet();
+        if (isQuotaError(e) || consecutiveFailures.get() >= MAX_CONSECUTIVE_FAILURES) {
+            ttsFailed.set(true);
+            lastFailureTime.set(System.currentTimeMillis());
         }
     }
 
     public static void reportSuccess() {
-        consecutiveFailures = 0;
+        ttsFailed.set(false);
+        consecutiveFailures.set(0);
     }
 }
