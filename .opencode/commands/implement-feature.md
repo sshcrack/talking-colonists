@@ -48,7 +48,6 @@ Read ALL of these to match the codebase conventions:
 - Conditional compilation with `/*? if neoforge {*/` / `/*? if forge {*/`
 - When both loaders need the same logic but different imports, use the stonecutter blocks around imports
 - For platform-specific things (registries, events), check what the existing code does
-- **Do NOT use `EquipmentSlot.BODY`** — it does not exist in 1.20.1-forge; use `EquipmentSlot.CHEST` instead
 - **Entity.level() can return null in Forge 1.20.1** — null-check before using it
 - Access transformers for MineColonies classes: `src/main/resources/aw/<version>.cfg` (Forge) or `src/main/resources/aw/<version>.accesswidener` (NeoForge)
 
