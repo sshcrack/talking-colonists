@@ -428,5 +428,6 @@ public class ConversationManager {
         citizenToPlayer.clear();
         addedEntities.clear();
         lastSessionEndTime.clear();
+        GeminiWsClient.shutdownExecutor();
     }
 }

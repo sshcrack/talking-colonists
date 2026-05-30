@@ -726,4 +726,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public boolean sendStatusUpdates() {
         return true;
     }
+
+    public static void shutdownExecutor() {
+        RECONNECT_EXECUTOR.shutdown();
+        try {
+            if (!RECONNECT_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                RECONNECT_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            RECONNECT_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 }
