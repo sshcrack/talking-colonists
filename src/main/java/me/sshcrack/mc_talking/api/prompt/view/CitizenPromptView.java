@@ -53,7 +53,9 @@ public record CitizenPromptView(
         /** Description of the current environment, e.g. "It is midday and sunny." */
         @Nullable String environment,
         /** Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none */
-        @Nullable List<String> activeItemRequests
+        @Nullable List<String> activeItemRequests,
+        /** Human-readable descriptions of active quests this citizen is involved in, or {@code null} if none */
+        @Nullable List<String> activeQuests
 ) {
 }
 

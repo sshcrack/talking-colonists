@@ -247,6 +247,30 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        // ── Active quests ──────────────────────────────────────────────────────
+        List<String> activeQuests = null;
+        if (data.hasQuestAssignment()) {
+            var colony = data.getColony();
+            var questManager = colony.getQuestManager();
+            var inProgress = questManager.getInProgressQuests();
+            if (inProgress != null && !inProgress.isEmpty()) {
+                activeQuests = new ArrayList<>();
+                int citizenId = data.getId();
+                for (var quest : inProgress) {
+                    if (quest.getParticipants().contains(citizenId)) {
+                        String questName = quest.getId().getPath()
+                                .replace("_", " ")
+                                .replace("/", " - ");
+                        int objective = quest.getObjectiveIndex() + 1; // 1-indexed for readability
+                        activeQuests.add(questName + " (objective " + objective + ")");
+                    }
+                }
+                if (activeQuests.isEmpty()) {
+                    activeQuests = null;
+                }
+            }
+        }
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -281,7 +305,8 @@ public final class CitizenPromptViewFactory {
                 customPersonalityText,
                 playerState,
                 environment,
-                activeItemRequests
+                activeItemRequests,
+                activeQuests
         );
     }
 
