@@ -262,21 +262,29 @@ public final class CitizenPromptViewFactory {
                     TreeMap<Integer, ColonyConnection> direct = connManager.getDirectlyConnectedColonies();
                     if (direct != null) {
                         for (Map.Entry<Integer, ColonyConnection> entry : direct.entrySet()) {
-                            int targetId = entry.getKey();
-                            ColonyConnection conn = entry.getValue();
-                            String connName = conn.name != null ? conn.name : "Colony #" + targetId;
-                            DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
-                            colonyConnections.add(connName + " (" + status.name() + ")");
+                            try {
+                                int targetId = entry.getKey();
+                                ColonyConnection conn = entry.getValue();
+                                String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                                DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                                colonyConnections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Failed to process direct colony connection {}", entry.getKey(), e);
+                            }
                         }
                     }
                     TreeMap<Integer, ColonyConnection> indirect = connManager.getIndirectlyConnectedColonies();
                     if (indirect != null) {
                         for (Map.Entry<Integer, ColonyConnection> entry : indirect.entrySet()) {
-                            int targetId = entry.getKey();
-                            ColonyConnection conn = entry.getValue();
-                            String connName = conn.name != null ? conn.name : "Colony #" + targetId;
-                            DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
-                            colonyConnections.add(connName + " (" + status.name() + ")");
+                            try {
+                                int targetId = entry.getKey();
+                                ColonyConnection conn = entry.getValue();
+                                String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                                DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                                colonyConnections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Failed to process indirect colony connection {}", entry.getKey(), e);
+                            }
                         }
                     }
                     if (colonyConnections.isEmpty()) {
