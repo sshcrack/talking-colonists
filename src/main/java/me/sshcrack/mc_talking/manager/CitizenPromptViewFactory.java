@@ -250,7 +250,7 @@ public final class CitizenPromptViewFactory {
 
         // ── Recent colony events ────────────────────────────────────────────
         int colonyId = data.getColony().getID();
-        int eventWindow = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
+        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
         List<String> recentEvents = eventWindow > 0
                 ? ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
                         .map(e -> e.description())

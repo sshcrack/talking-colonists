@@ -76,6 +76,16 @@ public final class ColonyEventBuffer {
         return lastRaidLostCitizens.getOrDefault(colonyId, 0);
     }
 
+    /**
+     * Removes all stored data for a specific colony.
+     * Call this when a colony is deleted to prevent memory leaks.
+     */
+    public static void removeColony(int colonyId) {
+        events.remove(colonyId);
+        lastRaidEndTime.remove(colonyId);
+        lastRaidLostCitizens.remove(colonyId);
+    }
+
     public static void clear() {
         events.clear();
         lastRaidEndTime.clear();

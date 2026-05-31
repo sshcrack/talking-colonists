@@ -4,11 +4,13 @@ import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
+import com.minecolonies.api.eventbus.events.colony.ColonyDeletedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenDiedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenJobChangedModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingConstructionModEvent;
+import com.minecolonies.api.eventbus.events.colony.buildings.BuildingRemovedModEvent;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.network.chat.Component;
 
@@ -28,7 +30,9 @@ public final class ColonyEventSubscriber {
             ICitizenData citizen = (ICitizenData) event.getCitizen();
             int colonyId = citizen.getColony().getID();
             String name = citizen.getName();
-            String source = event.getDamageSource().getMsgId();
+            String source = event.getDamageSource() != null
+                    ? event.getDamageSource().getMsgId()
+                    : "unknown cause";
             ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.CITIZEN_DEATH,
                     name + " died (" + source + ")");
         });
@@ -73,7 +77,7 @@ public final class ColonyEventSubscriber {
             int colonyId = building.getColony().getID();
             String buildingName = building.getBuildingDisplayName();
             ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.BUILDING_ADDED,
-                    buildingName + " was built");
+                    buildingName + " was placed");
         });
 
         bus.subscribe(BuildingConstructionModEvent.class, event -> {
@@ -85,6 +89,19 @@ public final class ColonyEventSubscriber {
                 ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.BUILDING_UPGRADED,
                         buildingName + " was upgraded to level " + level);
             }
+        });
+
+        bus.subscribe(BuildingRemovedModEvent.class, event -> {
+            IBuilding building = event.getBuilding();
+            int colonyId = building.getColony().getID();
+            String buildingName = building.getBuildingDisplayName();
+            ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.BUILDING_REMOVED,
+                    buildingName + " was destroyed");
+        });
+
+        bus.subscribe(ColonyDeletedModEvent.class, event -> {
+            int colonyId = event.getColony().getID();
+            ColonyEventBuffer.removeColony(colonyId);
         });
     }
 }
