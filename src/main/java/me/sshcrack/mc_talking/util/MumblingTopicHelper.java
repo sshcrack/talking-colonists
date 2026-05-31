@@ -35,19 +35,38 @@ public final class MumblingTopicHelper {
 
         String jobTopic = buildJobTopic(citizen, happiness);
 
+        // Colony milestone — rolls independently so it can supplement any topic.
+        String rawMilestone = null;
+        if (chance(0.35)) {
+            rawMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
+        }
+
         // Non-critical status + job: blend them so both colour the thought.
         if (statusTopic != null && jobTopic != null) {
             String blended = statusTopic + " Still, " +
                     Character.toLowerCase(jobTopic.charAt(0)) + jobTopic.substring(1);
+            if (rawMilestone != null) {
+                blended = blended + " You also find yourself thinking: " + rawMilestone.toLowerCase();
+            }
             return compose(blended);
         }
 
-        if (statusTopic != null) return compose(statusTopic);
-        if (jobTopic != null) return compose(jobTopic);
+        if (statusTopic != null) {
+            if (rawMilestone != null) {
+                return compose(statusTopic + " You also notice: " + rawMilestone.toLowerCase());
+            }
+            return compose(statusTopic);
+        }
 
-        if (chance(0.3)) {
-            String colonyTopic = buildColonyTopic(data);
-            if (colonyTopic != null) return compose(colonyTopic);
+        if (jobTopic != null) {
+            if (rawMilestone != null) {
+                return compose(jobTopic + " You're also aware that " + rawMilestone.toLowerCase());
+            }
+            return compose(jobTopic);
+        }
+
+        if (rawMilestone != null) {
+            return compose(standaloneColonyTopic(rawMilestone));
         }
 
         return FALLBACK;
@@ -475,10 +494,11 @@ public final class MumblingTopicHelper {
         return null;
     }
 
-    private static String buildColonyTopic(ICitizenData data) {
-        String milestone = ColonyStatsHelper.getColonyMilestoneText(data);
-        if (milestone == null) return null;
-
+    /**
+     * Wraps a raw colony milestone in an intro phrase for standalone use
+     * (no other topic available to blend with).
+     */
+    private static String standaloneColonyTopic(String milestone) {
         return pick(
                 "You're thinking about something — " + milestone.toLowerCase(),
                 "A thought crosses your mind: " + milestone.toLowerCase(),

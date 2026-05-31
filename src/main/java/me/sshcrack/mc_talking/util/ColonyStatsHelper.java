@@ -5,6 +5,8 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.util.constant.Constants;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class ColonyStatsHelper {
@@ -21,6 +23,9 @@ public final class ColonyStatsHelper {
     /**
      * Returns a 1-sentence milestone mention for the citizen's colony, or null
      * if no milestone is currently notable.
+     * <p>
+     * Collects all eligible milestones and picks one at random, so no single
+     * stat permanently dominates the dialogue.
      */
     public static String getColonyMilestoneText(ICitizenData data) {
         if (!McTalkingConfig.INSTANCE.instance().enableColonyStatsMentions) {
@@ -33,19 +38,21 @@ public final class ColonyStatsHelper {
         var stats = colony.getStatisticsManager();
         String modPrefix = Constants.MOD_ID + ".";
 
+        List<String> eligible = new ArrayList<>();
+
         int kills = stats.getStatTotal(modPrefix + "killed_total");
         if (kills > THRESHOLD_KILLED) {
-            return "Colony has fought off over " + THRESHOLD_KILLED + " mobs — shows how tough this place is.";
+            eligible.add("Colony has fought off over " + kills + " mobs — shows how tough this place is.");
         }
 
         int builds = stats.getStatTotal(modPrefix + "built_total");
         if (builds > THRESHOLD_BUILDS) {
-            return "Colony has built over " + THRESHOLD_BUILDS + " buildings — it's really growing.";
+            eligible.add("Colony has built over " + builds + " buildings — it's really growing.");
         }
 
         int raids = stats.getStatTotal(modPrefix + "raids_total");
         if (raids > THRESHOLD_RAIDS) {
-            return "Colony has survived over " + THRESHOLD_RAIDS + " raids — we're still standing.";
+            eligible.add("Colony has survived over " + raids + " raids — we're still standing.");
         }
 
         int deaths = stats.getStatTotal(modPrefix + "deaths_total");
@@ -53,21 +60,21 @@ public final class ColonyStatsHelper {
             int recentDeaths = stats.getStatsInPeriod(modPrefix + "deaths_total",
                     Math.max(0, colony.getDay() - 7), colony.getDay());
             if (recentDeaths > 3) {
-                return pick(
-                        "Too many have died recently. The colony feels heavy with loss.",
-                        "We've lost too many lately. It's hard to keep spirits up.",
-                        "The recent deaths weigh on everyone."
-                );
+                eligible.add("Too many have died recently. The colony feels heavy with loss.");
+                eligible.add("We've lost too many lately. It's hard to keep spirits up.");
+                eligible.add("The recent deaths weigh on everyone.");
+            } else {
+                eligible.add("So many have died since the colony was founded. We remember them.");
             }
-            return "So many have died since the colony was founded. We remember them.";
         }
 
         int citizenCount = colony.getCitizenManager().getCurrentCitizenCount();
         if (citizenCount > THRESHOLD_CITIZENS) {
-            return "There are over " + THRESHOLD_CITIZENS + " of us now — the colony is thriving.";
+            eligible.add("There are over " + citizenCount + " of us now — the colony is thriving.");
         }
 
-        return null;
+        if (eligible.isEmpty()) return null;
+        return pick(eligible.toArray(new String[0]));
     }
 
     private static String pick(String... options) {
