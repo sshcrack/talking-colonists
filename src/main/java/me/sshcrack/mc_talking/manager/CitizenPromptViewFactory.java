@@ -3,6 +3,9 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
+import com.minecolonies.api.colony.connections.ColonyConnection;
+import com.minecolonies.api.colony.connections.DiplomacyStatus;
+import com.minecolonies.api.colony.connections.IColonyConnectionManager;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
@@ -37,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.UUID;
 
 
@@ -54,6 +58,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
 
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -247,6 +252,43 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        // ── Colony connections (diplomacy) ────────────────────────────────
+        List<String> colonyConnections = null;
+        if (McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
+            try {
+                IColonyConnectionManager connManager = data.getColony().getConnectionManager();
+                if (connManager != null) {
+                    colonyConnections = new ArrayList<>();
+                    TreeMap<Integer, ColonyConnection> direct = connManager.getDirectlyConnectedColonies();
+                    if (direct != null) {
+                        for (Map.Entry<Integer, ColonyConnection> entry : direct.entrySet()) {
+                            int targetId = entry.getKey();
+                            ColonyConnection conn = entry.getValue();
+                            String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                            DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                            colonyConnections.add(connName + " (" + status.name() + ")");
+                        }
+                    }
+                    TreeMap<Integer, ColonyConnection> indirect = connManager.getIndirectlyConnectedColonies();
+                    if (indirect != null) {
+                        for (Map.Entry<Integer, ColonyConnection> entry : indirect.entrySet()) {
+                            int targetId = entry.getKey();
+                            ColonyConnection conn = entry.getValue();
+                            String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                            DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                            colonyConnections.add(connName + " (" + status.name() + ")");
+                        }
+                    }
+                    if (colonyConnections.isEmpty()) {
+                        colonyConnections = null;
+                    }
+                }
+            } catch (Exception e) {
+                McTalking.LOGGER.warn("Failed to extract colony connections", e);
+                colonyConnections = null;
+            }
+        }
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -281,7 +323,8 @@ public final class CitizenPromptViewFactory {
                 customPersonalityText,
                 playerState,
                 environment,
-                activeItemRequests
+                activeItemRequests,
+                colonyConnections
         );
     }
 
