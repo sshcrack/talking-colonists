@@ -257,12 +257,17 @@ public final class CitizenPromptViewFactory {
                 activeQuests = new ArrayList<>();
                 int citizenId = data.getId();
                 for (var quest : inProgress) {
-                    if (quest.getParticipants().contains(citizenId)) {
+                    var participants = quest.getParticipants();
+                    if (participants != null && participants.contains(citizenId)) {
                         String questName = quest.getId().getPath()
                                 .replace("_", " ")
                                 .replace("/", " - ");
-                        int objective = quest.getObjectiveIndex() + 1; // 1-indexed for readability
-                        activeQuests.add(questName + " (objective " + objective + ")");
+                        int rawObjective = quest.getObjectiveIndex();
+                        if (rawObjective >= 0) {
+                            int objective = rawObjective + 1; // 1-indexed for readability
+                            questName += " (objective " + objective + ")";
+                        }
+                        activeQuests.add(questName);
                     }
                 }
                 if (activeQuests.isEmpty()) {
