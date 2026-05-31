@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.util;
 
+import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
@@ -43,6 +44,11 @@ public final class MumblingTopicHelper {
 
         if (statusTopic != null) return compose(statusTopic);
         if (jobTopic != null) return compose(jobTopic);
+
+        if (chance(0.3)) {
+            String colonyTopic = buildColonyTopic(data);
+            if (colonyTopic != null) return compose(colonyTopic);
+        }
 
         return FALLBACK;
     }
@@ -467,6 +473,17 @@ public final class MumblingTopicHelper {
             );
 
         return null;
+    }
+
+    private static String buildColonyTopic(ICitizenData data) {
+        String milestone = ColonyStatsHelper.getColonyMilestoneText(data);
+        if (milestone == null) return null;
+
+        return pick(
+                "You're thinking about something — " + milestone.toLowerCase(),
+                "A thought crosses your mind: " + milestone.toLowerCase(),
+                "You can't help but notice that " + milestone.toLowerCase()
+        );
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

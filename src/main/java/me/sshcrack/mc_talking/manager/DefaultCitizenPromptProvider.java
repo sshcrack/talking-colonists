@@ -134,6 +134,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("- The player you are speaking to appears ").append(view.playerState()).append("\n");
         }
 
+        if (view.colonyMilestone() != null) {
+            obs.append("- Recently noted: ").append(view.colonyMilestone()).append(" This may come up in conversation.\n");
+        }
+
         if (view.activeItemRequests() != null && !view.activeItemRequests().isEmpty()) {
             obs.append("- You are currently waiting for:\n");
             for (String req : view.activeItemRequests()) {

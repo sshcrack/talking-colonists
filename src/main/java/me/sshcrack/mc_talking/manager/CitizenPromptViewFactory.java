@@ -12,6 +12,7 @@ import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
+import me.sshcrack.mc_talking.util.ColonyStatsHelper;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
@@ -228,6 +229,9 @@ public final class CitizenPromptViewFactory {
             peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
         }
 
+        // ── Colony milestone ──────────────────────────────────────────────────
+        String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
+
         // ── Active item requests ──────────────────────────────────────────────
         List<String> activeItemRequests = null;
         if (workBuilding != null) {
@@ -281,7 +285,8 @@ public final class CitizenPromptViewFactory {
                 customPersonalityText,
                 playerState,
                 environment,
-                activeItemRequests
+                activeItemRequests,
+                colonyMilestone
         );
     }
 
