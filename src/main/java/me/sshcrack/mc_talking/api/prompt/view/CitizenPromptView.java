@@ -53,7 +53,9 @@ public record CitizenPromptView(
         /** Description of the current environment, e.g. "It is midday and sunny." */
         @Nullable String environment,
         /** Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none */
-        @Nullable List<String> activeItemRequests
+        @Nullable List<String> activeItemRequests,
+        /** Descriptions of recent colony lifecycle events (deaths, births, building changes), or empty list if none */
+        List<String> recentColonyEvents
 ) {
 }
 

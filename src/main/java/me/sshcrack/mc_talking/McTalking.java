@@ -70,6 +70,7 @@ public class McTalking {
         AITools.register();
         McTalkingConfig.loadConfig();
         AiStatusPayload.registerMessages();
+        me.sshcrack.mc_talking.listener.ColonyEventSubscriber.register();
     }
 
 

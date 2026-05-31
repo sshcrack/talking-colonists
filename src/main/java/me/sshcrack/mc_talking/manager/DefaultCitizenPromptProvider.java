@@ -7,7 +7,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.util.RaidTraumaTracker;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -202,9 +202,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         // Post-raid trauma
         if (!view.peaceful()) {
             int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-            if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(view.colonyId(), traumaDuration)) {
-                long sinceMs = RaidTraumaTracker.millisSinceRaid(view.colonyId());
-                int lost = RaidTraumaTracker.getLostCitizens(view.colonyId());
+            if (traumaDuration > 0 && ColonyEventBuffer.isInTrauma(view.colonyId(), traumaDuration)) {
+                long sinceMs = ColonyEventBuffer.millisSinceRaid(view.colonyId());
+                int lost = ColonyEventBuffer.getLostCitizens(view.colonyId());
                 prompt.append("\n## POST-RAID TRAUMA\n");
                 if (sinceMs < 5 * 60_000L) {
                     prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
@@ -218,6 +218,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                             .append(" of your fellow colonists didn't survive.")
                             .append("\n");
                 }
+            }
+        }
+
+        // Recent colony events
+        if (!view.recentColonyEvents().isEmpty()) {
+            prompt.append("\n## RECENT COLONY EVENTS\n");
+            for (String event : view.recentColonyEvents()) {
+                prompt.append("- ").append(event).append("\n");
             }
         }
     }
