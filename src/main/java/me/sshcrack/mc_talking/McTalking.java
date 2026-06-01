@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.listener.ColonyEventSubscriber;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
@@ -11,9 +12,11 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 *//*?}*/
 /*? if neoforge {*/
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModLoadingContext;
@@ -47,6 +50,7 @@ public class McTalking {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
         ModItems.register(modEventBus);
+        modEventBus.addListener(CommonSetupEvent.class, this::onCommonSetup);
     }
     *//*?}*/
 
@@ -62,6 +66,7 @@ public class McTalking {
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
         ModItems.register(modEventBus);
         modEventBus.addListener(this::registerPayloadHandlers);
+        modEventBus.addListener(FMLCommonSetupEvent.class, this::onCommonSetup);
     }
     /*?}*/
 
@@ -69,7 +74,10 @@ public class McTalking {
         AITools.register();
         McTalkingConfig.loadConfig();
         AiStatusPayload.registerMessages();
-        me.sshcrack.mc_talking.listener.ColonyEventSubscriber.register();
+    }
+
+    private void onCommonSetup(final FMLCommonSetupEvent event) {
+        ColonyEventSubscriber.register();
     }
 
 
