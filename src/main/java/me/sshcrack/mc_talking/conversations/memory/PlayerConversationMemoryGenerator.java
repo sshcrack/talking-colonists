@@ -33,7 +33,6 @@ public class PlayerConversationMemoryGenerator extends Thread {
             ---
             %s
             ---
-            %s
 
             Return ONLY valid JSON.
 
@@ -107,7 +106,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
             String prompt = String.format(PROMPT_TEMPLATE,
                     citizenName, playerName, playerRank,
-                    transcript, "",
+                    transcript,
                     allowedTypes,
                     citizenName, playerName,
                     playerName, playerName);
