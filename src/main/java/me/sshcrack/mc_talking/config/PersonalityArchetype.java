@@ -123,10 +123,4 @@ public enum PersonalityArchetype {
     public String getPromptLines() {
         return promptLines;
     }
-
-    private static final PersonalityArchetype[] VALUES = values();
-
-    public static PersonalityArchetype random(double roll) {
-        return VALUES[Math.floorMod((int) (roll * VALUES.length), VALUES.length)];
-    }
 }

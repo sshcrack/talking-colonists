@@ -17,7 +17,6 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

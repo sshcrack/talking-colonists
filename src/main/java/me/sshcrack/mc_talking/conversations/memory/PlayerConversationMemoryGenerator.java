@@ -18,8 +18,6 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import me.sshcrack.mc_talking.config.McTalkingConfig;
-
 /**
  * Generates and saves memories for a citizen after a conversation with a player.
  * Runs on a background thread to avoid blocking the server tick.
@@ -172,7 +170,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
      * @param playerUuid the UUID of the player
      * @param playerName the display name of the player
      * @param playerRank the colony rank name of the player (e.g. "manager", "visitor")
-     * @param transcript the partial transcript of the citizen's speech (may be blank for audio-only)
+     * @param transcript the partial transcript of the citizen's speech (can be blank for audio-only)
      * @param server     the Minecraft server for thread-safe NBT writes
      */
     public static void generateAndSave(

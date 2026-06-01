@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
@@ -10,22 +11,19 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomModelData;
 
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import me.sshcrack.mc_talking.config.McTalkingConfig;
-
 /*? if neoforge {*/
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.item.component.CustomModelData;
 /*? }*/
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
@@ -378,7 +376,11 @@ public class ConversationManager {
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null) releaseSlot(entity);
         if (entity != null && entity.isAlive()) {
-            ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
+            var server = entity.level().getServer();
+            if (server == null)
+                return;
+
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player != null) {
                 for (ItemStack item : player.getInventory().items) {
                     if (item.getItem() instanceof CitizenTalkingDevice) {

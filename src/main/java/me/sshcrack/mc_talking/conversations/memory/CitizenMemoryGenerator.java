@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import me.sshcrack.mc_talking.config.McTalkingConfig;
-
 public class CitizenMemoryGenerator extends Thread {
     private static final String PROMPT = ("""
             Extract persistent memories from the following conversation.

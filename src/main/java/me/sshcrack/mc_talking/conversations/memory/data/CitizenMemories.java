@@ -22,7 +22,7 @@ public class CitizenMemories {
     private String sessionToken = "";
 
     public CitizenMemories() {
-        // We do not initialize this memories because at first it is empty.
+        // We do not initialize these memories because at first it is empty.
         // You can however deserialize it using @deserializeNbt if you have saved data
     }
 

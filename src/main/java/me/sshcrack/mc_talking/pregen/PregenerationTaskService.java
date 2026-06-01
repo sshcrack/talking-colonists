@@ -48,7 +48,7 @@ public class PregenerationTaskService {
 
                 // Check if we need greeting for c1 -> c2
                 if (!hasGreeting(c1.getUUID(), c2.getUUID())) {
-                    startPregenIfPossible(c1, "Generate a brief 1-sentence passing greeting for your friend " + c2.getCitizenData().getName() + ".", (audio) -> {
+                    startPregenerationIfPossible(c1, "Generate a brief 1-sentence passing greeting for your friend " + c2.getCitizenData().getName() + ".", (audio) -> {
                         putGreeting(c1.getUUID(), c2.getUUID(), audio);
                         isGenerating = false;
                     });
@@ -57,7 +57,7 @@ public class PregenerationTaskService {
 
                 // Check if we need greeting for c2 -> c1
                 if (!hasGreeting(c2.getUUID(), c1.getUUID())) {
-                    startPregenIfPossible(c2, "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".", (audio) -> {
+                    startPregenerationIfPossible(c2, "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".", (audio) -> {
                         putGreeting(c2.getUUID(), c1.getUUID(), audio);
                         isGenerating = false;
                     });
@@ -71,7 +71,7 @@ public class PregenerationTaskService {
         // stale attacker-specific messages and reduces storage of threat clips.
     }
 
-    private static void startPregenIfPossible(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
+    private static void startPregenerationIfPossible(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
         if (!McTalkingConfig.hasGeminiApiKey()) {
             return;
         }
@@ -86,7 +86,7 @@ public class PregenerationTaskService {
         isGenerating = true;
         McTalking.LOGGER.info("[Pregeneration] Starting audio pregeneration for citizen {}", citizen.getUUID());
 
-        PregenGeminiClient client = new PregenGeminiClient(citizen, prompt, audio -> {
+        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, audio -> {
             ConversationManager.releaseSlot(citizen);
             onComplete.accept(audio);
         }, () -> {
@@ -142,10 +142,10 @@ public class PregenerationTaskService {
         }
 
         // Generate on-demand (no caching). On completion, attempt immediate playback and update cooldown.
-        startPregenIfPossible(citizen, prompt, audio -> {
+        startPregenerationIfPossible(citizen, prompt, audio -> {
             long playedAt = System.currentTimeMillis();
             // Attempt playback
-            boolean played = PregenPlayback.playAudioIfPossible(citizen, audio);
+            boolean played = PregenerationPlayback.playAudioIfPossible(citizen, audio);
             if (played) {
                 lastThreatPlayTime.put(citizen.getUUID(), playedAt);
             } else {

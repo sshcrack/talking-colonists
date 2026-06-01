@@ -402,7 +402,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         break;
                     case RAIDWITHOUTDEATH:
                         if (!view.peaceful() && factor > 1.2) {
-                            prompt.append("- Feeling safe because the recent raid was without civilan deaths\n");
+                            prompt.append("- Feeling safe because the recent raid was without civilian deaths\n");
                         }
                         break;
                     case FOOD:

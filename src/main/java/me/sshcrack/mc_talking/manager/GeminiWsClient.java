@@ -89,7 +89,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected final GeminiStream stream;
     private final AbstractEntityCitizen entity;
-    private final AudioChannel channel;
     private final OpusDecoder decoder;
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
@@ -107,7 +106,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
-        this.channel = audioProvider.createChannel();
+        AudioChannel channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
         stream = new GeminiStream(channel);
         stream.setOnPause(this::onStreamPause);
@@ -564,7 +563,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {}", entity.getStringUUID(), name);
-        JsonObject result = null;
+        JsonObject result;
         try {
             result = action.execute(this.entity, colony, args);
         } catch (Exception e) {

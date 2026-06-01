@@ -21,7 +21,7 @@ import me.sshcrack.mc_talking.util.AudioHelper;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
-public class PregenGeminiClient extends GeminiLiveClient {
+public class PregenerationGeminiClient extends GeminiLiveClient {
     private final AbstractEntityCitizen entity;
     private final String promptText;
     private final Consumer<AudioChunk> onComplete;
@@ -29,7 +29,7 @@ public class PregenGeminiClient extends GeminiLiveClient {
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
     private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50 MB max
 
-    public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
+    public PregenerationGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.promptText = promptText;

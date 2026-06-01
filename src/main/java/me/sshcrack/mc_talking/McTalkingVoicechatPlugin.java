@@ -14,7 +14,6 @@ import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGener
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -273,7 +272,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             UUID entityId = entry.getKey();
             Long speechEndTime = entry.getValue();
 
-            // If we've exceeded the inactivity threshold and we're not already sending silence
+            // If we've exceeded the inactivity threshold, and we're not already sending silence
             if (speechEndTime != null &&
                     (currentTime - speechEndTime >= VOICE_INACTIVITY_THRESHOLD_MS) &&
                     isSpeaking.getOrDefault(entityId, false) &&

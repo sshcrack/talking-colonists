@@ -11,7 +11,6 @@ public class AiStatusHelper {
 
     public static void setAiStatusSynced(AbstractEntityCitizen citizen, AiStatus status) {
         var level = citizen.level();
-        if (level == null) return;
         var server = level.getServer();
         if (server == null) return;
         var serverThread = server.getRunningThread();

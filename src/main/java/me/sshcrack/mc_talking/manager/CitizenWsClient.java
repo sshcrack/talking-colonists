@@ -195,7 +195,7 @@ public class CitizenWsClient extends GeminiWsClient {
             Objects.requireNonNull(player.getServer()).execute(() -> {
                 AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
                 McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);
-                if (player.hasPermissions(4) && Boolean.TRUE.equals(McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers))
+                if (player.hasPermissions(4) && McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers)
                     player.sendSystemMessage(Component.literal(
                             "An error occurred in GeminiWsClient: " + ex.getMessage()));
             });
