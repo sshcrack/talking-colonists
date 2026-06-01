@@ -22,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 
 @Mixin(value = CitizenData.class, remap = false)
@@ -30,6 +31,8 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     private static final String TAG_MEMORY_KEY = "mc_talking_memory";
     @Unique
     private static final String TAG_PERSONALITY_KEY = "mc_talking_personality";
+    @Unique
+    private static final String SLEEP_PROMPT = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
     @Unique
     private CitizenMemories mc_talking$memory;
     @Unique
@@ -51,24 +54,15 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
             return;
         }
 
-        if (client.getLastStatus() == null) {
-            client.setLastStatus(status);
-            if (status == VisibleCitizenStatus.SLEEP) {
-                var sleepPrompt = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
-                McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
-                client.addPromptTextAfterTalkingComplete(sleepPrompt);
-            }
-            return;
-        }
-
-        if (client.getLastStatus().equals(status)) {
+        var lastStatus = client.getLastStatus();
+        if (lastStatus != null && lastStatus.equals(status)) {
             return;
         }
 
         if (status == VisibleCitizenStatus.SLEEP) {
-            var sleepPrompt = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
             McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
-            client.addPromptTextAfterTalkingComplete(sleepPrompt);
+            client.setLastStatus(status);
+            client.addPromptTextAfterTalkingComplete(SLEEP_PROMPT);
             return;
         }
 
@@ -185,7 +179,7 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
 
         List<String> customs = config.customPersonalityArchetypes;
         int totalPool = PersonalityArchetype.values().length + customs.size();
-        int pick = (int) (Math.random() * totalPool);
+        int pick = ThreadLocalRandom.current().nextInt(totalPool);
 
         if (pick < PersonalityArchetype.values().length) {
             mc_talking$personality = PersonalityArchetype.values()[pick];

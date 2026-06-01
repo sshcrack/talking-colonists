@@ -105,13 +105,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     }
 
 
-    @Nullable
-    private int[][] getIcon(String path) {
-        McTalking.LOGGER.warn("getIcon is not yet implemented");
-        return null;
-    }
-
-
     @Override
     public void registerEvents(EventRegistration registration) {
         registration.registerEvent(MicrophonePacketEvent.class, this::handleMicPacket);

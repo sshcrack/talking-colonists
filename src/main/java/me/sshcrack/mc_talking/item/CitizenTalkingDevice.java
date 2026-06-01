@@ -37,6 +37,7 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenTalkingDevice extends Item {
+    private static final double MODEL_UPDATE_CHANCE = 0.25D;
     /*? if forge {*/
     /*private static final String TAG_TALKING_PLAYER = "talkingPlayer";
     private static final String TAG_MODEL_DATA = "CustomModelData";
@@ -110,7 +111,7 @@ public class CitizenTalkingDevice extends Item {
     public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
 
-        if (Math.random() <= 0.25) {
+        if (java.util.concurrent.ThreadLocalRandom.current().nextDouble() <= MODEL_UPDATE_CHANCE) {
             UUID uuid = getUuidFromItem(stack);
             boolean isActive = uuid != null && ConversationManager.isPlayerInConversation(uuid);
             /*? if forge {*/
