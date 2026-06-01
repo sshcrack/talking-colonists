@@ -71,6 +71,11 @@ public class LeaveColonyAction extends FunctionAction {
         }
 
         var data = citizen.getCitizenData();
+        if (data == null) {
+            var invalidReturn = new JsonObject();
+            invalidReturn.addProperty("error", "Citizen data not available.");
+            return invalidReturn;
+        }
         var level = citizen.level();
         var pos = citizen.blockPosition();
 

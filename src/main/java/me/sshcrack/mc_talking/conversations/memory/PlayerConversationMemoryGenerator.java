@@ -90,51 +90,55 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
     @Override
     public void run() {
-        String citizenName = citizen.getCitizenData().getName();
-        McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
-
-        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
-        String allowedTypes = Arrays.stream(CitizenRelationshipChangeType.values())
-                .map(Enum::name)
-                .collect(Collectors.joining(", "));
-
-        String transcriptSection = transcript.isBlank()
-                ? "(No transcript available — the conversation was in audio-only mode.)"
-                : transcript;
-
-        String contextNote = transcript.isBlank()
-                ? "Since no transcript is available, generate plausible memories based on the citizen's known state and the fact that they spoke with this player."
-                : "";
-
-        String prompt = String.format(PROMPT_TEMPLATE,
-                citizenName, playerName, playerRank,
-                transcriptSection, contextNote,
-                allowedTypes,
-                citizenName, playerName,
-                playerName, playerName);
-
-        String responseJson;
         try {
-            responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
-            return;
-        } catch (UnexpectedResponseException | IOException e) {
-            McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
-            return;
-        }
+            String citizenName = citizen.getCitizenData().getName();
+            McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
 
-        GsonMemoryResponse response;
-        try {
-            response = GsonMemoryResponse.GSON.fromJson(responseJson, GsonMemoryResponse.class);
-        } catch (JsonSyntaxException e) {
-            McTalking.LOGGER.warn("[PlayerMemory] Failed to parse memory JSON for citizen {}: {}", citizenName, responseJson);
-            return;
-        }
+            String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
+            String allowedTypes = Arrays.stream(CitizenRelationshipChangeType.values())
+                    .map(Enum::name)
+                    .collect(Collectors.joining(", "));
 
-        server.execute(() -> saveMemories(response, citizenName));
-        McTalking.LOGGER.info("[PlayerMemory] Saved player-interaction memories for citizen {}", citizenName);
+            String transcriptSection = transcript.isBlank()
+                    ? "(No transcript available — the conversation was in audio-only mode.)"
+                    : transcript;
+
+            String contextNote = transcript.isBlank()
+                    ? "Since no transcript is available, generate plausible memories based on the citizen's known state and the fact that they spoke with this player."
+                    : "";
+
+            String prompt = String.format(PROMPT_TEMPLATE,
+                    citizenName, playerName, playerRank,
+                    transcriptSection, contextNote,
+                    allowedTypes,
+                    citizenName, playerName,
+                    playerName, playerName);
+
+            String responseJson;
+            try {
+                responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
+                return;
+            } catch (UnexpectedResponseException | IOException e) {
+                McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
+                return;
+            }
+
+            GsonMemoryResponse response;
+            try {
+                response = GsonMemoryResponse.GSON.fromJson(responseJson, GsonMemoryResponse.class);
+            } catch (JsonSyntaxException e) {
+                McTalking.LOGGER.warn("[PlayerMemory] Failed to parse memory JSON for citizen {}: {}", citizenName, responseJson);
+                return;
+            }
+
+            server.execute(() -> saveMemories(response, citizenName));
+            McTalking.LOGGER.info("[PlayerMemory] Saved player-interaction memories for citizen {}", citizenName);
+        } finally {
+            activeGenerators.remove(this);
+        }
     }
 
     private void saveMemories(GsonMemoryResponse response, String citizenName) {
@@ -184,10 +188,6 @@ public class PlayerConversationMemoryGenerator extends Thread {
         var generator = new PlayerConversationMemoryGenerator(
                 citizen, playerUuid, playerName, playerRank, transcript, server);
         activeGenerators.add(generator);
-        generator.setUncaughtExceptionHandler((t, e) -> {
-            McTalking.LOGGER.error("[PlayerMemory] Uncaught exception in memory thread", e);
-            activeGenerators.remove(generator);
-        });
         generator.start();
     }
 

@@ -9,7 +9,7 @@
     "AbstractEntityCitizenMixin",
     "CitizenDataAccessor",
     "CitizenDataMixin",
-    "EventDescriptionManagerMixin",
+
     "RaidManagerMixin",
     "ServerEntityMixin",
     "SoundUtilsMixin"

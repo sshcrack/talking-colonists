@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.config;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import dev.isxander.yacl3.api.NameableEnum;
 import net.minecraft.network.chat.Component;
@@ -19,7 +20,6 @@ public enum AvailableAI implements NameableEnum {
     private final String name;
     private final List<String> femaleVoices;
     private final List<String> maleVoices;
-    public static final Random random = new Random();
 
     AvailableAI(String name, List<String> maleVoices, List<String> femaleVoices) {
         this.name = name;
@@ -34,8 +34,8 @@ public enum AvailableAI implements NameableEnum {
     public String getRandomVoice(UUID uuid, boolean isFemale) {
         var availableVoices = isFemale ? femaleVoices : maleVoices;
 
-        random.setSeed(uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits());
-        return availableVoices.get(random.nextInt(availableVoices.size()));
+        var rng = new Random(uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits());
+        return availableVoices.get(rng.nextInt(availableVoices.size()));
     }
 
     @Override

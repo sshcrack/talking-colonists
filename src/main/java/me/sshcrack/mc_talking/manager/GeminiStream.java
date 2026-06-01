@@ -36,6 +36,7 @@ public class GeminiStream implements Supplier<short[]> {
 
     // Single buffer for incoming audio data
     private final List<byte[]> incomingData = Collections.synchronizedList(new ArrayList<>());
+    private int totalBufferedBytes = 0;
 
     private Runnable onPause;
     private OpusEncoder encoder;
@@ -68,12 +69,13 @@ public class GeminiStream implements Supplier<short[]> {
         if (data.length > 0) {
             synchronized (incomingData) {
                 incomingData.add(data);
+                totalBufferedBytes += data.length;
             }
         }
 
         // Only process if we have enough data for effective pitch shifting.
         // We collect more data before processing to ensure smoother playback.
-        int bufferedBytes = incomingData.stream().mapToInt(b -> b.length).sum();
+        int bufferedBytes = totalBufferedBytes;
         if (bufferedBytes >= MIN_BUFFER_SIZE_FOR_PITCH * 2) {
             return processBufferedData(sampleRate, false);
         }
@@ -95,7 +97,7 @@ public class GeminiStream implements Supplier<short[]> {
             }
 
             // Combine all buffered chunks into a single array
-            int totalBytes = incomingData.stream().mapToInt(b -> b.length).sum();
+            int totalBytes = totalBufferedBytes;
             combined = new byte[totalBytes];
             int offset = 0;
             for (byte[] chunk : incomingData) {
@@ -104,6 +106,7 @@ public class GeminiStream implements Supplier<short[]> {
             }
 
             incomingData.clear();
+            totalBufferedBytes = 0;
         }
 
         short[] samples = vcApi.getAudioConverter().bytesToShorts(combined);

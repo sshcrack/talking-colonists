@@ -127,6 +127,6 @@ public enum PersonalityArchetype {
     private static final PersonalityArchetype[] VALUES = values();
 
     public static PersonalityArchetype random(double roll) {
-        return VALUES[(int) (roll * VALUES.length) % VALUES.length];
+        return VALUES[Math.floorMod((int) (roll * VALUES.length), VALUES.length)];
     }
 }

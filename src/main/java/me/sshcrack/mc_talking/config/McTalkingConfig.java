@@ -266,7 +266,8 @@ public class McTalkingConfig {
                         case "ai_model":
                             try {
                                 INSTANCE.instance().currentAiModel = AvailableAI.valueOf(val);
-                            } catch (Exception ignored) {
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Unknown AI model in old config: {}", val);
                             }
                             break;
                         case "language":
@@ -281,7 +282,8 @@ public class McTalkingConfig {
                         case "ai_modality":
                             try {
                                 INSTANCE.instance().modality = ModalityModes.valueOf(val);
-                            } catch (Exception ignored) {
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Unknown modality in old config: {}", val);
                             }
                             break;
                         case "send_errors_to_players":

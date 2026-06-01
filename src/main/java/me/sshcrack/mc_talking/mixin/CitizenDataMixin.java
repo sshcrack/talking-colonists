@@ -52,25 +52,24 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
         }
 
         if (client.getLastStatus() == null) {
+            client.setLastStatus(status);
             if (status == VisibleCitizenStatus.SLEEP) {
                 var sleepPrompt = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
-                client.setLastStatus(status);
                 McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
                 client.addPromptTextAfterTalkingComplete(sleepPrompt);
             }
-
-            client.setLastStatus(status);
+            return;
         }
 
-        if (client.getLastStatus() != null && client.getLastStatus().equals(status)) {
+        if (client.getLastStatus().equals(status)) {
             return;
         }
 
         if (status == VisibleCitizenStatus.SLEEP) {
             var sleepPrompt = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
-            client.setLastStatus(status);
             McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
             client.addPromptTextAfterTalkingComplete(sleepPrompt);
+            return;
         }
 
         if (!client.sendStatusUpdates()) {

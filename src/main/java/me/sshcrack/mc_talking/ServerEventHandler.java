@@ -66,13 +66,11 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
-        if (!McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
-            return;
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+            McTalking.LOGGER.error("======================");
+            McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
+            McTalking.LOGGER.error("======================");
         }
-
-        McTalking.LOGGER.error("======================");
-        McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
-        McTalking.LOGGER.error("======================");
     }
 
     @SubscribeEvent

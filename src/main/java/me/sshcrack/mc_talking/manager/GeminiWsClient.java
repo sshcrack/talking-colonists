@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
-import cpw.mods.modlauncher.log.MLClassLoaderContextSelector;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
@@ -88,7 +87,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
-    private final List<Runnable> onCloseActions = new ArrayList<>();
+    private final List<Runnable> onCloseActions = Collections.synchronizedList(new ArrayList<>());
 
     @Nullable
     private VisibleCitizenStatus lastStatus;
@@ -106,8 +105,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         stream = new GeminiStream(channel);
         stream.setOnPause(this::onStreamPause);
 
-        var isFemale = entity.getCitizenData().isFemale();
-        var isChild = entity.getCitizenData().isChild();
+        var citizenData = entity.getCitizenData();
+        if (citizenData == null) {
+            throw new IllegalArgumentException("CitizenData cannot be null for entity " + entity.getUUID());
+        }
+        var isFemale = citizenData.isFemale();
+        var isChild = citizenData.isChild();
         if (isChild && !isFemale)
             stream.setPitch(1.2f); // Increase pitch
     }
@@ -544,7 +547,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var action = AITools.registeredFunctions.get(name);
         if (action == null) {
             McTalking.LOGGER.warn("Unknown function call: {}", name);
-            return null;
+            var error = new JsonObject();
+            error.addProperty("error", "Unknown function: " + name);
+            return error;
         }
 
         McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {}", entity.getStringUUID(), name);
@@ -709,11 +714,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         super.close();
         stream.close();
 
-        for (Runnable action : onCloseActions) {
-            try {
-                action.run();
-            } catch (Exception e) {
-                McTalking.LOGGER.error("Error executing onClose action", e);
+        synchronized (onCloseActions) {
+            for (Runnable action : onCloseActions) {
+                try {
+                    action.run();
+                } catch (Exception e) {
+                    McTalking.LOGGER.error("Error executing onClose action", e);
+                }
             }
         }
     }

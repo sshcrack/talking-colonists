@@ -15,9 +15,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -55,16 +55,16 @@ public class ConversationManager {
     private ConversationManager() { /* utility class */ }
 
     // Active AI clients keyed by citizen entity UUID
-    private static final Map<UUID, GeminiWsClient> clients = new HashMap<>();
+    private static final Map<UUID, GeminiWsClient> clients = new ConcurrentHashMap<>();
 
     // playerId → citizen entity the player is talking to
-    private static final Map<UUID, AbstractEntityCitizen> activeEntity = new HashMap<>();
+    private static final Map<UUID, AbstractEntityCitizen> activeEntity = new ConcurrentHashMap<>();
 
     // playerId → citizenId (the citizen the player is currently in conversation with)
-    private static final Map<UUID, UUID> playerConversationPartners = new HashMap<>();
+    private static final Map<UUID, UUID> playerConversationPartners = new ConcurrentHashMap<>();
 
     // citizenId → playerId reverse map for O(1) getPlayerForEntity lookups
-    private static final Map<UUID, UUID> citizenToPlayer = new HashMap<>();
+    private static final Map<UUID, UUID> citizenToPlayer = new ConcurrentHashMap<>();
 
     /**
      * citizenId → System.currentTimeMillis() at which their last automatic session ended.
@@ -77,7 +77,7 @@ public class ConversationManager {
      * Insertion-ordered queue of all occupied citizen slots.
      * The head (oldest) is the first eviction candidate.
      */
-    private static final Queue<UUID> addedEntities = new LinkedList<>();
+    private static final Set<UUID> addedEntities = new LinkedHashSet<>();
 
     // -------------------------------------------------------------------------
     // Slot management (priority-aware, synchronized)
@@ -118,7 +118,9 @@ public class ConversationManager {
                 return false;
             }
             // High priority last-resort: evict the oldest slot even if it is a player
-            victim = addedEntities.poll();
+            var it = addedEntities.iterator();
+            victim = it.hasNext() ? it.next() : null;
+            if (victim != null) it.remove();
         } else {
             addedEntities.remove(victim);
         }
@@ -385,7 +387,7 @@ public class ConversationManager {
         if (client != null) client.close();
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
-        releaseSlot(entity);
+        if (entity != null) releaseSlot(entity);
         if (entity != null && entity.isAlive()) {
             ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(playerId);
             if (player != null) {
@@ -434,7 +436,13 @@ public class ConversationManager {
     }
 
     public static void cleanup() {
-        for (GeminiWsClient client : clients.values()) client.close();
+        for (GeminiWsClient client : clients.values()) {
+            try {
+                client.close();
+            } catch (Exception e) {
+                McTalking.LOGGER.error("Error closing client during cleanup", e);
+            }
+        }
         clients.clear();
         activeEntity.clear();
         playerConversationPartners.clear();

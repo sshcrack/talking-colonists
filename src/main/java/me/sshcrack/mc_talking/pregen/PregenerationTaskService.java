@@ -20,7 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PregenerationTaskService {
-    private static boolean isGenerating = false;
+    private static volatile boolean isGenerating = false;
     private static int tickCounter = 0;
     private static final Map<UUID, Long> lastThreatPlayTime = new ConcurrentHashMap<>();
 
@@ -38,8 +38,8 @@ public class PregenerationTaskService {
 
         List<HeatmapTracker.UUIDPair> topPairs = HeatmapTracker.getTopPairs(5);
         for (HeatmapTracker.UUIDPair pair : topPairs) {
-            AbstractEntityCitizen c1 = findCitizen(server, pair.id1);
-            AbstractEntityCitizen c2 = findCitizen(server, pair.id2);
+            AbstractEntityCitizen c1 = findCitizen(server, pair.id1());
+            AbstractEntityCitizen c2 = findCitizen(server, pair.id2());
 
             if (c1 != null && c2 != null) {
                 if (ConversationManager.isCitizenBusy(c1) || ConversationManager.isCitizenBusy(c2)) {
