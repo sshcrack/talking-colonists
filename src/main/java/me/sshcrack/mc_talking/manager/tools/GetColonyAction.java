@@ -4,8 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
-import com.minecolonies.api.colony.buildings.IBuilding;
-import com.minecolonies.api.colony.buildings.ICommonBuilding;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.constant.Constants;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
@@ -123,7 +121,7 @@ public class GetColonyAction extends FunctionAction {
         }
 
         var level = citizen.level();
-        boolean peaceful = level != null && level.getDifficulty() == Difficulty.PEACEFUL;
+        boolean peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
         return getColonyInfoForRoleplaying(colony, peaceful);
     }
 }

@@ -17,15 +17,12 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 /*?}*/
-import net.minecraft.world.entity.LivingEntity;
 
 import java.util.UUID;
 
-public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/*?}*/ {
+public record AiStatusPayload(UUID citizen, AiStatus status) /*? if neoforge {*/ implements CustomPacketPayload/*?}*/ {
     /*? if forge {*/
     /*public static final String PROTOCOL_VERSION = "1";
     public static final ResourceLocation CHANNEL_ID = new ResourceLocation(McTalking.MODID, "ai_status");
@@ -39,7 +36,7 @@ public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/
     *//*?}*/
 
     /*? if neoforge {*/
-    public static final CustomPacketPayload.Type<AiStatusPayload> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(McTalking.MODID, "ai_status"));
+    public static final Type<AiStatusPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(McTalking.MODID, "ai_status"));
     public static final StreamCodec<ByteBuf, AiStatusPayload> STREAM_CODEC = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC,
             AiStatusPayload::citizen,
@@ -48,22 +45,6 @@ public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/
             AiStatusPayload::new
     );
     /*?}*/
-
-    private final UUID citizen;
-    private final AiStatus status;
-
-    public AiStatusPayload(UUID citizen, AiStatus status) {
-        this.citizen = citizen;
-        this.status = status;
-    }
-
-    public UUID citizen() {
-        return citizen;
-    }
-
-    public AiStatus status() {
-        return status;
-    }
 
     /*? if forge {*/
     /*public static void encode(AiStatusPayload msg, FriendlyByteBuf buf) {
@@ -92,6 +73,7 @@ public class AiStatusPayload /*? if neoforge {*/ implements CustomPacketPayload/
     }
 
     public static void registerMessages() {
+        // Intentionally empty so we do not get a compile error on neoforge
     }
     /*?}*/
 }

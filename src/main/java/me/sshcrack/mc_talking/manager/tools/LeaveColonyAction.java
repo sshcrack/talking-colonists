@@ -36,7 +36,9 @@ import static com.minecolonies.api.util.constant.NbtTagConstants.TAG_ID;
 import static com.minecolonies.api.util.constant.SchematicTagConstants.TAG_SITTING;
 
 public class LeaveColonyAction extends FunctionAction {
+    @SuppressWarnings("SpellCheckingInspection")
     private static final String TAG_RECRUIT_COST = "rcost";
+    @SuppressWarnings("SpellCheckingInspection")
     private static final String TAG_RECRUIT_COST_QTY = "rcostqty";
 
     public LeaveColonyAction() {
@@ -71,6 +73,11 @@ public class LeaveColonyAction extends FunctionAction {
         }
 
         var data = citizen.getCitizenData();
+        if (data == null) {
+            var invalidReturn = new JsonObject();
+            invalidReturn.addProperty("error", "Citizen data not available.");
+            return invalidReturn;
+        }
         var level = citizen.level();
         var pos = citizen.blockPosition();
 

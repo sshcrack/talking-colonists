@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
@@ -193,11 +194,13 @@ public class CitizenWsClient extends GeminiWsClient {
         if (player != null) {
             Objects.requireNonNull(player.getServer()).execute(() -> {
                 AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
-                if (player.hasPermissions(4) && Boolean.TRUE.equals(McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers))
+                McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);
+                if (player.hasPermissions(4) && McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers)
                     player.sendSystemMessage(Component.literal(
                             "An error occurred in GeminiWsClient: " + ex.getMessage()));
             });
         } else {
+            McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);
             AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
         }
     }

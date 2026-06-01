@@ -1,7 +1,6 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.commands.ListToolsCommand;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
@@ -11,7 +10,6 @@ import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -21,7 +19,7 @@ import java.util.UUID;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
-import me.sshcrack.mc_talking.pregen.PregenPlayback;
+import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
@@ -66,13 +64,11 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
-        if (!McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
-            return;
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+            McTalking.LOGGER.error("======================");
+            McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
+            McTalking.LOGGER.error("======================");
         }
-
-        McTalking.LOGGER.error("======================");
-        McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
-        McTalking.LOGGER.error("======================");
     }
 
     @SubscribeEvent
@@ -242,13 +238,13 @@ public class ServerEventHandler {
 
                 if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
                     AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
-                    if (audio != null && !PregenPlayback.playAudioIfPossible(citizenOne, audio)) {
+                    if (audio != null && !PregenerationPlayback.playAudioIfPossible(citizenOne, audio)) {
                         // put back if playback failed
                         PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
                     }
                 } else if (PregenerationTaskService.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
                     AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
-                    if (audio != null && !PregenPlayback.playAudioIfPossible(citizenTwo, audio)) {
+                    if (audio != null && !PregenerationPlayback.playAudioIfPossible(citizenTwo, audio)) {
                         PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
                     }
                 }

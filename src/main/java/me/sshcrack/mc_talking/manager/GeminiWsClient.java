@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
-import cpw.mods.modlauncher.log.MLClassLoaderContextSelector;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
@@ -38,11 +37,18 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     private static final int MAX_UNRECOGNIZED_CLOSE_RETRIES = 5;
-    private static final ScheduledExecutorService RECONNECT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "mc_talking_ws_reconnect");
-        t.setDaemon(true);
-        return t;
-    });
+    private static volatile ScheduledExecutorService RECONNECT_EXECUTOR;
+
+    private static synchronized ScheduledExecutorService getReconnectExecutor() {
+        if (RECONNECT_EXECUTOR == null || RECONNECT_EXECUTOR.isShutdown() || RECONNECT_EXECUTOR.isTerminated()) {
+            RECONNECT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "mc_talking_ws_reconnect");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return RECONNECT_EXECUTOR;
+    }
 
     private enum WsSessionState {
         NEW,
@@ -83,12 +89,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected final GeminiStream stream;
     private final AbstractEntityCitizen entity;
-    private final AudioChannel channel;
     private final OpusDecoder decoder;
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
-    private final List<Runnable> onCloseActions = new ArrayList<>();
+    private final List<Runnable> onCloseActions = Collections.synchronizedList(new ArrayList<>());
 
     @Nullable
     private VisibleCitizenStatus lastStatus;
@@ -101,13 +106,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
-        this.channel = audioProvider.createChannel();
+        AudioChannel channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
         stream = new GeminiStream(channel);
         stream.setOnPause(this::onStreamPause);
 
-        var isFemale = entity.getCitizenData().isFemale();
-        var isChild = entity.getCitizenData().isChild();
+        var citizenData = entity.getCitizenData();
+        if (citizenData == null) {
+            throw new IllegalArgumentException("CitizenData cannot be null for entity " + entity.getUUID());
+        }
+        var isFemale = citizenData.isFemale();
+        var isChild = citizenData.isChild();
         if (isChild && !isFemale)
             stream.setPitch(1.2f); // Increase pitch
     }
@@ -178,7 +187,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (remaining > 0) {
             if (!reconnectScheduled) {
                 reconnectScheduled = true;
-                reconnectFuture = RECONNECT_EXECUTOR.schedule(() -> {
+                reconnectFuture = getReconnectExecutor().schedule(() -> {
                     synchronized (GeminiWsClient.this) {
                         reconnectScheduled = false;
                         reconnectFuture = null;
@@ -222,21 +231,25 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         if (modality != ModalityModes.TEXT) {
-            setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
-            setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
-            var female = entity.getCitizenData().isFemale();
-            var uuid = entity.getUUID();
+            var citizenData = entity.getCitizenData();
+            if (citizenData == null) {
+                McTalking.LOGGER.warn("CitizenData not available for entity {} during setup, skipping audio config", entity.getUUID());
+            } else {
+                setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
+                setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
+                var female = citizenData.isFemale();
+                var uuid = entity.getUUID();
 
-            setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
-            var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
-            var sessionToken = mem.getSessionToken();
-            if (!sessionToken.isBlank() && shouldResumeAndSaveSession()) {
-                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
+                var mem = ((CitizenDataMemoryExtended) citizenData).mc_talking$getOrInitializeMemory();
+                var sessionToken = mem.getSessionToken();
+                if (!sessionToken.isBlank() && shouldResumeAndSaveSession()) {
+                    setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+                }
+                setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+                setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
+                setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
             }
-            setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
-
         }
 
         setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();
@@ -544,11 +557,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var action = AITools.registeredFunctions.get(name);
         if (action == null) {
             McTalking.LOGGER.warn("Unknown function call: {}", name);
-            return null;
+            var error = new JsonObject();
+            error.addProperty("error", "Unknown function: " + name);
+            return error;
         }
 
         McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {}", entity.getStringUUID(), name);
-        JsonObject result = null;
+        JsonObject result;
         try {
             result = action.execute(this.entity, colony, args);
         } catch (Exception e) {
@@ -709,11 +724,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         super.close();
         stream.close();
 
-        for (Runnable action : onCloseActions) {
-            try {
-                action.run();
-            } catch (Exception e) {
-                McTalking.LOGGER.error("Error executing onClose action", e);
+        synchronized (onCloseActions) {
+            for (Runnable action : onCloseActions) {
+                try {
+                    action.run();
+                } catch (Exception e) {
+                    McTalking.LOGGER.error("Error executing onClose action", e);
+                }
             }
         }
     }
