@@ -92,6 +92,12 @@ public class PlayerConversationMemoryGenerator extends Thread {
     public void run() {
         try {
             String citizenName = citizen.getCitizenData().getName();
+
+            if (transcript.isBlank()) {
+                McTalking.LOGGER.warn("[PlayerMemory] No transcript available for conversation with {} — skipping memory generation for citizen {}", playerName, citizenName);
+                return;
+            }
+
             McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
 
             String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
@@ -99,17 +105,9 @@ public class PlayerConversationMemoryGenerator extends Thread {
                     .map(Enum::name)
                     .collect(Collectors.joining(", "));
 
-            String transcriptSection = transcript.isBlank()
-                    ? "(No transcript available — the conversation was in audio-only mode.)"
-                    : transcript;
-
-            String contextNote = transcript.isBlank()
-                    ? "Since no transcript is available, generate plausible memories based on the citizen's known state and the fact that they spoke with this player."
-                    : "";
-
             String prompt = String.format(PROMPT_TEMPLATE,
                     citizenName, playerName, playerRank,
-                    transcriptSection, contextNote,
+                    transcript, "",
                     allowedTypes,
                     citizenName, playerName,
                     playerName, playerName);
