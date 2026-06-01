@@ -248,11 +248,14 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        boolean isGuard = data.getJob() != null && data.getJob().isGuard();
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
                 data.isFemale(),
                 jobName,
+                isGuard,
                 data.getCitizenDiseaseHandler().isSick(),
                 data.getHomeBuilding() == null,
                 parents,

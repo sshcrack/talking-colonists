@@ -19,12 +19,14 @@ import java.util.UUID;
  * @param playerState           Description of the speaking player's health and armor, e.g. "healthy (20/20 HP) wearing iron armor
  * @param environment           Description of the current environment, e.g. "It is midday and sunny."
  * @param activeItemRequests    Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none
+ * @param guard                 {@code true} when the citizen is a guard (knight/archer)
  */
 public record CitizenPromptView(
         String name,
         boolean child,
         boolean female,
         @Nullable String jobName,
+        boolean guard,
         boolean sick,
         boolean homeless,
         List<String> parentNames,
