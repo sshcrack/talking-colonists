@@ -67,6 +67,12 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.")
     public boolean sendMumblingAndConversationsToChat = false;
 
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation. "
+            + "If false (default), they stay in place for the duration of the conversation.")
+    public boolean continueWorkDuringConversation = false;
+
     // Citizen - Citizen Interaction (Conversations between them)
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @TickBox

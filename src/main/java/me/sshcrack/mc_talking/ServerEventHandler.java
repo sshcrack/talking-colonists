@@ -167,6 +167,15 @@ public class ServerEventHandler {
                 checkConversationDistance(player);
             }
 
+            AbstractEntityCitizen talkingCitizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
+            if (talkingCitizen != null
+                    && !McTalkingConfig.INSTANCE.instance().continueWorkDuringConversation) {
+                talkingCitizen.getLookControl().setLookAt(player, 30f, 30f);
+                if (!talkingCitizen.getNavigation().isDone()) {
+                    talkingCitizen.getNavigation().stop();
+                }
+            }
+
             if (ConversationManager.isPlayerInConversation(playerId))
                 continue;
 
