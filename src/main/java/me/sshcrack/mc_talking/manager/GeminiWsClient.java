@@ -225,21 +225,25 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         if (modality != ModalityModes.TEXT) {
-            setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
-            setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
-            var female = entity.getCitizenData().isFemale();
-            var uuid = entity.getUUID();
+            var citizenData = entity.getCitizenData();
+            if (citizenData == null) {
+                McTalking.LOGGER.warn("CitizenData not available for entity {} during setup, skipping audio config", entity.getUUID());
+            } else {
+                setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
+                setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
+                var female = citizenData.isFemale();
+                var uuid = entity.getUUID();
 
-            setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
-            var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
-            var sessionToken = mem.getSessionToken();
-            if (!sessionToken.isBlank() && shouldResumeAndSaveSession()) {
-                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+                setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig();
+                var mem = ((CitizenDataMemoryExtended) citizenData).mc_talking$getOrInitializeMemory();
+                var sessionToken = mem.getSessionToken();
+                if (!sessionToken.isBlank() && shouldResumeAndSaveSession()) {
+                    setup.sessionResumption = new BidiGenerateContentSetup.SessionResumptionConfig(sessionToken);
+                }
+                setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+                setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
+                setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
             }
-            setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
-
         }
 
         setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();

@@ -94,7 +94,13 @@ public class PregenerationTaskService {
             ConversationManager.releaseSlot(citizen);
         });
 
-        client.connect();
+        try {
+            client.connect();
+        } catch (Exception e) {
+            McTalking.LOGGER.error("[Pregeneration] Failed to connect for citizen {}", citizen.getUUID(), e);
+            isGenerating = false;
+            ConversationManager.releaseSlot(citizen);
+        }
     }
 
     /**

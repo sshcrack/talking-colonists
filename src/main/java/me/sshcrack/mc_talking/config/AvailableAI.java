@@ -3,7 +3,6 @@ package me.sshcrack.mc_talking.config;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 import dev.isxander.yacl3.api.NameableEnum;
 import net.minecraft.network.chat.Component;
