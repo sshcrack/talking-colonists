@@ -16,6 +16,8 @@ public class ListJobSpecificAction extends FunctionAction {
 
     @Override
     public @NotNull JsonObject execute(AbstractEntityCitizen citizen, IColony colony, @Nullable JsonObject parameters) {
-        return null;
+        var obj = new JsonObject();
+        obj.addProperty("error", "Not yet implemented.");
+        return obj;
     }
 }

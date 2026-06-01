@@ -24,6 +24,7 @@ import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
+import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -229,7 +230,7 @@ public final class CitizenPromptViewFactory {
         if (entityOptEnv.isPresent()) {
             Level level = entityOptEnv.get().level();
             long dayTime = level.getDayTime() % 24000L;
-            environment = "It is " + describeTime(dayTime) + " and " + describeWeather(level) + ".";
+            environment = "It is " + MiscUtil.describeTime(dayTime) + " and " + describeWeather(level) + ".";
             peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
         }
 
@@ -297,11 +298,14 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        boolean isGuard = data.getJob() != null && data.getJob().isGuard();
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
                 data.isFemale(),
                 jobName,
+                isGuard,
                 data.getCitizenDiseaseHandler().isSick(),
                 data.getHomeBuilding() == null,
                 parents,
@@ -446,17 +450,6 @@ public final class CitizenPromptViewFactory {
         }
 
         return HappinessModifierType.UNKNOWN;
-    }
-
-    private static String describeTime(long dayTime) {
-        if (dayTime < 1000) return "early morning (sunrise)";
-        if (dayTime < 6000) return "morning";
-        if (dayTime < 9000) return "midday";
-        if (dayTime < 12000) return "afternoon";
-        if (dayTime < 13000) return "sunset";
-        if (dayTime < 18000) return "night";
-        if (dayTime < 22000) return "late night";
-        return "pre-dawn";
     }
 
     private static String describeWeather(Level level) {

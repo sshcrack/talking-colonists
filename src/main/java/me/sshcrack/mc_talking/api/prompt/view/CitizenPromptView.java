@@ -10,13 +10,24 @@ import java.util.UUID;
 
 /**
  * Stable, MineColonies-agnostic data view used for prompt generation.
- * @param interestedParties Parties that may be included in the prompt for the memory of this citizen
+ *
+ * @param interestedParties     Parties that may be included in the prompt for the memory of this citizen
+ * @param colonyId              MineColonies colony ID — used for raid-trauma and personality lookups
+ * @param peaceful              {@code true} when the colony's world is on peaceful difficulty — suppresses raid-related prompt content
+ * @param personality           Built-in personality archetype, or {@code null} if a custom one is active
+ * @param customPersonalityText Freeform custom personality text, or {@code null} if a built-in is active
+ * @param playerState           Description of the speaking player's health and armor, e.g. "healthy (20/20 HP) wearing iron armor
+ * @param environment           Description of the current environment, e.g. "It is midday and sunny."
+ * @param activeItemRequests    Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none
+ * @param guard                 {@code true} when the citizen is a guard (knight/archer)
+ * @param colonyConnections     Diplomatic connections to neighboring colonies, e.g. "Oakvale (ALLY)", or {@code null} if none
  */
 public record CitizenPromptView(
         String name,
         boolean child,
         boolean female,
         @Nullable String jobName,
+        boolean guard,
         boolean sick,
         boolean homeless,
         List<String> parentNames,
@@ -40,22 +51,13 @@ public record CitizenPromptView(
         int homeBuildingLevel,
         @Nullable String workBuildingDisplayName,
         int workBuildingLevel,
-        /** MineColonies colony ID — used for raid-trauma and personality lookups */
         int colonyId,
-        /** {@code true} when the colony's world is on peaceful difficulty — suppresses raid-related prompt content */
         boolean peaceful,
-        /** Built-in personality archetype, or {@code null} if a custom one is active */
         @Nullable PersonalityArchetype personality,
-        /** Freeform custom personality text, or {@code null} if a built-in is active */
         @Nullable String customPersonalityText,
-        /** Description of the speaking player's health and armor, e.g. "healthy (20/20 HP) wearing iron armor" */
         @Nullable String playerState,
-        /** Description of the current environment, e.g. "It is midday and sunny." */
         @Nullable String environment,
-        /** Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none */
         @Nullable List<String> activeItemRequests,
-        /** Diplomatic connections to neighboring colonies, e.g. "Oakvale (ALLY)", or {@code null} if none */
         @Nullable List<String> colonyConnections
 ) {
 }
-

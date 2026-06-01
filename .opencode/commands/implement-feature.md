@@ -7,7 +7,7 @@ agent: build
 
 The user wants to implement the following features in parallel. The list is: $ARGUMENTS
 
-For EACH feature in that list, spawn a separate @general subagent with this exact task:
+For EACH feature in that list, create a new branch, create a new worktree for that branch in the upper directory (name schema should be `talking-colonists-<feature-name>`). Then in that worktree directory, spawn a new @general in a tmux session using `opencode --prompt [message]`. This is the exact message you should send to the agent, replacing the placeholders with the feature-specific information:
 
 ---
 You are implementing a feature for a Minecolonies Minecraft mod that adds Gemini AI voice chat to MineColonies citizens.
@@ -71,16 +71,13 @@ Read ALL of these to match the codebase conventions:
 
 Follow these in order:
 
-1. **Run**: `wt create <branch-slug>` — worktree for isolated development
-   - Use the printed worktree path for ALL subsequent operations
-
-2. **Create a GitHub issue**:
+1. **Create a GitHub issue**:
    ```
    gh issue create --title "<Feature title>" --body "<2-3 sentence description of what this adds and why>"
    ```
    Save the issue number from the output.
 
-3. **Implement the feature**:
+2. **Implement the feature**:
    - Before writing code, search for similar existing implementations in the codebase (grep for the API class you need)
    - Write clean Java matching the conventions above
    - Respect Stonecutter conditional compilation — test-logic that differs between Forge and NeoForge must use `/*? if neoforge {*/` / `/*? if forge {*/`
@@ -88,26 +85,26 @@ Follow these in order:
    - If you add new config options, they go in `McTalkingConfig.java`
    - If you add new prompt data, modify `CitizenPromptView` record, `CitizenPromptViewFactory`, and `DefaultCitizenPromptProvider`
 
-4. **Verify**:
+3. **Verify**:
    - Check that the mod compiles for the active Stonecutter version: `./gradlew buildAndCollect`
    - If there are compile errors, check if they're version-specific (1.20.1 vs 1.21.1) and add conditional compilation
    - Verify no new imports were added that are forge-specific without conditional blocks
 
-5. **When done, stage and commit**:
+4. **When done, stage and commit**:
    ```
    git add -A && git commit -m "feat: <short description>"
    git push -u origin <branch>
    ```
 
-6. **Open a draft PR**:
+5. **Open a draft PR**:
    ```
    gh pr create --draft \
    --title "feat: <Feature title>" \
    --body "## Summary\n<What was done and why>\n\nCloses #<issue number>"
    ```
 
-7. Report back: the issue URL, PR URL, and branch name.
+6. Report back: the issue URL, PR URL and any notes about that implementation in this workspace with filename IMPLEMENTATION_SUMMARY.md
 
 ---
 
-Spawn all agents in parallel. When all are done, summarize: list each feature with its issue link and draft PR link.
+Spawn all agents in parallel using tmux as described above and wait for them to finish. When all are done, read their summaries, summarize: list each feature with its issue link and draft PR link.

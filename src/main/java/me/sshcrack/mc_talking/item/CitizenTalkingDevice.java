@@ -37,6 +37,7 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public class CitizenTalkingDevice extends Item {
+    private static final double MODEL_UPDATE_CHANCE = 0.25D;
     /*? if forge {*/
     /*private static final String TAG_TALKING_PLAYER = "talkingPlayer";
     private static final String TAG_MODEL_DATA = "CustomModelData";
@@ -61,10 +62,11 @@ public class CitizenTalkingDevice extends Item {
         return tag.getUUID(TAG_TALKING_PLAYER);
         *//*?}*/
         /*? if neoforge {*/
-        if (stack.get(DataComponents.CUSTOM_DATA) == null)
+        var stackData = stack.get(DataComponents.CUSTOM_DATA);
+        if (stackData == null)
             return null;
 
-        var comp = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        var comp = stackData.copyTag();
         if (!comp.contains("talkingPlayer"))
             return null;
 
@@ -73,7 +75,7 @@ public class CitizenTalkingDevice extends Item {
     }
 
     @Override
-    public boolean isFoil(ItemStack stack) {
+    public boolean isFoil(@NotNull ItemStack stack) {
         UUID uuid = getUuidFromItem(stack);
         if (uuid == null) {
             return false;
@@ -99,7 +101,7 @@ public class CitizenTalkingDevice extends Item {
 
     /*? if neoforge {*/
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, List<Component> tooltipComponents,
+    public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, @NotNull List<Component> tooltipComponents,
                                 @NotNull TooltipFlag tooltipFlag) {
         appendTooltip(tooltipComponents);
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
@@ -110,7 +112,7 @@ public class CitizenTalkingDevice extends Item {
     public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slotId, boolean isSelected) {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
 
-        if (Math.random() <= 0.25) {
+        if (java.util.concurrent.ThreadLocalRandom.current().nextDouble() <= MODEL_UPDATE_CHANCE) {
             UUID uuid = getUuidFromItem(stack);
             boolean isActive = uuid != null && ConversationManager.isPlayerInConversation(uuid);
             /*? if forge {*/
@@ -170,7 +172,7 @@ public class CitizenTalkingDevice extends Item {
                             .withStyle(ChatFormatting.RED)
             );
 
-            return true; // Prevent attack on sleeping citizens);
+            return true; // Prevent attack on sleeping citizens
         }
 
         // Check if voice chat API is initialized

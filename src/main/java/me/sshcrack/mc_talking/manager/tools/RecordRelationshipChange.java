@@ -84,6 +84,7 @@ public class RecordRelationshipChange extends FunctionAction {
 
         McTalking.LOGGER.info("Recording relationship change for citizen {}: target={}, type={}, change={}", citizen.getName(), targetUUID, type, change);
         memory.addRelationshipChange(targetUUID, type, change);
+        obj.addProperty("success", true);
         return obj;
     }
 }

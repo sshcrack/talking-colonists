@@ -17,7 +17,6 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,6 +66,12 @@ public class McTalkingConfig {
     @TickBox
     @SerialEntry(comment = "If true, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.")
     public boolean sendMumblingAndConversationsToChat = false;
+
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation. "
+            + "If false (default), they stay in place for the duration of the conversation.")
+    public boolean continueWorkDuringConversation = false;
 
     // Citizen - Citizen Interaction (Conversations between them)
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
@@ -272,7 +277,8 @@ public class McTalkingConfig {
                         case "ai_model":
                             try {
                                 INSTANCE.instance().currentAiModel = AvailableAI.valueOf(val);
-                            } catch (Exception ignored) {
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Unknown AI model in old config: {}", val, e);
                             }
                             break;
                         case "language":
@@ -287,7 +293,8 @@ public class McTalkingConfig {
                         case "ai_modality":
                             try {
                                 INSTANCE.instance().modality = ModalityModes.valueOf(val);
-                            } catch (Exception ignored) {
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Unknown modality in old config: {}", val, e);
                             }
                             break;
                         case "send_errors_to_players":

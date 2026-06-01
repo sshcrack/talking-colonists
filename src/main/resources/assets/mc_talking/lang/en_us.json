@@ -73,6 +73,8 @@
   "yacl3.config.mc_talking:config.language.desc": "Preferred response language. If players ask to speak in another language, the AI will for their session.",
   "yacl3.config.mc_talking:config.respondInGroups": "Respond in Groups",
   "yacl3.config.mc_talking:config.respondInGroups.desc": "If disabled, citizens ignore your microphone while you are in a voice chat group.",
+  "yacl3.config.mc_talking:config.continueWorkDuringConversation": "Continue Wandering During Conversation",
+  "yacl3.config.mc_talking:config.continueWorkDuringConversation.desc": "When enabled, citizens will continue wandering normally while talking to a player. When disabled (default), they stand still for the duration of the conversation.",
   "yacl3.config.mc_talking:config.sendMumblingAndConversationsToChat": "Send Mumbling to Chat",
   "yacl3.config.mc_talking:config.sendMumblingAndConversationsToChat.desc": "If enabled, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.",
   "yacl3.config.mc_talking:config.maxConcurrentAgents": "Max Concurrent Agents",
