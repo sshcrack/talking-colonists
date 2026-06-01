@@ -13,7 +13,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
@@ -141,6 +143,12 @@ public class ServerEventHandler {
         // mumbles / random conversations interrupting them.
         var activePlayers = server.getPlayerList().getPlayers();
 
+        // De-duplication sets: ensure each citizen pair / citizen is processed at most
+        // once per tick interval, regardless of how many players happen to be nearby.
+        Set<Long> processedGreetingPairs = new HashSet<>();  // encoded symmetric pair key
+        Set<UUID> mumbledCitizens       = new HashSet<>();   // citizens that mumbled this interval
+        Set<UUID> contactedCitizens     = new HashSet<>();   // citizens that made contact this interval
+
         for (ServerPlayer player : activePlayers) {
 
             UUID playerId = player.getUUID();
@@ -163,17 +171,17 @@ public class ServerEventHandler {
                 continue;
 
             if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enablePregeneration)
-                checkProximityAndGreetings(citizens);
+                checkProximityAndGreetings(citizens, processedGreetingPairs);
 
 
             // Mumbling: only if this player is NOT in a conversation
             if (doMumblingCheck) {
-                checkForMumblingCitizens(citizens);
+                checkForMumblingCitizens(citizens, mumbledCitizens);
             }
 
             // Citizen-initiated contact: only if this player is NOT already in a conversation
             if (doContactCheck) {
-                checkForCitizenInitiatedContact(player, citizens);
+                checkForCitizenInitiatedContact(player, citizens, contactedCitizens);
             }
         }
 
@@ -218,7 +226,8 @@ public class ServerEventHandler {
         }
     }
 
-    private void checkProximityAndGreetings(List<AbstractEntityCitizen> citizens) {
+    private void checkProximityAndGreetings(List<AbstractEntityCitizen> citizens,
+                                             Set<Long> processedPairs) {
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
             for (int j = i + 1; j < citizens.size(); j++) {
@@ -226,6 +235,16 @@ public class ServerEventHandler {
                 double distSq = citizenOne.distanceToSqr(citizenTwo);
                 if (distSq < HeatmapTracker.DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING) {
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
+                }
+
+                // Deduplicate: each citizen pair is handled at most once per tick interval,
+                // even when multiple players are nearby and trigger this method repeatedly.
+                int idA = citizenOne.getId();
+                int idB = citizenTwo.getId();
+                // Encode as a single long with smaller id in the high 32 bits
+                long pairKey = ((long) Math.min(idA, idB) << 32) | (Math.max(idA, idB) & 0xFFFFFFFFL);
+                if (!processedPairs.add(pairKey)) {
+                    continue;
                 }
 
                 if (!ConversationManager.canCitizenSpeak(citizenOne) || !ConversationManager.canCitizenSpeak(citizenTwo)) {
@@ -237,25 +256,41 @@ public class ServerEventHandler {
                     continue;
 
                 if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
-                    AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
-                    if (audio != null && !PregenerationPlayback.playAudioIfPossible(citizenOne, audio)) {
-                        // put back if playback failed
-                        PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
+                    // Only play if the pair is not still on cooldown from a recent greeting
+                    if (!PregenerationTaskService.isGreetingOnCooldown(citizenOne.getUUID(), citizenTwo.getUUID())) {
+                        AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
+                        if (audio != null) {
+                            if (PregenerationPlayback.playAudioIfPossible(citizenOne, audio)) {
+                                PregenerationTaskService.recordGreetingPlayed(citizenOne.getUUID(), citizenTwo.getUUID());
+                            } else {
+                                // put back if playback failed
+                                PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
+                            }
+                        }
                     }
                 } else if (PregenerationTaskService.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
-                    AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
-                    if (audio != null && !PregenerationPlayback.playAudioIfPossible(citizenTwo, audio)) {
-                        PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
+                    if (!PregenerationTaskService.isGreetingOnCooldown(citizenTwo.getUUID(), citizenOne.getUUID())) {
+                        AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
+                        if (audio != null) {
+                            if (PregenerationPlayback.playAudioIfPossible(citizenTwo, audio)) {
+                                PregenerationTaskService.recordGreetingPlayed(citizenTwo.getUUID(), citizenOne.getUUID());
+                            } else {
+                                PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private void checkForMumblingCitizens(List<AbstractEntityCitizen> citizens) {
+    private void checkForMumblingCitizens(List<AbstractEntityCitizen> citizens,
+                                            Set<UUID> mumbledThisInterval) {
         for (AbstractEntityCitizen citizen : citizens) {
             // Skip if this citizen already has any kind of active session
             if (!ConversationManager.canCitizenSpeak(citizen)) continue;
+            // Skip if this citizen already mumbled this interval (dedup across multiple players)
+            if (!mumbledThisInterval.add(citizen.getUUID())) continue;
             // Skip if this citizen is still within their post-session cooldown
             if (Math.random() < McTalkingConfig.INSTANCE.instance().mumblingChance) {
                 ConversationManager.startMumbling(citizen);
@@ -270,13 +305,16 @@ public class ServerEventHandler {
      *
      * <p>Only one citizen initiates contact per player per check to avoid audio overlap.</p>
      */
-    private void checkForCitizenInitiatedContact(ServerPlayer player, List<AbstractEntityCitizen> citizens) {
+    private void checkForCitizenInitiatedContact(ServerPlayer player, List<AbstractEntityCitizen> citizens,
+                                                   Set<UUID> contactedThisInterval) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
 
         for (AbstractEntityCitizen citizen : citizens) {
             if (!ConversationManager.canCitizenSpeak(citizen)) continue;
             if (citizen.getCitizenData() == null) continue;
+            // Skip citizens that already initiated contact this interval (dedup across players)
+            if (!contactedThisInterval.add(citizen.getUUID())) continue;
 
             double urgencyWeight = calculateUrgencyWeight(citizen);
             if (urgencyWeight <= 0) continue;

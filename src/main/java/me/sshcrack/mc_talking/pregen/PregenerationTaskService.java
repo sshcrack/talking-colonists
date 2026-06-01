@@ -24,6 +24,19 @@ public class PregenerationTaskService {
     private static int tickCounter = 0;
     private static final Map<UUID, Long> lastThreatPlayTime = new ConcurrentHashMap<>();
 
+    /**
+     * Tracks the last time (System.currentTimeMillis()) a greeting was successfully
+     * played for each ordered citizen pair (greeter -> greeted).  Used to enforce a
+     * per-pair cooldown so that a dense group of citizens does not fire the same
+     * greeting over and over while they remain close to each other.
+     *
+     * The key is {@code greeterUUID + ":" + greetedUUID}.
+     */
+    private static final Map<String, Long> lastGreetingPlayTime = new ConcurrentHashMap<>();
+
+    /** How long (ms) before the same citizen pair may greet each other again. Default: 60 s. */
+    private static final long GREETING_PLAY_COOLDOWN_MS = 60_000L;
+
     // Caches merged into the service
     // citizen UUID -> (friend UUID -> AudioChunk) - insertion ordered map for eviction
     private static final Map<UUID, Map<UUID, AudioChunk>> greetingCache = new ConcurrentHashMap<>();
@@ -157,6 +170,19 @@ public class PregenerationTaskService {
     }
 
     // Cache management methods
+
+    /** Returns {@code true} if the (greeter, greeted) pair is still within its greeting play cooldown. */
+    public static boolean isGreetingOnCooldown(UUID greeterId, UUID greetedId) {
+        String key = greeterId + ":" + greetedId;
+        Long last = lastGreetingPlayTime.get(key);
+        return last != null && (System.currentTimeMillis() - last) < GREETING_PLAY_COOLDOWN_MS;
+    }
+
+    /** Records that a greeting was just successfully played from greeter to greeted. */
+    public static void recordGreetingPlayed(UUID greeterId, UUID greetedId) {
+        lastGreetingPlayTime.put(greeterId + ":" + greetedId, System.currentTimeMillis());
+    }
+
     public static void putGreeting(UUID citizenId, UUID friendId, AudioChunk audioData) {
         Map<UUID, AudioChunk> friends = greetingCache.computeIfAbsent(citizenId, k -> Collections.synchronizedMap(new LinkedHashMap<>()));
         synchronized (friends) {
@@ -197,6 +223,7 @@ public class PregenerationTaskService {
         lastThreatPlayTime.clear();
         isGenerating = false;
         tickCounter = 0;
+        lastGreetingPlayTime.clear();
         greetingCache.clear();
     }
 
