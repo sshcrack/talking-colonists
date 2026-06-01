@@ -745,6 +745,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     public static void shutdownExecutor() {
+        if(RECONNECT_EXECUTOR == null) return;
         RECONNECT_EXECUTOR.shutdown();
         try {
             if (!RECONNECT_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
