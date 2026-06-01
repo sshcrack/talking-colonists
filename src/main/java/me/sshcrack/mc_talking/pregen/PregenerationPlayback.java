@@ -13,10 +13,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class PregenPlayback {
+public class PregenerationPlayback {
     private static final Map<UUID, Boolean> ACTIVE_PREGENERATED_PLAYBACK = new ConcurrentHashMap<>();
 
-    private PregenPlayback() {
+    private PregenerationPlayback() {
         /* This utility class should not be instantiated */
     }
 

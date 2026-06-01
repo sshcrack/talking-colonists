@@ -8,6 +8,7 @@
 
 package me.sshcrack.mc_talking.util;
 
+@SuppressWarnings("all")
 public class Sonic {
 
     private static final int SONIC_MIN_PITCH = 65;

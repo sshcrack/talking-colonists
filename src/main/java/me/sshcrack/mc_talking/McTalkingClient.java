@@ -93,8 +93,7 @@ public class McTalkingClient {
             return;
         }
 
-        assert minecraft.player != null;
-        if (entity.isInvisibleTo(minecraft.player))
+        if (minecraft.player == null || entity.isInvisibleTo(minecraft.player))
             return;
 
         var status = aiStatus.get(citizen.getUUID());

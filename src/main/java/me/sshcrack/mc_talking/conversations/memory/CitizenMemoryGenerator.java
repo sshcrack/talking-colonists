@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import me.sshcrack.mc_talking.config.McTalkingConfig;
-
 public class CitizenMemoryGenerator extends Thread {
     private static final String PROMPT = ("""
             Extract persistent memories from the following conversation.
@@ -72,35 +70,39 @@ public class CitizenMemoryGenerator extends Thread {
 
     @Override
     public void run() {
-        McTalking.LOGGER.debug("Starting memories generation for conversation: {}", conversation);
-        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
-        String memoryString;
         try {
-            memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            McTalking.LOGGER.debug("Memory generation thread was interrupted for conversation: {}", conversation);
-            return;
-        } catch (UnexpectedResponseException | IOException e) {
-            McTalking.LOGGER.error("Failed to generate memories for conversation: {}", conversation, e);
-            throw new RuntimeException(e);
-        }
+            McTalking.LOGGER.debug("Starting memories generation for conversation: {}", conversation);
+            String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
+            String memoryString;
+            try {
+                memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                McTalking.LOGGER.debug("Memory generation thread was interrupted for conversation: {}", conversation);
+                return;
+            } catch (UnexpectedResponseException | IOException e) {
+                McTalking.LOGGER.error("Failed to generate memories for conversation: {}", conversation, e);
+                return;
+            }
 
-        GsonMemoryResponse json;
-        try {
-            json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
-        } catch (JsonSyntaxException e) {
-            McTalking.LOGGER.warn("Failed to parse memories response JSON: {}", memoryString);
-            return;
-        }
+            GsonMemoryResponse json;
+            try {
+                json = GsonMemoryResponse.GSON.fromJson(memoryString, GsonMemoryResponse.class);
+            } catch (JsonSyntaxException e) {
+                McTalking.LOGGER.warn("Failed to parse memories response JSON: {}", memoryString);
+                return;
+            }
 
-        if (shouldSaveMemory) {
-            server.executeBlocking(() -> minecraftSaveMemoryRun(json));
-        } else {
-            savedResponse = json;
-        }
+            if (shouldSaveMemory) {
+                server.executeBlocking(() -> minecraftSaveMemoryRun(json));
+            } else {
+                savedResponse = json;
+            }
 
-        McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
+            McTalking.LOGGER.info("Updated memories for conversation with {} participants", participants.size());
+        } finally {
+            activeGenerators.remove(this);
+        }
     }
 
     public void scheduleOrSaveMemory() {
