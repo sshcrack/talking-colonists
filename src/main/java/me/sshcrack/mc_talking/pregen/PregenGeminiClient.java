@@ -27,6 +27,7 @@ public class PregenGeminiClient extends GeminiLiveClient {
     private final Consumer<AudioChunk> onComplete;
     private final Runnable onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
+    private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50 MB max
 
     public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
@@ -84,6 +85,12 @@ public class PregenGeminiClient extends GeminiLiveClient {
     public void onGeneratedAudio(byte[] data, int sampleRate) {
         byte[] processed = resampleToTarget(data, sampleRate);
         try {
+            if (audioBuffer.size() + processed.length > MAX_BUFFER_SIZE) {
+                McTalking.LOGGER.error("Pregenerated audio buffer exceeded maximum size, aborting");
+                if (onError != null) onError.run();
+                close();
+                return;
+            }
             audioBuffer.write(processed);
         } catch (IOException e) {
             McTalking.LOGGER.error("Failed to write pregenerated audio", e);

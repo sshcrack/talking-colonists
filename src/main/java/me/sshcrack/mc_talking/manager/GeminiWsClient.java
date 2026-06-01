@@ -37,11 +37,18 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     private static final int MAX_UNRECOGNIZED_CLOSE_RETRIES = 5;
-    private static final ScheduledExecutorService RECONNECT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "mc_talking_ws_reconnect");
-        t.setDaemon(true);
-        return t;
-    });
+    private static volatile ScheduledExecutorService RECONNECT_EXECUTOR;
+
+    private static synchronized ScheduledExecutorService getReconnectExecutor() {
+        if (RECONNECT_EXECUTOR == null || RECONNECT_EXECUTOR.isShutdown() || RECONNECT_EXECUTOR.isTerminated()) {
+            RECONNECT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "mc_talking_ws_reconnect");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return RECONNECT_EXECUTOR;
+    }
 
     private enum WsSessionState {
         NEW,
@@ -181,7 +188,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (remaining > 0) {
             if (!reconnectScheduled) {
                 reconnectScheduled = true;
-                reconnectFuture = RECONNECT_EXECUTOR.schedule(() -> {
+                reconnectFuture = getReconnectExecutor().schedule(() -> {
                     synchronized (GeminiWsClient.this) {
                         reconnectScheduled = false;
                         reconnectFuture = null;
