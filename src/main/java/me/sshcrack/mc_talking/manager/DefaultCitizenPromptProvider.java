@@ -206,17 +206,32 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 long sinceMs = ColonyEventBuffer.millisSinceRaid(view.colonyId());
                 int lost = ColonyEventBuffer.getLostCitizens(view.colonyId());
                 prompt.append("\n## POST-RAID TRAUMA\n");
-                if (sinceMs < 5 * 60_000L) {
-                    prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
-                } else if (sinceMs < 15 * 60_000L) {
-                    prompt.append("- The recent raid is still fresh in your mind. You're on edge and jumpy.\n");
+
+                if (view.guard()) {
+                    if (sinceMs < 5 * 60_000L) {
+                        prompt.append("- Adrenaline is still pumping after the fight. You're angry the raid happened, not scared.\n");
+                    } else if (sinceMs < 15 * 60_000L) {
+                        prompt.append("- You're still wired from the battle, replaying the fight and thinking about how to do better next time.\n");
+                    } else {
+                        prompt.append("- You've settled down but remain vigilant. Another attack won't catch you off guard.\n");
+                    }
+                    if (lost > 0) {
+                        prompt.append("- Tragically, ").append(lost)
+                                .append(" of your fellow colonists didn't survive. You silently vow to protect the rest.\n");
+                    }
                 } else {
-                    prompt.append("- You're slowly calming down after the raid, but still feel uneasy.\n");
-                }
-                if (lost > 0) {
-                    prompt.append("- Tragically, ").append(lost)
-                            .append(" of your fellow colonists didn't survive.")
-                            .append("\n");
+                    if (sinceMs < 5 * 60_000L) {
+                        prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
+                    } else if (sinceMs < 15 * 60_000L) {
+                        prompt.append("- The recent raid is still fresh in your mind. You're on edge and jumpy.\n");
+                    } else {
+                        prompt.append("- You're slowly calming down after the raid, but still feel uneasy.\n");
+                    }
+                    if (lost > 0) {
+                        prompt.append("- Tragically, ").append(lost)
+                                .append(" of your fellow colonists didn't survive.")
+                                .append("\n");
+                    }
                 }
             }
         }
@@ -271,9 +286,23 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     @Override
     public String generateSystemControlledRoleplayPrompt(CitizenPromptView view) {
-        return String.format("""
-                        You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.
-                        %s
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.\n");
+        prompt.append(getGeneralCitizenPrompt(view, true));
+
+        if (view.guard()) {
+            prompt.append("""
+                    
+                    ## GUARD DUTY
+                    - You are a guard — brave, tough, and sworn to protect the colony.
+                    - You are not afraid of monsters or threats; you stand your ground and fight.
+                    - You take pride in your duty to defend your fellow colonists.
+                    - Your tone is confident and resolute; panic and cowardice are beneath you.
+                    
+                    """);
+        }
+
+        prompt.append("""
                         ## GUIDELINES
                         - HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST
                         - Do not generate creative responses for information that functions can provide
@@ -283,21 +312,27 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         - Do not use markdown, speak in plain text.
                         REMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.
                         Start by speaking in the language %s and ONLY switch if the user is speaking in another language
-                        """,
-                /*
+                        """.formatted(view.responseLanguageName()));
 
-                        - If a player begins speaking to you directly, seamlessly continue the conversation as if you were naturally interrupted from your thoughts. Do not restart or re-introduce yourself.
-                        Stay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.
-                 */
-                getGeneralCitizenPrompt(view, true),
-                view.responseLanguageName()
-        );
+        return prompt.toString();
     }
 
     @Override
     public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));
+
+        if (view.guard()) {
+            prompt.append("""
+                    
+                    ## GUARD DUTY
+                    - You are a guard — brave, tough, and sworn to protect the colony.
+                    - You are not afraid of monsters or threats; you stand your ground and fight.
+                    - You take pride in your duty to defend your fellow colonists.
+                    - Your tone is confident and resolute; panic and cowardice are beneath you.
+                    
+                    """);
+        }
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
@@ -410,7 +445,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         break;
                     case RAIDWITHOUTDEATH:
                         if (!view.peaceful() && factor > 1.2) {
-                            prompt.append("- Feeling safe because the recent raid was without civilan deaths\n");
+                            prompt.append("- Feeling safe because the recent raid was without civilian deaths\n");
                         }
                         break;
                     case FOOD:

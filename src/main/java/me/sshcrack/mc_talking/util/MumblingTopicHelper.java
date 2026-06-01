@@ -34,7 +34,7 @@ public final class MumblingTopicHelper {
 
         String jobTopic = buildJobTopic(citizen, happiness);
 
-        // Non-critical status + job: blend them so both colour the thought.
+        // Non-critical status + job: blend them so both color the thought.
         if (statusTopic != null && jobTopic != null) {
             String blended = statusTopic + " Still, " +
                     Character.toLowerCase(jobTopic.charAt(0)) + jobTopic.substring(1);
@@ -381,7 +381,7 @@ public final class MumblingTopicHelper {
     }
 
     /**
-     * Appends a mood-coloured sentence to a neutral job thought based on the
+     * Appends a mood-colored sentence to a neutral job thought based on the
      * citizen's current happiness level. Neutral happiness (5–8) is left untouched
      * to avoid every mumble feeling melodramatic.
      */

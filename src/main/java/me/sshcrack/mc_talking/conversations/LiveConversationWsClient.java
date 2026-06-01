@@ -161,7 +161,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
     @Override
     protected void onErrorEvent(Exception ex) {
-        McTalking.LOGGER.error("[LiveConvWs] Error for {}: {}", citizen.getCitizenData().getName(), ex.getMessage());
+        McTalking.LOGGER.error("[LiveConvWs] Error for {}", citizen.getCitizenData().getName(), ex);
         AiStatusHelper.setAiStatusOnServerThread(citizen, AiStatus.ERROR);
         onEnded.accept(this);
     }

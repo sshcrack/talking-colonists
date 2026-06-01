@@ -18,8 +18,6 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import me.sshcrack.mc_talking.config.McTalkingConfig;
-
 /**
  * Generates and saves memories for a citizen after a conversation with a player.
  * Runs on a background thread to avoid blocking the server tick.
@@ -33,7 +31,6 @@ public class PlayerConversationMemoryGenerator extends Thread {
             ---
             %s
             ---
-            %s
 
             Return ONLY valid JSON.
 
@@ -90,51 +87,53 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
     @Override
     public void run() {
-        String citizenName = citizen.getCitizenData().getName();
-        McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
-
-        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
-        String allowedTypes = Arrays.stream(CitizenRelationshipChangeType.values())
-                .map(Enum::name)
-                .collect(Collectors.joining(", "));
-
-        String transcriptSection = transcript.isBlank()
-                ? "(No transcript available — the conversation was in audio-only mode.)"
-                : transcript;
-
-        String contextNote = transcript.isBlank()
-                ? "Since no transcript is available, generate plausible memories based on the citizen's known state and the fact that they spoke with this player."
-                : "";
-
-        String prompt = String.format(PROMPT_TEMPLATE,
-                citizenName, playerName, playerRank,
-                transcriptSection, contextNote,
-                allowedTypes,
-                citizenName, playerName,
-                playerName, playerName);
-
-        String responseJson;
         try {
-            responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
-            return;
-        } catch (UnexpectedResponseException | IOException e) {
-            McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
-            return;
-        }
+            String citizenName = citizen.getCitizenData().getName();
 
-        GsonMemoryResponse response;
-        try {
-            response = GsonMemoryResponse.GSON.fromJson(responseJson, GsonMemoryResponse.class);
-        } catch (JsonSyntaxException e) {
-            McTalking.LOGGER.warn("[PlayerMemory] Failed to parse memory JSON for citizen {}: {}", citizenName, responseJson);
-            return;
-        }
+            if (transcript.isBlank()) {
+                McTalking.LOGGER.warn("[PlayerMemory] No transcript available for conversation with {} — skipping memory generation for citizen {}", playerName, citizenName);
+                return;
+            }
 
-        server.execute(() -> saveMemories(response, citizenName));
-        McTalking.LOGGER.info("[PlayerMemory] Saved player-interaction memories for citizen {}", citizenName);
+            McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
+
+            String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
+            String allowedTypes = Arrays.stream(CitizenRelationshipChangeType.values())
+                    .map(Enum::name)
+                    .collect(Collectors.joining(", "));
+
+            String prompt = String.format(PROMPT_TEMPLATE,
+                    citizenName, playerName, playerRank,
+                    transcript,
+                    allowedTypes,
+                    citizenName, playerName,
+                    playerName, playerName);
+
+            String responseJson;
+            try {
+                responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
+                return;
+            } catch (UnexpectedResponseException | IOException e) {
+                McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
+                return;
+            }
+
+            GsonMemoryResponse response;
+            try {
+                response = GsonMemoryResponse.GSON.fromJson(responseJson, GsonMemoryResponse.class);
+            } catch (JsonSyntaxException e) {
+                McTalking.LOGGER.warn("[PlayerMemory] Failed to parse memory JSON for citizen {}: {}", citizenName, responseJson);
+                return;
+            }
+
+            server.execute(() -> saveMemories(response, citizenName));
+            McTalking.LOGGER.info("[PlayerMemory] Saved player-interaction memories for citizen {}", citizenName);
+        } finally {
+            activeGenerators.remove(this);
+        }
     }
 
     private void saveMemories(GsonMemoryResponse response, String citizenName) {
@@ -171,7 +170,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
      * @param playerUuid the UUID of the player
      * @param playerName the display name of the player
      * @param playerRank the colony rank name of the player (e.g. "manager", "visitor")
-     * @param transcript the partial transcript of the citizen's speech (may be blank for audio-only)
+     * @param transcript the partial transcript of the citizen's speech (can be blank for audio-only)
      * @param server     the Minecraft server for thread-safe NBT writes
      */
     public static void generateAndSave(
@@ -184,10 +183,6 @@ public class PlayerConversationMemoryGenerator extends Thread {
         var generator = new PlayerConversationMemoryGenerator(
                 citizen, playerUuid, playerName, playerRank, transcript, server);
         activeGenerators.add(generator);
-        generator.setUncaughtExceptionHandler((t, e) -> {
-            McTalking.LOGGER.error("[PlayerMemory] Uncaught exception in memory thread", e);
-            activeGenerators.remove(generator);
-        });
         generator.start();
     }
 

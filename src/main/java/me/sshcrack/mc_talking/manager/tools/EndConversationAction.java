@@ -20,6 +20,12 @@ public class EndConversationAction extends FunctionAction {
         var client = ConversationManager.getClientForEntity(citizen.getUUID());
         var obj = new JsonObject();
 
+        if (client == null) {
+            obj.addProperty("success", false);
+            obj.addProperty("error", "No active conversation found.");
+            return obj;
+        }
+
         client.endConversationWhenPossible();
         obj.addProperty("success", true);
 

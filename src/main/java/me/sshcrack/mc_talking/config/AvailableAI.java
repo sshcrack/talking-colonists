@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 public enum AvailableAI implements NameableEnum {
     //Voice 'Fenir' isn't available for the API IDK why
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "SpellCheckingInspection"})
     Flash3("gemini-3.1-flash-live-preview",
             List.of("Puck", "Charon", "Orus", "Enceladus", "Iapetus", "Umbriel", "Algieba", "Algenib", "Rasalgethi", "Alnilam", "Schedar", "Archid", "Zubenelgenubi", "Sadachbia", "Sadaltager"),
             List.of("Zephyr", "Kore", "Leda", "Aoede", "Callirrhoe", "Autonoe", "Despina", "Erinome", "Laomedeia", "Achernar", "Gacrux", "Pulcherrima", "Vindemiatrix", "Sulafat")
@@ -19,7 +19,6 @@ public enum AvailableAI implements NameableEnum {
     private final String name;
     private final List<String> femaleVoices;
     private final List<String> maleVoices;
-    public static final Random random = new Random();
 
     AvailableAI(String name, List<String> maleVoices, List<String> femaleVoices) {
         this.name = name;
@@ -34,8 +33,8 @@ public enum AvailableAI implements NameableEnum {
     public String getRandomVoice(UUID uuid, boolean isFemale) {
         var availableVoices = isFemale ? femaleVoices : maleVoices;
 
-        random.setSeed(uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits());
-        return availableVoices.get(random.nextInt(availableVoices.size()));
+        var rng = new Random(uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits());
+        return availableVoices.get(rng.nextInt(availableVoices.size()));
     }
 
     @Override
