@@ -50,7 +50,7 @@ public class McTalking {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         MinecraftForge.EVENT_BUS.register(new ServerEventHandler());
         ModItems.register(modEventBus);
-        modEventBus.addListener(CommonSetupEvent.class, this::onCommonSetup);
+        modEventBus.addListener(net.minecraftforge.eventbus.api.EventPriority.NORMAL, this::onCommonSetup);
     }
     *//*?}*/
 
