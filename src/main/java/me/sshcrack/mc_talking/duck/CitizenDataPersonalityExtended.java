@@ -21,7 +21,7 @@ public interface CitizenDataPersonalityExtended {
     PersonalityArchetype mc_talking$getPersonality();
 
     /**
-     * The freeform custom archetype text assigned to this citizen, or {@code null}
+     * The free-form custom archetype text assigned to this citizen, or {@code null}
      * if the citizen uses a built-in archetype or hasn't been assigned yet.
      */
     @Nullable

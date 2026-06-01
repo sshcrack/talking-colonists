@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 public class HeatmapTracker {
     private HeatmapTracker() {
@@ -33,31 +32,14 @@ public class HeatmapTracker {
                 .toList();
     }
 
-    public static class UUIDPair {
-        public final UUID id1;
-        public final UUID id2;
-
-        public UUIDPair(UUID id1, UUID id2) {
-            if (id1.compareTo(id2) < 0) {
-                this.id1 = id1;
-                this.id2 = id2;
-            } else {
-                this.id1 = id2;
-                this.id2 = id1;
+    public record UUIDPair(UUID id1, UUID id2) {
+        public UUIDPair {
+            if (id1.compareTo(id2) > 0) {
+                // swap to ensure consistent ordering
+                var tmp = id1;
+                id1 = id2;
+                id2 = tmp;
             }
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            UUIDPair uuidPair = (UUIDPair) o;
-            return id1.equals(uuidPair.id1) && id2.equals(uuidPair.id2);
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * id1.hashCode() + id2.hashCode();
         }
     }
 }

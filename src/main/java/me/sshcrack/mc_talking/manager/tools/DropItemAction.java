@@ -32,16 +32,16 @@ public class DropItemAction extends FunctionAction {
             return obj;
         }
 
-        var slot_index = parameters.get("slot_index").getAsInt();
+        var slotIndex = parameters.get("slot_index").getAsInt();
         var rCount = parameters.get("count").getAsInt();
 
-        if (slot_index < 0 || slot_index >= citizen.getInventoryCitizen().getSlots()) {
+        if (slotIndex < 0 || slotIndex >= citizen.getInventoryCitizen().getSlots()) {
             obj.addProperty("success", false);
             obj.addProperty("error", "Invalid slot index.");
             return obj;
         }
 
-        ItemStack stack = citizen.getInventoryCitizen().getStackInSlot(slot_index);
+        ItemStack stack = citizen.getInventoryCitizen().getStackInSlot(slotIndex);
         if (stack.isEmpty()) {
             obj.addProperty("success", false);
             obj.addProperty("error", "No item in the specified slot.");

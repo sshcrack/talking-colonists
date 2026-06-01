@@ -21,14 +21,15 @@ import me.sshcrack.mc_talking.util.AudioHelper;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
-public class PregenGeminiClient extends GeminiLiveClient {
+public class PregenerationGeminiClient extends GeminiLiveClient {
     private final AbstractEntityCitizen entity;
     private final String promptText;
     private final Consumer<AudioChunk> onComplete;
     private final Runnable onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
+    private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50 MB max
 
-    public PregenGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
+    public PregenerationGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.promptText = promptText;
@@ -84,6 +85,12 @@ public class PregenGeminiClient extends GeminiLiveClient {
     public void onGeneratedAudio(byte[] data, int sampleRate) {
         byte[] processed = resampleToTarget(data, sampleRate);
         try {
+            if (audioBuffer.size() + processed.length > MAX_BUFFER_SIZE) {
+                McTalking.LOGGER.error("Pregenerated audio buffer exceeded maximum size, aborting");
+                if (onError != null) onError.run();
+                close();
+                return;
+            }
             audioBuffer.write(processed);
         } catch (IOException e) {
             McTalking.LOGGER.error("Failed to write pregenerated audio", e);

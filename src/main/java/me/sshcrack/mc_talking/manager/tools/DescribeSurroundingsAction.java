@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.monster.Monster;
@@ -44,7 +45,7 @@ public class DescribeSurroundingsAction extends FunctionAction {
 
         // ── Time & weather ──────────────────────────────────────────────────
         long dayTime = level.getDayTime() % 24000L;
-        result.addProperty("time_of_day", describeTime(dayTime));
+        result.addProperty("time_of_day", MiscUtil.describeTime(dayTime));
         result.addProperty("is_raining", level.isRaining());
         result.addProperty("is_thundering", level.isThundering());
         result.addProperty("sky_light", level.getBrightness(LightLayer.SKY, pos));
@@ -65,7 +66,6 @@ public class DescribeSurroundingsAction extends FunctionAction {
 
         // Fellow citizens
         JsonArray citizens = new JsonArray();
-        Set<String> citizenJobsSeen = new HashSet<>();
         level.getEntitiesOfClass(AbstractEntityCitizen.class, scanBox).forEach(c -> {
             if (c.getUUID().equals(citizen.getUUID())) return;
             JsonObject cObj = new JsonObject();
@@ -77,13 +77,12 @@ public class DescribeSurroundingsAction extends FunctionAction {
                         c.getCitizenData().getJob().getJobRegistryEntry().getTranslationKey()
                 ).getString();
                 cObj.addProperty("job", job);
-                citizenJobsSeen.add(job);
             }
             citizens.add(cObj);
         });
         result.add("nearby_citizens", citizens);
 
-        // Animals (summarised by type to keep the response compact)
+        // Animals (summarized by type to keep the response compact)
         JsonObject animalCounts = new JsonObject();
         level.getEntitiesOfClass(Animal.class, scanBox).forEach(a -> {
             String type = a.getType().getDescriptionId();
@@ -124,16 +123,5 @@ public class DescribeSurroundingsAction extends FunctionAction {
         result.addProperty("dimension", level.dimension().location().toString());
 
         return result;
-    }
-
-    private static String describeTime(long dayTime) {
-        if (dayTime < 1000)  return "early morning (sunrise)";
-        if (dayTime < 6000)  return "morning";
-        if (dayTime < 9000)  return "midday";
-        if (dayTime < 12000) return "afternoon";
-        if (dayTime < 13000) return "sunset";
-        if (dayTime < 18000) return "night";
-        if (dayTime < 22000) return "late night";
-        return "pre-dawn";
     }
 }

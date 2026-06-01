@@ -406,7 +406,7 @@ public final class MumblingTopicHelper {
     }
 
     /**
-     * Appends a mood-coloured sentence to a neutral job thought based on the
+     * Appends a mood-colored sentence to a neutral job thought based on the
      * citizen's current happiness level. Neutral happiness (5–8) is left untouched
      * to avoid every mumble feeling melodramatic.
      */

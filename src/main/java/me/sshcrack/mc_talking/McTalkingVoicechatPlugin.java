@@ -14,17 +14,13 @@ import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGener
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
-import org.jetbrains.annotations.Nullable;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.net.URL;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -105,35 +101,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         vcApi.registerVolumeCategory(directDialog);
         vcApi.registerVolumeCategory(citizenConversation);
-    }
-
-
-    @Nullable
-    private int[][] getIcon(String path) {
-        try {
-            Enumeration<URL> resources = McTalkingVoicechatPlugin.class.getClassLoader().getResources(path);
-            while (resources.hasMoreElements()) {
-                BufferedImage bufferedImage = ImageIO.read(resources.nextElement().openStream());
-                if (bufferedImage.getWidth() != 16) {
-                    continue;
-                }
-                if (bufferedImage.getHeight() != 16) {
-                    continue;
-                }
-                int[][] image = new int[16][16];
-                for (int x = 0; x < bufferedImage.getWidth(); x++) {
-                    for (int y = 0; y < bufferedImage.getHeight(); y++) {
-                        image[x][y] = bufferedImage.getRGB(x, y);
-                    }
-                }
-                return image;
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return null;
     }
 
 
@@ -271,7 +238,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
      */
     private static short[] generateAmbientNoise(int length) {
         short[] audio = new short[length];
-        Random random = new Random();
+        Random random = ThreadLocalRandom.current();
 
         // Parameters for realistic ambient noise
         double baseAmplitude = 5.0;  // Very low base amplitude
@@ -305,7 +272,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             UUID entityId = entry.getKey();
             Long speechEndTime = entry.getValue();
 
-            // If we've exceeded the inactivity threshold and we're not already sending silence
+            // If we've exceeded the inactivity threshold, and we're not already sending silence
             if (speechEndTime != null &&
                     (currentTime - speechEndTime >= VOICE_INACTIVITY_THRESHOLD_MS) &&
                     isSpeaking.getOrDefault(entityId, false) &&
