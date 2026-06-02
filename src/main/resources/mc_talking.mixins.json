@@ -12,7 +12,8 @@
     "EntityAICitizenWanderMixin",
     "RaidManagerMixin",
     "ServerEntityMixin",
-    "SoundUtilsMixin"
+    "SoundUtilsMixin",
+    "StandardRequestManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
