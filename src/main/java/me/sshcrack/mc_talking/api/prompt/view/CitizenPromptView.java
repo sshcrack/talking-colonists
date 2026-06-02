@@ -56,6 +56,9 @@ public record CitizenPromptView(
         @Nullable String customPersonalityText,
         @Nullable String playerState,
         @Nullable String environment,
-        @Nullable List<String> activeItemRequests
+        /** Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none */
+        @Nullable List<String> activeItemRequests,
+        /** Human-readable descriptions of active quests this citizen is involved in, or {@code null} if none */
+        @Nullable List<String> activeQuests
 ) {
 }
