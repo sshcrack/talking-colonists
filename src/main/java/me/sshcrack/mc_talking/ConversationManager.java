@@ -174,6 +174,16 @@ public class ConversationManager {
         return (free + evictable) >= slotsNeeded;
     }
 
+
+    /**
+     * Returns {@code true} if at least {@code slotsNeeded} slots can be granted
+     * */
+    public static synchronized boolean hasFreeCapacity(int slotsNeeded) {
+        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
+        int free = max - addedEntities.size();
+        return free >= slotsNeeded;
+    }
+
     /**
      * The oldest non-player entity in the queue that can be evicted, or {@code null}.
      */
@@ -189,6 +199,14 @@ public class ConversationManager {
      */
     private static void evict(UUID entityId) {
         if (entityId == null) return;
+
+        UUID playerId = getPlayerForEntity(entityId);
+        if (playerId != null) {
+            addedEntities.add(entityId);
+            endConversation(playerId, false);
+            return;
+        }
+
         GeminiWsClient client = clients.remove(entityId);
         if (client != null) client.close();
         McTalking.LOGGER.info("[ConversationManager] Evicted slot for entity {} to make room", entityId);

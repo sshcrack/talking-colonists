@@ -29,12 +29,14 @@ public class PregenerationTaskService {
      * played for each ordered citizen pair (greeter -> greeted).  Used to enforce a
      * per-pair cooldown so that a dense group of citizens does not fire the same
      * greeting over and over while they remain close to each other.
-     *
+     * <p>
      * The key is {@code greeterUUID + ":" + greetedUUID}.
      */
     private static final Map<String, Long> lastGreetingPlayTime = new ConcurrentHashMap<>();
 
-    /** How long (ms) before the same citizen pair may greet each other again. Default: 60 s. */
+    /**
+     * How long (ms) before the same citizen pair may greet each other again. Default: 60 s.
+     */
     private static final long GREETING_PLAY_COOLDOWN_MS = 60_000L;
 
     // Caches merged into the service
@@ -89,7 +91,7 @@ public class PregenerationTaskService {
             return;
         }
 
-        if (!ConversationManager.hasLowPriorityCapacity(1))
+        if (!ConversationManager.hasFreeCapacity(1))
             return;
 
         if (!ConversationManager.claimSlot(citizen, false)) {
@@ -171,14 +173,18 @@ public class PregenerationTaskService {
 
     // Cache management methods
 
-    /** Returns {@code true} if the (greeter, greeted) pair is still within its greeting play cooldown. */
+    /**
+     * Returns {@code true} if the (greeter, greeted) pair is still within its greeting play cooldown.
+     */
     public static boolean isGreetingOnCooldown(UUID greeterId, UUID greetedId) {
         String key = greeterId + ":" + greetedId;
         Long last = lastGreetingPlayTime.get(key);
         return last != null && (System.currentTimeMillis() - last) < GREETING_PLAY_COOLDOWN_MS;
     }
 
-    /** Records that a greeting was just successfully played from greeter to greeted. */
+    /**
+     * Records that a greeting was just successfully played from greeter to greeted.
+     */
     public static void recordGreetingPlayed(UUID greeterId, UUID greetedId) {
         lastGreetingPlayTime.put(greeterId + ":" + greetedId, System.currentTimeMillis());
     }

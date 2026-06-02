@@ -148,8 +148,6 @@ public class CitizenConversation {
 
         AbstractEntityCitizen citizenA = participants.get(0);
         AbstractEntityCitizen citizenB = participants.get(1);
-        UUID idA = citizenA.getUUID();
-        UUID idB = citizenB.getUUID();
 
         // "Already busy" guard: abort if either citizen is already in any session
         if (!ConversationManager.canCitizenSpeak(citizenA) || !ConversationManager.canCitizenSpeak(citizenB)) {
