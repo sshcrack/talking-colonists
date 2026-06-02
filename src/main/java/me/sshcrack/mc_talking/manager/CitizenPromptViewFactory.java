@@ -73,275 +73,40 @@ public final class CitizenPromptViewFactory {
     }
 
     public static CitizenPromptView create(ICitizenData data, @NotNull Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
-        String jobName = null;
-        if (data.getJob() != null) {
-            jobName = Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
-        }
-
-        List<String> parents = new ArrayList<>();
-        Tuple<String, String> parentTuple = data.getParents();
-        if (parentTuple != null) {
-            if (parentTuple.getA() != null && !parentTuple.getA().isEmpty()) {
-                parents.add(parentTuple.getA());
-            }
-            if (parentTuple.getB() != null && !parentTuple.getB().isEmpty()) {
-                parents.add(parentTuple.getB());
-            }
-        }
-
-        Double healthPercent = null;
-        var entityOpt = data.getEntity();
-        if (entityOpt.isPresent()) {
-            var entity = entityOpt.get();
-            healthPercent = (entity.getHealth() / Math.max(1.0, entity.getMaxHealth())) * 100.0;
-        }
-
-        var happinessHandler = data.getCitizenHappinessHandler();
-        double happiness = happinessHandler.getHappiness(data.getColony(), data);
-
-        List<HappinessModifierView> modifiers = happinessHandler.getModifiers().stream()
-                .map(modifierId -> {
-                    IHappinessModifier modifier = happinessHandler.getModifier(modifierId);
-                    if (modifier == null) {
-                        return null;
-                    }
-                    return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
-                })
-                .filter(Objects::nonNull)
-                .toList();
-
+        String jobName = extractJobName(data);
+        List<String> parents = extractParents(data);
+        Double healthPercent = extractHealthPercent(data);
+        double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
+        List<HappinessModifierView> modifiers = extractHappinessModifiers(data);
         boolean hasSchool = data.getColony().getServerBuildingManager().hasBuilding(
                 ModBuildings.school.get().getRegistryName(),
                 1,
                 true
         );
-
-        List<SkillLevelView> skills = List.of();
-        if (data.getCitizenSkillHandler() != null) {
-            skills = data.getCitizenSkillHandler().getSkills().entrySet().stream()
-                    .map(e -> new SkillLevelView(e.getKey().name(), e.getValue().getLevel()))
-                    .toList();
-        }
-
-        List<String> blockingMessages = ((CitizenDataAccessor) data)
-                .getCitizenChatOptions()
-                .values()
-                .stream()
-                .filter(e -> e.getPriority().getPriority() >= ChatPriority.IMPORTANT.getPriority())
-                .map(e -> e.getInquiry().getString())
-                .toList();
-
-        PlayerRelationView relation = null;
-        if (speakingTo != null) {
-            String speakingName = speakingTo.getName().getString();
-            var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
-            if (perms != null) {
-                var rank = perms.getRank();
-                String rankName = getRankName(rank);
-                relation = new PlayerRelationView(speakingName, rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
-            }
-        }
-
-        List<String> childrenNames = new ArrayList<>();
-        if (data.getChildren() != null) {
-            for (int childId : data.getChildren()) {
-                var child = data.getColony().getCitizen(childId);
-                childrenNames.add(child.getName());
-            }
-        }
-        List<String> siblingNames = new ArrayList<>();
-        if (data.getSiblings() != null) {
-            for (int siblingId : data.getSiblings()) {
-                var sibling = data.getColony().getCitizen(siblingId);
-                siblingNames.add(sibling.getName());
-            }
-        }
-
+        List<SkillLevelView> skills = extractSkills(data);
+        List<String> blockingMessages = extractBlockingMessages(data);
+        PlayerRelationView relation = extractPlayerRelation(data, speakingTo);
+        List<String> childrenNames = extractChildrenNames(data);
+        List<String> siblingNames = extractSiblingNames(data);
         String colonyName = data.getColony().getName();
-
         IBuilding homeBuilding = data.getHomeBuilding();
         String homeBuildingDisplayName = homeBuilding != null ? homeBuilding.getBuildingDisplayName() : null;
         int homeBuildingLevel = homeBuilding != null ? homeBuilding.getBuildingLevel() : 0;
-
         IBuilding workBuilding = data.getWorkBuilding();
         String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
         int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
-
-        // Personality — lazy assignment on first prompt generation
         var personalityExt = (CitizenDataPersonalityExtended) data;
         personalityExt.mc_talking$assignPersonality();
         PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
         String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
-
-        // ── Player state ──────────────────────────────────────────────────────
-        String playerState = null;
-        if (speakingTo != null) {
-            float health = speakingTo.getHealth();
-            float maxHealth = speakingTo.getMaxHealth();
-            int armorValue = speakingTo.getArmorValue();
-
-            StringBuilder ps = new StringBuilder();
-            float healthPct = health / Math.max(1.0f, maxHealth);
-            if (healthPct > 0.75f) ps.append("healthy");
-            else if (healthPct > 0.50f) ps.append("lightly wounded");
-            else if (healthPct > 0.25f) ps.append("wounded");
-            else ps.append("severely injured");
-            ps.append(" (").append(Math.round(health)).append("/").append(Math.round(maxHealth)).append(" HP)");
-
-            if (armorValue > 0) {
-                int wornPieces = 0;
-                float bestToughness = 0;
-                String bestArmorName = "";
-
-                EquipmentSlot[] toCheck = {
-                        EquipmentSlot.HEAD,
-                        EquipmentSlot.CHEST,
-                        EquipmentSlot.LEGS,
-                        EquipmentSlot.FEET
-                };
-
-                for (EquipmentSlot slot : toCheck) {
-                    ItemStack itemStack = speakingTo.getItemBySlot(slot);
-                    if (itemStack.isEmpty())
-                        continue;
-
-                    if (itemStack.getItem() instanceof ArmorItem armor) {
-                        float toughness = armor.getToughness();
-                        if (toughness > bestToughness) {
-                            bestToughness = toughness;
-                            bestArmorName = itemStack.getDisplayName().getString();
-                        }
-
-                        wornPieces++;
-                    }
-                }
-
-                ps.append(", wearing ").append(wornPieces).append(" armor pieces");
-                if (!bestArmorName.isEmpty())
-                    ps.append(String.format(" (best: %s)", bestArmorName));
-            } else {
-                ps.append(", no armor");
-            }
-            playerState = ps.toString();
-        }
-
-        // ── Environment ────────────────────────────────────────────────────────
-        String environment = null;
-        boolean peaceful = false;
-        var entityOptEnv = data.getEntity();
-        if (entityOptEnv.isPresent()) {
-            Level level = entityOptEnv.get().level();
-            long dayTime = level.getDayTime() % 24000L;
-            environment = "It is " + MiscUtil.describeTime(dayTime) + " and " + describeWeather(level) + ".";
-            peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
-        }
-
-        // ── Colony milestone ──────────────────────────────────────────────────
+        String playerState = extractPlayerState(speakingTo);
+        var envInfo = extractEnvironmentInfo(data);
         String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
-
-        // ── Active item requests ──────────────────────────────────────────────
-        List<String> activeItemRequests = null;
-        if (workBuilding != null) {
-            Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
-            if (openRequests != null && !openRequests.isEmpty()) {
-                activeItemRequests = new ArrayList<>();
-                for (IRequest<?> request : openRequests) {
-                    var requestable = request.getRequest();
-                    if (requestable instanceof Stack stackReq) {
-                        ItemStack itemStack = stackReq.getStack();
-                        int count = stackReq.getCount();
-                        activeItemRequests.add(count + "x " + itemStack.getDisplayName().getString());
-                    } else {
-                        activeItemRequests.add(request.getShortDisplayString().getString());
-                    }
-                }
-            }
-        }
-
-        // ── Active quests ──────────────────────────────────────────────────────
-        List<String> activeQuests = null;
-        if (data.hasQuestAssignment()) {
-            var colony = data.getColony();
-            var questManager = colony.getQuestManager();
-            var inProgress = questManager.getInProgressQuests();
-            if (inProgress != null && !inProgress.isEmpty()) {
-                activeQuests = new ArrayList<>();
-                int citizenId = data.getId();
-                for (var quest : inProgress) {
-                    var participants = quest.getParticipants();
-                    if (participants != null && participants.contains(citizenId)) {
-                        String questName = quest.getId().getPath()
-                                .replace("_", " ")
-                                .replace("/", " - ");
-                        int rawObjective = quest.getObjectiveIndex();
-                        if (rawObjective >= 0) {
-                            int objective = rawObjective + 1; // 1-indexed for readability
-                            questName += " (objective " + objective + ")";
-                        }
-                        activeQuests.add(questName);
-                    }
-                }
-                if (activeQuests.isEmpty()) {
-                    activeQuests = null;
-                }
-            }
-        }
-
+        List<String> activeItemRequests = extractActiveItemRequests(data, workBuilding);
+        List<String> activeQuests = extractActiveQuests(data);
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
-
-        // ── Colony connections (diplomacy) ────────────────────────────────
-        List<String> colonyConnections = null;
-        if (McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
-            try {
-                IColonyConnectionManager connManager = data.getColony().getConnectionManager();
-                if (connManager != null) {
-                    colonyConnections = new ArrayList<>();
-                    TreeMap<Integer, ColonyConnection> direct = connManager.getDirectlyConnectedColonies();
-                    if (direct != null) {
-                        for (Map.Entry<Integer, ColonyConnection> entry : direct.entrySet()) {
-                            try {
-                                int targetId = entry.getKey();
-                                ColonyConnection conn = entry.getValue();
-                                String connName = conn.name != null ? conn.name : "Colony #" + targetId;
-                                DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
-                                colonyConnections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
-                            } catch (Exception e) {
-                                McTalking.LOGGER.warn("Failed to process direct colony connection {}", entry.getKey(), e);
-                            }
-                        }
-                    }
-                    TreeMap<Integer, ColonyConnection> indirect = connManager.getIndirectlyConnectedColonies();
-                    if (indirect != null) {
-                        for (Map.Entry<Integer, ColonyConnection> entry : indirect.entrySet()) {
-                            try {
-                                int targetId = entry.getKey();
-                                ColonyConnection conn = entry.getValue();
-                                String connName = conn.name != null ? conn.name : "Colony #" + targetId;
-                                DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
-                                colonyConnections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
-                            } catch (Exception e) {
-                                McTalking.LOGGER.warn("Failed to process indirect colony connection {}", entry.getKey(), e);
-                            }
-                        }
-                    }
-                    if (colonyConnections.isEmpty()) {
-                        colonyConnections = null;
-                    }
-                }
-            } catch (Exception e) {
-                McTalking.LOGGER.warn("Failed to extract colony connections", e);
-                colonyConnections = null;
-            }
-        }
-
-        // ── Recent colony events ────────────────────────────────────────────
-        int colonyId = data.getColony().getID();
-        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
-        List<String> recentEvents = eventWindow > 0
-                ? ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
-                .map(ColonyEventBuffer.ColonyEvent::description)
-                .toList()
-                : List.of();
+        List<String> colonyConnections = extractColonyConnections(data);
+        List<String> recentEvents = extractRecentEvents(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -373,11 +138,11 @@ public final class CitizenPromptViewFactory {
                 workBuildingDisplayName,
                 workBuildingLevel,
                 data.getColony().getID(),
-                peaceful,
+                envInfo.peaceful(),
                 personality,
                 customPersonalityText,
                 playerState,
-                environment,
+                envInfo.description(),
                 activeItemRequests,
                 activeQuests,
                 recentEvents,
@@ -385,6 +150,282 @@ public final class CitizenPromptViewFactory {
                 colonyMilestone
         );
     }
+
+    // ── Extracted helpers ────────────────────────────────────────────────
+
+    @Nullable
+    private static String extractJobName(ICitizenData data) {
+        if (data.getJob() == null) {
+            return null;
+        }
+        return Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
+    }
+
+    private static List<String> extractParents(ICitizenData data) {
+        List<String> parents = new ArrayList<>();
+        Tuple<String, String> parentTuple = data.getParents();
+        if (parentTuple != null) {
+            if (parentTuple.getA() != null && !parentTuple.getA().isEmpty()) {
+                parents.add(parentTuple.getA());
+            }
+            if (parentTuple.getB() != null && !parentTuple.getB().isEmpty()) {
+                parents.add(parentTuple.getB());
+            }
+        }
+        return parents;
+    }
+
+    @Nullable
+    private static Double extractHealthPercent(ICitizenData data) {
+        var entityOpt = data.getEntity();
+        if (entityOpt.isEmpty()) {
+            return null;
+        }
+        var entity = entityOpt.get();
+        return (entity.getHealth() / Math.max(1.0, entity.getMaxHealth())) * 100.0;
+    }
+
+    private static List<HappinessModifierView> extractHappinessModifiers(ICitizenData data) {
+        var handler = data.getCitizenHappinessHandler();
+        return handler.getModifiers().stream()
+                .map(modifierId -> {
+                    IHappinessModifier modifier = handler.getModifier(modifierId);
+                    if (modifier == null) {
+                        return null;
+                    }
+                    return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static List<SkillLevelView> extractSkills(ICitizenData data) {
+        if (data.getCitizenSkillHandler() == null) {
+            return List.of();
+        }
+        return data.getCitizenSkillHandler().getSkills().entrySet().stream()
+                .map(e -> new SkillLevelView(e.getKey().name(), e.getValue().getLevel()))
+                .toList();
+    }
+
+    private static List<String> extractBlockingMessages(ICitizenData data) {
+        return ((CitizenDataAccessor) data)
+                .getCitizenChatOptions()
+                .values()
+                .stream()
+                .filter(e -> e.getPriority().getPriority() >= ChatPriority.IMPORTANT.getPriority())
+                .map(e -> e.getInquiry().getString())
+                .toList();
+    }
+
+    @Nullable
+    private static PlayerRelationView extractPlayerRelation(ICitizenData data, @Nullable ServerPlayer speakingTo) {
+        if (speakingTo == null) {
+            return null;
+        }
+        String speakingName = speakingTo.getName().getString();
+        var perms = data.getColony().getPermissions().getPlayers().get(speakingTo.getUUID());
+        if (perms == null) {
+            return null;
+        }
+        var rank = perms.getRank();
+        String rankName = getRankName(rank);
+        return new PlayerRelationView(speakingName, rankName, rank.isHostile(), rank.isColonyManager() || rank.isInitial());
+    }
+
+    private static List<String> extractChildrenNames(ICitizenData data) {
+        List<String> names = new ArrayList<>();
+        if (data.getChildren() != null) {
+            for (int childId : data.getChildren()) {
+                var child = data.getColony().getCitizen(childId);
+                names.add(child.getName());
+            }
+        }
+        return names;
+    }
+
+    private static List<String> extractSiblingNames(ICitizenData data) {
+        List<String> names = new ArrayList<>();
+        if (data.getSiblings() != null) {
+            for (int siblingId : data.getSiblings()) {
+                var sibling = data.getColony().getCitizen(siblingId);
+                names.add(sibling.getName());
+            }
+        }
+        return names;
+    }
+
+    @Nullable
+    private static String extractPlayerState(@Nullable ServerPlayer speakingTo) {
+        if (speakingTo == null) {
+            return null;
+        }
+        float health = speakingTo.getHealth();
+        float maxHealth = speakingTo.getMaxHealth();
+        int armorValue = speakingTo.getArmorValue();
+        StringBuilder ps = new StringBuilder();
+        float healthPct = health / Math.max(1.0f, maxHealth);
+        if (healthPct > 0.75f) ps.append("healthy");
+        else if (healthPct > 0.50f) ps.append("lightly wounded");
+        else if (healthPct > 0.25f) ps.append("wounded");
+        else ps.append("severely injured");
+        ps.append(" (").append(Math.round(health)).append("/").append(Math.round(maxHealth)).append(" HP)");
+        if (armorValue > 0) {
+            int wornPieces = 0;
+            float bestToughness = 0;
+            String bestArmorName = "";
+            EquipmentSlot[] toCheck = {
+                    EquipmentSlot.HEAD,
+                    EquipmentSlot.CHEST,
+                    EquipmentSlot.LEGS,
+                    EquipmentSlot.FEET
+            };
+            for (EquipmentSlot slot : toCheck) {
+                ItemStack itemStack = speakingTo.getItemBySlot(slot);
+                if (itemStack.isEmpty())
+                    continue;
+                if (itemStack.getItem() instanceof ArmorItem armor) {
+                    float toughness = armor.getToughness();
+                    if (toughness > bestToughness) {
+                        bestToughness = toughness;
+                        bestArmorName = itemStack.getDisplayName().getString();
+                    }
+                    wornPieces++;
+                }
+            }
+            ps.append(", wearing ").append(wornPieces).append(" armor pieces");
+            if (!bestArmorName.isEmpty())
+                ps.append(String.format(" (best: %s)", bestArmorName));
+        } else {
+            ps.append(", no armor");
+        }
+        return ps.toString();
+    }
+
+    private static EnvironmentInfo extractEnvironmentInfo(ICitizenData data) {
+        var entityOpt = data.getEntity();
+        if (entityOpt.isEmpty()) {
+            return new EnvironmentInfo(null, false);
+        }
+        var entity = entityOpt.get();
+        Level level = entity.level();
+        long dayTime = level.getDayTime() % 24000L;
+        String description = "It is " + MiscUtil.describeTime(dayTime) + " and " + describeWeather(level) + ".";
+        boolean peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
+        return new EnvironmentInfo(description, peaceful);
+    }
+
+    @Nullable
+    private static List<String> extractActiveItemRequests(ICitizenData data, @Nullable IBuilding workBuilding) {
+        if (workBuilding == null) {
+            return null;
+        }
+        Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
+        if (openRequests == null || openRequests.isEmpty()) {
+            return null;
+        }
+        List<String> requests = new ArrayList<>();
+        for (IRequest<?> request : openRequests) {
+            var requestable = request.getRequest();
+            if (requestable instanceof Stack stackReq) {
+                ItemStack itemStack = stackReq.getStack();
+                int count = stackReq.getCount();
+                requests.add(count + "x " + itemStack.getDisplayName().getString());
+            } else {
+                requests.add(request.getShortDisplayString().getString());
+            }
+        }
+        return requests;
+    }
+
+    @Nullable
+    private static List<String> extractActiveQuests(ICitizenData data) {
+        if (!data.hasQuestAssignment()) {
+            return null;
+        }
+        var colony = data.getColony();
+        var questManager = colony.getQuestManager();
+        var inProgress = questManager.getInProgressQuests();
+        if (inProgress == null || inProgress.isEmpty()) {
+            return null;
+        }
+        List<String> quests = new ArrayList<>();
+        int citizenId = data.getId();
+        for (var quest : inProgress) {
+            var participants = quest.getParticipants();
+            if (participants != null && participants.contains(citizenId)) {
+                String questName = quest.getId().getPath()
+                        .replace("_", " ")
+                        .replace("/", " - ");
+                int rawObjective = quest.getObjectiveIndex();
+                if (rawObjective >= 0) {
+                    int objective = rawObjective + 1;
+                    questName += " (objective " + objective + ")";
+                }
+                quests.add(questName);
+            }
+        }
+        return quests.isEmpty() ? null : quests;
+    }
+
+    @Nullable
+    private static List<String> extractColonyConnections(ICitizenData data) {
+        if (!McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
+            return null;
+        }
+        try {
+            IColonyConnectionManager connManager = data.getColony().getConnectionManager();
+            if (connManager == null) {
+                return null;
+            }
+            List<String> connections = new ArrayList<>();
+            TreeMap<Integer, ColonyConnection> direct = connManager.getDirectlyConnectedColonies();
+            if (direct != null) {
+                for (Map.Entry<Integer, ColonyConnection> entry : direct.entrySet()) {
+                    try {
+                        int targetId = entry.getKey();
+                        ColonyConnection conn = entry.getValue();
+                        String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                        DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                        connections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
+                    } catch (Exception e) {
+                        McTalking.LOGGER.warn("Failed to process direct colony connection {}", entry.getKey(), e);
+                    }
+                }
+            }
+            TreeMap<Integer, ColonyConnection> indirect = connManager.getIndirectlyConnectedColonies();
+            if (indirect != null) {
+                for (Map.Entry<Integer, ColonyConnection> entry : indirect.entrySet()) {
+                    try {
+                        int targetId = entry.getKey();
+                        ColonyConnection conn = entry.getValue();
+                        String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                        DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                        connections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
+                    } catch (Exception e) {
+                        McTalking.LOGGER.warn("Failed to process indirect colony connection {}", entry.getKey(), e);
+                    }
+                }
+            }
+            return connections.isEmpty() ? null : connections;
+        } catch (Exception e) {
+            McTalking.LOGGER.warn("Failed to extract colony connections", e);
+            return null;
+        }
+    }
+
+    private static List<String> extractRecentEvents(ICitizenData data) {
+        int colonyId = data.getColony().getID();
+        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
+        if (eventWindow <= 0) {
+            return List.of();
+        }
+        return ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
+                .map(ColonyEventBuffer.ColonyEvent::description)
+                .toList();
+    }
+
+    private record EnvironmentInfo(@Nullable String description, boolean peaceful) {}
 
     @NotNull
     private static String getRankName(Rank rank) {
