@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-ARCHIVE_NAME="talking-colonists-source-$(date +%Y%m%d-%H%M%S).zip"
+ARCHIVE_NAME="talking-colonists-source.zip"
 
 if [ ! -d "$REPO_ROOT/build/archives" ]; then
     mkdir -p "$REPO_ROOT/build/archives"

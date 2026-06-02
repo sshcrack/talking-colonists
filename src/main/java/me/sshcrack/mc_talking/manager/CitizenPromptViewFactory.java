@@ -3,6 +3,9 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
+import com.minecolonies.api.colony.connections.ColonyConnection;
+import com.minecolonies.api.colony.connections.DiplomacyStatus;
+import com.minecolonies.api.colony.connections.IColonyConnectionManager;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
@@ -11,6 +14,7 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.util.ColonyStatsHelper;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
@@ -39,6 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.UUID;
 
 
@@ -56,6 +61,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT
 import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
 import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
 
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -252,7 +258,90 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        // ── Active quests ──────────────────────────────────────────────────────
+        List<String> activeQuests = null;
+        if (data.hasQuestAssignment()) {
+            var colony = data.getColony();
+            var questManager = colony.getQuestManager();
+            var inProgress = questManager.getInProgressQuests();
+            if (inProgress != null && !inProgress.isEmpty()) {
+                activeQuests = new ArrayList<>();
+                int citizenId = data.getId();
+                for (var quest : inProgress) {
+                    var participants = quest.getParticipants();
+                    if (participants != null && participants.contains(citizenId)) {
+                        String questName = quest.getId().getPath()
+                                .replace("_", " ")
+                                .replace("/", " - ");
+                        int rawObjective = quest.getObjectiveIndex();
+                        if (rawObjective >= 0) {
+                            int objective = rawObjective + 1; // 1-indexed for readability
+                            questName += " (objective " + objective + ")";
+                        }
+                        activeQuests.add(questName);
+                    }
+                }
+                if (activeQuests.isEmpty()) {
+                    activeQuests = null;
+                }
+            }
+        }
+
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
+
+        // ── Colony connections (diplomacy) ────────────────────────────────
+        List<String> colonyConnections = null;
+        if (McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
+            try {
+                IColonyConnectionManager connManager = data.getColony().getConnectionManager();
+                if (connManager != null) {
+                    colonyConnections = new ArrayList<>();
+                    TreeMap<Integer, ColonyConnection> direct = connManager.getDirectlyConnectedColonies();
+                    if (direct != null) {
+                        for (Map.Entry<Integer, ColonyConnection> entry : direct.entrySet()) {
+                            try {
+                                int targetId = entry.getKey();
+                                ColonyConnection conn = entry.getValue();
+                                String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                                DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                                colonyConnections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Failed to process direct colony connection {}", entry.getKey(), e);
+                            }
+                        }
+                    }
+                    TreeMap<Integer, ColonyConnection> indirect = connManager.getIndirectlyConnectedColonies();
+                    if (indirect != null) {
+                        for (Map.Entry<Integer, ColonyConnection> entry : indirect.entrySet()) {
+                            try {
+                                int targetId = entry.getKey();
+                                ColonyConnection conn = entry.getValue();
+                                String connName = conn.name != null ? conn.name : "Colony #" + targetId;
+                                DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
+                                colonyConnections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
+                            } catch (Exception e) {
+                                McTalking.LOGGER.warn("Failed to process indirect colony connection {}", entry.getKey(), e);
+                            }
+                        }
+                    }
+                    if (colonyConnections.isEmpty()) {
+                        colonyConnections = null;
+                    }
+                }
+            } catch (Exception e) {
+                McTalking.LOGGER.warn("Failed to extract colony connections", e);
+                colonyConnections = null;
+            }
+        }
+
+        // ── Recent colony events ────────────────────────────────────────────
+        int colonyId = data.getColony().getID();
+        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
+        List<String> recentEvents = eventWindow > 0
+                ? ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
+                .map(ColonyEventBuffer.ColonyEvent::description)
+                .toList()
+                : List.of();
 
         return new CitizenPromptView(
                 data.getName(),
@@ -290,6 +379,9 @@ public final class CitizenPromptViewFactory {
                 playerState,
                 environment,
                 activeItemRequests,
+                activeQuests,
+                recentEvents,
+                colonyConnections,
                 colonyMilestone
         );
     }
