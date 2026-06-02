@@ -280,15 +280,13 @@ public final class CitizenPromptViewFactory {
 
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
 
-        boolean isGuard = data.getJob() != null && data.getJob().isGuard();
-
         // ── Recent colony events ────────────────────────────────────────────
         int colonyId = data.getColony().getID();
         int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
         List<String> recentEvents = eventWindow > 0
                 ? ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
-                        .map(e -> e.description())
-                        .toList()
+                .map(e -> e.description())
+                .toList()
                 : List.of();
 
         return new CitizenPromptView(
@@ -326,7 +324,9 @@ public final class CitizenPromptViewFactory {
                 customPersonalityText,
                 playerState,
                 environment,
-                activeItemRequests
+                activeItemRequests,
+                activeQuests,
+                recentEvents
         );
     }
 
