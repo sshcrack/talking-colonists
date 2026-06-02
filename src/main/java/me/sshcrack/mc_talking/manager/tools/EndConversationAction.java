@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,6 +30,19 @@ public class EndConversationAction extends FunctionAction {
 
         client.endConversationWhenPossible();
         obj.addProperty("success", true);
+
+        var playerUUID = ConversationManager.getPlayerForEntity(citizen.getUUID());
+        if (playerUUID != null) {
+            var server = citizen.level().getServer();
+            if (server != null) {
+                var player = server.getPlayerList().getPlayer(playerUUID);
+                if (player != null) {
+                    player.sendSystemMessage(
+                            Component.translatable("mc_talking.colonist_ended_conversation")
+                                    .withStyle(ChatFormatting.YELLOW));
+                }
+            }
+        }
 
         return obj;
     }

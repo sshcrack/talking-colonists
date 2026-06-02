@@ -35,6 +35,7 @@
   "mc_talking.configuration.citizen_contact_base_chance": "Base chance for contact",
   "mc_talking.configuration.citizen_contact_check_interval_ticks": "Citizen contact check interval (ticks)",
 
+  "mc_talking.colonist_ended_conversation": "The citizen ended the conversation.",
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
   "mc_talking.ai_status.listening": "Listening",
   "mc_talking.ai_status.thinking": "Thinking",
