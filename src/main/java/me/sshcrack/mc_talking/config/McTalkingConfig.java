@@ -207,6 +207,12 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How long (in seconds) citizens express post-raid trauma in their prompts after a raid ends. Set to 0 to disable.")
     public int raidTraumaDurationSeconds = 1200;
 
+    // Colony Events Window
+    @AutoGen(category = "citizens", group = "colony_events")
+    @IntField(min = 0, max = 7200)
+    @SerialEntry(comment = "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.")
+    public int colonyEventWindowSeconds = 1200;
+
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
     public int configVersion = 0;
 

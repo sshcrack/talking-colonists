@@ -14,6 +14,7 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
@@ -253,6 +254,37 @@ public final class CitizenPromptViewFactory {
             }
         }
 
+        // ── Active quests ──────────────────────────────────────────────────────
+        List<String> activeQuests = null;
+        if (data.hasQuestAssignment()) {
+            var colony = data.getColony();
+            var questManager = colony.getQuestManager();
+            var inProgress = questManager.getInProgressQuests();
+            if (inProgress != null && !inProgress.isEmpty()) {
+                activeQuests = new ArrayList<>();
+                int citizenId = data.getId();
+                for (var quest : inProgress) {
+                    var participants = quest.getParticipants();
+                    if (participants != null && participants.contains(citizenId)) {
+                        String questName = quest.getId().getPath()
+                                .replace("_", " ")
+                                .replace("/", " - ");
+                        int rawObjective = quest.getObjectiveIndex();
+                        if (rawObjective >= 0) {
+                            int objective = rawObjective + 1; // 1-indexed for readability
+                            questName += " (objective " + objective + ")";
+                        }
+                        activeQuests.add(questName);
+                    }
+                }
+                if (activeQuests.isEmpty()) {
+                    activeQuests = null;
+                }
+            }
+        }
+
+        boolean isGuard = data.getJob() != null && data.getJob().isGuard();
+
         // ── Colony connections (diplomacy) ────────────────────────────────
         List<String> colonyConnections = null;
         if (McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
@@ -298,7 +330,14 @@ public final class CitizenPromptViewFactory {
             }
         }
 
-        boolean isGuard = data.getJob() != null && data.getJob().isGuard();
+        // ── Recent colony events ────────────────────────────────────────────
+        int colonyId = data.getColony().getID();
+        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
+        List<String> recentEvents = eventWindow > 0
+                ? ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
+                .map(ColonyEventBuffer.ColonyEvent::description)
+                .toList()
+                : List.of();
 
         return new CitizenPromptView(
                 data.getName(),
@@ -336,6 +375,8 @@ public final class CitizenPromptViewFactory {
                 playerState,
                 environment,
                 activeItemRequests,
+                activeQuests,
+                recentEvents,
                 colonyConnections
         );
     }

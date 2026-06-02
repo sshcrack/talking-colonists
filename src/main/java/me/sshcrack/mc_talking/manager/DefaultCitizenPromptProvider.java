@@ -7,7 +7,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.util.RaidTraumaTracker;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -143,6 +143,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("- Since you need these materials, naturally mention what you are waiting for if the player asks how you are doing.\n");
         }
 
+        if (view.activeQuests() != null && !view.activeQuests().isEmpty()) {
+            obs.append("- You are currently involved in the following quests:\n");
+            for (String q : view.activeQuests()) {
+                obs.append("  - ").append(q).append("\n");
+            }
+            obs.append("- Since you have ongoing quests, you can naturally mention them if the topic comes up.\n");
+        }
+
         if (!obs.isEmpty()) {
             prompt.append("\n## OBSERVATIONS\n").append(obs);
         }
@@ -203,9 +211,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         // Post-raid trauma
         if (!view.peaceful()) {
             int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-            if (traumaDuration > 0 && RaidTraumaTracker.isInTrauma(view.colonyId(), traumaDuration)) {
-                long sinceMs = RaidTraumaTracker.millisSinceRaid(view.colonyId());
-                int lost = RaidTraumaTracker.getLostCitizens(view.colonyId());
+            if (traumaDuration > 0 && ColonyEventBuffer.isInTrauma(view.colonyId(), traumaDuration)) {
+                long sinceMs = ColonyEventBuffer.millisSinceRaid(view.colonyId());
+                int lost = ColonyEventBuffer.getLostCitizens(view.colonyId());
                 prompt.append("\n## POST-RAID TRAUMA\n");
 
                 if (view.guard()) {
@@ -234,6 +242,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                 .append("\n");
                     }
                 }
+            }
+        }
+
+        // Recent colony events
+        if (!view.recentColonyEvents().isEmpty()) {
+            prompt.append("\n## RECENT COLONY EVENTS\n");
+            for (String event : view.recentColonyEvents()) {
+                prompt.append("- ").append(event).append("\n");
             }
         }
     }
