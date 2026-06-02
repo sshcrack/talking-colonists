@@ -454,8 +454,8 @@ public class ServerEventHandler {
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
         /*? if forge {*/
-        /*LivingEntity newTarget = event.getNewTarget();*/
-        /*?}*/
+        /*LivingEntity newTarget = event.getNewTarget();
+        *//*?}*/
 
         /*? if neoforge {*/
         LivingEntity newTarget = event.getNewAboutToBeSetTarget();

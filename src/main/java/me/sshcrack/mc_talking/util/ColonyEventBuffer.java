@@ -16,6 +16,7 @@ public final class ColonyEventBuffer {
         CITIZEN_DEATH,
         CITIZEN_BORN,
         CITIZEN_HIRED,
+        CITIZEN_RESURRECTED,
         CITIZEN_JOB_CHANGE,
         BUILDING_ADDED,
         BUILDING_REMOVED,

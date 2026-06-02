@@ -50,6 +50,10 @@ public final class ColonyEventSubscriber {
                     ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.CITIZEN_HIRED,
                             name + " was hired from the tavern");
                     break;
+                case RESURRECTED:
+                    ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.CITIZEN_RESURRECTED,
+                            name + " was resurrected");
+                    break;
                 default:
                     break;
             }
