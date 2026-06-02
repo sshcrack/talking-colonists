@@ -67,6 +67,12 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.")
     public boolean sendMumblingAndConversationsToChat = false;
 
+    // Colony Statistics Mentions
+    @AutoGen(category = "citizens")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will occasionally mention colony milestones (buildings built, mobs killed, etc.) in their idle mumbles and conversations.")
+    public boolean enableColonyStatsMentions = true;
+
     @AutoGen(category = "general", group = "interaction")
     @TickBox
     @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation. "
