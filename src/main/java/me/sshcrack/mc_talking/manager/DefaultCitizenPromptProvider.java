@@ -70,6 +70,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         addRelationships(view, prompt);
+        addColonyDiplomacy(view, prompt);
         addCurrentState(view, prompt, view.sick());
         addObservations(view, prompt);
         addMemory(view, prompt);
@@ -368,6 +369,17 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
 
         return prompt.toString();
+    }
+
+    private static void addColonyDiplomacy(@NotNull CitizenPromptView view, StringBuilder prompt) {
+        List<String> connections = view.colonyConnections();
+        if (connections != null && !connections.isEmpty()) {
+            prompt.append("\n## COLONY DIPLOMACY\n");
+            prompt.append("Your colony has relations with neighboring colonies:\n");
+            for (String conn : connections) {
+                prompt.append("- ").append(conn).append("\n");
+            }
+        }
     }
 
     private static void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {

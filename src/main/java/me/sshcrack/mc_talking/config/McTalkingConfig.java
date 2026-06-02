@@ -227,6 +227,12 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
     public List<String> customPersonalityArchetypes = new ArrayList<>();
 
+    // Colony Diplomacy
+    @AutoGen(category = "citizens", group = "colony_diplomacy")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will reference neighboring colonies and their diplomatic standing (allies, enemies, etc.) in conversations.")
+    public boolean enableColonyDiplomacy = true;
+
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
         @Override
         public String provideNewValue() {

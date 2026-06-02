@@ -22,6 +22,7 @@ import java.util.UUID;
  * @param guard                 {@code true} when the citizen is a guard (knight/archer)
  * @param activeQuests Human-readable descriptions of active quests this citizen is involved in, or {@code null} if none
  * @param recentColonyEvents Descriptions of recent colony lifecycle events (deaths, births, building changes), or empty list if none
+ * @param colonyConnections     Diplomatic connections to neighboring colonies, e.g. "Oakvale (ALLY)", or {@code null} if none
  */
 public record CitizenPromptView(
         String name,
@@ -60,6 +61,7 @@ public record CitizenPromptView(
         @Nullable String environment,
         @Nullable List<String> activeItemRequests,
         @Nullable List<String> activeQuests,
-        List<String> recentColonyEvents
+        List<String> recentColonyEvents,
+        @Nullable List<String> colonyConnections
 ) {
 }
