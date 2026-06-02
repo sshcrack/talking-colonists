@@ -142,6 +142,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("- Since you need these materials, naturally mention what you are waiting for if the player asks how you are doing.\n");
         }
 
+        if (view.activeQuests() != null && !view.activeQuests().isEmpty()) {
+            obs.append("- You are currently involved in the following quests:\n");
+            for (String q : view.activeQuests()) {
+                obs.append("  - ").append(q).append("\n");
+            }
+            obs.append("- Since you have ongoing quests, you can naturally mention them if the topic comes up.\n");
+        }
+
         if (!obs.isEmpty()) {
             prompt.append("\n## OBSERVATIONS\n").append(obs);
         }
