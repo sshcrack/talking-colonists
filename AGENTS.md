@@ -14,7 +14,7 @@ Uses **Stonecutter** for two versions: `1.21.1-neoforge` (VCS default) and `1.20
 - Custom Gradle plugin `mod-platform` defined in `build-logic/`.
 
 ## Minecolonies Lookup
-When working with the Minecolonies API, look at the scripts/MINECOLONIES_DOCS.md to view the docs and if you need actual code insight, use the gradle classes / minecolonies sources jar to view the source.
+When working with the Minecolonies API, look at the `scripts/MINECOLONIES_DOCS.md` to view the docs and if you need actual code insight, use the gradle classes / minecolonies sources jar to view the source.
 
 ## Build & Run
 
