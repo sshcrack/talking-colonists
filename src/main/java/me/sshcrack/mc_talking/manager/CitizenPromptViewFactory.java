@@ -11,6 +11,7 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
@@ -279,6 +280,15 @@ public final class CitizenPromptViewFactory {
 
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
 
+        // ── Recent colony events ────────────────────────────────────────────
+        int colonyId = data.getColony().getID();
+        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
+        List<String> recentEvents = eventWindow > 0
+                ? ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
+                .map(e -> e.description())
+                .toList()
+                : List.of();
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -315,7 +325,8 @@ public final class CitizenPromptViewFactory {
                 playerState,
                 environment,
                 activeItemRequests,
-                activeQuests
+                activeQuests,
+                recentEvents
         );
     }
 

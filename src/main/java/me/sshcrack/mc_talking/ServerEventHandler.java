@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.CitizenHelper;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -85,6 +86,7 @@ public class ServerEventHandler {
     public void onServerStop(ServerStoppingEvent event) {
         PregenerationTaskService.cleanup();
         ConversationManager.cleanup();
+        ColonyEventBuffer.clear();
     }
 
     /**
@@ -452,8 +454,8 @@ public class ServerEventHandler {
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
         /*? if forge {*/
-        /*LivingEntity newTarget = event.getNewTarget();*/
-        /*?}*/
+        /*LivingEntity newTarget = event.getNewTarget();
+        *//*?}*/
 
         /*? if neoforge {*/
         LivingEntity newTarget = event.getNewAboutToBeSetTarget();
