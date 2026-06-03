@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import com.minecolonies.api.entity.ai.JobStatus;
 import me.sshcrack.mc_talking.commands.McTalkingDebugCommand;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
@@ -14,10 +15,14 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
@@ -64,6 +69,9 @@ import net.minecraftforge.fml.common.Mod;
 public class ServerEventHandler {
     private int tickCounter = 0;
 
+    private record WalkingTarget(UUID playerId, int lastRepathTick) {}
+    private final Map<UUID, WalkingTarget> walkingCitizens = new HashMap<>();
+
     /**
      * Called when the server starts
      */
@@ -91,6 +99,12 @@ public class ServerEventHandler {
         ConversationManager.cleanup();
         ColonyEventBuffer.clear();
         PlayerHeatmapTracker.cleanup();
+
+        MinecraftServer server = event.getServer();
+        for (UUID citizenId : walkingCitizens.keySet()) {
+            abortWalking(citizenId, server);
+        }
+        walkingCitizens.clear();
     }
 
     /**
@@ -124,6 +138,15 @@ public class ServerEventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             ConversationManager.endConversation(player.getUUID(), false);
             PlayerHeatmapTracker.onPlayerRemoved(player.getUUID());
+
+            MinecraftServer server = player.getServer();
+            walkingCitizens.entrySet().removeIf(entry -> {
+                if (entry.getValue().playerId().equals(player.getUUID())) {
+                    abortWalking(entry.getKey(), server);
+                    return true;
+                }
+                return false;
+            });
         }
     }
 
@@ -178,6 +201,9 @@ public class ServerEventHandler {
 
             if (doDistanceCheck) {
                 checkConversationDistance(player);
+                if (McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
+                    checkUrgentContactAbort(player);
+                }
             }
 
             AbstractEntityCitizen talkingCitizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
@@ -205,6 +231,11 @@ public class ServerEventHandler {
             if (doContactCheck) {
                 checkForCitizenInitiatedContact(player, citizens, contactedCitizens);
             }
+        }
+
+        // Walking citizens: update once per tick interval, not per player
+        if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
+            updateWalkingCitizens(server);
         }
 
         // Random citizen-to-citizen conversations (once per interval, not per player)
@@ -332,10 +363,20 @@ public class ServerEventHandler {
                                                    Set<UUID> contactedThisInterval) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
+        boolean walkToPlayer = McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer;
 
-        for (AbstractEntityCitizen citizen : citizens) {
+        // When walk-to-player is enabled, scan a wider range for urgent contacts only
+        List<AbstractEntityCitizen> contactCitizens = citizens;
+        if (walkToPlayer) {
+            double wideRange = McTalkingConfig.INSTANCE.instance().urgentContactSearchRange;
+            var wideAabb = player.getBoundingBox().inflate(wideRange);
+            contactCitizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, wideAabb);
+        }
+
+        for (AbstractEntityCitizen citizen : contactCitizens) {
             if (!ConversationManager.canCitizenSpeak(citizen)) continue;
             if (citizen.getCitizenData() == null) continue;
+            if (walkingCitizens.containsKey(citizen.getUUID())) continue;
             // Skip citizens that already initiated contact this interval (dedup across players)
             if (!contactedThisInterval.add(citizen.getUUID())) continue;
 
@@ -343,9 +384,16 @@ public class ServerEventHandler {
             if (urgencyWeight <= 0) continue;
 
             if (Math.random() < baseChance * urgencyWeight) {
-                McTalking.LOGGER.info("[CitizenContact] Citizen {} initiating contact with player {}",
-                        citizen.getCitizenData().getName(), player.getName().getString());
-                ConversationManager.startUrgentContact(citizen, player);
+                McTalking.LOGGER.info("[CitizenContact] Citizen {} initiating {} with player {}",
+                        citizen.getCitizenData().getName(),
+                        walkToPlayer ? "walk-to-player" : "contact",
+                        player.getName().getString());
+
+                if (walkToPlayer) {
+                    startWalkingUrgentContact(citizen, player);
+                } else {
+                    ConversationManager.startUrgentContact(citizen, player);
+                }
                 break; // Only one citizen per player per check
             }
         }
@@ -394,7 +442,111 @@ public class ServerEventHandler {
             }
         }
 
+        if (data.getJobStatus() == JobStatus.STUCK) {
+            weight += McTalkingConfig.INSTANCE.instance().blockingTaskUrgencyMultiplier;
+        }
+
         return weight;
+    }
+
+    private void startWalkingUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
+        if (!ConversationManager.claimSlot(citizen, false)) {
+            McTalking.LOGGER.debug("[CitizenContact] No slot available for walking citizen {}", citizen.getUUID());
+            return;
+        }
+
+        walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), tickCounter));
+        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.URGENT_WALKING);
+
+        citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
+
+        McTalking.LOGGER.info("[CitizenContact] Citizen {} walking to player {}", 
+                citizen.getCitizenData().getName(), player.getName().getString());
+    }
+
+    private void updateWalkingCitizens(MinecraftServer server) {
+        var it = walkingCitizens.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            UUID citizenId = entry.getKey();
+            WalkingTarget target = entry.getValue();
+
+            var player = server.getPlayerList().getPlayer(target.playerId());
+            if (player == null || !player.isAlive()) {
+                abortWalking(citizenId, server);
+                it.remove();
+                continue;
+            }
+
+            // Find the citizen entity on the server
+            AbstractEntityCitizen citizen = findWalkingCitizenEntity(server, citizenId);
+            if (citizen == null || !citizen.isAlive()) {
+                abortWalking(citizenId, server);
+                it.remove();
+                continue;
+            }
+
+            // Check if urgent need is resolved
+            if (calculateUrgencyWeight(citizen) <= 0) {
+                McTalking.LOGGER.info("[CitizenContact] Citizen {} — urgent need resolved, aborting walk",
+                        citizen.getCitizenData().getName());
+                citizen.getNavigation().stop();
+                AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
+                ConversationManager.releaseSlot(citizen);
+                it.remove();
+                continue;
+            }
+
+            // Check if in voice range to start conversation
+            double voiceRange = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+            if (citizen.distanceToSqr(player) <= voiceRange * voiceRange) {
+                McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
+                        citizen.getCitizenData().getName());
+                it.remove();
+                // Release walking slot so canCitizenSpeak doesn't block the conversation
+                AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
+                ConversationManager.releaseSlot(citizen);
+                ConversationManager.startUrgentContact(citizen, player);
+                continue;
+            }
+
+            // Repath every 20 ticks
+            if (tickCounter - target.lastRepathTick >= 20) {
+                citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
+                entry.setValue(new WalkingTarget(target.playerId(), tickCounter));
+            }
+        }
+    }
+
+    private void abortWalking(UUID citizenId, MinecraftServer server) {
+        AbstractEntityCitizen entity = findWalkingCitizenEntity(server, citizenId);
+        if (entity != null && entity.isAlive()) {
+            entity.getNavigation().stop();
+            AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
+        }
+        ConversationManager.releaseSlot(citizenId);
+    }
+
+    @Nullable
+    private AbstractEntityCitizen findWalkingCitizenEntity(MinecraftServer server, UUID citizenId) {
+        for (var p : server.getPlayerList().getPlayers()) {
+            var e = p.serverLevel().getEntities().get(citizenId);
+            if (e instanceof AbstractEntityCitizen c) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    private void checkUrgentContactAbort(ServerPlayer player) {
+        AbstractEntityCitizen citizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
+        if (citizen == null || citizen.getCitizenData() == null) return;
+
+        if (calculateUrgencyWeight(citizen) <= 0) {
+            McTalking.LOGGER.info("[CitizenContact] Urgent need resolved during conversation for citizen {}",
+                    citizen.getCitizenData().getName());
+            ConversationManager.endConversation(player.getUUID(), false);
+        }
     }
 
     /**

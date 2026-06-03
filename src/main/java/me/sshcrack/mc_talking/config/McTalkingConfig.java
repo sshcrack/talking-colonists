@@ -31,6 +31,9 @@ public class McTalkingConfig {
     public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
+    /** Movement speed multiplier when a citizen walks to the player on urgent contact. */
+    public static final double CITIZEN_URGENT_WALK_SPEED = 1.2;
+
     public static final ConfigClassHandler<McTalkingConfig> INSTANCE = ConfigClassHandler.createBuilder(McTalkingConfig.class)
             .id(YACLPlatform.rl("mc_talking", "config"))
             .serializer(config -> GsonConfigSerializerBuilder.create(config)
@@ -190,6 +193,21 @@ public class McTalkingConfig {
     @IntField(min = 1, max = 10000)
     @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
     public int citizenContactCheckIntervalTicks = 400;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @TickBox
+    @SerialEntry(comment = "When enabled, urgent citizens walk to the player and follow them, searching over a larger radius. The conversation auto-starts when they get close.")
+    public boolean enableUrgentContactWalkToPlayer = true;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @DoubleField(min = 5.0, max = 100.0)
+    @SerialEntry(comment = "Search radius for urgent contacts when walk-to-player is enabled.")
+    public double urgentContactSearchRange = 30.0;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @DoubleSlider(min = 0.0, max = 10.0, step = 0.1)
+    @SerialEntry(comment = "Extra urgency weight applied when the citizen is stuck (blocked by missing tools/items). Makes them much more likely to call for help.")
+    public double blockingTaskUrgencyMultiplier = 3.0;
 
     @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox

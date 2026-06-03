@@ -134,7 +134,10 @@ public class ConversationManager {
      * Use when the client is already closed externally.
      */
     public static synchronized void releaseSlot(AbstractEntityCitizen citizen) {
-        UUID entityId = citizen.getUUID();
+        releaseSlot(citizen.getUUID());
+    }
+
+    public static synchronized void releaseSlot(UUID entityId) {
         if (addedEntities.remove(entityId)) {
             McTalking.LOGGER.info("[ConversationManager] Freed slot for entity {}", entityId);
         }
