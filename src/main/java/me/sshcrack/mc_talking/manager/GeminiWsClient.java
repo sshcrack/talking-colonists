@@ -232,7 +232,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
 
-        if (modality == ModalityModes.TEXT_AND_AUDIO || McTalkingConfig.INSTANCE.instance().enableCitizenMemory) {
+        if (modality == ModalityModes.TEXT_AND_AUDIO || McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
             setup.outputAudioTranscription = new JsonObject();
         }
 

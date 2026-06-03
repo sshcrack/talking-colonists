@@ -49,7 +49,7 @@ public class McTalkingDebugCommand {
                         .withStyle(ChatFormatting.WHITE))
                 .append(Component.literal("\n"))
                 .append(Component.translatable("mc_talking.debug.config_toggles",
-                                booleanToStr(config.enableCitizenMemory),
+                                booleanToStr(config.enableConversationSummaryAndMemorize),
                                 booleanToStr(config.enablePersonalityArchetypes),
                                 booleanToStr(config.enableCitizenToCitizenConversation),
                                 booleanToStr(config.enablePregeneration))

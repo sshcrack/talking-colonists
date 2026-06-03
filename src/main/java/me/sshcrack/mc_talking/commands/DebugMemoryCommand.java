@@ -5,7 +5,6 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipMemory;

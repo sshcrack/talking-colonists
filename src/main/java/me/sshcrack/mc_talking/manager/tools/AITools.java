@@ -48,6 +48,7 @@ public class AITools {
         tool.functionDeclarations.addAll(
                 functions
                         .filter(e -> !rawToolsDisabled.contains(e.getName()))
+                        .filter(FunctionAction::isEnabled)
                         .map(e -> {
                             var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(e.getName(), e.getDescription());
                             if (e.getProperty() != null)

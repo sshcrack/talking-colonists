@@ -215,7 +215,7 @@ public class CitizenWsClient extends GeminiWsClient {
         ServerPlayer closingPlayer = player;
         super.close();
 
-        if (closingPlayer == null || !McTalkingConfig.INSTANCE.instance().enableCitizenMemory) return;
+        if (closingPlayer == null || !McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
         if (!startedInSystemMode) {
             // Direct player conversation — generate memory of this interaction
             triggerPlayerMemoryGeneration(closingPlayer);
