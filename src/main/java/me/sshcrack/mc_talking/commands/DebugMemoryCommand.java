@@ -40,13 +40,6 @@ public class DebugMemoryCommand {
             return 0;
         }
 
-        boolean memoryEnabled = McTalkingConfig.INSTANCE.instance().enableCitizenMemory;
-        if (!memoryEnabled) {
-            source.sendSuccess(() -> Component.translatable("mc_talking.debug.memory_disabled")
-                    .withStyle(ChatFormatting.YELLOW), false);
-            return 1;
-        }
-
         CitizenMemories mem = ((CitizenDataMemoryExtended) data).mc_talking$getMemory();
         if (mem == null) {
             source.sendSuccess(() -> Component.translatable("mc_talking.debug.memory_empty")
