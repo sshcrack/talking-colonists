@@ -8,9 +8,9 @@ import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 
-import java.util.List;
 import java.util.function.Consumer;
 
 public class MemoryCompactionWsClient extends GeminiLiveClient {
@@ -19,6 +19,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
     private final Consumer<String> onComplete;
     private final Runnable onError;
     private final StringBuilder summaryBuffer = new StringBuilder();
+    private volatile boolean completed = false;
 
     public MemoryCompactionWsClient(AbstractEntityCitizen citizen, CitizenMemories memories,
                                     Consumer<String> onComplete, Runnable onError) {
@@ -33,14 +34,25 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
     public BidiGenerateContentSetup getSetup() {
         var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
 
-        setup.generationConfig.responseModalities = List.of("TEXT", "AUDIO");
+        setup.generationConfig.responseModalities = ModalityModes.TEXT_AND_AUDIO.getModalities();
+        setup.outputAudioTranscription = new JsonObject();
+
+        var citizenData = citizen.getCitizenData();
+        if (citizenData != null) {
+            setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
+            setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
+            var female = citizenData.isFemale();
+            var uuid = citizen.getUUID();
+            setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
+        }
+
+        setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(
-                "You are a memory summarization assistant for a Minecraft colony citizen. " +
-                        "Given the citizen's events and facts, produce a concise first-person summary. " +
-                        "Keep recent and significant information. Discard minor details. " +
-                        "Output only the summary text, no labels or formatting."
+                MemoryCompactionService.SYSTEM_PROMPT
         );
         sys.parts.add(p);
         setup.systemInstruction = sys;
@@ -50,35 +62,9 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
-        String prompt = buildPrompt();
         var input = new RealtimeInput();
-        input.text = prompt;
+        input.text = MemoryCompactionService.buildPrompt(citizen, memories);
         send(ClientMessages.input(input));
-    }
-
-    private String buildPrompt() {
-        String name = citizen.getCitizenData().getName();
-        StringBuilder sb = new StringBuilder();
-        sb.append("Summarize these memories for ").append(name).append(":\n\n");
-
-        if (!memories.getEvents().isEmpty()) {
-            sb.append("Events:\n");
-            for (String event : memories.getEvents()) {
-                sb.append("- ").append(event).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        if (!memories.getFacts().isEmpty()) {
-            sb.append("Facts:\n");
-            for (String fact : memories.getFacts()) {
-                sb.append("- ").append(fact).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        sb.append("Summary:");
-        return sb.toString();
     }
 
     @Override
@@ -88,14 +74,17 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
+        // We don't process audio and don't expect it
     }
 
     @Override
     public void onOutputTranscription(String transcription) {
+        summaryBuffer.append(transcription);
     }
 
     @Override
     public void onTurnComplete() {
+        completed = true;
         String summary = summaryBuffer.toString().trim();
         if (summary.isEmpty()) {
             McTalking.LOGGER.warn("[MemoryCompaction] Live client produced empty summary for citizen {}",
@@ -127,6 +116,17 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
     }
 
     @Override
+    public void onClose(int code, String reason, boolean remote) {
+        super.onClose(code, reason, remote);
+        if (!completed) {
+            McTalking.LOGGER.warn("[MemoryCompaction] Unexpected close for citizen {} (code={}, reason={}, remote={})",
+                    citizen.getCitizenData().getName(), code, reason, remote);
+            onError.run();
+        }
+    }
+
+    @Override
     public void addPromptAudio(short[] audio) {
+        // We don't want to add prompt audio
     }
 }

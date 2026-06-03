@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.MemoryMode;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -20,6 +21,16 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class MemoryCompactionService {
+    private MemoryCompactionService() {
+        /* This utility class should not be instantiated */
+    }
+
+    public static final String SYSTEM_PROMPT = """
+            You are a memory summarization assistant for a Minecraft colony citizen.\
+            Given the citizen's events and facts, produce a concise first-person summary.\
+            Retain solely permanent traits, lasting historical milestones, established relationships, and enduring social connections. \
+            Ensure all captured information remains true regardless of the current moment.\
+            OUTPUT THE SUMMARY IN PLAIN, UNFORMATTED TEXT""";
     private static final List<UUID> activeCompactionCitizens = new CopyOnWriteArrayList<>();
 
     private static int tickCounter = 0;
@@ -90,15 +101,16 @@ public class MemoryCompactionService {
     private static void startFlashCompaction(AbstractEntityCitizen citizen) {
         UUID citizenId = citizen.getUUID();
         activeCompactionCitizens.add(citizenId);
+        var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
+        var mem = data.mc_talking$getOrInitializeMemory();
 
         Thread thread = new Thread(() -> {
             try {
                 String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
-                String prompt = buildCompactionPrompt(citizen);
 
                 String responseText;
                 try {
-                    responseText = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory summary now.");
+                    responseText = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, SYSTEM_PROMPT, buildPrompt(citizen, mem));
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
@@ -115,10 +127,9 @@ public class MemoryCompactionService {
                     return;
                 }
 
-                String finalSummary = summary;
                 var server = citizen.level().getServer();
                 if (server != null) {
-                    server.execute(() -> applyCompaction(citizen, finalSummary));
+                    server.execute(() -> applyCompaction(citizen, summary));
                 }
             } finally {
                 activeCompactionCitizens.remove(citizenId);
@@ -166,39 +177,6 @@ public class MemoryCompactionService {
         }
     }
 
-    private static String buildCompactionPrompt(AbstractEntityCitizen citizen) {
-        String name = citizen.getCitizenData().getName();
-        var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
-        var mem = data.mc_talking$getOrInitializeMemory();
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("You are summarizing past memories for ").append(name)
-                .append(", a citizen of a Minecraft colony.\n\n");
-        sb.append("Keep only the most important information. Prioritize recent and significant events and facts.\n");
-        sb.append("Discard small talk and minor details. Write in first person from the citizen's perspective.\n\n");
-
-        if (!mem.getEvents().isEmpty()) {
-            sb.append("Events:\n");
-            for (String event : mem.getEvents()) {
-                sb.append("- ").append(event).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        if (!mem.getFacts().isEmpty()) {
-            sb.append("Facts:\n");
-            for (String fact : mem.getFacts()) {
-                sb.append("- ").append(fact).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        sb.append("Produce a single consolidated summary paragraph in first person.\n");
-        sb.append("Return ONLY the summary text, no labels or formatting.");
-
-        return sb.toString();
-    }
-
     private static String extractSummaryFromResponse(String response) {
         if (response == null) return null;
         response = response.trim();
@@ -230,11 +208,40 @@ public class MemoryCompactionService {
         // TODO: consider compacting stale relationship entries in the future
     }
 
+    public static int getActiveCount() {
+        return activeCompactionCitizens.size();
+    }
+
     public static void cleanup() {
         for (UUID citizenId : activeCompactionCitizens) {
             // Can't reliably release slots without the entity reference on shutdown
             McTalking.LOGGER.info("[MemoryCompaction] Cleanup: dropping active task for citizen {}", citizenId);
         }
         activeCompactionCitizens.clear();
+    }
+
+    static String buildPrompt(AbstractEntityCitizen citizen, CitizenMemories memories) {
+        String name = citizen.getCitizenData().getName();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Summarize these memories for ").append(name).append(":\n\n");
+
+        if (!memories.getEvents().isEmpty()) {
+            sb.append("Events:\n");
+            for (String event : memories.getEvents()) {
+                sb.append("- ").append(event).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!memories.getFacts().isEmpty()) {
+            sb.append("Facts:\n");
+            for (String fact : memories.getFacts()) {
+                sb.append("- ").append(fact).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("Summary:");
+        return sb.toString();
     }
 }

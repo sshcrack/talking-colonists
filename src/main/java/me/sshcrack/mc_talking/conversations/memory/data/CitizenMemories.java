@@ -48,19 +48,12 @@ public class CitizenMemories {
         events.add(event);
     }
 
-    /**
-     * Adds a relationship change to the memories. If a change for the same citizen and relationship type already exists, it will be updated instead of adding a new entry.
-     *
-     * @param targetUUID the UUID of the other citizen or the affected player
-     * @param type       the type of relationship change (e.g. trust, friendship, etc.)
-     * @param change     the amount of change to apply to the relationship (positive or negative)
-     */
     public void setSummarizedMemory(String summarizedMemory) {
         this.summarizedMemory = summarizedMemory == null ? "" : summarizedMemory;
     }
 
     public String getSummarizedMemory() {
-        return summarizedMemory == null ? "" : summarizedMemory;
+        return summarizedMemory;
     }
 
     public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipChangeType type, float change) {
