@@ -1,7 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.mc_talking.commands.ListToolsCommand;
+import me.sshcrack.mc_talking.commands.McTalkingDebugCommand;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -76,7 +76,7 @@ public class ServerEventHandler {
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
-        ListToolsCommand.register(event.getDispatcher());
+        McTalkingDebugCommand.register(event.getDispatcher());
     }
 
     /**

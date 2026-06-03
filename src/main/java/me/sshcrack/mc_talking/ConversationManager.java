@@ -15,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -210,6 +211,38 @@ public class ConversationManager {
         GeminiWsClient client = clients.remove(entityId);
         if (client != null) client.close();
         McTalking.LOGGER.info("[ConversationManager] Evicted slot for entity {} to make room", entityId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Debug / inspection accessors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns an unmodifiable view of all active AI clients (citizen UUID → client).
+     */
+    public static Map<UUID, GeminiWsClient> getClients() {
+        return Collections.unmodifiableMap(clients);
+    }
+
+    /**
+     * Returns an unmodifiable view of the citizen→player reverse mapping.
+     */
+    public static Map<UUID, UUID> getCitizenToPlayer() {
+        return Collections.unmodifiableMap(citizenToPlayer);
+    }
+
+    /**
+     * Returns an unmodifiable view of the player→citizen mapping.
+     */
+    public static Map<UUID, UUID> getPlayerConversationPartners() {
+        return Collections.unmodifiableMap(playerConversationPartners);
+    }
+
+    /**
+     * Returns an unmodifiable view of the last session end times.
+     */
+    public static Map<UUID, Long> getLastSessionEndTimes() {
+        return Collections.unmodifiableMap(lastSessionEndTime);
     }
 
     // -------------------------------------------------------------------------
