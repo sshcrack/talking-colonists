@@ -28,7 +28,7 @@ public class MemoryCompactionService {
         tickCounter++;
         int interval = McTalkingConfig.INSTANCE.instance().memoryCompactionIntervalTicks;
         if (tickCounter % interval != 0) return;
-        if (!McTalkingConfig.INSTANCE.instance().enableCitizenMemory) return;
+        if (McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
         if (!McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) return;
         if (!activeCompactionCitizens.isEmpty()) return;
 
@@ -236,15 +236,5 @@ public class MemoryCompactionService {
             McTalking.LOGGER.info("[MemoryCompaction] Cleanup: dropping active task for citizen {}", citizenId);
         }
         activeCompactionCitizens.clear();
-    }
-
-    private static AbstractEntityCitizen findCitizen(MinecraftServer server, UUID uuid) {
-        for (ServerLevel level : server.getAllLevels()) {
-            Entity entity = level.getEntity(uuid);
-            if (entity instanceof AbstractEntityCitizen citizen) {
-                return citizen;
-            }
-        }
-        return null;
     }
 }
