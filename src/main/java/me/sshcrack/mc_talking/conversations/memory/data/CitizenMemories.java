@@ -16,10 +16,12 @@ public class CitizenMemories {
     private static final String TAG_EVENTS_KEY = "events";
     private static final String TAG_RELATIONSHIPS_KEY = "relationships";
     private static final String TAG_SESSION_TOKEN = "gemini_session_token";
+    private static final String TAG_SUMMARIZED_MEMORY = "summarized_memory";
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<CitizenRelationshipMemory> relationships = new ArrayList<>();
     private String sessionToken = "";
+    private String summarizedMemory = "";
 
     public CitizenMemories() {
         // We do not initialize these memories because at first it is empty.
@@ -53,6 +55,14 @@ public class CitizenMemories {
      * @param type       the type of relationship change (e.g. trust, friendship, etc.)
      * @param change     the amount of change to apply to the relationship (positive or negative)
      */
+    public void setSummarizedMemory(String summarizedMemory) {
+        this.summarizedMemory = summarizedMemory == null ? "" : summarizedMemory;
+    }
+
+    public String getSummarizedMemory() {
+        return summarizedMemory == null ? "" : summarizedMemory;
+    }
+
     public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipChangeType type, float change) {
         for (CitizenRelationshipMemory relationship : relationships) {
             if (relationship.getTargetUUID().equals(targetUUID) && relationship.getType() == type) {
@@ -88,6 +98,9 @@ public class CitizenMemories {
         if (sessionToken != null && !sessionToken.isBlank()) {
             tag.putString(TAG_SESSION_TOKEN, sessionToken);
         }
+        if (!summarizedMemory.isBlank()) {
+            tag.putString(TAG_SUMMARIZED_MEMORY, summarizedMemory);
+        }
         return tag;
     }
 
@@ -115,6 +128,9 @@ public class CitizenMemories {
         if (tag.contains(TAG_SESSION_TOKEN)) {
             sessionToken = tag.getString(TAG_SESSION_TOKEN);
         }
+        if (tag.contains(TAG_SUMMARIZED_MEMORY)) {
+            summarizedMemory = tag.getString(TAG_SUMMARIZED_MEMORY);
+        }
     }
 
     public String getSessionToken() {
@@ -133,17 +149,23 @@ public class CitizenMemories {
      */
     public String toPrompt(Map<UUID, String> interestedParties) {
         StringBuilder prompt = new StringBuilder();
-        if (!facts.isEmpty()) {
-            prompt.append(" Facts:\n");
-            for (String fact : facts) {
-                prompt.append("- ").append(fact).append("\n");
-            }
+
+        if (!summarizedMemory.isBlank()) {
+            prompt.append(" Summarized Memory:\n");
+            prompt.append(" ").append(summarizedMemory).append("\n\n");
         }
 
         if (!events.isEmpty()) {
-            prompt.append(" Events:\n");
+            prompt.append(" Recent Events:\n");
             for (String event : events) {
                 prompt.append("- ").append(event).append("\n");
+            }
+        }
+
+        if (!facts.isEmpty()) {
+            prompt.append(" Recent Facts:\n");
+            for (String fact : facts) {
+                prompt.append("- ").append(fact).append("\n");
             }
         }
 

@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
@@ -84,6 +85,7 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStop(ServerStoppingEvent event) {
+        MemoryCompactionService.cleanup();
         PregenerationTaskService.cleanup();
         ConversationManager.cleanup();
         ColonyEventBuffer.clear();
@@ -203,6 +205,10 @@ public class ServerEventHandler {
 
         if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
             PregenerationTaskService.tick(server);
+        }
+
+        if (McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) {
+            MemoryCompactionService.tick(server);
         }
     }
 
