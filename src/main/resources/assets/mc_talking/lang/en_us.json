@@ -54,6 +54,38 @@
   "mc_talking.commands.tool_description": "The description of tool %s is:\n%s\nProperties:%s",
   "mc_talking.commands.list_tools": "List of available tools:\n%s",
 
+  "mc_talking.debug.not_citizen": "Target must be a MineColonies citizen.",
+  "mc_talking.debug.no_citizen_data": "Citizen has no data (offline/unloaded).",
+  "mc_talking.debug.no_connections": "No active Gemini connections.",
+  "mc_talking.debug.no_colony_specified": "Specify a colony ID or execute near a colony.",
+  "mc_talking.debug.no_colony_found": "Could not find a colony for you. Specify a colony ID.",
+  "mc_talking.debug.memory_disabled": "Citizen memory is disabled in config.",
+  "mc_talking.debug.memory_empty": "No memories stored for this citizen.",
+
+  "mc_talking.debug.header": "--- McTalking Debug Overview ---",
+  "mc_talking.debug.api_key_set": "  API Key: §a✔ §r(set)",
+  "mc_talking.debug.api_key_empty": "  API Key: §c✘ §r(not set)",
+  "mc_talking.debug.active_sessions": "  Active sessions: %d/%d (%d player)",
+  "mc_talking.debug.config_toggles": "  Memory: %s  Personality: %s  C2C: %s  Pregen: %s",
+  "mc_talking.debug.cooldown": "  Cooldown: %s",
+
+  "mc_talking.debug.status_header": "--- McTalking Status ---",
+  "mc_talking.debug.api_key_status": "API Key: %s",
+  "mc_talking.debug.status_sessions": "Sessions: %d/%d (%d player, %d non-player)",
+  "mc_talking.debug.status_cooldown": "Cooldown: %s",
+  "mc_talking.debug.status_memory": "Memory: %s",
+  "mc_talking.debug.status_personality": "Personality: %s",
+  "mc_talking.debug.status_citizen_to_citizen": "Citizen-to-Citizen: %s",
+  "mc_talking.debug.status_pregeneration": "Pregeneration: %s",
+
+  "mc_talking.debug.connections_header": "--- Active Connections (%d) ---",
+
+  "mc_talking.debug.citizen_header": "--- Citizen Info: %s ---",
+
+  "mc_talking.debug.memory_header": "--- Citizen Memory: %s ---",
+
+  "mc_talking.debug.events_header": "--- Colony Events: %s (#%d) ---",
+
   "yacl3.config.mc_talking:config.category.api": "API",
   "yacl3.config.mc_talking:config.category.general": "General",
   "yacl3.config.mc_talking:config.category.citizens": "Citizens",

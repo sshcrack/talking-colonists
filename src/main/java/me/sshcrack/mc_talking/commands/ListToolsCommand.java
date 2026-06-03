@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking.commands;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
@@ -55,17 +55,15 @@ public class ListToolsCommand {
         return 0;
     }
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static void addTo(LiteralArgumentBuilder<CommandSourceStack> root) {
         var builder = Commands.literal("list_tools");
 
         for (String fn_name : AITools.getRegisteredFunctionNames()) {
-            builder
-                    .then(Commands.literal(fn_name)
-                            .executes(context -> get_description(context, fn_name)));
+            builder.then(Commands.literal(fn_name)
+                    .executes(context -> get_description(context, fn_name)));
         }
 
-        dispatcher.register(builder
-                .requires(source -> source.hasPermission(2))
+        root.then(builder
                 .executes(ctx -> {
                     var src = ctx.getSource();
                     var tools = AITools.getRegisteredFunctionNames();
