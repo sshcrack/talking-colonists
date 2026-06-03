@@ -33,12 +33,13 @@ public class DeliveryInteractionManager {
     private DeliveryInteractionManager() {}
 
     private static final int PREGEN_DISTANCE_SQ = 15 * 15;
-    private static final int TICK_INTERVAL = 10;
     private static final long STALE_TIMEOUT_MS = 300_000;
-    private static int tickCounter = 0;
+    private static final long RETRY_COOLDOWN_MS = 1_000;
 
     private static final ConcurrentHashMap<String, PendingDelivery> pendingDeliveries = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, CachedAudio> pregenCache = new ConcurrentHashMap<>();
+
+    private record SpeakerAndPrompt(AbstractEntityCitizen speaker, String prompt) {}
 
     private static class PendingDelivery {
         final IToken<?> token;
@@ -51,6 +52,8 @@ public class DeliveryInteractionManager {
         boolean pregenStarted;
         UUID deliverymanUuid;
 
+        long lastRetryTime;
+
         PendingDelivery(IToken<?> token, BlockPos targetPos, int colonyId, ResourceKey<Level> dimension,
                         String itemName, int itemCount) {
             this.token = token;
@@ -60,6 +63,7 @@ public class DeliveryInteractionManager {
             this.itemName = itemName;
             this.itemCount = itemCount;
             this.trackedSince = System.currentTimeMillis();
+            this.lastRetryTime = System.currentTimeMillis();
         }
     }
 
@@ -74,9 +78,9 @@ public class DeliveryInteractionManager {
     }
 
     /**
-     * Fast-path: called from the mixin when a Delivery request enters IN_PROGRESS via
-     * updateRequestState(). Most deliveries set IN_PROGRESS internally (bypassing
-     * updateRequestState), so the main discovery happens in tick() instead.
+     * Called from the AbstractRequest.setState() mixin when a Delivery request
+     * transitions to IN_PROGRESS. Catches all state transitions since AbstractRequest
+     * is the sole concrete IRequest implementation.
      */
     public static void trackDelivery(IColony colony, IRequest<?> request, IToken<?> token) {
         if (!(request.getRequest() instanceof Delivery delivery)) return;
@@ -107,49 +111,7 @@ public class DeliveryInteractionManager {
                 key, itemName, itemCount);
     }
 
-    /**
-     * Scans all colonies for deliverymen with active Delivery tasks in their queues
-     * and registers any undiscovered deliveries for pregeneration tracking.
-     */
-    private static void discoverDeliveries(MinecraftServer server) {
-        for (IColony colony : IMinecoloniesAPI.getInstance().getColonyManager().getAllColonies()) {
-            if (!(colony.getWorld() instanceof ServerLevel)) continue;
-
-            for (ICitizenData cd : colony.getCitizenManager().getCitizens()) {
-                if (!(cd.getJob() instanceof JobDeliveryman dman)) continue;
-
-                for (IToken<?> taskToken : dman.getTaskQueue()) {
-                    String key = taskToken.toString();
-                    if (pendingDeliveries.containsKey(key)) continue;
-
-                    IRequest<?> request = colony.getRequestManager().getRequestForToken(taskToken);
-                    if (request == null) continue;
-                    if (!(request.getRequest() instanceof Delivery delivery)) continue;
-
-                    BlockPos targetPos = delivery.getTarget().getInDimensionLocation();
-                    String itemName = delivery.getStack().getHoverName().getString();
-                    int itemCount = delivery.getStack().getCount();
-
-                    PendingDelivery pd = new PendingDelivery(taskToken, targetPos, colony.getID(),
-                            colony.getDimension(), itemName, itemCount);
-
-                    cd.getEntity().ifPresent(entity -> pd.deliverymanUuid = entity.getUUID());
-
-                    pendingDeliveries.put(key, pd);
-                    McTalking.LOGGER.info("[DeliveryInteraction] Discovered delivery {} for {} (item: {} x{})",
-                            key, itemName, itemCount, pd.deliverymanUuid != null ? " found deliveryman" : " no deliveryman yet");
-                }
-            }
-        }
-    }
-
     public static void tick(MinecraftServer server) {
-        tickCounter++;
-        if (tickCounter % TICK_INTERVAL != 0) return;
-
-        if (McTalkingConfig.INSTANCE.instance().enablePregeneration && McTalkingConfig.hasGeminiApiKey()) {
-            discoverDeliveries(server);
-        }
 
         if (pendingDeliveries.isEmpty()) return;
 
@@ -169,7 +131,8 @@ public class DeliveryInteractionManager {
             }
 
             if (pd.deliverymanUuid == null) {
-                // Retry finding the deliveryman (may not have been assigned yet)
+                if (now - pd.lastRetryTime < RETRY_COOLDOWN_MS) continue;
+                pd.lastRetryTime = now;
                 tryRetryFindDeliveryman(pd);
                 if (pd.deliverymanUuid == null) continue;
             }
@@ -197,32 +160,19 @@ public class DeliveryInteractionManager {
 
             if (ConversationManager.isCitizenBusy(deliveryman)) continue;
 
-            // Pick speaker and generate prompt
-            AbstractEntityCitizen speaker;
-            String prompt;
-
-            AbstractEntityCitizen recipient = findNearestCitizen(world, pd.targetPos.getX(), pd.targetPos.getY(), pd.targetPos.getZ());
-            if (recipient != null && recipient != deliveryman && recipient.isAlive()
-                    && !ConversationManager.isCitizenBusy(recipient)
-                    && ThreadLocalRandom.current().nextBoolean()) {
-                speaker = recipient;
-                prompt = buildRecipientPrompt(recipient, pd);
-            } else {
-                speaker = deliveryman;
-                prompt = buildDeliverymanPrompt(deliveryman, pd);
-            }
-
-            if (prompt == null) continue;
+            SpeakerAndPrompt sp = selectSpeakerAndPrompt(world, pd.targetPos, deliveryman,
+                    pd.itemName, pd.itemCount);
+            if (sp == null) continue;
 
             final String finalKey = entry.getKey();
-            final UUID speakerUuid = speaker.getUUID();
+            final UUID speakerUuid = sp.speaker().getUUID();
             pd.pregenStarted = true;
 
             McTalking.LOGGER.info("[DeliveryInteraction] Starting pregen for delivery {} (speaker: {}, distance: {})",
-                    finalKey, speaker.getCitizenData() != null ? speaker.getCitizenData().getName() : "unknown",
+                    finalKey, sp.speaker().getCitizenData() != null ? sp.speaker().getCitizenData().getName() : "unknown",
                     Math.sqrt(distSq));
 
-            startPregeneration(speaker, prompt, audio -> {
+            startPregeneration(sp.speaker(), sp.prompt(), audio -> {
                 pregenCache.put(finalKey, new CachedAudio(audio, speakerUuid));
                 McTalking.LOGGER.info("[DeliveryInteraction] Pregen complete for {}", finalKey);
             });
@@ -243,37 +193,32 @@ public class DeliveryInteractionManager {
                     McTalking.LOGGER.info("[DeliveryInteraction] Played cached audio for delivery {}", key);
                 }
             }
-        } else if (true) {
-            // Fallback: on-demand generation (set to false to test pregen-only path)
+        } else {
+            // On-demand generation
             if (!McTalkingConfig.hasGeminiApiKey()) return;
             if (!(colony.getWorld() instanceof ServerLevel world)) return;
 
-            BlockPos targetPos;
-            String itemName;
-            int itemCount;
-            if (request.getRequest() instanceof Delivery delivery) {
-                targetPos = delivery.getTarget().getInDimensionLocation();
-                itemName = delivery.getStack().getHoverName().getString();
-                itemCount = delivery.getStack().getCount();
-            } else {
-                return;
+            if (!(request.getRequest() instanceof Delivery delivery)) return;
+
+            BlockPos targetPos = delivery.getTarget().getInDimensionLocation();
+            String itemName = delivery.getStack().getHoverName().getString();
+            int itemCount = delivery.getStack().getCount();
+
+            AbstractEntityCitizen deliveryman = null;
+            for (ICitizenData cd : colony.getCitizenManager().getCitizens()) {
+                if (cd.getJob() instanceof JobDeliveryman dman
+                        && dman.getTaskQueue().contains(token)) {
+                    deliveryman = cd.getEntity().orElse(null);
+                    if (deliveryman != null) break;
+                }
             }
 
-            if (!PlayerHeatmapTracker.isPlayerNearby(world,
-                    targetPos.getX(), targetPos.getY(), targetPos.getZ(),
-                    McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance)) return;
+            SpeakerAndPrompt sp = selectSpeakerAndPrompt(world, targetPos, deliveryman, itemName, itemCount);
+            if (sp == null) return;
 
-            AbstractEntityCitizen speaker = findNearestCitizen(world, targetPos.getX(), targetPos.getY(), targetPos.getZ());
-            if (speaker == null) return;
-            if (ConversationManager.isCitizenBusy(speaker)) return;
-
-            String prompt = "You are " + (speaker.getCitizenData() != null ? speaker.getCitizenData().getName() : "a colonist")
-                    + ". React briefly to acknowledge a just-completed delivery of " + itemCount + " " + itemName
-                    + " — respond as someone who just received or delivered these items to a fellow colonist.";
-
-            final AbstractEntityCitizen finalSpeaker = speaker;
-            startPregeneration(speaker, prompt, audio -> {
-                PregenerationPlayback.playAudioIfPossible(finalSpeaker, audio);
+            final AbstractEntityCitizen speaker = sp.speaker();
+            startPregeneration(sp.speaker(), sp.prompt(), audio -> {
+                PregenerationPlayback.playAudioIfPossible(speaker, audio);
             });
         }
     }
@@ -287,23 +232,22 @@ public class DeliveryInteractionManager {
     public static void cleanup() {
         pendingDeliveries.clear();
         pregenCache.clear();
-        tickCounter = 0;
     }
 
     // -------------------------------------------------------------------------
     // Prompt builders
     // -------------------------------------------------------------------------
 
-    private static String buildDeliverymanPrompt(AbstractEntityCitizen deliveryman, PendingDelivery pd) {
+    private static String buildDeliverymanPrompt(AbstractEntityCitizen deliveryman, String itemName, int itemCount) {
         if (deliveryman.getCitizenData() == null) return null;
         String name = deliveryman.getCitizenData().getName();
         return String.format(
                 "You are %s, a deliveryman in a Minecraft colony. You just finished a delivery: you brought %d %s to a fellow colonist. React briefly to acknowledge the completed delivery.",
-                name, pd.itemCount, pd.itemName);
+                name, itemCount, itemName);
     }
 
     @Nullable
-    private static String buildRecipientPrompt(AbstractEntityCitizen recipient, PendingDelivery pd) {
+    private static String buildRecipientPrompt(AbstractEntityCitizen recipient, String itemName, int itemCount) {
         if (recipient.getCitizenData() == null) return null;
         ICitizenData data = recipient.getCitizenData();
 
@@ -323,10 +267,51 @@ public class DeliveryInteractionManager {
             }
         }
 
-        sb.append(" You just received ").append(pd.itemCount).append(" ").append(pd.itemName)
+        sb.append(" You just received ").append(itemCount).append(" ").append(itemName)
                 .append(" from the deliveryman. React briefly to acknowledge the delivery.");
 
         return sb.toString();
+    }
+
+    @Nullable
+    private static SpeakerAndPrompt selectSpeakerAndPrompt(
+            ServerLevel world,
+            BlockPos targetPos,
+            @Nullable AbstractEntityCitizen deliveryman,
+            String itemName,
+            int itemCount
+    ) {
+        if (!PlayerHeatmapTracker.isPlayerNearby(world,
+                targetPos.getX(), targetPos.getY(), targetPos.getZ(),
+                McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance)) {
+            return null;
+        }
+
+        AbstractEntityCitizen recipient = findNearestCitizen(world, targetPos.getX(), targetPos.getY(), targetPos.getZ());
+
+        if (deliveryman != null && recipient != null && recipient != deliveryman && recipient.isAlive()
+                && !ConversationManager.isCitizenBusy(recipient)
+                && ThreadLocalRandom.current().nextBoolean()) {
+            String prompt = buildRecipientPrompt(recipient, itemName, itemCount);
+            if (prompt != null) return new SpeakerAndPrompt(recipient, prompt);
+        }
+
+        if (deliveryman != null && deliveryman.isAlive() && !ConversationManager.isCitizenBusy(deliveryman)) {
+            String prompt = buildDeliverymanPrompt(deliveryman, itemName, itemCount);
+            if (prompt != null) return new SpeakerAndPrompt(deliveryman, prompt);
+        }
+
+        if (recipient != null && recipient.isAlive() && !ConversationManager.isCitizenBusy(recipient)) {
+            if (recipient.getCitizenData() != null) {
+                String name = recipient.getCitizenData().getName();
+                String prompt = "You are " + name
+                        + ". React briefly to acknowledge a just-completed delivery of " + itemCount + " " + itemName
+                        + " — respond as someone who just received or delivered these items to a fellow colonist.";
+                return new SpeakerAndPrompt(recipient, prompt);
+            }
+        }
+
+        return null;
     }
 
     @Nullable
