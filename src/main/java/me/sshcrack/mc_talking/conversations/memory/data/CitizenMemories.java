@@ -34,6 +34,10 @@ public class CitizenMemories {
         return events;
     }
 
+    public List<CitizenRelationshipMemory> getRelationships() {
+        return relationships;
+    }
+
     public void addFact(String fact) {
         facts.add(fact);
     }

@@ -95,6 +95,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
     private final List<Runnable> onCloseActions = Collections.synchronizedList(new ArrayList<>());
 
+    private final long sessionStartTimeMs = System.currentTimeMillis();
+
+    public long getSessionStartTimeMs() {
+        return sessionStartTimeMs;
+    }
+
     @Nullable
     private VisibleCitizenStatus lastStatus;
 
