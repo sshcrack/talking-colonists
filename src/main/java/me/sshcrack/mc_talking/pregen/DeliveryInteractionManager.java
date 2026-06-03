@@ -73,10 +73,15 @@ public class DeliveryInteractionManager {
         }
     }
 
+    /**
+     * Fast-path: called from the mixin when a Delivery request enters IN_PROGRESS via
+     * updateRequestState(). Most deliveries set IN_PROGRESS internally (bypassing
+     * updateRequestState), so the main discovery happens in tick() instead.
+     */
     public static void trackDelivery(IColony colony, IRequest<?> request, IToken<?> token) {
+        if (!(request.getRequest() instanceof Delivery delivery)) return;
         if (!McTalkingConfig.INSTANCE.instance().enablePregeneration) return;
         if (!McTalkingConfig.hasGeminiApiKey()) return;
-        if (!(request.getRequest() instanceof Delivery delivery)) return;
 
         String key = token.toString();
         if (pendingDeliveries.containsKey(key)) return;
@@ -88,11 +93,9 @@ public class DeliveryInteractionManager {
         PendingDelivery pd = new PendingDelivery(token, targetPos, colony.getID(), colony.getDimension(),
                 itemName, itemCount);
 
-        // Find the deliveryman citizen handling this request
         for (ICitizenData cd : colony.getCitizenManager().getCitizens()) {
             if (cd.getJob() instanceof JobDeliveryman dman) {
-                IRequest<?> task = dman.getCurrentTask();
-                if (task != null && task.getId().equals(token)) {
+                if (dman.getTaskQueue().contains(token)) {
                     cd.getEntity().ifPresent(entity -> pd.deliverymanUuid = entity.getUUID());
                     break;
                 }
@@ -100,15 +103,55 @@ public class DeliveryInteractionManager {
         }
 
         pendingDeliveries.put(key, pd);
-        McTalking.LOGGER.info("[DeliveryInteraction] Tracking delivery {} for {} (item: {} x{})",
-                key, itemName, itemCount, pd.deliverymanUuid != null ? " found deliveryman" : " no deliveryman yet");
+        McTalking.LOGGER.info("[DeliveryInteraction] Fast-path tracked delivery {} (item: {} x{})",
+                key, itemName, itemCount);
+    }
+
+    /**
+     * Scans all colonies for deliverymen with active Delivery tasks in their queues
+     * and registers any undiscovered deliveries for pregeneration tracking.
+     */
+    private static void discoverDeliveries(MinecraftServer server) {
+        for (IColony colony : IMinecoloniesAPI.getInstance().getColonyManager().getAllColonies()) {
+            if (!(colony.getWorld() instanceof ServerLevel)) continue;
+
+            for (ICitizenData cd : colony.getCitizenManager().getCitizens()) {
+                if (!(cd.getJob() instanceof JobDeliveryman dman)) continue;
+
+                for (IToken<?> taskToken : dman.getTaskQueue()) {
+                    String key = taskToken.toString();
+                    if (pendingDeliveries.containsKey(key)) continue;
+
+                    IRequest<?> request = colony.getRequestManager().getRequestForToken(taskToken);
+                    if (request == null) continue;
+                    if (!(request.getRequest() instanceof Delivery delivery)) continue;
+
+                    BlockPos targetPos = delivery.getTarget().getInDimensionLocation();
+                    String itemName = delivery.getStack().getHoverName().getString();
+                    int itemCount = delivery.getStack().getCount();
+
+                    PendingDelivery pd = new PendingDelivery(taskToken, targetPos, colony.getID(),
+                            colony.getDimension(), itemName, itemCount);
+
+                    cd.getEntity().ifPresent(entity -> pd.deliverymanUuid = entity.getUUID());
+
+                    pendingDeliveries.put(key, pd);
+                    McTalking.LOGGER.info("[DeliveryInteraction] Discovered delivery {} for {} (item: {} x{})",
+                            key, itemName, itemCount, pd.deliverymanUuid != null ? " found deliveryman" : " no deliveryman yet");
+                }
+            }
+        }
     }
 
     public static void tick(MinecraftServer server) {
-        if (pendingDeliveries.isEmpty()) return;
-
         tickCounter++;
         if (tickCounter % TICK_INTERVAL != 0) return;
+
+        if (McTalkingConfig.INSTANCE.instance().enablePregeneration && McTalkingConfig.hasGeminiApiKey()) {
+            discoverDeliveries(server);
+        }
+
+        if (pendingDeliveries.isEmpty()) return;
 
         long now = System.currentTimeMillis();
         Iterator<Map.Entry<String, PendingDelivery>> it = pendingDeliveries.entrySet().iterator();
