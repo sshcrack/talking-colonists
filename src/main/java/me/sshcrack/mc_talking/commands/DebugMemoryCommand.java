@@ -5,7 +5,6 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipMemory;
@@ -38,13 +37,6 @@ public class DebugMemoryCommand {
         if (data == null) {
             source.sendFailure(Component.translatable("mc_talking.debug.no_citizen_data"));
             return 0;
-        }
-
-        boolean memoryEnabled = McTalkingConfig.INSTANCE.instance().enableCitizenMemory;
-        if (!memoryEnabled) {
-            source.sendSuccess(() -> Component.translatable("mc_talking.debug.memory_disabled")
-                    .withStyle(ChatFormatting.YELLOW), false);
-            return 1;
         }
 
         CitizenMemories mem = ((CitizenDataMemoryExtended) data).mc_talking$getMemory();

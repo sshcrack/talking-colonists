@@ -22,7 +22,6 @@ public class DebugStatusCommand {
         var config = McTalkingConfig.INSTANCE.instance();
         var clients = ConversationManager.getClients();
         var citizenToPlayer = ConversationManager.getCitizenToPlayer();
-        var lastSessionEndTimes = ConversationManager.getLastSessionEndTimes();
 
         int activeSessions = clients.size();
         int playerSessions = citizenToPlayer.size();
@@ -62,7 +61,7 @@ public class DebugStatusCommand {
             // Toggles
             msg.append(Component.literal("  "))
                     .append(Component.translatable("mc_talking.debug.status_memory",
-                            McTalkingDebugCommand.booleanToStr(config.enableCitizenMemory)))
+                            config.enableConversationSummaryAndMemorize ? "Compaction after conversation" : "Live during Conversation"))
                     .withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("\n"));
             msg.append(Component.literal("  "))

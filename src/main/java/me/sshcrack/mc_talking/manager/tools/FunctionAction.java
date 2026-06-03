@@ -41,6 +41,10 @@ public abstract class FunctionAction {
         return description;
     }
 
+    public boolean isEnabled() {
+        return true;
+    }
+
     @NotNull
     public abstract JsonObject execute(AbstractEntityCitizen citizen, IColony colony, @Nullable JsonObject parameters);
 

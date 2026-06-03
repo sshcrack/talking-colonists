@@ -82,8 +82,8 @@ public class McTalkingConfig {
     // Citizen - Citizen Interaction (Conversations between them)
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @TickBox
-    @SerialEntry(comment = "If true, citizens will remember previous conversations that happened between them. Not recommended for free tier")
-    public boolean enableCitizenMemory = false;
+    @SerialEntry(comment = "If true, an AI will look at the conversation and take not of the most notable events that happend in that conversation. If not the real time AI is only able to update their memory mid conversation (less accurate)")
+    public boolean enableConversationSummaryAndMemorize = false;
 
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @TickBox

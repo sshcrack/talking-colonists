@@ -223,7 +223,7 @@ public class CitizenConversationGenerator {
         }
 
         CitizenMemoryGenerator generator = null;
-        if (McTalkingConfig.INSTANCE.instance().enableCitizenMemory) {
+        if (McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
             generator = CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
         }
         return new RawConversation(rawConversationOutput, generator);

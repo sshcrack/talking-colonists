@@ -24,6 +24,8 @@ import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
+import me.sshcrack.mc_talking.pregen.PlayerHeatmapTracker;
+import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
@@ -87,8 +89,10 @@ public class ServerEventHandler {
     public void onServerStop(ServerStoppingEvent event) {
         MemoryCompactionService.cleanup();
         PregenerationTaskService.cleanup();
+        DeliveryInteractionManager.cleanup();
         ConversationManager.cleanup();
         ColonyEventBuffer.clear();
+        PlayerHeatmapTracker.cleanup();
     }
 
     /**
@@ -121,6 +125,7 @@ public class ServerEventHandler {
     public void onPlayerLeave(EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ConversationManager.endConversation(player.getUUID(), false);
+            PlayerHeatmapTracker.onPlayerRemoved(player.getUUID());
         }
     }
 
@@ -163,6 +168,12 @@ public class ServerEventHandler {
             double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
             var aabb = player.getBoundingBox().inflate(range);
             var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
+
+            // Track player-citizen proximity for heatmap
+            for (AbstractEntityCitizen citizen : citizens) {
+                PlayerHeatmapTracker.recordProximity(player.getUUID(), citizen.getUUID());
+            }
+
             var anyBusy = citizens.stream().anyMatch(ConversationManager::isCitizenBusy);
             if (anyBusy)
                 continue;
@@ -205,6 +216,7 @@ public class ServerEventHandler {
 
         if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
             PregenerationTaskService.tick(server);
+            DeliveryInteractionManager.tick(server);
         }
 
         if (McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) {

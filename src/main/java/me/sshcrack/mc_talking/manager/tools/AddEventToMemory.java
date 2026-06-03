@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -20,6 +21,11 @@ public class AddEventToMemory extends FunctionAction {
                 new ObjectProperty(new HashMap<>() {{
                     put("event", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
                 }}));
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return super.isEnabled() && !McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize;
     }
 
     @NotNull

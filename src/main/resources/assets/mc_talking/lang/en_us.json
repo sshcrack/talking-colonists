@@ -121,8 +121,8 @@
   "yacl3.config.mc_talking:config.disabledTools": "Disabled Tools",
   "yacl3.config.mc_talking:config.disabledTools.desc": "Function-call tool names to block from the AI. Disabled tools are removed from the tool list sent to Gemini.",
 
-  "yacl3.config.mc_talking:config.enableCitizenMemory": "Enable Citizen Memory",
-  "yacl3.config.mc_talking:config.enableCitizenMemory.desc": "Stores conversation memory summaries when sessions end and enables transcript capture for memory generation. Increases API usage. Only recommended for paid tiers.",
+  "yacl3.config.mc_talking:config.enableConversationSummaryAndMemorize": "Enable Conversation Summary and Memorization",
+  "yacl3.config.mc_talking:config.enableConversationSummaryAndMemorize.desc": "Stores conversation memory summaries when sessions end and enables transcript capture for memory generation. Increases API usage. Only recommended for paid tiers. AIs are still able to remember stuff mid conversation using the 'add_event_to_memory' tool",
   "yacl3.config.mc_talking:config.enableCitizenToCitizenConversation": "Enable Citizen to Citizen Conversation",
   "yacl3.config.mc_talking:config.enableCitizenToCitizenConversation.desc": "Allows citizens to talk to each other without direct player speech input randomly.",
   "yacl3.config.mc_talking:config.conversationMode": "Conversation Mode",
