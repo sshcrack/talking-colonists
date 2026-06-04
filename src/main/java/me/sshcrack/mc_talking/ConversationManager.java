@@ -87,6 +87,24 @@ public class ConversationManager {
      */
     private static final Set<UUID> addedEntities = new LinkedHashSet<>();
 
+    /**
+     * Set of citizens that are currently occupied by a conversation or audio
+     * playback that does not use a Gemini Live WebSocket nor a slot reservation.
+     *
+     * <p>Use {@link #markBusy} / {@link #markNotBusy} to manage this set.
+     * Citizens in this set will be reported as busy by {@link #isCitizenBusy},
+     * preventing them from being selected for new sessions, but they do
+     * <em>not</em> count toward {@link #maxConcurrentAgents} and are never
+     * evicted — they are simply blocked from starting new sessions.</p>
+     */
+    private static final Set<UUID> busyEntities = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Citizen UUID → handler that aborts a non-WebSocket session (e.g. Flash/TTS
+     * conversation) so a player conversation can take over.
+     */
+    private static final Map<UUID, Runnable> abortHandlers = new ConcurrentHashMap<>();
+
     // -------------------------------------------------------------------------
     // Slot management (priority-aware, synchronized)
     // -------------------------------------------------------------------------
@@ -263,12 +281,60 @@ public class ConversationManager {
     // -------------------------------------------------------------------------
 
     /**
+     * Marks the citizen as busy without claiming a slot.
+     *
+     * <p>Use this only for sessions that consume the citizen's attention but
+     * do not need a Gemini Live WebSocket connection or a slot reservation
+     * (e.g. Flash/TTS-based citizen-to-citizen conversations). The citizen
+     * will be reported as busy by {@link #isCitizenBusy}, preventing
+     * double-booking, but will not count toward {@link #maxConcurrentAgents}
+     * and will not be evictable.
+     *
+     * <p>Every call must be paired with a corresponding {@link #markNotBusy}
+     * call (typically in a {@code finally} block).
+     */
+    public static void markBusy(AbstractEntityCitizen citizen) {
+        busyEntities.add(citizen.getUUID());
+    }
+
+    /**
+     * Removes the busy mark previously set by {@link #markBusy}.
+     *
+     * <p>Call this when the session that called {@link #markBusy} ends
+     * (typically in a {@code finally} block).
+     */
+    public static void markNotBusy(AbstractEntityCitizen citizen) {
+        busyEntities.remove(citizen.getUUID());
+    }
+
+    /**
+     * Registers an abort handler for a citizen that is occupied by a
+     * non-WebSocket session (e.g. a Flash/TTS conversation).
+     *
+     * <p>When {@link #startPlayerConversation} takes over this citizen,
+     * the handler is executed so the session can stop its work and skip
+     * any lifecycle cleanup that would interfere with the new conversation.
+     *
+     * <p>Must be paired with {@link #unregisterAbortHandler} in a {@code finally} block.
+     */
+    public static void registerAbortHandler(AbstractEntityCitizen citizen, Runnable handler) {
+        abortHandlers.put(citizen.getUUID(), handler);
+    }
+
+    /**
+     * Removes the abort handler previously registered by {@link #registerAbortHandler}.
+     */
+    public static void unregisterAbortHandler(AbstractEntityCitizen citizen) {
+        abortHandlers.remove(citizen.getUUID());
+    }
+
+    /**
      * Returns {@code true} when the citizen already has any kind of active
      * session: mumbling, player conversation, or citizen-to-citizen conversation.
      * Use this before starting any new session to avoid duplicates.
      */
     public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
-        return clients.containsKey(citizen.getUUID()) || addedEntities.contains(citizen.getUUID());
+        return clients.containsKey(citizen.getUUID()) || addedEntities.contains(citizen.getUUID()) || busyEntities.contains(citizen.getUUID());
     }
 
     /**
@@ -455,6 +521,13 @@ public class ConversationManager {
             // Reuse the mumbling session – slot is already held
             cws.transitionToPlayer(player);
         } else {
+            // If the citizen is busy via a non-WebSocket session (e.g. Flash/TTS),
+            // abort it so the player can take over
+            Runnable abortHandler = abortHandlers.remove(citizenId);
+            if (abortHandler != null) {
+                abortHandler.run();
+            }
+
             // Close any non-player session that is occupying this citizen's slot
             if (existingClient != null) {
                 existingClient.close();
@@ -561,6 +634,8 @@ public class ConversationManager {
         playerConversationPartners.clear();
         citizenToPlayer.clear();
         addedEntities.clear();
+        busyEntities.clear();
+        abortHandlers.clear();
         lastSessionEndTime.clear();
         lastSessionNeedSignatures.clear();
         GeminiWsClient.shutdownExecutor();

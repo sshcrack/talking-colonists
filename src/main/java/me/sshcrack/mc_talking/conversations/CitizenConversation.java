@@ -25,6 +25,8 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
+import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.util.AiStatusHelper;
 
 /**
  * Orchestrates a citizen-to-citizen conversation.
@@ -54,6 +56,15 @@ public class CitizenConversation {
     private List<LiveConversationWsClient> liveClients;
 
     private Consumer<ConversationState> onStateChanged;
+
+    /**
+     * Set to {@code true} when a player takes over one of the participants via
+     * {@link me.sshcrack.mc_talking.item.CitizenTalkingDevice}.
+     * The {@code finally} block in {@link #performFlashTtsConversation(Runnable)}
+     * checks this flag to skip lifecycle cleanup that would interfere with the
+     * player conversation.
+     */
+    private volatile boolean aborted;
 
     public enum ConversationState {
         GENERATING,
@@ -94,6 +105,20 @@ public class CitizenConversation {
         this.onStateChanged = callback;
     }
 
+    /**
+     * Called by {@link me.sshcrack.mc_talking.ConversationManager} when a player
+     * starts a conversation with a participant of this Flash/TTS conversation.
+     * Prevents the background thread from setting {@link ConversationState#ENDED},
+     * which would interfere with the player conversation's AiStatus.
+     */
+    public void abort() {
+        this.aborted = true;
+        if (stream != null) {
+            stream.stop();
+            stream.close();
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Flash + TTS mode (original pipeline)
     // -------------------------------------------------------------------------
@@ -103,17 +128,36 @@ public class CitizenConversation {
     }
 
     private void performFlashTtsConversation(Runnable fallback) {
+        // Guard: all participants must be able to speak
+        for (AbstractEntityCitizen p : participants) {
+            if (!ConversationManager.canCitizenSpeak(p)) {
+                setState(ConversationState.ENDED);
+                return;
+            }
+        }
+
         if (stream == null) {
             stream = new GeminiStream(constructLocationalAudioChannel());
         }
 
+        // Mark participants as busy so they can't be double-booked
+        for (AbstractEntityCitizen p : participants) {
+            ConversationManager.markBusy(p);
+            ConversationManager.registerAbortHandler(p, this::abort);
+        }
+
         new Thread(() -> {
             setState(ConversationState.GENERATING);
+
             try {
                 CitizenConversationGenerator.generateConversation(
                         participants, server,
                         chunk -> stream.addGeminiPcmWithPitch(chunk.audioBytes(), chunk.sampleRate()));
-                setState(ConversationState.ENDED);
+
+                if (!aborted) {
+                    setState(ConversationState.ENDED);
+                }
+
             } catch (ConversationGenerationException e) {
                 McTalking.LOGGER.error("Failed to generate Flash/TTS conversation: {}, cause: {}",
                         e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
@@ -126,9 +170,16 @@ public class CitizenConversation {
                     fallback.run();
                 }
             } finally {
-                // Ensure state is always cleaned up, even on unexpected runtime exceptions.
-                // When a fallback is running, it manages its own lifecycle state.
-                if (fallback == null) {
+                for (AbstractEntityCitizen p : participants) {
+                    ConversationManager.unregisterAbortHandler(p);
+                    ConversationManager.markNotBusy(p);
+                    if (fallback == null && !aborted) {
+                        ConversationManager.recordCooldown(p);
+                        AiStatusHelper.setAiStatusSynced(p, AiStatus.NONE);
+                    }
+                }
+
+                if (fallback == null && !aborted) {
                     setState(ConversationState.ENDED);
                 }
             }
