@@ -1,7 +1,7 @@
 mod.id = "mc_talking"
 mod.name = "MineColonies Talking Citizens"
 mod.group = "me.sshcrack.mc_talking"
-mod.version = "1.6.1"
+mod.version = "1.7.0"
 mod.channel_tag = ""
 mod.description = "Uses Gemini Flash Live to make your citizens talk in Minecolonies."
 mod.authors = ["sshcrack"]
