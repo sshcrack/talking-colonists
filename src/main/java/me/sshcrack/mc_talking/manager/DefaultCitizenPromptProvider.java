@@ -212,6 +212,17 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
+        String citizenAiState = view.citizenAiState();
+        String workAiState = view.workAiState();
+        String nameTagDescription = view.nameTagDescription();
+        if (citizenAiState != null || workAiState != null || nameTagDescription != null) {
+            prompt.append("- AI state: ");
+            if (citizenAiState != null) prompt.append(citizenAiState);
+            if (workAiState != null) prompt.append(" / ").append(workAiState);
+            if (nameTagDescription != null) prompt.append(" — ").append(nameTagDescription);
+            prompt.append("\n");
+        }
+
         if (view.environment() != null) {
             prompt.append("- ").append(view.environment()).append("\n");
         }

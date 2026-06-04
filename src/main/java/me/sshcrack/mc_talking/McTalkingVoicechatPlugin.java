@@ -9,6 +9,7 @@ import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
+import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
@@ -317,5 +318,10 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                 }
             }
         }
+    }
+
+    public static boolean shouldDisableColoniesTicks(ServerPlayer player) {
+        var conn = vcApi.getConnectionOf(player.getUUID());
+        return conn != null && conn.isDisabled() && McTalkingConfig.INSTANCE.instance().modality == ModalityModes.AUDIO;
     }
 }

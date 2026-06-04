@@ -1,6 +1,8 @@
 package me.sshcrack.mc_talking.mixin;
 
-import com.minecolonies.core.entity.ai.minimal.EntityAICitizenWander;
+import com.minecolonies.api.entity.ai.statemachine.states.CitizenAIState;
+import com.minecolonies.api.entity.ai.statemachine.states.IState;
+import com.minecolonies.core.entity.ai.workers.CitizenAI;
 import com.minecolonies.core.entity.citizen.EntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -11,18 +13,18 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(value = EntityAICitizenWander.class, remap = false)
-public class EntityAICitizenWanderMixin {
+@Mixin(value = CitizenAI.class, remap = false)
+public class CitizenAIMixin {
 
     @Shadow
     @Final
-    protected EntityCitizen citizen;
+    private EntityCitizen citizen;
 
-    @Inject(method = "canUse", at = @At("HEAD"), cancellable = true)
-    private void mc_talking$suppressWanderingDuringConversation(CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "calculateNextState", at = @At("HEAD"), cancellable = true)
+    private void mc_talking$suppressWorkDuringUrgentContact(CallbackInfoReturnable<IState> cir) {
         if (McTalkingConfig.INSTANCE.instance().continueWorkDuringConversation) return;
         if (ConversationManager.isCitizenBusy(citizen)) {
-            cir.setReturnValue(false);
+            cir.setReturnValue(CitizenAIState.IDLE);
         }
     }
 }

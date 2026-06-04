@@ -48,7 +48,7 @@ public interface CitizenPromptProvider {
             case SICK:
                 return "ill and needing care";
             case EAT:
-                return "hungry and looking for food";
+                return "eating at the restaurant";
             case UNKNOWN:
             default:
                 break;

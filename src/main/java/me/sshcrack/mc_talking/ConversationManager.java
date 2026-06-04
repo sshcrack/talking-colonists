@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking;
 
+import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -15,8 +16,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -70,6 +73,13 @@ public class ConversationManager {
      * {@link me.sshcrack.mc_talking.config.McTalkingConfig#citizenCooldownSeconds}.
      */
     private static final Map<UUID, Long> lastSessionEndTime = new ConcurrentHashMap<>();
+
+    /**
+     * citizenId → need signature captured when the cooldown was recorded.
+     * If the citizen's current need signature differs, the cooldown is cleared
+     * so they can immediately contact about a new problem.
+     */
+    private static final Map<UUID, String> lastSessionNeedSignatures = new ConcurrentHashMap<>();
 
     /**
      * Insertion-ordered queue of all occupied citizen slots.
@@ -134,7 +144,10 @@ public class ConversationManager {
      * Use when the client is already closed externally.
      */
     public static synchronized void releaseSlot(AbstractEntityCitizen citizen) {
-        UUID entityId = citizen.getUUID();
+        releaseSlot(citizen.getUUID());
+    }
+
+    public static synchronized void releaseSlot(UUID entityId) {
         if (addedEntities.remove(entityId)) {
             McTalking.LOGGER.info("[ConversationManager] Freed slot for entity {}", entityId);
         }
@@ -265,17 +278,76 @@ public class ConversationManager {
      */
     public static void recordCooldown(AbstractEntityCitizen citizen) {
         lastSessionEndTime.put(citizen.getUUID(), System.currentTimeMillis());
+        lastSessionNeedSignatures.put(citizen.getUUID(), computeNeedSignature(citizen));
     }
 
     /**
      * Returns {@code true} if the citizen is still within their cooldown period and
      * should not be selected for a new automatic (mumble / citizen-to-citizen) session.
+     *
+     * <p>If the citizen's current needs differ from when the cooldown was recorded,
+     * the cooldown is cleared so they can immediately contact about the new problem.</p>
      */
     public static boolean isCitizenOnCooldown(AbstractEntityCitizen citizen) {
-        Long lastEnd = lastSessionEndTime.get(citizen.getUUID());
+        UUID citizenId = citizen.getUUID();
+        Long lastEnd = lastSessionEndTime.get(citizenId);
         if (lastEnd == null) return false;
+
+        // Check if the citizen's needs have changed since cooldown was recorded
+        String prevSignature = lastSessionNeedSignatures.get(citizenId);
+        String currentSignature = computeNeedSignature(citizen);
+        if (prevSignature != null && !prevSignature.equals(currentSignature)) {
+            lastSessionEndTime.remove(citizenId);
+            lastSessionNeedSignatures.remove(citizenId);
+            return false;
+        }
+
         long cooldownMs = McTalkingConfig.INSTANCE.instance().citizenCooldownSeconds * 1000L;
         return (System.currentTimeMillis() - lastEnd) < cooldownMs;
+    }
+
+    /**
+     * Computes a signature string representing the citizen's current urgent needs.
+     * If this signature changes between sessions, the cooldown is cleared so the
+     * citizen can immediately contact about a new problem.
+     */
+    public static String computeNeedSignature(AbstractEntityCitizen citizen) {
+        var data = citizen.getCitizenData();
+        if (data == null) return "none";
+
+        List<String> needs = new ArrayList<>();
+
+        if (data.getJobStatus() == JobStatus.STUCK) needs.add("stuck");
+        if (data.getCitizenDiseaseHandler().isSick()) needs.add("sick");
+
+        double saturation = data.getSaturation();
+        if (saturation <= 1) {
+            needs.add("starving");
+        } else if (saturation <= 3) {
+            needs.add("hungry");
+        }
+
+        if (data.getHomeBuilding() == null) needs.add("homeless");
+
+        double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
+        if (happiness < 3.0) {
+            needs.add("very_unhappy");
+        } else if (happiness < 5.0) {
+            needs.add("unhappy");
+        }
+
+        var entityOpt = data.getEntity();
+        if (entityOpt.isPresent()) {
+            double healthPercent = (entityOpt.get().getHealth() / Math.max(1.0, entityOpt.get().getMaxHealth())) * 100.0;
+            if (healthPercent < 25.0) {
+                needs.add("low_health");
+            } else if (healthPercent < 50.0) {
+                needs.add("medium_health");
+            }
+        }
+
+        if (needs.isEmpty()) needs.add("none");
+        return String.join(",", needs);
     }
 
     // -------------------------------------------------------------------------
@@ -490,6 +562,7 @@ public class ConversationManager {
         citizenToPlayer.clear();
         addedEntities.clear();
         lastSessionEndTime.clear();
+        lastSessionNeedSignatures.clear();
         GeminiWsClient.shutdownExecutor();
     }
 }

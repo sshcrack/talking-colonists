@@ -24,6 +24,9 @@ import java.util.UUID;
  * @param recentColonyEvents Descriptions of recent colony lifecycle events (deaths, births, building changes), or empty list if none
  * @param colonyConnections     Diplomatic connections to neighboring colonies, e.g. "Oakvale (ALLY)", or {@code null} if none
  * @param colonyMilestone Colony milestone description (buildings built, mobs killed, etc.), or {@code null} if none
+ * @param citizenAiState        Current CitizenAI state, e.g. "WORKING", "IDLE", "SLEEP", "EATING" — from {@code /mc citizens info}, or {@code null} if entity not loaded
+ * @param workAiState           Current work AI state, e.g. "IDLE", "START_WORKING", "NEEDS_ITEM" — from {@code /mc citizens info}, or {@code null} if entity not loaded
+ * @param nameTagDescription    Job nametag description, the citizen's current activity text — from {@code /mc citizens info}, or {@code null} if unavailable
  */
 public record CitizenPromptView(
         String name,
@@ -64,6 +67,9 @@ public record CitizenPromptView(
         @Nullable List<String> activeQuests,
         List<String> recentColonyEvents,
         @Nullable List<String> colonyConnections,
-        @Nullable String colonyMilestone
+        @Nullable String colonyMilestone,
+        @Nullable String citizenAiState,
+        @Nullable String workAiState,
+        @Nullable String nameTagDescription
 ) {
 }

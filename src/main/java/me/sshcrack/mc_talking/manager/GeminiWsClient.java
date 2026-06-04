@@ -144,6 +144,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         onCloseActions.add(action);
     }
 
+    private void fireOnCloseActions() {
+        synchronized (onCloseActions) {
+            for (Runnable action : onCloseActions) {
+                try {
+                    action.run();
+                } catch (Exception e) {
+                    McTalking.LOGGER.error("Error executing onClose action", e);
+                }
+            }
+        }
+    }
+
     public void endConversationWhenPossible() {
         this.shouldEndConversation = true;
     }
@@ -594,7 +606,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        super.onClose(code, reason, remote);
+        try {
+            super.onClose(code, reason, remote);
+        } catch (Exception e) {
+            McTalking.LOGGER.error("Error in GeminiLiveClient.onClose", e);
+        }
 
         if (intentionalClose) {
             setWsSessionState(WsSessionState.CLOSED, "intentional close");
@@ -605,7 +621,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return;
         }
 
-        if (reason.contains("BidiGenerateContent session")) {
+        if (reason != null && reason.contains("BidiGenerateContent session")) {
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
             ensureConnectionForQueuedInput("session token invalidated");
@@ -615,13 +631,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (code == 1000) {
             setWsSessionState(WsSessionState.CLOSED, "normal close");
             McTalking.LOGGER.info("GeminiWsClient closed normally: {}", reason);
+            fireOnCloseActions();
         } else if (code == 1001) {
             setWsSessionState(WsSessionState.CLOSED, "going away");
             McTalking.LOGGER.info("GeminiWsClient closed (going away): {}", reason);
+            fireOnCloseActions();
         } else {
             McTalking.LOGGER.warn("GeminiWsClient closed: {} and code {}", reason, code);
             if (unrecognizedCloseRetryCount >= MAX_UNRECOGNIZED_CLOSE_RETRIES) {
                 setWsSessionState(WsSessionState.TERMINAL_ERROR, "retry cap exceeded for close code " + code);
+                fireOnCloseActions();
+                AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
                 onErrorEvent(new RuntimeException("Close with code " + code + ": " + reason));
                 return;
             }
@@ -629,7 +649,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             unrecognizedCloseRetryCount++;
             McTalking.LOGGER.warn("Attempting reconnect after unrecognized close code {} (attempt {}/{})",
                     code, unrecognizedCloseRetryCount, MAX_UNRECOGNIZED_CLOSE_RETRIES);
-            ensureConnectionForQueuedInput("abnormal close code " + code + " attempt " + unrecognizedCloseRetryCount);
+            try {
+                ensureConnectionForQueuedInput("abnormal close code " + code + " attempt " + unrecognizedCloseRetryCount);
+            } catch (Exception e) {
+                McTalking.LOGGER.error("Reconnect failed after close code {}", code, e);
+                setWsSessionState(WsSessionState.TERMINAL_ERROR, "reconnect failed");
+                fireOnCloseActions();
+                AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
+            }
         }
     }
 
@@ -648,6 +675,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         setWsSessionState(WsSessionState.TERMINAL_ERROR, "websocket error");
+        fireOnCloseActions();
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         onErrorEvent(ex);
     }
 
@@ -731,15 +760,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         super.close();
         stream.close();
 
-        synchronized (onCloseActions) {
-            for (Runnable action : onCloseActions) {
-                try {
-                    action.run();
-                } catch (Exception e) {
-                    McTalking.LOGGER.error("Error executing onClose action", e);
-                }
-            }
-        }
+        fireOnCloseActions();
     }
 
     /**

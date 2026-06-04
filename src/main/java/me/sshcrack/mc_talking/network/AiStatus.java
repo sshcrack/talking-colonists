@@ -16,7 +16,8 @@ public enum AiStatus {
     LISTENING,
     NONE,
     CONNECTING,
-    RECONNECTING;
+    RECONNECTING,
+    URGENT_WALKING;
 
     public static AiStatus fromId(int id) {
         if (id < 0 || id >= values().length) {

@@ -45,6 +45,7 @@
   "mc_talking.ai_status.error": "Error",
   "mc_talking.ai_status.connecting": "Connecting",
   "mc_talking.ai_status.reconnecting": "Reconnecting",
+  "mc_talking.ai_status.urgent_walking": "Walking to Player",
   "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work.",
   "mc_talking.recruit_lore": "Maybe this little gift will help you get this citizen back to join your colony.",
   "mc_talking.invalid_on_visitor": "You cannot use the Talking Device on visitors.",
@@ -56,6 +57,8 @@
   "mc_talking.commands.list_tools": "List of available tools:\n%s",
 
   "mc_talking.debug.not_citizen": "Target must be a MineColonies citizen.",
+  "mc_talking.debug.not_player": "Command must be executed by a player.",
+  "mc_talking.debug.urgent_contact_triggered": "Triggered urgent contact walk-to-player for %s",
   "mc_talking.debug.no_citizen_data": "Citizen has no data (offline/unloaded).",
   "mc_talking.debug.no_connections": "No active Gemini connections.",
   "mc_talking.debug.no_colony_specified": "Specify a colony ID or execute near a colony.",
@@ -98,6 +101,17 @@
   "yacl3.config.mc_talking:config.category.citizens.group.random_conversations": "Random Conversations",
   "yacl3.config.mc_talking:config.category.citizens.group.mumbling": "Mumbling",
   "yacl3.config.mc_talking:config.category.citizens.group.citizen_contact": "Citizen-Initiated Contact",
+
+  "yacl3.config.mc_talking:config.category.citizens.group.colony_events": "Colony Events",
+  "yacl3.config.mc_talking:config.colonyEventWindowSeconds": "Colony Event Window (seconds)",
+  "yacl3.config.mc_talking:config.colonyEventWindowSeconds.desc": "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.",
+
+  "yacl3.config.mc_talking:config.category.citizens.group.colony_diplomacy": "Colony Diplomacy",
+  "yacl3.config.mc_talking:config.enableColonyDiplomacy": "Enable Colony Diplomacy",
+  "yacl3.config.mc_talking:config.enableColonyDiplomacy.desc": "If enabled, citizens reference neighboring colonies and their diplomatic standing (allies, enemies, etc.) in conversations.",
+
+  "yacl3.config.mc_talking:config.enableColonyStatsMentions": "Enable Colony Stats Mentions",
+  "yacl3.config.mc_talking:config.enableColonyStatsMentions.desc": "If enabled, citizens occasionally mention colony milestones (buildings built, mobs killed, etc.) in their idle mumbles and conversations.",
 
   "yacl3.config.mc_talking:config.geminiApiKey": "API Key",
   "yacl3.config.mc_talking:config.geminiApiKey.desc": "Gemini API key used to authenticate all AI requests. If empty, all functionality is disabled.",
@@ -147,6 +161,19 @@
   "yacl3.config.mc_talking:config.citizenContactBaseChance.desc": "Base per-check chance for urgent contact. Multiplied by an urgency score from happiness, sickness, hunger, health, and homelessness.",
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks": "Citizen Contact Check Interval (ticks)",
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks.desc": "How often the server checks whether urgent citizens should initiate contact. 20 ticks = 1 second.",
+
+  "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer": "Walk to Player on Urgent Contact",
+  "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer.desc": "When enabled, urgent citizens walk toward you over a larger search range, follow you until close, then auto-start the conversation. They stop following when the need resolves.",
+
+  "yacl3.config.mc_talking:config.urgentContactSearchRange": "Urgent Contact Search Range",
+  "yacl3.config.mc_talking:config.urgentContactSearchRange.desc": "Extended scan radius (in blocks) for finding citizens with urgent needs when walk-to-player is enabled.",
+
+  "yacl3.config.mc_talking:config.blockingTaskUrgencyMultiplier": "Blocking Task Urgency Multiplier",
+  "yacl3.config.mc_talking:config.blockingTaskUrgencyMultiplier.desc": "Extra urgency weight for citizens stuck on a task (missing tools/items). Higher values make them much more likely to call for help.",
+
+  "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds": "Player Urgent Contact Cooldown (seconds)",
+  "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds.desc": "Minimum time between urgent citizen contacts for the same player, preventing multiple citizens from calling out at once. Set to 0 to disable.",
+
   "yacl3.config.mc_talking:config.citizenCooldownSeconds": "Citizen Cooldown (seconds)",
   "yacl3.config.mc_talking:config.citizenCooldownSeconds.desc": "Cooldown after an automatic session ends before that citizen can be auto-selected again (mumbling, urgent contact, or citizen-to-citizen). Set to 0 to disable.",
 

@@ -31,6 +31,9 @@ public class McTalkingConfig {
     public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
+    /** Movement speed multiplier when a citizen walks to the player on urgent contact. */
+    public static final double CITIZEN_URGENT_WALK_SPEED = 1.2;
+
     public static final ConfigClassHandler<McTalkingConfig> INSTANCE = ConfigClassHandler.createBuilder(McTalkingConfig.class)
             .id(YACLPlatform.rl("mc_talking", "config"))
             .serializer(config -> GsonConfigSerializerBuilder.create(config)
@@ -75,7 +78,7 @@ public class McTalkingConfig {
 
     @AutoGen(category = "general", group = "interaction")
     @TickBox
-    @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation. "
+    @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation / conversation with another citizen etc. "
             + "If false (default), they stay in place for the duration of the conversation.")
     public boolean continueWorkDuringConversation = false;
 
@@ -184,12 +187,32 @@ public class McTalkingConfig {
     @AutoGen(category = "citizens", group = "citizen_contact")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
-    public double citizenContactBaseChance = 0.02;
+    public double citizenContactBaseChance = 0.5;
 
     @AutoGen(category = "citizens", group = "citizen_contact")
     @IntField(min = 1, max = 10000)
     @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
     public int citizenContactCheckIntervalTicks = 400;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @TickBox
+    @SerialEntry(comment = "When enabled, urgent citizens walk to the player and follow them, searching over a larger radius. The conversation auto-starts when they get close.")
+    public boolean enableUrgentContactWalkToPlayer = true;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @DoubleField(min = 5.0, max = 100.0)
+    @SerialEntry(comment = "Search radius for urgent contacts when walk-to-player is enabled.")
+    public double urgentContactSearchRange = 30.0;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @DoubleSlider(min = 0.0, max = 10.0, step = 0.1)
+    @SerialEntry(comment = "Extra urgency weight applied when the citizen is stuck (blocked by missing tools/items). Makes them much more likely to call for help.")
+    public double blockingTaskUrgencyMultiplier = 3.0;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @IntField(min = 0, max = 10000)
+    @SerialEntry(comment = "Minimum cooldown in seconds between urgent citizen contacts for the same player. Set to 0 to disable.")
+    public int playerUrgentContactCooldownSeconds = 60;
 
     @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
@@ -220,7 +243,7 @@ public class McTalkingConfig {
     public int colonyEventWindowSeconds = 1200;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
-    public int configVersion = 0;
+    public int configVersion = 2;
 
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
@@ -366,6 +389,16 @@ public class McTalkingConfig {
                 McTalking.LOGGER.info("[Config] Migrated conversationMode from LIVE_WEBSOCKETS to AUTO");
             }
             INSTANCE.instance().configVersion = 1;
+            INSTANCE.save();
+        }
+
+        // One-time migration: old default citizenContactBaseChance (0.02) → new default (0.5)
+        if (INSTANCE.instance().configVersion < 2) {
+            if (INSTANCE.instance().citizenContactBaseChance <= 0.02) {
+                INSTANCE.instance().citizenContactBaseChance = 0.5;
+                McTalking.LOGGER.info("[Config] Migrated citizenContactBaseChance from 0.02 to 0.5");
+            }
+            INSTANCE.instance().configVersion = 2;
             INSTANCE.save();
         }
     }

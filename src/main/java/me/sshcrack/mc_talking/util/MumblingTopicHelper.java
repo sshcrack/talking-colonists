@@ -1,13 +1,19 @@
 package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class MumblingTopicHelper {
@@ -527,6 +533,26 @@ public final class MumblingTopicHelper {
 
         var data = citizen.getCitizenData();
 
+        // ── CRITICAL: blocking task (STUCK) ──────────────
+        if (data.getJobStatus() == JobStatus.STUCK) {
+            String jobName = data.getJob() != null
+                    ? Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString()
+                    : "worker";
+            String needed = collectNeededItems(data);
+            if (!needed.isEmpty()) {
+                return format(playerName, pick(
+                        "You're completely stuck and can't do your work as a " + jobName + ". You need: " + needed + ". Call out to %s by name and urgently explain you're blocked and need help.",
+                        "You can't continue your job as a " + jobName + " because you're missing something important: " + needed + ". Call out to %s by name and ask for assistance.",
+                        "As a " + jobName + ", you're stuck waiting for supplies: " + needed + ". Call out to %s by name and plead for help to get back to work."
+                ));
+            } else {
+                return format(playerName, pick(
+                        "You're completely stuck and can't do your work as a " + jobName + ". Call out to %s by name and urgently explain what's wrong and ask for help.",
+                        "You can't continue your job as a " + jobName + " because you're blocked by missing supplies. Call out to %s by name and ask for assistance."
+                ));
+            }
+        }
+
         // ── CRITICAL: sickness ───────────────────────────
         if (data.getCitizenDiseaseHandler().isSick()) {
             return format(playerName, pick(
@@ -580,6 +606,34 @@ public final class MumblingTopicHelper {
         }
 
         return buildGenericUrgentPrompt(playerName);
+    }
+
+    /**
+     * Queries the citizen's work building for open requests and returns a comma-separated
+     * list of the items/equipment they are waiting for. Returns empty string if nothing found.
+     * Limited to the first 5 items to keep the prompt bounded.
+     */
+    private static String collectNeededItems(ICitizenData data) {
+        IBuilding workBuilding = data.getWorkBuilding();
+        if (workBuilding == null) return "";
+
+        Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
+        if (openRequests == null || openRequests.isEmpty()) return "";
+
+        List<String> items = new ArrayList<>();
+        for (IRequest<?> req : openRequests) {
+            if (items.size() >= 5) {
+                items.add("...and more");
+                break;
+            }
+            String display = req.getShortDisplayString().getString();
+            if (display != null && !display.isEmpty()) {
+                items.add(display);
+            }
+        }
+
+        if (items.isEmpty()) return "";
+        return String.join(", ", items);
     }
 
     private static String format(String playerName, String template) {

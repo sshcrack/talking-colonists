@@ -107,6 +107,9 @@ public final class CitizenPromptViewFactory {
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
         List<String> colonyConnections = extractColonyConnections(data);
         List<String> recentEvents = extractRecentEvents(data);
+        String citizenAiState = extractCitizenAiState(data);
+        String workAiState = extractWorkAiState(data);
+        String nameTagDescription = extractNameTagDescription(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -147,7 +150,10 @@ public final class CitizenPromptViewFactory {
                 activeQuests,
                 recentEvents,
                 colonyConnections,
-                colonyMilestone
+                colonyMilestone,
+                citizenAiState,
+                workAiState,
+                nameTagDescription
         );
     }
 
@@ -159,6 +165,39 @@ public final class CitizenPromptViewFactory {
             return null;
         }
         return Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
+    }
+
+    @Nullable
+    private static String extractCitizenAiState(ICitizenData data) {
+        var entityOpt = data.getEntity();
+        if (entityOpt.isEmpty()) return null;
+        var entity = entityOpt.get();
+        if (!(entity instanceof com.minecolonies.core.entity.citizen.EntityCitizen citizen)) return null;
+        var ai = citizen.getCitizenAI();
+        if (ai == null) return null;
+        var state = ai.getState();
+        return state != null ? state.toString() : null;
+    }
+
+    @Nullable
+    private static String extractWorkAiState(ICitizenData data) {
+        var entityOpt = data.getEntity();
+        if (entityOpt.isEmpty()) return null;
+        var entity = entityOpt.get();
+        var jobHandler = entity.getCitizenJobHandler();
+        if (jobHandler == null) return null;
+        var workAi = jobHandler.getWorkAI();
+        if (workAi == null) return null;
+        var stateAi = workAi.getStateAI();
+        if (stateAi == null) return null;
+        var state = stateAi.getState();
+        return state != null ? state.toString() : null;
+    }
+
+    @Nullable
+    private static String extractNameTagDescription(ICitizenData data) {
+        if (data.getJob() == null) return null;
+        return data.getJob().getNameTagDescription();
     }
 
     private static List<String> extractParents(ICitizenData data) {
