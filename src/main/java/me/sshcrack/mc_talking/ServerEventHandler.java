@@ -67,6 +67,8 @@ import net.minecraftforge.fml.common.Mod;
  * Handler for server-side events related to player-citizen interactions.
  */
 public class ServerEventHandler {
+    private static ServerEventHandler INSTANCE;
+
     private int tickCounter = 0;
 
     private record WalkingTarget(UUID playerId, int lastRepathTick) {}
@@ -74,6 +76,10 @@ public class ServerEventHandler {
 
     /** playerId → System.currentTimeMillis() of the last urgent contact for that player. */
     private final Map<UUID, Long> lastPlayerUrgentContactTimes = new HashMap<>();
+
+    public ServerEventHandler() {
+        INSTANCE = this;
+    }
 
     /**
      * Called when the server starts
@@ -464,6 +470,18 @@ public class ServerEventHandler {
         }
 
         return weight;
+    }
+
+    /**
+     * Triggers the walk-to-player urgent contact flow for a citizen targeting a player.
+     * Used by the debug command {@code /talking_colonists urgent_contact}.
+     */
+    public static void triggerWalkToPlayer(AbstractEntityCitizen citizen, ServerPlayer player) {
+        if (INSTANCE == null) {
+            McTalking.LOGGER.warn("[CitizenContact] ServerEventHandler not initialized");
+            return;
+        }
+        INSTANCE.startWalkingUrgentContact(citizen, player);
     }
 
     private void startWalkingUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {

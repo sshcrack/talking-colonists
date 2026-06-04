@@ -78,7 +78,7 @@ public class McTalkingConfig {
 
     @AutoGen(category = "general", group = "interaction")
     @TickBox
-    @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation. "
+    @SerialEntry(comment = "If true, citizens continue wandering normally while in a player conversation / conversation with another citizen etc. "
             + "If false (default), they stay in place for the duration of the conversation.")
     public boolean continueWorkDuringConversation = false;
 

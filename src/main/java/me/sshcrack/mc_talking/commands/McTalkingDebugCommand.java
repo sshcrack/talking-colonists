@@ -24,6 +24,7 @@ public class McTalkingDebugCommand {
         DebugCitizenCommand.addTo(root);
         DebugMemoryCommand.addTo(root);
         DebugEventsCommand.addTo(root);
+        DebugUrgentContactCommand.addTo(root);
         ListToolsCommand.addTo(root);
 
         dispatcher.register(root);

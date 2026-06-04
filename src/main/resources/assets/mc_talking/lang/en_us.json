@@ -56,6 +56,8 @@
   "mc_talking.commands.list_tools": "List of available tools:\n%s",
 
   "mc_talking.debug.not_citizen": "Target must be a MineColonies citizen.",
+  "mc_talking.debug.not_player": "Command must be executed by a player.",
+  "mc_talking.debug.urgent_contact_triggered": "Triggered urgent contact walk-to-player for %s",
   "mc_talking.debug.no_citizen_data": "Citizen has no data (offline/unloaded).",
   "mc_talking.debug.no_connections": "No active Gemini connections.",
   "mc_talking.debug.no_colony_specified": "Specify a colony ID or execute near a colony.",
