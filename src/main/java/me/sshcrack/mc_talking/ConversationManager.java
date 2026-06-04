@@ -94,7 +94,7 @@ public class ConversationManager {
      * <p>Use {@link #markBusy} / {@link #markNotBusy} to manage this set.
      * Citizens in this set will be reported as busy by {@link #isCitizenBusy},
      * preventing them from being selected for new sessions, but they do
-     * <em>not</em> count toward {@link #maxConcurrentAgents} and are never
+     * <em>not</em> count toward {@link McTalkingConfig#maxConcurrentAgents} and are never
      * evicted — they are simply blocked from starting new sessions.</p>
      */
     private static final Set<UUID> busyEntities = ConcurrentHashMap.newKeySet();
@@ -287,7 +287,7 @@ public class ConversationManager {
      * do not need a Gemini Live WebSocket connection or a slot reservation
      * (e.g. Flash/TTS-based citizen-to-citizen conversations). The citizen
      * will be reported as busy by {@link #isCitizenBusy}, preventing
-     * double-booking, but will not count toward {@link #maxConcurrentAgents}
+     * double-booking, but will not count toward {@link McTalkingConfig#maxConcurrentAgents}
      * and will not be evictable.
      *
      * <p>Every call must be paired with a corresponding {@link #markNotBusy}
