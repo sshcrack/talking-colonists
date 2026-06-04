@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
@@ -45,6 +46,10 @@ public class PregenerationTaskService {
     // Caches merged into the service
     // citizen UUID -> (friend UUID -> AudioChunk) - insertion ordered map for eviction
     private static final Map<UUID, Map<UUID, AudioChunk>> greetingCache = new ConcurrentHashMap<>();
+
+    private static final Map<String, Long> lastPlayerGreetingPlayTime = new ConcurrentHashMap<>();
+    private static final long PLAYER_GREETING_PLAY_COOLDOWN_MS = 60_000L;
+    private static final Map<String, AudioChunk> playerGreetingCache = new ConcurrentHashMap<>();
 
     public static void tick(MinecraftServer server) {
         tickCounter++;
@@ -85,9 +90,29 @@ public class PregenerationTaskService {
             }
         }
 
-        // Note: threat audio is intentionally NOT pregenerated. Threat prompts are generated on-demand
-        // when an attacker's target changes (so they can include the attacker's name). This avoids caching
-        // stale attacker-specific messages and reduces storage of threat clips.
+        // Player greeting pregen: pregenerate greetings for frequent citizen-player pairs
+        if (McTalkingConfig.INSTANCE.instance().enablePlayerGreetingPregen) {
+            List<PlayerHeatmapTracker.CitizenPlayerPair> topPlayerPairs = PlayerHeatmapTracker.getTopPairs(5);
+            for (PlayerHeatmapTracker.CitizenPlayerPair pair : topPlayerPairs) {
+                AbstractEntityCitizen citizen = findCitizen(server, pair.citizenId());
+                ServerPlayer player = findPlayer(server, pair.playerId());
+
+                if (citizen != null && player != null) {
+                    if (ConversationManager.isCitizenBusy(citizen)) {
+                        continue;
+                    }
+
+                    String cacheKey = pair.citizenId() + ":" + pair.playerId();
+                    if (!playerGreetingCache.containsKey(cacheKey)) {
+                        String playerName = player.getName().getString();
+                        startPregenerationIfPossible(citizen,
+                                "Generate a brief 1-sentence greeting for " + playerName + " who is approaching you. Greet them by name and say hello, you're happy to see them.",
+                                (audio) -> putPlayerGreeting(pair.citizenId(), pair.playerId(), audio));
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     private static void startPregenerationIfPossible(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
@@ -231,6 +256,33 @@ public class PregenerationTaskService {
         return friends != null && friends.containsKey(friendId);
     }
 
+    public static boolean hasPlayerGreeting(UUID citizenId, UUID playerId) {
+        return playerGreetingCache.containsKey(citizenId + ":" + playerId);
+    }
+
+    public static AudioChunk popPlayerGreeting(UUID citizenId, UUID playerId) {
+        return playerGreetingCache.remove(citizenId + ":" + playerId);
+    }
+
+    public static void putPlayerGreeting(UUID citizenId, UUID playerId, AudioChunk audioData) {
+        playerGreetingCache.put(citizenId + ":" + playerId, audioData);
+    }
+
+    public static boolean isPlayerGreetingOnCooldown(UUID citizenId, UUID playerId) {
+        String key = citizenId + ":" + playerId;
+        Long last = lastPlayerGreetingPlayTime.get(key);
+        return last != null && (System.currentTimeMillis() - last) < PLAYER_GREETING_PLAY_COOLDOWN_MS;
+    }
+
+    public static void recordPlayerGreetingPlayed(UUID citizenId, UUID playerId) {
+        lastPlayerGreetingPlayTime.put(citizenId + ":" + playerId, System.currentTimeMillis());
+    }
+
+    public static void generatePlayerGreetingNow(AbstractEntityCitizen citizen, String playerName, java.util.function.Consumer<AudioChunk> onComplete) {
+        String prompt = "Generate a brief 1-sentence greeting for " + playerName + " who is approaching you. Greet them by name and say hello, you're happy to see them.";
+        startPregenerationIfPossible(citizen, prompt, onComplete);
+    }
+
     public static boolean isPregenerating() {
         return generatingCount.get() > 0;
     }
@@ -242,6 +294,9 @@ public class PregenerationTaskService {
         decayTickCounter = 0;
         lastGreetingPlayTime.clear();
         greetingCache.clear();
+        lastPlayerGreetingPlayTime.clear();
+        playerGreetingCache.clear();
+        PlayerHeatmapTracker.clear();
     }
 
     private static AbstractEntityCitizen findCitizen(MinecraftServer server, java.util.UUID uuid) {
@@ -252,5 +307,9 @@ public class PregenerationTaskService {
             }
         }
         return null;
+    }
+
+    private static ServerPlayer findPlayer(MinecraftServer server, java.util.UUID uuid) {
+        return server.getPlayerList().getPlayer(uuid);
     }
 }

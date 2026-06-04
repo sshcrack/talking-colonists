@@ -192,7 +192,7 @@ public class McTalkingConfig {
     @AutoGen(category = "citizens", group = "citizen_contact")
     @IntField(min = 1, max = 10000)
     @SerialEntry(comment = "How often (in server ticks) to check for citizens that should initiate contact. 20 ticks = 1 second")
-    public int citizenContactCheckIntervalTicks = 400;
+    public int citizenContactCheckIntervalTicks = 80;
 
     @AutoGen(category = "citizens", group = "citizen_contact")
     @TickBox
@@ -213,6 +213,26 @@ public class McTalkingConfig {
     @IntField(min = 0, max = 10000)
     @SerialEntry(comment = "Minimum cooldown in seconds between urgent citizen contacts for the same player. Set to 0 to disable.")
     public int playerUrgentContactCooldownSeconds = 60;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
+    @SerialEntry(comment = "Base weight for casual greetings (0.0-1.0). Even content citizens get this small chance to wave/say hello per check interval. Multiplied by citizenContactBaseChance.")
+    public double citizenCasualGreetingWeight = 0.1;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @TickBox
+    @SerialEntry(comment = "If true, the mod will pregenerate player-specific greetings for frequent citizen-player pairs in the background.")
+    public boolean enablePlayerGreetingPregen = true;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @DoubleField(min = 1.0, max = 20.0)
+    @SerialEntry(comment = "Distance in blocks within which a citizen will trigger their pregenerated player greeting.")
+    public double playerGreetingDistance = 8.0;
+
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 0, max = 600)
+    @SerialEntry(comment = "Cooldown in seconds between pregenerated player greetings for the same citizen-player pair.")
+    public int playerGreetingCooldownSeconds = 60;
 
     @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
@@ -399,6 +419,16 @@ public class McTalkingConfig {
                 McTalking.LOGGER.info("[Config] Migrated citizenContactBaseChance from 0.02 to 0.5");
             }
             INSTANCE.instance().configVersion = 2;
+            INSTANCE.save();
+        }
+
+        // One-time migration: old default citizenContactCheckIntervalTicks (400) → new default (80)
+        if (INSTANCE.instance().configVersion < 3) {
+            if (INSTANCE.instance().citizenContactCheckIntervalTicks == 400) {
+                INSTANCE.instance().citizenContactCheckIntervalTicks = 80;
+                McTalking.LOGGER.info("[Config] Migrated citizenContactCheckIntervalTicks from 400 to 80");
+            }
+            INSTANCE.instance().configVersion = 3;
             INSTANCE.save();
         }
     }

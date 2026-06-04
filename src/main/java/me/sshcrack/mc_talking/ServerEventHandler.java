@@ -27,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
+import me.sshcrack.mc_talking.pregen.PlayerHeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
@@ -77,6 +78,9 @@ public class ServerEventHandler {
     /** playerId → System.currentTimeMillis() of the last urgent contact for that player. */
     private final Map<UUID, Long> lastPlayerUrgentContactTimes = new HashMap<>();
 
+    /** playerId → System.currentTimeMillis() of the last casual greeting for that player. */
+    private final Map<UUID, Long> lastPlayerCasualGreetingTimes = new HashMap<>();
+
     public ServerEventHandler() {
         INSTANCE = this;
     }
@@ -114,6 +118,8 @@ public class ServerEventHandler {
         }
         walkingCitizens.clear();
         lastPlayerUrgentContactTimes.clear();
+        lastPlayerCasualGreetingTimes.clear();
+        PlayerHeatmapTracker.clear();
     }
 
     /**
@@ -156,6 +162,8 @@ public class ServerEventHandler {
                 return false;
             });
             lastPlayerUrgentContactTimes.remove(player.getUUID());
+            lastPlayerCasualGreetingTimes.remove(player.getUUID());
+            PlayerHeatmapTracker.removePlayer(player.getUUID());
         }
     }
 
@@ -187,6 +195,7 @@ public class ServerEventHandler {
         Set<Long> processedGreetingPairs = new HashSet<>();  // encoded symmetric pair key
         Set<UUID> mumbledCitizens       = new HashSet<>();   // citizens that mumbled this interval
         Set<UUID> contactedCitizens     = new HashSet<>();   // citizens that made contact this interval
+        Set<UUID> greetedCasually       = new HashSet<>();   // citizens that gave a casual greeting this interval
 
         for (ServerPlayer player : activePlayers) {
 
@@ -200,6 +209,7 @@ public class ServerEventHandler {
 
             if (doDistanceCheck) {
                 trackCitizenProximityHeatmap(citizens, processedGreetingPairs);
+                trackPlayerCitizenHeatmap(player, citizens);
                 checkConversationDistance(player);
                 if (McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
                     checkUrgentContactAbort(player);
@@ -226,6 +236,10 @@ public class ServerEventHandler {
             if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enablePregeneration)
                 playPregeneratedGreetings(citizens, processedGreetingPairs);
 
+            // Play pregenerated player greetings (100% trigger if greeting exists)
+            if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enablePlayerGreetingPregen)
+                playPregeneratedPlayerGreetings(player, citizens);
+
 
             // Mumbling: only if this player is NOT in a conversation
             if (doMumblingCheck) {
@@ -235,6 +249,11 @@ public class ServerEventHandler {
             // Citizen-initiated contact: only if this player is NOT already in a conversation
             if (doContactCheck) {
                 checkForCitizenInitiatedContact(player, citizens, contactedCitizens);
+            }
+
+            // Casual greeting: content citizens occasionally wave/say hello (no walking)
+            if (doContactCheck && McTalkingConfig.INSTANCE.instance().citizenCasualGreetingWeight > 0) {
+                checkForCasualGreeting(player, citizens, greetedCasually);
             }
         }
 
@@ -309,6 +328,16 @@ public class ServerEventHandler {
         }
     }
 
+    private void trackPlayerCitizenHeatmap(ServerPlayer player, List<AbstractEntityCitizen> citizens) {
+        UUID playerId = player.getUUID();
+        for (AbstractEntityCitizen citizen : citizens) {
+            double distSq = player.distanceToSqr(citizen);
+            if (distSq < PlayerHeatmapTracker.DISTANCE_FOR_RECORDING) {
+                PlayerHeatmapTracker.recordProximity(citizen.getUUID(), playerId);
+            }
+        }
+    }
+
     private void playPregeneratedGreetings(List<AbstractEntityCitizen> citizens,
                                             Set<Long> processedPairs) {
         for (int i = 0; i < citizens.size(); i++) {
@@ -356,6 +385,37 @@ public class ServerEventHandler {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private void playPregeneratedPlayerGreetings(ServerPlayer player, List<AbstractEntityCitizen> citizens) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+
+        UUID playerId = player.getUUID();
+        double triggerDist = McTalkingConfig.INSTANCE.instance().playerGreetingDistance;
+
+        for (AbstractEntityCitizen citizen : citizens) {
+            if (!ConversationManager.canCitizenSpeak(citizen)) continue;
+            if (citizen.getCitizenData() == null) continue;
+
+            double distSq = player.distanceToSqr(citizen);
+            if (distSq >= triggerDist * triggerDist) continue;
+
+            UUID citizenId = citizen.getUUID();
+
+            if (PregenerationTaskService.isPlayerGreetingOnCooldown(citizenId, playerId)) continue;
+
+            if (PregenerationTaskService.hasPlayerGreeting(citizenId, playerId)) {
+                var audio = PregenerationTaskService.popPlayerGreeting(citizenId, playerId);
+                if (audio != null) {
+                    if (PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
+                        PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
+                    } else {
+                        PregenerationTaskService.putPlayerGreeting(citizenId, playerId, audio);
+                    }
+                    return;
                 }
             }
         }
@@ -431,6 +491,62 @@ public class ServerEventHandler {
                     ConversationManager.startUrgentContact(citizen, player);
                 }
                 break; // Only one citizen per player per check
+            }
+        }
+    }
+
+    private void checkForCasualGreeting(ServerPlayer player, List<AbstractEntityCitizen> citizens,
+                                         Set<UUID> greetedThisInterval) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+
+        double casualWeight = McTalkingConfig.INSTANCE.instance().citizenCasualGreetingWeight;
+        if (casualWeight <= 0) return;
+
+        int playerCooldownSecs = McTalkingConfig.INSTANCE.instance().playerUrgentContactCooldownSeconds;
+        if (playerCooldownSecs > 0) {
+            Long lastContact = lastPlayerCasualGreetingTimes.get(player.getUUID());
+            if (lastContact != null && (System.currentTimeMillis() - lastContact) / 1000L < playerCooldownSecs) {
+                return;
+            }
+        }
+
+        double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
+
+        for (AbstractEntityCitizen citizen : citizens) {
+            if (!ConversationManager.canCitizenSpeak(citizen)) continue;
+            if (citizen.getCitizenData() == null) continue;
+            if (!greetedThisInterval.add(citizen.getUUID())) continue;
+
+            // Skip citizens with real urgency — handled by the urgent contact check
+            if (calculateUrgencyWeight(citizen) > 0) continue;
+
+            if (Math.random() < baseChance * casualWeight) {
+                McTalking.LOGGER.info("[CasualGreeting] Citizen {} greeting player {}",
+                        citizen.getCitizenData().getName(),
+                        player.getName().getString());
+
+                lastPlayerCasualGreetingTimes.put(player.getUUID(), System.currentTimeMillis());
+
+                UUID citizenId = citizen.getUUID();
+                UUID playerId = player.getUUID();
+
+                // Try pregenerated greeting first
+                if (PregenerationTaskService.hasPlayerGreeting(citizenId, playerId)
+                        && !PregenerationTaskService.isPlayerGreetingOnCooldown(citizenId, playerId)) {
+                    var audio = PregenerationTaskService.popPlayerGreeting(citizenId, playerId);
+                    if (audio != null && PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
+                        PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
+                    } else if (audio != null) {
+                        PregenerationTaskService.putPlayerGreeting(citizenId, playerId, audio);
+                    }
+                } else {
+                    // Fallback: generate on-demand and play when complete
+                    String playerName = player.getName().getString();
+                    PregenerationTaskService.generatePlayerGreetingNow(citizen, playerName, audio -> {
+                        PregenerationPlayback.playAudioIfPossible(citizen, audio);
+                    });
+                }
+                break;
             }
         }
     }
