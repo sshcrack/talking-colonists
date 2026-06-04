@@ -15,6 +15,7 @@ public enum AiStatus {
     IN_CONVERSATION,
     LISTENING,
     NONE,
+    CONNECTING,
     RECONNECTING;
 
     public static AiStatus fromId(int id) {
