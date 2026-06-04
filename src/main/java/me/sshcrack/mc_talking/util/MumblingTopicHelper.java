@@ -611,6 +611,7 @@ public final class MumblingTopicHelper {
     /**
      * Queries the citizen's work building for open requests and returns a comma-separated
      * list of the items/equipment they are waiting for. Returns empty string if nothing found.
+     * Limited to the first 5 items to keep the prompt bounded.
      */
     private static String collectNeededItems(ICitizenData data) {
         IBuilding workBuilding = data.getWorkBuilding();
@@ -621,6 +622,10 @@ public final class MumblingTopicHelper {
 
         List<String> items = new ArrayList<>();
         for (IRequest<?> req : openRequests) {
+            if (items.size() >= 5) {
+                items.add("...and more");
+                break;
+            }
             String display = req.getShortDisplayString().getString();
             if (display != null && !display.isEmpty()) {
                 items.add(display);

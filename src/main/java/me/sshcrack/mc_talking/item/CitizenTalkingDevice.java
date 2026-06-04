@@ -4,7 +4,6 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
-import me.sshcrack.mc_talking.config.ModalityModes;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;

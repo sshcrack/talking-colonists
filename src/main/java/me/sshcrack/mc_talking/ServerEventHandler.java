@@ -151,6 +151,7 @@ public class ServerEventHandler {
                 }
                 return false;
             });
+            lastPlayerUrgentContactTimes.remove(player.getUUID());
         }
     }
 
@@ -502,10 +503,24 @@ public class ServerEventHandler {
                 continue;
             }
 
-            // Check if urgent need is resolved
-            if (calculateUrgencyWeight(citizen) <= 0) {
-                McTalking.LOGGER.info("[CitizenContact] Citizen {} — urgent need resolved, aborting walk",
+            // If the player started a conversation with this citizen (e.g. via Talking Device)
+            // while they were walking, stop walking and let the conversation take over.
+            if (ConversationManager.getPlayerForEntity(citizenId) != null) {
+                McTalking.LOGGER.info("[CitizenContact] Citizen {} picked up for player conversation, aborting walk",
                         citizen.getCitizenData().getName());
+                citizen.getNavigation().stop();
+                AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
+                // Don't release the slot — the player conversation now holds it.
+                it.remove();
+                continue;
+            }
+
+            // Check if urgent need is resolved
+            var urgencyData = citizen.getCitizenData();
+            if (calculateUrgencyWeight(citizen) <= 0) {
+                String citizenName = urgencyData != null ? urgencyData.getName() : "unknown";
+                McTalking.LOGGER.info("[CitizenContact] Citizen {} — urgent need resolved, aborting walk",
+                        citizenName);
                 citizen.getNavigation().stop();
                 AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
                 ConversationManager.releaseSlot(citizen);
@@ -514,16 +529,19 @@ public class ServerEventHandler {
             }
 
             // Check if in voice range to start conversation
-            double voiceRange = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
-            if (citizen.distanceToSqr(player) <= voiceRange * voiceRange) {
-                McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
-                        citizen.getCitizenData().getName());
-                it.remove();
-                // Release walking slot so canCitizenSpeak doesn't block the conversation
-                AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
-                ConversationManager.releaseSlot(citizen);
-                ConversationManager.startUrgentContact(citizen, player);
-                continue;
+            // Must be in the same dimension for distance checks to be meaningful
+            if (citizen.level() == player.level()) {
+                double voiceRange = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+                if (citizen.distanceToSqr(player) <= voiceRange * voiceRange) {
+                    McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
+                            citizen.getCitizenData().getName());
+                    it.remove();
+                    // Release walking slot so canCitizenSpeak doesn't block the conversation
+                    AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
+                    ConversationManager.releaseSlot(citizen);
+                    ConversationManager.startUrgentContact(citizen, player);
+                    continue;
+                }
             }
 
             // Repath every 20 ticks
