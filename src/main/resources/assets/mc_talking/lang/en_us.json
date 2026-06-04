@@ -98,6 +98,17 @@
   "yacl3.config.mc_talking:config.category.citizens.group.mumbling": "Mumbling",
   "yacl3.config.mc_talking:config.category.citizens.group.citizen_contact": "Citizen-Initiated Contact",
 
+  "yacl3.config.mc_talking:config.category.citizens.group.colony_events": "Colony Events",
+  "yacl3.config.mc_talking:config.colonyEventWindowSeconds": "Colony Event Window (seconds)",
+  "yacl3.config.mc_talking:config.colonyEventWindowSeconds.desc": "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.",
+
+  "yacl3.config.mc_talking:config.category.citizens.group.colony_diplomacy": "Colony Diplomacy",
+  "yacl3.config.mc_talking:config.enableColonyDiplomacy": "Enable Colony Diplomacy",
+  "yacl3.config.mc_talking:config.enableColonyDiplomacy.desc": "If enabled, citizens reference neighboring colonies and their diplomatic standing (allies, enemies, etc.) in conversations.",
+
+  "yacl3.config.mc_talking:config.enableColonyStatsMentions": "Enable Colony Stats Mentions",
+  "yacl3.config.mc_talking:config.enableColonyStatsMentions.desc": "If enabled, citizens occasionally mention colony milestones (buildings built, mobs killed, etc.) in their idle mumbles and conversations.",
+
   "yacl3.config.mc_talking:config.geminiApiKey": "API Key",
   "yacl3.config.mc_talking:config.geminiApiKey.desc": "Gemini API key used to authenticate all AI requests. If empty, all functionality is disabled.",
   "yacl3.config.mc_talking:config.currentAiModel": "AI Model",
