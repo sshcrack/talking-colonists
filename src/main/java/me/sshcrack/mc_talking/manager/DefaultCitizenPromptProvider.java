@@ -449,7 +449,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         break;
                     case SECURITY:
                         if (factor < 0.8) {
-                            prompt.append("- Feels unsafe in the colony\n");
+                            if (!view.peaceful()) {
+                                prompt.append("- Feels unsafe in the colony\n");
+                            }
                         } else {
                             prompt.append("- Feels very secure in the colony\n");
                         }
