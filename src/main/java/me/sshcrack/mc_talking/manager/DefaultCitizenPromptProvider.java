@@ -56,6 +56,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         if (view.homeBuildingDisplayName() != null && !view.homeless()) {
             prompt.append(" | Home: ").append(view.homeBuildingDisplayName())
                     .append(" (level ").append(view.homeBuildingLevel()).append(")");
+        } else if (view.guard() && view.workBuildingDisplayName() != null) {
+            prompt.append(" | Home: ").append(view.workBuildingDisplayName())
+                    .append(" (level ").append(view.workBuildingLevel())
+                    .append(") — your guard post serves as your living quarters");
         }
         prompt.append("\n\n");
         return prompt.toString();
@@ -405,7 +409,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             if (factor < 0.8 || factor > 1.2) {
                 switch (modifierType) {
                     case HOMELESSNESS:
-                        if (factor < 0.8) {
+                        if (factor < 0.8 && !view.guard()) {
                             prompt.append("- Distressed about housing situation\n");
                         }
                         break;

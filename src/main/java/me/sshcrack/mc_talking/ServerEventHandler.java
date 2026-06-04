@@ -373,7 +373,7 @@ public class ServerEventHandler {
             weight += 0.8;
         }
 
-        if (data.getHomeBuilding() == null) {
+        if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
             weight += 0.7;
         }
 
