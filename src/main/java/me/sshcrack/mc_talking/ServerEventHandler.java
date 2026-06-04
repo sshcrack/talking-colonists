@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
@@ -103,6 +104,7 @@ public class ServerEventHandler {
      */
     @SubscribeEvent
     public void onServerStop(ServerStoppingEvent event) {
+        MemoryCompactionService.cleanup();
         PregenerationTaskService.cleanup();
         DeliveryInteractionManager.cleanup();
         ConversationManager.cleanup();
@@ -206,6 +208,7 @@ public class ServerEventHandler {
             }
 
             if (doDistanceCheck) {
+                trackCitizenProximityHeatmap(citizens);
                 checkConversationDistance(player);
                 if (McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
                     checkUrgentContactAbort(player);
@@ -228,8 +231,9 @@ public class ServerEventHandler {
             if (ConversationManager.isPlayerInConversation(playerId))
                 continue;
 
+            // Play pregenerated greetings (only when no citizens in range are busy)
             if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enablePregeneration)
-                checkProximityAndGreetings(citizens, processedGreetingPairs);
+                playPregeneratedGreetings(citizens, processedGreetingPairs);
 
 
             // Mumbling: only if this player is NOT in a conversation
@@ -256,6 +260,10 @@ public class ServerEventHandler {
         if (McTalkingConfig.INSTANCE.instance().enablePregeneration) {
             PregenerationTaskService.tick(server);
             DeliveryInteractionManager.tick(server);
+        }
+
+        if (McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) {
+            MemoryCompactionService.tick(server);
         }
     }
 
@@ -290,8 +298,7 @@ public class ServerEventHandler {
         }
     }
 
-    private void checkProximityAndGreetings(List<AbstractEntityCitizen> citizens,
-                                             Set<Long> processedPairs) {
+    private void trackCitizenProximityHeatmap(List<AbstractEntityCitizen> citizens) {
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
             for (int j = i + 1; j < citizens.size(); j++) {
@@ -300,12 +307,22 @@ public class ServerEventHandler {
                 if (distSq < HeatmapTracker.DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING) {
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
                 }
+            }
+        }
+    }
+
+    private void playPregeneratedGreetings(List<AbstractEntityCitizen> citizens,
+                                            Set<Long> processedPairs) {
+        for (int i = 0; i < citizens.size(); i++) {
+            AbstractEntityCitizen citizenOne = citizens.get(i);
+            for (int j = i + 1; j < citizens.size(); j++) {
+                AbstractEntityCitizen citizenTwo = citizens.get(j);
+                double distSq = citizenOne.distanceToSqr(citizenTwo);
 
                 // Deduplicate: each citizen pair is handled at most once per tick interval,
                 // even when multiple players are nearby and trigger this method repeatedly.
                 int idA = citizenOne.getId();
                 int idB = citizenTwo.getId();
-                // Encode as a single long with smaller id in the high 32 bits
                 long pairKey = ((long) Math.min(idA, idB) << 32) | (Math.max(idA, idB) & 0xFFFFFFFFL);
                 if (!processedPairs.add(pairKey)) {
                     continue;
@@ -320,14 +337,12 @@ public class ServerEventHandler {
                     continue;
 
                 if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
-                    // Only play if the pair is not still on cooldown from a recent greeting
                     if (!PregenerationTaskService.isGreetingOnCooldown(citizenOne.getUUID(), citizenTwo.getUUID())) {
                         AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
                         if (audio != null) {
                             if (PregenerationPlayback.playAudioIfPossible(citizenOne, audio)) {
                                 PregenerationTaskService.recordGreetingPlayed(citizenOne.getUUID(), citizenTwo.getUUID());
                             } else {
-                                // put back if playback failed
                                 PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
                             }
                         }
@@ -444,7 +459,7 @@ public class ServerEventHandler {
             weight += 0.8;
         }
 
-        if (data.getHomeBuilding() == null) {
+        if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
             weight += 0.7;
         }
 

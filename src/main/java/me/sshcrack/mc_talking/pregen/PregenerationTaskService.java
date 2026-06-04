@@ -225,6 +225,10 @@ public class PregenerationTaskService {
         return friends != null && friends.containsKey(friendId);
     }
 
+    public static boolean isPregenerating() {
+        return isGenerating;
+    }
+
     public static void cleanup() {
         lastThreatPlayTime.clear();
         isGenerating = false;

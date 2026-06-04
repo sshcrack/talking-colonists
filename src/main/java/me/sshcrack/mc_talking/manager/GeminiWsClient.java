@@ -721,6 +721,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         intentionalClose = false;
         hasMadeInitialConnection = true;
         setWsSessionState(WsSessionState.CONNECTING, "connect()");
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.CONNECTING);
         super.connect();
     }
 

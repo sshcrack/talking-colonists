@@ -3,6 +3,8 @@ package me.sshcrack.mc_talking.commands;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
+import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -26,6 +28,9 @@ public class DebugStatusCommand {
         int activeSessions = clients.size();
         int playerSessions = citizenToPlayer.size();
         int nonPlayerSessions = activeSessions - playerSessions;
+        int pregenActive = PregenerationTaskService.isPregenerating() ? 1 : 0;
+        int compactionActive = MemoryCompactionService.getActiveCount();
+        int totalActive = activeSessions + pregenActive + compactionActive;
         int maxAgents = config.maxConcurrentAgents;
         boolean hasKey = !config.geminiApiKey.isEmpty();
 
@@ -45,7 +50,7 @@ public class DebugStatusCommand {
             // Sessions
             msg.append(Component.literal("  "))
                     .append(Component.translatable("mc_talking.debug.status_sessions",
-                            activeSessions, maxAgents, playerSessions, nonPlayerSessions))
+                            totalActive, maxAgents, playerSessions, nonPlayerSessions, pregenActive, compactionActive))
                     .withStyle(ChatFormatting.WHITE)
                     .append(Component.literal("\n"));
 
@@ -76,7 +81,15 @@ public class DebugStatusCommand {
                     .append(Component.literal("\n"));
             msg.append(Component.literal("  "))
                     .append(Component.translatable("mc_talking.debug.status_pregeneration",
-                            McTalkingDebugCommand.booleanToStr(config.enablePregeneration)))
+                            McTalkingDebugCommand.booleanToStr(config.enablePregeneration),
+                            PregenerationTaskService.isPregenerating() ? "§aactive" : "§7idle"))
+                    .withStyle(ChatFormatting.GRAY)
+                    .append(Component.literal("\n"));
+            msg.append(Component.literal("  "))
+                    .append(Component.translatable("mc_talking.debug.status_compaction",
+                            McTalkingDebugCommand.booleanToStr(config.enableMemoryCompaction),
+                            config.memoryMode.name(),
+                            MemoryCompactionService.getActiveCount()))
                     .withStyle(ChatFormatting.GRAY);
 
             return msg;

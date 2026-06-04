@@ -262,6 +262,27 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, citizens will reference neighboring colonies and their diplomatic standing (allies, enemies, etc.) in conversations.")
     public boolean enableColonyDiplomacy = true;
 
+    // Memory Compaction
+    @AutoGen(category = "citizens", group = "memory")
+    @EnumCycler
+    @SerialEntry(comment = "How memory compaction is performed. LIVE uses a text-only WebSocket session. FLASH uses the Gemini Flash API.")
+    public MemoryMode memoryMode = MemoryMode.LIVE;
+
+    @AutoGen(category = "citizens", group = "memory")
+    @TickBox
+    @SerialEntry(comment = "If true, citizen memories will be periodically compacted and summarized to prevent unbounded growth.")
+    public boolean enableMemoryCompaction = true;
+
+    @AutoGen(category = "citizens", group = "memory")
+    @IntField(min = 20, max = 72000)
+    @SerialEntry(comment = "How often (in server ticks) to check for memory compaction candidates. 20 ticks = 1 second.")
+    public int memoryCompactionIntervalTicks = 100;
+
+    @AutoGen(category = "citizens", group = "memory")
+    @IntField(min = 1, max = 500)
+    @SerialEntry(comment = "Maximum number of individual events/facts before compaction is triggered for a citizen.")
+    public int memoryCompactionThreshold = 15;
+
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
         @Override
         public String provideNewValue() {

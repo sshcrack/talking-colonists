@@ -61,6 +61,15 @@ public class DebugMemoryCommand {
                             .append(Component.literal(hasSessionToken ? "§a§lSET" : "§8none"))
                             .append(Component.literal("\n")));
 
+            // Summarized Memory (compaction)
+            String summarized = mem.getSummarizedMemory();
+            msg.append(Component.literal("  §7Summarized Memory (" + summarized.length() + " chars):\n"));
+            if (summarized.isBlank()) {
+                msg.append(Component.literal("    §8(none)\n"));
+            } else {
+                msg.append(Component.literal("    §f" + summarized + "\n"));
+            }
+
             // Facts
             msg.append(Component.literal("  §7Facts (" + facts.size() + "):\n"));
             if (facts.isEmpty()) {

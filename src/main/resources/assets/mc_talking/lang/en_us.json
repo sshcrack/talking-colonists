@@ -43,6 +43,7 @@
   "mc_talking.ai_status.talking": "Talking",
   "mc_talking.ai_status.in_conversation": "In conversation",
   "mc_talking.ai_status.error": "Error",
+  "mc_talking.ai_status.connecting": "Connecting",
   "mc_talking.ai_status.reconnecting": "Reconnecting",
   "mc_talking.ai_status.urgent_walking": "Walking to Player",
   "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work.",
@@ -74,12 +75,13 @@
 
   "mc_talking.debug.status_header": "--- McTalking Status ---",
   "mc_talking.debug.api_key_status": "API Key: %s",
-  "mc_talking.debug.status_sessions": "Sessions: %d/%d (%d player, %d non-player)",
+  "mc_talking.debug.status_sessions": "Sessions: %d/%d (%d player, %d non-player, %d pregen, %d compaction)",
   "mc_talking.debug.status_cooldown": "Cooldown: %s",
   "mc_talking.debug.status_memory": "Memory: %s",
   "mc_talking.debug.status_personality": "Personality: %s",
   "mc_talking.debug.status_citizen_to_citizen": "Citizen-to-Citizen: %s",
-  "mc_talking.debug.status_pregeneration": "Pregeneration: %s",
+  "mc_talking.debug.status_pregeneration": "Pregeneration: %s (%s)",
+  "mc_talking.debug.status_compaction": "MemCompaction: %s [%s] (%d active)",
 
   "mc_talking.debug.connections_header": "--- Active Connections (%d) ---",
 

@@ -118,7 +118,7 @@ public final class CitizenPromptViewFactory {
                 jobName,
                 isGuard,
                 data.getCitizenDiseaseHandler().isSick(),
-                data.getHomeBuilding() == null,
+                data.getHomeBuilding() == null && !isGuard,
                 parents,
                 data.getPartner() != null,
                 childrenNames,

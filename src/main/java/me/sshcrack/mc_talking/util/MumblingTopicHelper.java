@@ -573,7 +573,7 @@ public final class MumblingTopicHelper {
         }
 
         // ── CRITICAL: no home ────────────────────────────
-        if (data.getHomeBuilding() == null) {
+        if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
             return format(playerName, pick(
                     "You have nowhere to sleep. Call out to %s by name and urgently ask for help.",
                     "You're distressed about having no home. Call out to %s by name and plead for shelter.",
