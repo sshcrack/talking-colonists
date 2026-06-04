@@ -3,6 +3,8 @@ package me.sshcrack.mc_talking.item;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
+import me.sshcrack.mc_talking.config.ModalityModes;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
@@ -182,6 +184,15 @@ public class CitizenTalkingDevice extends Item {
                             .withStyle(ChatFormatting.RED)
             );
             return true; // Still prevent attack
+        }
+
+        if (McTalkingVoicechatPlugin.shouldDisableColoniesTicks(serverPlayer)) {
+            serverPlayer.sendSystemMessage(
+                    Component.literal("Your voice chat is currently disabled. Please enable it to talk to citizens.")
+                            .withStyle(ChatFormatting.RED)
+            );
+
+            return true;
         }
 
         // If there was a previously focused entity, remove its glowing effect

@@ -72,6 +72,9 @@ public class ServerEventHandler {
     private record WalkingTarget(UUID playerId, int lastRepathTick) {}
     private final Map<UUID, WalkingTarget> walkingCitizens = new HashMap<>();
 
+    /** playerId → System.currentTimeMillis() of the last urgent contact for that player. */
+    private final Map<UUID, Long> lastPlayerUrgentContactTimes = new HashMap<>();
+
     /**
      * Called when the server starts
      */
@@ -105,6 +108,7 @@ public class ServerEventHandler {
             abortWalking(citizenId, server);
         }
         walkingCitizens.clear();
+        lastPlayerUrgentContactTimes.clear();
     }
 
     /**
@@ -182,8 +186,7 @@ public class ServerEventHandler {
         for (ServerPlayer player : activePlayers) {
 
             UUID playerId = player.getUUID();
-            var conn = McTalkingVoicechatPlugin.vcApi.getConnectionOf(player.getUUID());
-            if (conn != null && conn.isDisabled())
+            if (McTalkingVoicechatPlugin.shouldDisableColoniesTicks(player))
                 continue;
 
             double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
@@ -195,16 +198,16 @@ public class ServerEventHandler {
                 PlayerHeatmapTracker.recordProximity(player.getUUID(), citizen.getUUID());
             }
 
-            var anyBusy = citizens.stream().anyMatch(ConversationManager::isCitizenBusy);
-            if (anyBusy)
-                continue;
-
             if (doDistanceCheck) {
                 checkConversationDistance(player);
                 if (McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
                     checkUrgentContactAbort(player);
                 }
             }
+
+            var anyBusy = citizens.stream().anyMatch(ConversationManager::isCitizenBusy);
+            if (anyBusy)
+                continue;
 
             AbstractEntityCitizen talkingCitizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
             if (talkingCitizen != null
@@ -362,6 +365,16 @@ public class ServerEventHandler {
     private void checkForCitizenInitiatedContact(ServerPlayer player, List<AbstractEntityCitizen> citizens,
                                                    Set<UUID> contactedThisInterval) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+
+        // Per-player urgent contact cooldown: prevent spam from multiple citizens
+        int playerCooldownSecs = McTalkingConfig.INSTANCE.instance().playerUrgentContactCooldownSeconds;
+        if (playerCooldownSecs > 0) {
+            Long lastContact = lastPlayerUrgentContactTimes.get(player.getUUID());
+            if (lastContact != null && (System.currentTimeMillis() - lastContact) / 1000L < playerCooldownSecs) {
+                return;
+            }
+        }
+
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
         boolean walkToPlayer = McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer;
 
@@ -388,6 +401,9 @@ public class ServerEventHandler {
                         citizen.getCitizenData().getName(),
                         walkToPlayer ? "walk-to-player" : "contact",
                         player.getName().getString());
+
+                // Record per-player cooldown timestamp
+                lastPlayerUrgentContactTimes.put(player.getUUID(), System.currentTimeMillis());
 
                 if (walkToPlayer) {
                     startWalkingUrgentContact(citizen, player);
@@ -460,7 +476,7 @@ public class ServerEventHandler {
 
         citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
 
-        McTalking.LOGGER.info("[CitizenContact] Citizen {} walking to player {}", 
+        McTalking.LOGGER.info("[CitizenContact] Citizen {} walking to player {}",
                 citizen.getCitizenData().getName(), player.getName().getString());
     }
 

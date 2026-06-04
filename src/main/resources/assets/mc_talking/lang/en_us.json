@@ -166,6 +166,10 @@
 
   "yacl3.config.mc_talking:config.blockingTaskUrgencyMultiplier": "Blocking Task Urgency Multiplier",
   "yacl3.config.mc_talking:config.blockingTaskUrgencyMultiplier.desc": "Extra urgency weight for citizens stuck on a task (missing tools/items). Higher values make them much more likely to call for help.",
+
+  "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds": "Player Urgent Contact Cooldown (seconds)",
+  "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds.desc": "Minimum time between urgent citizen contacts for the same player, preventing multiple citizens from calling out at once. Set to 0 to disable.",
+
   "yacl3.config.mc_talking:config.citizenCooldownSeconds": "Citizen Cooldown (seconds)",
   "yacl3.config.mc_talking:config.citizenCooldownSeconds.desc": "Cooldown after an automatic session ends before that citizen can be auto-selected again (mumbling, urgent contact, or citizen-to-citizen). Set to 0 to disable.",
 

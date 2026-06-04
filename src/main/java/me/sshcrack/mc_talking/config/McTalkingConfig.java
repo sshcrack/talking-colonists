@@ -187,7 +187,7 @@ public class McTalkingConfig {
     @AutoGen(category = "citizens", group = "citizen_contact")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
-    public double citizenContactBaseChance = 0.02;
+    public double citizenContactBaseChance = 0.5;
 
     @AutoGen(category = "citizens", group = "citizen_contact")
     @IntField(min = 1, max = 10000)
@@ -208,6 +208,11 @@ public class McTalkingConfig {
     @DoubleSlider(min = 0.0, max = 10.0, step = 0.1)
     @SerialEntry(comment = "Extra urgency weight applied when the citizen is stuck (blocked by missing tools/items). Makes them much more likely to call for help.")
     public double blockingTaskUrgencyMultiplier = 3.0;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @IntField(min = 0, max = 10000)
+    @SerialEntry(comment = "Minimum cooldown in seconds between urgent citizen contacts for the same player. Set to 0 to disable.")
+    public int playerUrgentContactCooldownSeconds = 60;
 
     @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
@@ -238,7 +243,7 @@ public class McTalkingConfig {
     public int colonyEventWindowSeconds = 1200;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
-    public int configVersion = 0;
+    public int configVersion = 2;
 
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
@@ -363,6 +368,16 @@ public class McTalkingConfig {
                 McTalking.LOGGER.info("[Config] Migrated conversationMode from LIVE_WEBSOCKETS to AUTO");
             }
             INSTANCE.instance().configVersion = 1;
+            INSTANCE.save();
+        }
+
+        // One-time migration: old default citizenContactBaseChance (0.02) → new default (0.5)
+        if (INSTANCE.instance().configVersion < 2) {
+            if (INSTANCE.instance().citizenContactBaseChance <= 0.02) {
+                INSTANCE.instance().citizenContactBaseChance = 0.5;
+                McTalking.LOGGER.info("[Config] Migrated citizenContactBaseChance from 0.02 to 0.5");
+            }
+            INSTANCE.instance().configVersion = 2;
             INSTANCE.save();
         }
     }
