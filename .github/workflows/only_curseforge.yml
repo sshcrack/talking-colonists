@@ -1,0 +1,69 @@
+name: release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build_reusable.yml
+    with:
+      release: true
+
+  publish:
+    name: Publish to CurseForge
+    runs-on: ubuntu-latest
+    needs: build
+
+    env:
+      MOD_IS_RELEASE: true
+      PUB_DRY_RUN: ${{ vars.PUB_DRY_RUN }}
+      PUB_MODS_ENABLE: ${{ vars.PUB_MODS_ENABLE }}
+      PUB_MAVEN_ENABLE: ${{ vars.PUB_MAVEN_ENABLE }}
+      PUB_MAVEN_CENTRAL_ENABLE: ${{ vars.PUB_MAVEN_CENTRAL_ENABLE }}
+      PUB_MAVEN_CENTRAL_SNAPSHOTS: ${{ vars.PUB_MAVEN_CENTRAL_SNAPSHOTS }}
+      PUB_MODRINTH_STAGING: ${{ vars.PUB_MODRINTH_STAGING }}
+      PUB_MODRINTH_PROJECT_ID: ${{ vars.PUB_MODRINTH_PROJECT_ID }}
+      PUB_CURSEFORGE_PROJECT_ID: ${{ vars.PUB_CURSEFORGE_PROJECT_ID }}
+      PUB_MODRINTH_TOKEN: ${{ secrets.PUB_MODRINTH_TOKEN }}
+      PUB_CURSEFORGE_TOKEN: ${{ secrets.PUB_CURSEFORGE_TOKEN }}
+      PUB_SIGNING_KEY: ${{ secrets.PUB_SIGNING_KEY }}
+      PUB_SIGNING_ID: ${{ secrets.PUB_SIGNING_ID }}
+      PUB_SIGNING_PASSWORD: ${{ secrets.PUB_SIGNING_PASSWORD }}
+      PUB_MAVEN_CENTRAL_USERNAME: ${{ secrets.PUB_MAVEN_CENTRAL_USERNAME }}
+      PUB_MAVEN_CENTRAL_PASSWORD: ${{ secrets.PUB_MAVEN_CENTRAL_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: build/libs/
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'microsoft'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Publish to CurseForge
+        run: ./gradlew publishCurseforge --stacktrace
