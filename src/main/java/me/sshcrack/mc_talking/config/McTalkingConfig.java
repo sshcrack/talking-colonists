@@ -123,7 +123,7 @@ public class McTalkingConfig {
     @AutoGen(category = "citizens", group = "pregeneration")
     @DoubleField(min = 1.0, max = 20.0)
     @SerialEntry(comment = "Distance in blocks within which passing citizens will trigger their pregenerated greeting.")
-    public double pregeneratedGreetingDistance = 3.0;
+    public double pregeneratedGreetingDistance = 6.0;
 
     @AutoGen(category = "citizens", group = "pregeneration")
     @IntField(min = 0, max = 60000)

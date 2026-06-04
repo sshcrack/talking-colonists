@@ -51,7 +51,7 @@ public class RecordRelationshipChange extends FunctionAction {
         var typeStr = parameters.get("type").getAsString();
 
         var typeOpt = Arrays.stream(CitizenRelationshipChangeType.values())
-                .filter(t -> t.name().equals(typeStr))
+                .filter(t -> t.name().equalsIgnoreCase(typeStr))
                 .findFirst();
 
         if (typeOpt.isEmpty()) {

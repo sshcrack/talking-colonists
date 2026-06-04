@@ -29,7 +29,6 @@ import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
-import me.sshcrack.mc_talking.pregen.PlayerHeatmapTracker;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -109,8 +108,6 @@ public class ServerEventHandler {
         DeliveryInteractionManager.cleanup();
         ConversationManager.cleanup();
         ColonyEventBuffer.clear();
-        PlayerHeatmapTracker.cleanup();
-
         MinecraftServer server = event.getServer();
         for (UUID citizenId : walkingCitizens.keySet()) {
             abortWalking(citizenId, server);
@@ -149,7 +146,6 @@ public class ServerEventHandler {
     public void onPlayerLeave(EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             ConversationManager.endConversation(player.getUUID(), false);
-            PlayerHeatmapTracker.onPlayerRemoved(player.getUUID());
 
             MinecraftServer server = player.getServer();
             walkingCitizens.entrySet().removeIf(entry -> {
@@ -202,13 +198,8 @@ public class ServerEventHandler {
             var aabb = player.getBoundingBox().inflate(range);
             var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
-            // Track player-citizen proximity for heatmap
-            for (AbstractEntityCitizen citizen : citizens) {
-                PlayerHeatmapTracker.recordProximity(player.getUUID(), citizen.getUUID());
-            }
-
             if (doDistanceCheck) {
-                trackCitizenProximityHeatmap(citizens);
+                trackCitizenProximityHeatmap(citizens, processedGreetingPairs);
                 checkConversationDistance(player);
                 if (McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
                     checkUrgentContactAbort(player);
@@ -298,13 +289,20 @@ public class ServerEventHandler {
         }
     }
 
-    private void trackCitizenProximityHeatmap(List<AbstractEntityCitizen> citizens) {
+    private void trackCitizenProximityHeatmap(List<AbstractEntityCitizen> citizens,
+                                               Set<Long> processedPairs) {
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
             for (int j = i + 1; j < citizens.size(); j++) {
                 AbstractEntityCitizen citizenTwo = citizens.get(j);
                 double distSq = citizenOne.distanceToSqr(citizenTwo);
                 if (distSq < HeatmapTracker.DISTANCE_BETWEEN_CITIZENS_FOR_RECORDING) {
+                    int idA = citizenOne.getId();
+                    int idB = citizenTwo.getId();
+                    long pairKey = ((long) Math.min(idA, idB) << 32) | (Math.max(idA, idB) & 0xFFFFFFFFL);
+                    if (processedPairs.contains(pairKey)) {
+                        continue;
+                    }
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
                 }
             }

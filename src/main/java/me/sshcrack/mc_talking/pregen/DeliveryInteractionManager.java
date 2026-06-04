@@ -152,9 +152,13 @@ public class DeliveryInteractionManager {
                     pd.targetPos.getZ() + 0.5);
             if (distSq > PREGEN_DISTANCE_SQ) continue;
 
-            if (!PlayerHeatmapTracker.isPlayerNearby(world,
-                    pd.targetPos.getX(), pd.targetPos.getY(), pd.targetPos.getZ(),
-                    McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance)) {
+            if (world.getEntitiesOfClass(net.minecraft.server.level.ServerPlayer.class,
+                    new AABB(pd.targetPos.getX() - McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance,
+                            pd.targetPos.getY() - McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance,
+                            pd.targetPos.getZ() - McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance,
+                            pd.targetPos.getX() + McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance,
+                            pd.targetPos.getY() + McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance,
+                            pd.targetPos.getZ() + McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance)).isEmpty()) {
                 continue;
             }
 
@@ -281,9 +285,10 @@ public class DeliveryInteractionManager {
             String itemName,
             int itemCount
     ) {
-        if (!PlayerHeatmapTracker.isPlayerNearby(world,
-                targetPos.getX(), targetPos.getY(), targetPos.getZ(),
-                McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance)) {
+        double range = McTalkingConfig.INSTANCE.instance().pregeneratedGreetingDistance;
+        if (world.getEntitiesOfClass(net.minecraft.server.level.ServerPlayer.class,
+                new AABB(targetPos.getX() - range, targetPos.getY() - range, targetPos.getZ() - range,
+                        targetPos.getX() + range, targetPos.getY() + range, targetPos.getZ() + range)).isEmpty()) {
             return null;
         }
 

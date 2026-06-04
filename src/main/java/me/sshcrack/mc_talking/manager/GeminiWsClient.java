@@ -58,6 +58,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         RECONNECTING,
         CLOSED,
         TERMINAL_ERROR,
+        INVALID_SESSION_TOKEN,
         QUOTA_EXCEEDED
     }
 
@@ -622,6 +623,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         if (reason != null && reason.contains("BidiGenerateContent session")) {
+            McTalking.LOGGER.info("Session token invalidated, clearing and forcing reconnect. Can attempt recovery? {} with state {}", canAttemptRecovery(), wsSessionState);
+            wsSessionState = WsSessionState.INVALID_SESSION_TOKEN;
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
             ensureConnectionForQueuedInput("session token invalidated");
@@ -735,7 +738,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         nextReconnectAllowedAt = System.currentTimeMillis() + currentReconnectBackoffMs();
         setWsSessionState(WsSessionState.RECONNECTING, "reconnect()");
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.RECONNECTING);
-        super.reconnect();
+        getReconnectExecutor().execute(() -> super.reconnect());
     }
 
     public void promptAudioOpus(byte[] audio) {

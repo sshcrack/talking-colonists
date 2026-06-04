@@ -18,10 +18,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PregenerationTaskService {
-    private static volatile boolean isGenerating = false;
+    private static final int MAX_CONCURRENT_PREGENS = 2;
+    private static final AtomicInteger generatingCount = new AtomicInteger(0);
     private static int tickCounter = 0;
+    private static int decayTickCounter = 0;
     private static final Map<UUID, Long> lastThreatPlayTime = new ConcurrentHashMap<>();
 
     /**
@@ -47,9 +50,12 @@ public class PregenerationTaskService {
         tickCounter++;
         if (tickCounter % 200 != 0) return; // Check every 10 seconds
 
-        HeatmapTracker.decayScores();
+        decayTickCounter++;
+        if (decayTickCounter % 600 == 0) {
+            HeatmapTracker.decayScores();
+        }
 
-        if (isGenerating) return;
+        if (generatingCount.get() >= MAX_CONCURRENT_PREGENS) return;
 
         List<HeatmapTracker.UUIDPair> topPairs = HeatmapTracker.getTopPairs(5);
         for (HeatmapTracker.UUIDPair pair : topPairs) {
@@ -65,7 +71,6 @@ public class PregenerationTaskService {
                 if (!hasGreeting(c1.getUUID(), c2.getUUID())) {
                     startPregenerationIfPossible(c1, "Generate a brief 1-sentence passing greeting for your friend " + c2.getCitizenData().getName() + ".", (audio) -> {
                         putGreeting(c1.getUUID(), c2.getUUID(), audio);
-                        isGenerating = false;
                     });
                     return;
                 }
@@ -74,7 +79,6 @@ public class PregenerationTaskService {
                 if (!hasGreeting(c2.getUUID(), c1.getUUID())) {
                     startPregenerationIfPossible(c2, "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".", (audio) -> {
                         putGreeting(c2.getUUID(), c1.getUUID(), audio);
-                        isGenerating = false;
                     });
                     return;
                 }
@@ -91,6 +95,9 @@ public class PregenerationTaskService {
             return;
         }
 
+        if (generatingCount.get() >= MAX_CONCURRENT_PREGENS)
+            return;
+
         if (!ConversationManager.hasFreeCapacity(1))
             return;
 
@@ -98,14 +105,15 @@ public class PregenerationTaskService {
             return;
         }
 
-        isGenerating = true;
+        generatingCount.incrementAndGet();
         McTalking.LOGGER.info("[Pregeneration] Starting audio pregeneration for citizen {}", citizen.getUUID());
 
         PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, audio -> {
             ConversationManager.releaseSlot(citizen);
+            generatingCount.decrementAndGet();
             onComplete.accept(audio);
         }, () -> {
-            isGenerating = false;
+            generatingCount.decrementAndGet();
             ConversationManager.releaseSlot(citizen);
         });
 
@@ -113,7 +121,7 @@ public class PregenerationTaskService {
             client.connect();
         } catch (Exception e) {
             McTalking.LOGGER.error("[Pregeneration] Failed to connect for citizen {}", citizen.getUUID(), e);
-            isGenerating = false;
+            generatingCount.decrementAndGet();
             ConversationManager.releaseSlot(citizen);
         }
     }
@@ -166,8 +174,6 @@ public class PregenerationTaskService {
             } else {
                 lastThreatPlayTime.remove(citizen.getUUID());
             }
-
-            isGenerating = false;
         });
     }
 
@@ -226,13 +232,14 @@ public class PregenerationTaskService {
     }
 
     public static boolean isPregenerating() {
-        return isGenerating;
+        return generatingCount.get() > 0;
     }
 
     public static void cleanup() {
         lastThreatPlayTime.clear();
-        isGenerating = false;
+        generatingCount.set(0);
         tickCounter = 0;
+        decayTickCounter = 0;
         lastGreetingPlayTime.clear();
         greetingCache.clear();
     }
