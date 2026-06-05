@@ -72,12 +72,14 @@ public class AITools {
                 new DescribeSurroundingsAction(),
                 new EndConversationAction(),
                 new RecordRelationshipChange(),
-                new AddEventToMemory()
+                new AddEventToMemory(),
+                new RecommendJobAction()
 //                new JobSpecificAction()
         ));
         addAll(playerConversationOnlyTools, List.of(
                 new DropItemAction(),
-                new LeaveColonyAction()
+                new LeaveColonyAction(),
+                new InitiateBroadcastAction()
         ));
     }
 }

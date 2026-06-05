@@ -171,7 +171,7 @@ public class McTalkingConfig {
     @DoubleField(min = 1.0, max = 100.0)
     @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble/start a conversation etc when a player is nearby")
     //TODO this is also used for greetings between citizens
-    public double mumblingDetectionRange = 10.0;
+    public double citizenInteractionRange = 10.0;
 
     @AutoGen(category = "citizens", group = "mumbling")
     @IntField(min = 1, max = 10000)
@@ -261,6 +261,58 @@ public class McTalkingConfig {
     @IntField(min = 0, max = 7200)
     @SerialEntry(comment = "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.")
     public int colonyEventWindowSeconds = 1200;
+
+    // Rumor Mill
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will share memories with each other as rumors, creating a living information ecosystem.")
+    public boolean enableRumorMill = true;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 1, max = 72000)
+    @SerialEntry(comment = "How often (in server ticks) to check for rumor propagation between nearby citizens. 20 ticks = 1 second.")
+    public int rumorMillCheckIntervalTicks = 600;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleField(min = 1.0, max = 50.0)
+    @SerialEntry(comment = "Maximum distance in blocks for rumor propagation between citizens.")
+    public double rumorMillRange = 8.0;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Chance (0.0-1.0) that rumors are shared between a pair of nearby citizens per check.")
+    public double rumorMillChancePerPair = 0.4;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum number of rumor propagations per tick to bound server cost.")
+    public int rumorMillMaxPropagationsPerTick = 3;
+
+    // Broadcast System
+    @AutoGen(category = "citizens", group = "broadcast")
+    @TickBox
+    @SerialEntry(comment = "If true, players can ask citizens to broadcast messages across the colony, which propagate through citizen-to-citizen interactions.")
+    public boolean enableBroadcastPropagation = true;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 1, max = 72000)
+    @SerialEntry(comment = "How often (in server ticks) to check for broadcast propagation between citizens. 20 ticks = 1 second.")
+    public int broadcastPropagationIntervalTicks = 300;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum number of broadcast propagations per tick.")
+    public int broadcastMaxPropagationsPerTick = 5;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 0, max = 20)
+    @SerialEntry(comment = "How many of the most recent broadcasts to include in a citizen's prompt.")
+    public int maxBroadcastsInPrompt = 3;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum broadcasts stored per citizen. Oldest discarded when limit reached.")
+    public int maxBroadcastsStored = 20;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
     public int configVersion = 2;

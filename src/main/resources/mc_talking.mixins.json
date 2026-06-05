@@ -14,7 +14,8 @@
     "RaidManagerMixin",
     "ServerEntityMixin",
     "SoundUtilsMixin",
-    "AbstractRequestMixin"
+    "AbstractRequestMixin",
+    "UpdateRequestStateMixin"
   ],
   "injectors": {
     "defaultRequire": 1
