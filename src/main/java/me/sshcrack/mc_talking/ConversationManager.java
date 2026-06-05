@@ -564,6 +564,7 @@ public class ConversationManager {
         }
 
         playerConversationPartners.put(playerId, citizenId);
+        urgentContactConversations.remove(citizenId);
     }
 
     /**
