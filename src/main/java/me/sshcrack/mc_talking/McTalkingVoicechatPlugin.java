@@ -49,7 +49,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     // Whether this entity is currently in a speaking state
     private final Map<UUID, Boolean> isSpeaking = new ConcurrentHashMap<>();
 
-    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledExecutorService executor;
 
     // Silence duration in milliseconds
     private static final long SILENCE_DURATION_MS = 2000;
@@ -73,12 +73,15 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     }
 
     public void onStop(VoicechatServerStoppedEvent event) {
-        executor.shutdownNow();
+        if (executor != null) executor.shutdownNow();
         CitizenMemoryGenerator.stopAllGenerators();
         PlayerConversationMemoryGenerator.stopAllGenerators();
     }
 
     public void onServerStarted(VoicechatServerStartedEvent event) {
+        if (executor == null || executor.isShutdown()) {
+            executor = Executors.newSingleThreadScheduledExecutor();
+        }
         // Start a periodic task to check for speech end and schedule silence packets
         executor.scheduleAtFixedRate(this::checkForSpeechEnd,
                 PERIODIC_SILENCE_CHECK_MS, PERIODIC_SILENCE_CHECK_MS, TimeUnit.MILLISECONDS);
