@@ -100,6 +100,14 @@ public class ConversationManager {
     private static final Set<UUID> busyEntities = ConcurrentHashMap.newKeySet();
 
     /**
+     * Citizen UUIDs whose active conversation originated from the urgent-contact
+     * walk-to-player system. Only these conversations should be auto-aborted by
+     * {@link me.sshcrack.mc_talking.ServerEventHandler#checkUrgentContactAbort}
+     * when the citizen's needs are resolved.
+     */
+    private static final Set<UUID> urgentContactConversations = ConcurrentHashMap.newKeySet();
+
+    /**
      * Citizen UUID → handler that aborts a non-WebSocket session (e.g. Flash/TTS
      * conversation) so a player conversation can take over.
      */
@@ -166,6 +174,7 @@ public class ConversationManager {
     }
 
     public static synchronized void releaseSlot(UUID entityId) {
+        urgentContactConversations.remove(entityId);
         if (addedEntities.remove(entityId)) {
             McTalking.LOGGER.info("[ConversationManager] Freed slot for entity {}", entityId);
         }
@@ -457,6 +466,9 @@ public class ConversationManager {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
         if (!canCitizenSpeak(citizen)) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
+        if (clients.containsKey(citizen.getUUID())) {
+            urgentContactConversations.add(citizen.getUUID());
+        }
     }
 
     /**
@@ -564,6 +576,7 @@ public class ConversationManager {
         UUID citizenId = playerConversationPartners.remove(playerId);
         if (citizenId == null) return;
 
+        urgentContactConversations.remove(citizenId);
         citizenToPlayer.remove(citizenId);
         GeminiWsClient client = clients.remove(citizenId);
         if (client != null) client.close();
@@ -612,6 +625,14 @@ public class ConversationManager {
 
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {
         return activeEntity.get(playerId);
+    }
+
+    /**
+     * @return {@code true} if the given citizen's conversation originated from
+     * the urgent-contact walk-to-player system
+     */
+    public static boolean isUrgentConversation(UUID citizenId) {
+        return urgentContactConversations.contains(citizenId);
     }
 
     /**

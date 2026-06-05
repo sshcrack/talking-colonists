@@ -723,6 +723,10 @@ public class ServerEventHandler {
         AbstractEntityCitizen citizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         if (citizen == null || citizen.getCitizenData() == null) return;
 
+        // Only auto-abort conversations that originated from the urgent-contact
+        // walk-to-player system — not player-initiated chats via the Talking Device.
+        if (!ConversationManager.isUrgentConversation(citizen.getUUID())) return;
+
         if (calculateUrgencyWeight(citizen) <= 0) {
             McTalking.LOGGER.info("[CitizenContact] Urgent need resolved during conversation for citizen {}",
                     citizen.getCitizenData().getName());
