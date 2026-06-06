@@ -24,7 +24,15 @@ jobs:
           path: build-artifacts
 
       - name: Generate PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[] | select(.name=="build-artifacts") | .id' | head -n1)
+          artifact_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          if [ -n "$artifact_id" ]; then
+            artifact_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/$artifact_id"
+          fi
+
           echo "## Build Artifacts" > comment.md
           echo "" >> comment.md
           echo "These JARs were built from this PR:" >> comment.md
@@ -34,7 +42,7 @@ jobs:
           find build-artifacts -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" -type f | sort | while read jar; do
             name=$(basename "$jar")
             size=$(du -h "$jar" | cut -f1)
-            echo "| \`$name\` | $size |" >> comment.md
+            echo "| [\`$name\`]($artifact_url) | $size |" >> comment.md
           done
           echo "" >> comment.md
           echo "Download from the [GitHub Actions run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)." >> comment.md
@@ -44,4 +52,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body-file comment.md
+          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file comment.md

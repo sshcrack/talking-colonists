@@ -53,6 +53,12 @@ public class CitizenWsClient extends GeminiWsClient {
     private boolean playerInputStarted = false;
 
     /**
+     * The player whose name was most recently announced to the AI.
+     * Used to avoid re-announcing the same player on every audio packet.
+     */
+    private UUID lastAnnouncedPlayerId = null;
+
+    /**
      * {@code true} when the session was opened in system-controlled (mumbling) mode.
      * Determines which system prompt is used at connection time.
      */
@@ -113,6 +119,23 @@ public class CitizenWsClient extends GeminiWsClient {
         this.player = player;
         this.onSystemConversationEnded = null;
         this.playerInputStarted = false;
+        this.lastAnnouncedPlayerId = null;
+    }
+
+    /**
+     * If {@code speaker} is different from the last player the AI was told
+     * about, injects a short text attribution so the AI knows who is speaking.
+     * Safe to call before every audio or text chunk — it is a no-op when the
+     * speaker has not changed.
+     */
+    public void announcePlayerIfChanged(ServerPlayer speaker) {
+        if (speaker == null) return;
+        UUID speakerId = speaker.getUUID();
+        if (speakerId.equals(lastAnnouncedPlayerId)) return;
+        lastAnnouncedPlayerId = speakerId;
+        String name = speaker.getName().getString();
+        String attribution = "[" + name + " is now speaking to you]";
+        addPromptTextImmediate(attribution);
     }
 
     // -------------------------------------------------------------------------
