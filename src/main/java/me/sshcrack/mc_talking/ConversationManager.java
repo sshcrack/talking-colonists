@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking;
 
-import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -10,16 +9,15 @@ import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -388,48 +386,8 @@ public class ConversationManager {
         return (System.currentTimeMillis() - lastEnd) < cooldownMs;
     }
 
-    /**
-     * Computes a signature string representing the citizen's current urgent needs.
-     * If this signature changes between sessions, the cooldown is cleared so the
-     * citizen can immediately contact about a new problem.
-     */
     public static String computeNeedSignature(AbstractEntityCitizen citizen) {
-        var data = citizen.getCitizenData();
-        if (data == null) return "none";
-
-        List<String> needs = new ArrayList<>();
-
-        if (data.getJobStatus() == JobStatus.STUCK) needs.add("stuck");
-        if (data.getCitizenDiseaseHandler().isSick()) needs.add("sick");
-
-        double saturation = data.getSaturation();
-        if (saturation <= 1) {
-            needs.add("starving");
-        } else if (saturation <= 3) {
-            needs.add("hungry");
-        }
-
-        if (data.getHomeBuilding() == null) needs.add("homeless");
-
-        double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
-        if (happiness < 3.0) {
-            needs.add("very_unhappy");
-        } else if (happiness < 5.0) {
-            needs.add("unhappy");
-        }
-
-        var entityOpt = data.getEntity();
-        if (entityOpt.isPresent()) {
-            double healthPercent = (entityOpt.get().getHealth() / Math.max(1.0, entityOpt.get().getMaxHealth())) * 100.0;
-            if (healthPercent < 25.0) {
-                needs.add("low_health");
-            } else if (healthPercent < 50.0) {
-                needs.add("medium_health");
-            }
-        }
-
-        if (needs.isEmpty()) needs.add("none");
-        return String.join(",", needs);
+        return CitizenNeedAssessor.computeNeedSignature(citizen);
     }
 
     // -------------------------------------------------------------------------
