@@ -147,6 +147,9 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
         UUID entityId = entity.getUUID();
 
+        McTalking.LOGGER.info("[Voicechat] Player '{}' ({}) sending audio to entity {} (manager={})",
+                player.getName().getString(), player.getUUID(), entityId, manager.getClass().getSimpleName());
+
         // Process the voice packet
         byte[] opusData = packet.getOpusEncodedData();
         boolean hasVoiceActivity = hasVoiceActivity(opusData);

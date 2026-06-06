@@ -134,6 +134,7 @@ public class CitizenWsClient extends GeminiWsClient {
         if (speakerId.equals(lastAnnouncedPlayerId)) return;
         lastAnnouncedPlayerId = speakerId;
         String name = speaker.getName().getString();
+        McTalking.LOGGER.info("[CitizenWsClient] Player changed -> announcing '{}' to AI for citizen {}", name, getEntity().getUUID());
         String attribution = "[" + name + " is now speaking to you]";
         addPromptTextImmediate(attribution);
     }
