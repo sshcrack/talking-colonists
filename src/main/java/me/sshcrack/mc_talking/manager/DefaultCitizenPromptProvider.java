@@ -372,7 +372,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         var relation = view.playerRelation();
         if (relation != null) {
-            prompt.append("- Address player as ").append(relation.playerName()).append(", he has the role of a ").append(relation.rankName()).append("\n");
+            prompt.append("- The colony has multiple players. When someone speaks to you, a context message like [PlayerName is now speaking to you] will appear. Always address that person by their announced name.\n");
+            prompt.append("- Default speaking player: ").append(relation.playerName()).append(" (role: ").append(relation.rankName()).append(")\n");
 
             if (relation.hostile()) {
                 prompt.append("- Be guarded and suspicious toward the player\n");
