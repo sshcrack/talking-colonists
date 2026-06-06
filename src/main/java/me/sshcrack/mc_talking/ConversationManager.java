@@ -7,7 +7,7 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
-import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
+import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
@@ -84,6 +84,11 @@ public class ConversationManager {
     /**
      * Insertion-ordered queue of all occupied citizen slots.
      * The head (oldest) is the first eviction candidate.
+     *
+     * <p>This set can diverge from {@link #clients}: {@link #claimSlot} adds to
+     * {@code addedEntities} before a client is created, and {@link #registerExternalClient}
+     * adds to {@code clients} without touching this set. {@link #isCitizenBusy} checks
+     * both, so either being present is sufficient to prevent double-booking.</p>
      */
     private static final Set<UUID> addedEntities = new LinkedHashSet<>();
 
@@ -243,6 +248,8 @@ public class ConversationManager {
 
         UUID playerId = getPlayerForEntity(entityId);
         if (playerId != null) {
+            // Re-add entityId because endConversation -> releaseSlot will remove it.
+            // This keeps the slot reserved (counted) during the tear-down sequence.
             addedEntities.add(entityId);
             endConversation(playerId, false);
             return;
@@ -436,8 +443,7 @@ public class ConversationManager {
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, boolean isPlayerRequest) {
         return !citizen.isSleeping()
                 && !(citizen instanceof VisitorCitizen)
-                && (isPlayerRequest || !isCitizenOnCooldown(citizen))
-                && (isPlayerRequest || !isCitizenBusy(citizen));
+                && (isPlayerRequest || (!isCitizenOnCooldown(citizen) && !isCitizenBusy(citizen)));
     }
 
 
@@ -550,7 +556,7 @@ public class ConversationManager {
             // High-priority claim (may evict an older non-player slot if at capacity)
             claimSlot(citizen, true);
             var ws = new CitizenWsClient(
-                    new CitzienEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
+                    new CitizenEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
                     citizen, player);
 
             clients.put(citizenId, ws);

@@ -9,12 +9,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
-public class CitzienEntityAudioProvider implements AudioProvider {
+public class CitizenEntityAudioProvider implements AudioProvider {
     private final AbstractEntityCitizen entity;
     @Nullable
     private final String channelId;
 
-    public CitzienEntityAudioProvider(AbstractEntityCitizen entity, @Nullable String channelId) {
+    public CitizenEntityAudioProvider(AbstractEntityCitizen entity, @Nullable String channelId) {
         this.entity = entity;
         this.channelId = channelId;
     }

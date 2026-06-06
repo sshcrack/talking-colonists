@@ -7,7 +7,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
-import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
+import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 
 import java.util.Map;
 import java.util.UUID;
@@ -35,7 +35,7 @@ public class PregenerationPlayback {
 
         try {
             McTalking.LOGGER.info("Playing back pregenerated audio for {}", citizen.getCitizenData().getName());
-            AudioProvider audioProvider = new CitzienEntityAudioProvider(citizen, null);
+            AudioProvider audioProvider = new CitizenEntityAudioProvider(citizen, null);
             AudioChannel channel = audioProvider.createChannel();
             if (channel == null) {
                 releasePlaybackSlot(citizenId);

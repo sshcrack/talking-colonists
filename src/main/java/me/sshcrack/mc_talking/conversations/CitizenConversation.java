@@ -9,7 +9,7 @@ import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.ConversationMode;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.GeminiStream;
-import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
+import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
@@ -257,11 +257,11 @@ public class CitizenConversation {
                 """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
 
         LiveConversationWsClient clientA = new LiveConversationWsClient(
-                new CitzienEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
+                new CitizenEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
                 citizenA, sharedTurnCounter, onClientEnded);
 
         LiveConversationWsClient clientB = new LiveConversationWsClient(
-                new CitzienEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
+                new CitizenEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
                 citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
 
         clientA.setPeer(clientB);

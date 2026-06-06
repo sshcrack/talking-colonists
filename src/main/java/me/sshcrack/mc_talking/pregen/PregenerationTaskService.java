@@ -6,7 +6,6 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
@@ -228,9 +227,7 @@ public class PregenerationTaskService {
             if (max > 0 && friends.size() > max) {
                 Iterator<UUID> it = friends.keySet().iterator();
                 if (it.hasNext()) {
-                    @SuppressWarnings("unused")
-                    UUID oldest = it.next();
-
+                    it.next();
                     it.remove();
                 }
             }
@@ -300,13 +297,7 @@ public class PregenerationTaskService {
     }
 
     private static AbstractEntityCitizen findCitizen(MinecraftServer server, java.util.UUID uuid) {
-        for (ServerLevel level : server.getAllLevels()) {
-            Entity entity = level.getEntity(uuid);
-            if (entity instanceof AbstractEntityCitizen citizen) {
-                return citizen;
-            }
-        }
-        return null;
+        return CitizenHelper.findCitizen(server, uuid);
     }
 
     private static ServerPlayer findPlayer(MinecraftServer server, java.util.UUID uuid) {

@@ -80,6 +80,8 @@ public final class ColonyEventBuffer {
     /**
      * Removes all stored data for a specific colony.
      * Call this when a colony is deleted to prevent memory leaks.
+     *
+     * TODO: Wire this up to a colony-deletion event listener.
      */
     public static void removeColony(int colonyId) {
         events.remove(colonyId);

@@ -319,7 +319,7 @@ public class ServerEventHandler {
                     int idA = citizenOne.getId();
                     int idB = citizenTwo.getId();
                     long pairKey = ((long) Math.min(idA, idB) << 32) | (Math.max(idA, idB) & 0xFFFFFFFFL);
-                    if (processedPairs.contains(pairKey)) {
+                    if (!processedPairs.add(pairKey)) {
                         continue;
                     }
                     HeatmapTracker.recordProximity(citizenOne.getUUID(), citizenTwo.getUUID());
@@ -710,13 +710,7 @@ public class ServerEventHandler {
 
     @Nullable
     private AbstractEntityCitizen findWalkingCitizenEntity(MinecraftServer server, UUID citizenId) {
-        for (var p : server.getPlayerList().getPlayers()) {
-            var e = p.serverLevel().getEntities().get(citizenId);
-            if (e instanceof AbstractEntityCitizen c) {
-                return c;
-            }
-        }
-        return null;
+        return CitizenHelper.findCitizen(server, citizenId);
     }
 
     private void checkUrgentContactAbort(ServerPlayer player) {
