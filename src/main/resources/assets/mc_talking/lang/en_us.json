@@ -214,6 +214,9 @@
   "yacl3.config.mc_talking:config.maxPregeneratedGreetingsPerCitizen": "Max Pregenerated Greetings Per Citizen",
   "yacl3.config.mc_talking:config.maxPregeneratedGreetingsPerCitizen.desc": "Maximum number of cached pregenerated greetings stored per citizen. Oldest greetings are discarded when this limit is reached.",
 
+  "yacl3.config.mc_talking:config.maxGreetingsPerTickInterval": "Max Greetings Per Tick Interval",
+  "yacl3.config.mc_talking:config.maxGreetingsPerTickInterval.desc": "Maximum number of pregenerated citizen-to-citizen greetings that may play in a single tick interval. Increase only if you have a very large colony and want more ambient chatter.",
+
   "yacl3.config.mc_talking:config.category.citizens.group.voice_chat": "Voice Chat",
   "yacl3.config.mc_talking:config.citizenVoiceWhisper": "Citizen Voice Whisper",
   "yacl3.config.mc_talking:config.citizenVoiceWhisper.desc": "Marks the citizens voice channel as a whisper, which has a smaller default radius",

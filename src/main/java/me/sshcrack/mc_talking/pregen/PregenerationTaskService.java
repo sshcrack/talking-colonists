@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,6 +55,19 @@ public class PregenerationTaskService {
     private static final long PLAYER_GREETING_PLAY_COOLDOWN_MS = 60_000L;
     private static final Map<String, AudioChunk> playerGreetingCache = new ConcurrentHashMap<>();
 
+    /**
+     * Tracks which greeting cache keys are currently being regenerated.
+     * Key format is {@code "greeterUUID:greetedUUID"}. Prevents duplicate
+     * concurrent regeneration for the same pair. The entry is removed when
+     * {@link #replaceGreeting} or {@link #replacePlayerGreeting} is called.
+     */
+    private static final Set<String> pendingRegen = ConcurrentHashMap.newKeySet();
+
+    private static final String PLAYER_GREETING_PROMPT = "You are greeting %s who has just approached you. "
+            + "Generate a single brief greeting sentence that authentically reflects your current mood, "
+            + "health, concerns, and relationship with this person. "
+            + "Do not use markdown. Stay in character.";
+
     public static void tick(MinecraftServer server) {
         tickCounter++;
         if (tickCounter % 200 != 0) return;
@@ -75,12 +89,11 @@ public class PregenerationTaskService {
                 if (citizen != null && player != null) {
                     if (ConversationManager.isCitizenBusy(citizen)) continue;
 
-                    String cacheKey = pair.citizenId() + ":" + pair.playerId();
-                    if (!playerGreetingCache.containsKey(cacheKey)) {
+                    if (!hasPlayerGreeting(pair.citizenId(), pair.playerId())) {
                         String playerName = player.getName().getString();
                         startPregenerationIfPossible(citizen,
-                                "Generate a brief 1-sentence greeting for " + playerName + " who is approaching you. Greet them by name and say hello, you're happy to see them.",
-                                (audio) -> putPlayerGreeting(pair.citizenId(), pair.playerId(), audio),
+                                PLAYER_GREETING_PROMPT.formatted(playerName),
+                                (audio) -> replacePlayerGreeting(pair.citizenId(), pair.playerId(), audio),
                                 false, true);
                         return;
                     }
@@ -95,12 +108,11 @@ public class PregenerationTaskService {
                         if (!(entity instanceof AbstractEntityCitizen citizen)) continue;
                         if (ConversationManager.isCitizenBusy(citizen)) continue;
 
-                        String cacheKey = citizen.getUUID() + ":" + player.getUUID();
-                        if (!playerGreetingCache.containsKey(cacheKey)) {
+                        if (!hasPlayerGreeting(citizen.getUUID(), player.getUUID())) {
                             String playerName = player.getName().getString();
                             startPregenerationIfPossible(citizen,
-                                    "Generate a brief 1-sentence greeting for " + playerName + " who is approaching you. Greet them by name and say hello, you're happy to see them.",
-                                    (audio) -> putPlayerGreeting(citizen.getUUID(), player.getUUID(), audio),
+                                    PLAYER_GREETING_PROMPT.formatted(playerName),
+                                    (audio) -> replacePlayerGreeting(citizen.getUUID(), player.getUUID(), audio),
                                     false, true);
                             return;
                         }
@@ -122,7 +134,7 @@ public class PregenerationTaskService {
                     if (!hasGreeting(c1.getUUID(), c2.getUUID())) {
                         startPregenerationIfPossible(c1,
                                 "Generate a brief 1-sentence passing greeting for your friend " + c2.getCitizenData().getName() + ".",
-                                (audio) -> putGreeting(c1.getUUID(), c2.getUUID(), audio),
+                                (audio) -> replaceGreeting(c1.getUUID(), c2.getUUID(), audio),
                                 false, false);
                         return;
                     }
@@ -130,7 +142,7 @@ public class PregenerationTaskService {
                     if (!hasGreeting(c2.getUUID(), c1.getUUID())) {
                         startPregenerationIfPossible(c2,
                                 "Generate a brief 1-sentence passing greeting for your friend " + c1.getCitizenData().getName() + ".",
-                                (audio) -> putGreeting(c2.getUUID(), c1.getUUID(), audio),
+                                (audio) -> replaceGreeting(c2.getUUID(), c1.getUUID(), audio),
                                 false, false);
                         return;
                     }
@@ -139,19 +151,19 @@ public class PregenerationTaskService {
         }
     }
 
-    private static void startPregenerationIfPossible(AbstractEntityCitizen citizen, String prompt,
-                                                      java.util.function.Consumer<AudioChunk> onComplete,
-                                                      boolean isThreat, boolean isPlayerGreeting) {
-        if (!McTalkingConfig.hasGeminiApiKey()) return;
+    private static boolean startPregenerationIfPossible(AbstractEntityCitizen citizen, String prompt,
+                                                         java.util.function.Consumer<AudioChunk> onComplete,
+                                                         boolean isThreat, boolean isPlayerGreeting) {
+        if (!McTalkingConfig.hasGeminiApiKey()) return false;
 
         AvailableAI model;
         if (isThreat) {
             model = McTalkingConfig.INSTANCE.instance().currentAiModel;
-            if (!ConversationManager.claimSlot(citizen, false)) return;
+            if (!ConversationManager.claimSlot(citizen, false)) return false;
         } else {
             model = McTalkingConfig.CHEAP_LIVE_MODEL;
-            if (QuotaTracker.isQuotaExceeded(model.getName())) return;
-            if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return;
+            if (QuotaTracker.isQuotaExceeded(model.getName())) return false;
+            if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return false;
         }
 
         generatingCount.incrementAndGet();
@@ -180,12 +192,14 @@ public class PregenerationTaskService {
             if (!isThreat) {
                 ConversationManager.registerBackgroundClient(citizen.getUUID(), client);
             }
+            return true;
         } catch (Exception e) {
             McTalking.LOGGER.error("[Pregeneration] Failed to connect for citizen {}", citizen.getUUID(), e);
             if (isThreat) ConversationManager.releaseSlot(citizen);
             else ConversationManager.releaseBackgroundSlot(citizen.getUUID());
             generatingCount.decrementAndGet();
             if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+            return false;
         }
     }
 
@@ -256,52 +270,63 @@ public class PregenerationTaskService {
         lastGreetingPlayTime.put(greeterId + ":" + greetedId, System.currentTimeMillis());
     }
 
-    public static void putGreeting(UUID citizenId, UUID friendId, AudioChunk audioData) {
+    public static boolean hasGreeting(UUID citizenId, UUID friendId) {
+        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
+        return friends != null && friends.containsKey(friendId);
+    }
+
+    /**
+     * Returns the cached greeting audio WITHOUT removing it from the cache.
+     * The entry stays alive until {@link #replaceGreeting} atomically swaps it.
+     */
+    public static AudioChunk peekGreeting(UUID citizenId, UUID friendId) {
+        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
+        if (friends == null) return null;
+        synchronized (friends) {
+            return friends.get(friendId);
+        }
+    }
+
+    /**
+     * Atomically replaces the greeting for (citizenId, friendId) with newAudio,
+     * or simply stores it if none existed. Also clears the pendingRegen flag.
+     */
+    public static void replaceGreeting(UUID citizenId, UUID friendId, AudioChunk newAudio) {
+        String regenKey = citizenId + ":" + friendId;
         Map<UUID, AudioChunk> friends = greetingCache.computeIfAbsent(citizenId, k -> Collections.synchronizedMap(new LinkedHashMap<>()));
         synchronized (friends) {
-            friends.put(friendId, audioData);
+            friends.put(friendId, newAudio);
             int max = McTalkingConfig.INSTANCE.instance().maxPregeneratedGreetingsPerCitizen;
             if (max > 0 && friends.size() > max) {
                 Iterator<UUID> it = friends.keySet().iterator();
                 if (it.hasNext()) {
-                    @SuppressWarnings("unused")
-                    UUID oldest = it.next();
-
+                    it.next();
                     it.remove();
                 }
             }
         }
-    }
-
-    public static AudioChunk popGreeting(UUID citizenId, UUID friendId) {
-        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
-        if (friends != null) {
-            synchronized (friends) {
-                AudioChunk data = friends.remove(friendId);
-                if (friends.isEmpty()) {
-                    greetingCache.remove(citizenId);
-                }
-                return data;
-            }
-        }
-        return null;
-    }
-
-    public static boolean hasGreeting(UUID citizenId, UUID friendId) {
-        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
-        return friends != null && friends.containsKey(friendId);
+        pendingRegen.remove(regenKey);
     }
 
     public static boolean hasPlayerGreeting(UUID citizenId, UUID playerId) {
         return playerGreetingCache.containsKey(citizenId + ":" + playerId);
     }
 
-    public static AudioChunk popPlayerGreeting(UUID citizenId, UUID playerId) {
-        return playerGreetingCache.remove(citizenId + ":" + playerId);
+    /**
+     * Returns the cached player greeting audio WITHOUT removing it from the cache.
+     * The entry stays alive until {@link #replacePlayerGreeting} atomically swaps it.
+     */
+    public static AudioChunk peekPlayerGreeting(UUID citizenId, UUID playerId) {
+        return playerGreetingCache.get(citizenId + ":" + playerId);
     }
 
-    public static void putPlayerGreeting(UUID citizenId, UUID playerId, AudioChunk audioData) {
-        playerGreetingCache.put(citizenId + ":" + playerId, audioData);
+    /**
+     * Atomically replaces the player greeting for (citizenId, playerId) with newAudio,
+     * or simply stores it if none existed. Also clears the pendingRegen flag.
+     */
+    public static void replacePlayerGreeting(UUID citizenId, UUID playerId, AudioChunk newAudio) {
+        playerGreetingCache.put(citizenId + ":" + playerId, newAudio);
+        pendingRegen.remove(citizenId + ":" + playerId);
     }
 
     public static boolean isPlayerGreetingOnCooldown(UUID citizenId, UUID playerId) {
@@ -315,11 +340,42 @@ public class PregenerationTaskService {
     }
 
     public static void generatePlayerGreetingNow(AbstractEntityCitizen citizen, String playerName, java.util.function.Consumer<AudioChunk> onComplete) {
-        String prompt = "You are greeting " + playerName + " who has just approached you. " +
-                "Generate a single brief greeting sentence that authentically reflects your current mood, " +
-                "health, concerns, and relationship with this person. " +
-                "Do not use markdown. Stay in character.";
-        startPregenerationIfPossible(citizen, prompt, onComplete, false, true);
+        startPregenerationIfPossible(citizen, PLAYER_GREETING_PROMPT.formatted(playerName), onComplete, false, true);
+    }
+
+    /**
+     * Schedules a background regeneration of the citizen-to-citizen greeting.
+     * The existing cached greeting (if any) is kept intact until the new one
+     * arrives and is atomically swapped in via {@link #replaceGreeting}.
+     * No-ops if a regen for this pair is already in flight.
+     */
+    public static void scheduleGreetingRegen(AbstractEntityCitizen greeter, AbstractEntityCitizen greeted) {
+        String key = greeter.getUUID() + ":" + greeted.getUUID();
+        if (!pendingRegen.add(key)) return;
+
+        String prompt = "Generate a brief 1-sentence passing greeting for your friend "
+            + greeted.getCitizenData().getName() + ".";
+        boolean started = startPregenerationIfPossible(greeter, prompt, audio -> {
+            replaceGreeting(greeter.getUUID(), greeted.getUUID(), audio);
+        }, false, false);
+        if (!started) pendingRegen.remove(key);
+    }
+
+    /**
+     * Schedules a background regeneration of the citizen-to-player greeting.
+     * The existing cached greeting (if any) is kept intact until the new one
+     * arrives and is atomically swapped in via {@link #replacePlayerGreeting}.
+     * No-ops if a regen for this pair is already in flight.
+     */
+    public static void schedulePlayerGreetingRegen(AbstractEntityCitizen citizen, ServerPlayer player) {
+        String key = citizen.getUUID() + ":" + player.getUUID();
+        if (!pendingRegen.add(key)) return;
+
+        String playerName = player.getName().getString();
+        boolean started = startPregenerationIfPossible(citizen, PLAYER_GREETING_PROMPT.formatted(playerName), audio -> {
+            replacePlayerGreeting(citizen.getUUID(), player.getUUID(), audio);
+        }, false, true);
+        if (!started) pendingRegen.remove(key);
     }
 
     public static boolean isPregenerating() {
@@ -347,6 +403,7 @@ public class PregenerationTaskService {
         greetingCache.clear();
         lastPlayerGreetingPlayTime.clear();
         playerGreetingCache.clear();
+        pendingRegen.clear();
         PlayerHeatmapTracker.clear();
     }
 
