@@ -8,7 +8,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class ListCitizenAction extends FunctionAction {
+public class ListCitizenAction extends GeneralFunctionAction {
     public ListCitizenAction() {
         super("list_citizens", "Listens all citizens in the colony by their names.");
     }

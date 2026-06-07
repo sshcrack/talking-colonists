@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashMap;
 import java.util.List;
 
-public class GetColonyAction extends FunctionAction {
+public class GetColonyAction extends GeneralFunctionAction {
     public GetColonyAction() {
         super("get_colony", "Gets information about the colony. If no colony ID is provided, it returns the colony the citizen is currently living in. This includes the name of the colony, buildings, maxCitizens, overallHappiness and other useful information.",
                 new ObjectProperty(new HashMap<>() {{

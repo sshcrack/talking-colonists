@@ -18,7 +18,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.stream.Collectors;
 
-public class GetInventoryAction extends FunctionAction {
+public class GetInventoryAction extends GeneralFunctionAction {
     public GetInventoryAction() {
         super("get_inventory", "Lists the current items in your inventory.");
     }

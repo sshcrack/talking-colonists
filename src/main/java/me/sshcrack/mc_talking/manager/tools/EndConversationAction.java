@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class EndConversationAction extends FunctionAction {
+public class EndConversationAction extends GeneralFunctionAction {
     public EndConversationAction() {
         super("end_conversation", """
                 This will end the conversation. The peer you are talking to isn't able to respond after. Only use if you are sure you want to end the conversation.

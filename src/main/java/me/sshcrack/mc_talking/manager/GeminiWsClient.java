@@ -287,9 +287,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         setup.systemInstruction = sys;
 
-        boolean isPlayer = resolveActivePlayer() != null;
-        McTalking.LOGGER.info("Adding tools (player enabled {})", isPlayer);
-        setup.tools.addAll(AITools.getEnabledTools(isPlayer));
+        setup.tools.addAll(AITools.getEnabledTools());
 
         return setup;
     }
@@ -573,11 +571,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public JsonObject onFunctionCall(String name, @Nullable JsonObject args) {
         var colony = this.entity.getCitizenColonyHandler().getColony();
 
-        var action = AITools.registeredFunctions.get(name);
+        var action = AITools.getAction(name);
         if (action == null) {
             McTalking.LOGGER.warn("Unknown function call: {}", name);
             var error = new JsonObject();
             error.addProperty("error", "Unknown function: " + name);
+            return error;
+        }
+
+        if (AITools.isPlayerOnlyAction(name) && resolveActivePlayer() == null) {
+            McTalking.LOGGER.warn("Player-only tool {} called without active player", name);
+            var error = new JsonObject();
+            error.addProperty("error", "You cannot use this tool until a player is speaking to you directly.");
             return error;
         }
 
