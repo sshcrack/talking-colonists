@@ -229,11 +229,6 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Distance in blocks within which a citizen will trigger their pregenerated player greeting.")
     public double playerGreetingDistance = 8.0;
 
-    @AutoGen(category = "citizens", group = "pregeneration")
-    @IntField(min = 0, max = 600)
-    @SerialEntry(comment = "Cooldown in seconds between pregenerated player greetings for the same citizen-player pair.")
-    public int playerGreetingCooldownSeconds = 60;
-
     @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
     @SerialEntry(comment = "If true, citizens will whisper when talking")
@@ -274,9 +269,9 @@ public class McTalkingConfig {
     public int rumorMillCheckIntervalTicks = 600;
 
     @AutoGen(category = "citizens", group = "rumor_mill")
-    @DoubleField(min = 1.0, max = 50.0)
+    @DoubleField(min = 1.0, max = 100.0)
     @SerialEntry(comment = "Maximum distance in blocks for rumor propagation between citizens.")
-    public double rumorMillRange = 8.0;
+    public double rumorMillRange = 12.0;
 
     @AutoGen(category = "citizens", group = "rumor_mill")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
@@ -301,7 +296,7 @@ public class McTalkingConfig {
     @AutoGen(category = "citizens", group = "rumor_mill")
     @DoubleField(min = 1.0, max = 50.0)
     @SerialEntry(comment = "Maximum distance in blocks for a player to witness voiced rumors.")
-    public double rumorTalkingRange = 8.0;
+    public double rumorTalkingRange = 12.0;
 
     // Broadcast System
     @AutoGen(category = "citizens", group = "broadcast")
@@ -320,9 +315,9 @@ public class McTalkingConfig {
     public int broadcastMaxPropagationsPerTick = 5;
 
     @AutoGen(category = "citizens", group = "broadcast")
-    @DoubleField(min = 1.0, max = 50.0)
+    @DoubleField(min = 1.0, max = 1000.0)
     @SerialEntry(comment = "Maximum distance in blocks between citizens for broadcast propagation. Broadcasts spread through proximity like rumors.")
-    public double broadcastPropagationRange = 8.0;
+    public double broadcastPropagationRange = 24.0;
 
     @AutoGen(category = "citizens", group = "broadcast")
     @IntField(min = 0, max = 20)
@@ -340,9 +335,10 @@ public class McTalkingConfig {
     public boolean enableBroadcastYelling = true;
 
     @AutoGen(category = "citizens", group = "broadcast")
-    @DoubleField(min = 1.0, max = 50.0)
+    @DoubleField(min = 1.0, max = 10000.0)
     @SerialEntry(comment = "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.")
-    public double broadcastYellingRange = 8.0;
+    // This is half of the default voice distance range
+    public double broadcastYellingRange = 24.0;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
     public int configVersion = 2;

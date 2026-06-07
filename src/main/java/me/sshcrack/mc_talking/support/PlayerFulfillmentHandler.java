@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.mixin.support;
+package me.sshcrack.mc_talking.support;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
