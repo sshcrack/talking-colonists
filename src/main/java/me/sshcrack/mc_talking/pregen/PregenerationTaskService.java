@@ -315,7 +315,10 @@ public class PregenerationTaskService {
     }
 
     public static void generatePlayerGreetingNow(AbstractEntityCitizen citizen, String playerName, java.util.function.Consumer<AudioChunk> onComplete) {
-        String prompt = "Generate a brief 1-sentence greeting for " + playerName + " who is approaching you. Greet them by name and say hello, you're happy to see them.";
+        String prompt = "You are greeting " + playerName + " who has just approached you. " +
+                "Generate a single brief greeting sentence that authentically reflects your current mood, " +
+                "health, concerns, and relationship with this person. " +
+                "Do not use markdown. Stay in character.";
         startPregenerationIfPossible(citizen, prompt, onComplete, false, true);
     }
 

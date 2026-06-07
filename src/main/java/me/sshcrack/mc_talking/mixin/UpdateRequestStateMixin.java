@@ -3,7 +3,7 @@ package me.sshcrack.mc_talking.mixin;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.core.network.messages.server.colony.UpdateRequestStateMessage;
-import me.sshcrack.mc_talking.mixin.support.PlayerFulfillmentHandler;
+import me.sshcrack.mc_talking.support.PlayerFulfillmentHandler;
 import net.minecraft.server.level.ServerPlayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
