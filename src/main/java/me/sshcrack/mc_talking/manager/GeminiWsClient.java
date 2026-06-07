@@ -85,6 +85,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected boolean shouldEndConversation = false;
 
     /**
+     * The most recent text submitted via {@link #addPromptTextAfterTalkingComplete}.
+     * Saved so that after a session-token invalidation and reconnect the prompt can
+     * be re-queued, preventing system-controlled sessions (mumbling / urgent contact)
+     * from falling silent.
+     */
+    @Nullable
+    private String lastPromptText = null;
+
+    /**
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
      */
     protected String currentTurnTranscript = "";
@@ -634,6 +643,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             wsSessionState = WsSessionState.INVALID_SESSION_TOKEN;
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
+
+            // If a system-controlled prompt (mumbling / urgent contact) was previously
+            // submitted, re-queue it so the AI is re-prompted after the new connection
+            // establishes, rather than sitting in LISTENING state silently.
+            if (lastPromptText != null) {
+                synchronized (pendingSystemText) {
+                    if (!pendingSystemText.contains(lastPromptText)) {
+                        pendingSystemText.add(lastPromptText);
+                    }
+                }
+            }
+
             ensureConnectionForQueuedInput("session token invalidated");
             return;
         }
@@ -711,7 +732,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         send(ClientMessages.input(input));
     }
 
+    /**
+     * Queues {@code text} to be sent to the API after the current AI turn finishes.
+     * If the session is not yet ready the text is buffered in {@link #pendingSystemText}
+     * and sent once setup completes.
+     *
+     * <p>The text is also saved to {@link #lastPromptText} so that if the session
+     * token is later invalidated the prompt can be replayed on the new connection,
+     * preventing system-controlled conversations from going silent.</p>
+     *
+     * @param text the text prompt to send after the current AI turn completes
+     */
     public void addPromptTextAfterTalkingComplete(String text) {
+        this.lastPromptText = text;
+
         if (sentGeneratingStatus)
             onGenerationPaused();
 
