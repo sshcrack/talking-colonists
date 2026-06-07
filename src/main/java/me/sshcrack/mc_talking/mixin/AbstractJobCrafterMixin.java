@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking.mixin;
 
-import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.jobs.AbstractJobCrafter;
