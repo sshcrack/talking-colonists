@@ -18,6 +18,7 @@ import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.util.ColonyStatsHelper;
@@ -29,6 +30,7 @@ import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
+import me.sshcrack.mc_talking.duck.CitizenMinimalAISubStateProvider;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import me.sshcrack.mc_talking.util.MiscUtil;
@@ -118,6 +120,7 @@ public final class CitizenPromptViewFactory {
         String nameTagDescription = extractNameTagDescription(data);
         String colonyFoodSituation = extractFoodSituation(data, citizenAiState);
         List<String> recentActions = extractRecentActions(data);
+        MinimalAISubState minimalAiSubState = extractMinimalAiSubState(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -163,7 +166,8 @@ public final class CitizenPromptViewFactory {
                 workAiState,
                 nameTagDescription,
                 colonyFoodSituation,
-                recentActions
+                recentActions,
+                minimalAiSubState
         );
     }
 
@@ -248,6 +252,12 @@ public final class CitizenPromptViewFactory {
         if (!(data instanceof CitizenRecentActionsProvider provider)) return null;
         var actions = provider.mc_talking$getRecentActions();
         return actions.isEmpty() ? null : actions;
+    }
+
+    @Nullable
+    private static MinimalAISubState extractMinimalAiSubState(ICitizenData data) {
+        if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
+        return provider.mc_talking$getMinimalAiSubState();
     }
 
     private static List<String> extractParents(ICitizenData data) {
