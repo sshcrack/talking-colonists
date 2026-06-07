@@ -7,11 +7,13 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
+import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -353,6 +355,31 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         if (citizenAiState == null && workAiState == null) return null;
 
+        MinimalAISubState sub = view.minimalAiSubState();
+        if (sub != null && isSubStateConsistentWithAiState(sub, citizenAiState)) {
+            return switch (sub) {
+                case EAT_SEARCH_RESTAURANT -> "Hungry and walking to the restaurant, hoping to find a free table.";
+                case EAT_GET_FOOD          -> "At the restaurant, waiting for food to be served.";
+                case EAT_WAITING_FOOD      -> "Standing at the restaurant, waiting for the cook to prepare a meal.";
+                case EAT_EATING            -> "Sitting down and eating a meal at the restaurant.";
+                case SLEEP_WALKING_TO_BED  -> "Walking home to go to sleep for the night.";
+                case SLEEP_FINDING_BED     -> "Looking for a free bed to sleep in.";
+                case SLEEP_IN_BED          -> "Fast asleep — dreaming the night away.";
+                case MOURN_WALKING         -> "Walking aimlessly while mourning.";
+                case MOURN_AT_TOWNHALL     -> "Gathering at the town hall to mourn a fallen colonist.";
+                case MOURN_WALKING_TO_GRAVEYARD -> "Walking to pay respects at a fallen colonist's grave.";
+                case MOURN_AT_GRAVE        -> "Standing quietly at a grave, grieving.";
+                case MOURN_STARING         -> "Staring into the distance, lost in grief.";
+                case SICK_CHECKING_FOR_CURE -> "Checking their pockets desperately for medicine.";
+                case SICK_WALKING_TO_HOSPITAL -> "Feeling very ill and making their way to the hospital.";
+                case SICK_AT_HOSPITAL      -> "Resting in bed at the hospital, receiving treatment.";
+                case SICK_RECEIVING_CURE   -> "Receiving medical treatment from the colony's healer.";
+                case SICK_WANDERING        -> "Too sick to function, wandering around aimlessly.";
+                case FLEE_CHECKING         -> "Looking around nervously for threats.";
+                case FLEE_RUNNING          -> "Running away from a threat!";
+            };
+        }
+
         if (citizenAiState == CitizenAIState.EATING) {
             return "Taking a break to eat or waiting at the restaurant for a meal.";
         }
@@ -411,6 +438,17 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         return nameTagDescription != null ? nameTagDescription + "." : null;
+    }
+
+    private static boolean isSubStateConsistentWithAiState(MinimalAISubState sub, @Nullable CitizenAIState aiState) {
+        if (aiState == null) return false;
+        return switch (sub) {
+            case EAT_SEARCH_RESTAURANT, EAT_GET_FOOD, EAT_WAITING_FOOD, EAT_EATING -> aiState == CitizenAIState.EATING;
+            case SLEEP_WALKING_TO_BED, SLEEP_FINDING_BED, SLEEP_IN_BED -> aiState == CitizenAIState.SLEEP;
+            case MOURN_WALKING, MOURN_AT_TOWNHALL, MOURN_WALKING_TO_GRAVEYARD, MOURN_AT_GRAVE, MOURN_STARING -> aiState == CitizenAIState.MOURN;
+            case SICK_CHECKING_FOR_CURE, SICK_WALKING_TO_HOSPITAL, SICK_AT_HOSPITAL, SICK_RECEIVING_CURE, SICK_WANDERING -> aiState == CitizenAIState.SICK;
+            case FLEE_CHECKING, FLEE_RUNNING -> aiState == CitizenAIState.FLEE;
+        };
     }
 
     private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
