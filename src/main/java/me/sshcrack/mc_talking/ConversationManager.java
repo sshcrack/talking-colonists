@@ -480,12 +480,45 @@ public class ConversationManager {
     }
 
     /**
-     * Starts a low-priority, one-sided AI session for the given citizen.
-     * The citizen speaks the prompt aloud once and the session ends.
+     * Starts a low-priority, one-sided AI voice session for {@code citizen}.
      *
-     * <p>Guards: API key, {@link #canCitizenSpeak} (which subsumes busy,
-     * cooldown, sleeping, and visitor checks), and
-     * {@link #claimSlot}(low-priority). Silently returns if any guard fails.</p>
+     * <h3>How it works under the hood</h3>
+     * <p>This method opens a <em>Gemini Live WebSocket</em> in system-controlled
+     * (mumbling) mode.  The session uses
+     * {@link me.sshcrack.mc_talking.api.prompt.CitizenPromptService#generateSystemControlledRoleplayPrompt}
+     * as the base system prompt, then appends {@code userPrompt} to that system
+     * prompt before sending the first turn.  The model then speaks aloud as the
+     * citizen, and the session closes automatically when talking is complete.</p>
+     *
+     * <h3>Prompt authoring contract — IMPORTANT</h3>
+     * <p>{@code userPrompt} is injected <strong>into the system prompt</strong>, not
+     * sent as a user chat message.  It must therefore be written as a directive
+     * addressed to the AI model — second person, imperative — describing what the
+     * citizen should say or do in this turn.  Examples of correct phrasing:</p>
+     * <pre>{@code
+     * // ✓ Correct — system directive style:
+     * "## CURRENT TASK\nTurn to Aldric and mention the food shortage you heard about. One sentence."
+     *
+     * // ✗ Wrong — reads like a user chat message:
+     * "Tell Aldric about this: Rumor: I heard from ... that ..."
+     * }</pre>
+     * <p>For a reference implementation see
+     * {@link me.sshcrack.mc_talking.broadcast.BroadcastPropagationService} (broadcast
+     * yelling prompt) and
+     * {@link me.sshcrack.mc_talking.rumor.RumorMillService#attemptRumorTalking}.</p>
+     *
+     * <h3>Guards</h3>
+     * <ul>
+     *   <li>API key must be configured.</li>
+     *   <li>{@link #canCitizenSpeak} must return {@code true} (subsumes busy,
+     *       cooldown, sleeping, and visitor checks).</li>
+     *   <li>A low-priority slot must be available via {@link #claimSlot}.</li>
+     * </ul>
+     * <p>Silently returns without throwing if any guard fails.</p>
+     *
+     * @param citizen    the citizen who will speak
+     * @param userPrompt a system-prompt addition written as a directive to the AI
+     *                   model; see authoring contract above
      */
     public static void startLowPrioritySession(AbstractEntityCitizen citizen, String prompt) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;

@@ -298,6 +298,16 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Maximum distance in blocks for a player to witness voiced rumors.")
     public double rumorTalkingRange = 12.0;
 
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum rumors stored per citizen. Oldest discarded when limit reached.")
+    public int maxRumorsStored = 10;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 0, max = 20)
+    @SerialEntry(comment = "How many rumors to include in a citizen's prompt. Set to 0 to disable.")
+    public int maxRumorsInPrompt = 3;
+
     // Broadcast System
     @AutoGen(category = "citizens", group = "broadcast")
     @TickBox

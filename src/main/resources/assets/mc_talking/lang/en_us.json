@@ -234,6 +234,11 @@
   "yacl3.config.mc_talking:config.rumorTalkingRange": "Rumor Talking Range",
   "yacl3.config.mc_talking:config.rumorTalkingRange.desc": "Maximum distance in blocks from the source citizen for a player to witness a voiced rumor.",
 
+  "yacl3.config.mc_talking:config.maxRumorsStored": "Max Rumors Stored",
+  "yacl3.config.mc_talking:config.maxRumorsStored.desc": "Maximum rumors a citizen remembers. Oldest are discarded first.",
+  "yacl3.config.mc_talking:config.maxRumorsInPrompt": "Max Rumors in Prompt",
+  "yacl3.config.mc_talking:config.maxRumorsInPrompt.desc": "How many rumors appear in the citizen system prompt. Set to 0 to disable.",
+
   "yacl3.config.mc_talking:config.category.citizens.group.broadcast": "Colony Broadcast System",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation": "Enable Broadcast Propagation",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation.desc": "If enabled, players can ask citizens to broadcast messages across the colony. The message spreads from citizen to citizen over time.",
