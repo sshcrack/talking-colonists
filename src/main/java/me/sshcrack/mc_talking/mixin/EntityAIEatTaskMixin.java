@@ -23,8 +23,7 @@ public class EntityAIEatTaskMixin {
         at = @At(
             value = "INVOKE",
             target = "Lcom/minecolonies/api/colony/ICitizenData;setJustAte(Z)V"
-        ),
-        cancellable = false
+        )
     )
     private void mc_talking$onEatComplete(CallbackInfoReturnable<IState> cir) {
         var data = citizen.getCitizenData();
@@ -38,8 +37,7 @@ public class EntityAIEatTaskMixin {
         at = @At(
             value = "INVOKE",
             target = "Lcom/minecolonies/api/colony/ICitizenData;triggerInteraction(Lcom/minecolonies/api/colony/interactionhandling/IInteractionResponseHandler;)V"
-        ),
-        cancellable = false
+        )
     )
     private void mc_talking$onNoRestaurant(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
         var data = citizen.getCitizenData();
