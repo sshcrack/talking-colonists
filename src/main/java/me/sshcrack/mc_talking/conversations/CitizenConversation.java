@@ -137,7 +137,13 @@ public class CitizenConversation {
         }
 
         if (stream == null) {
-            stream = new GeminiStream(constructLocationalAudioChannel());
+            var channel = constructLocationalAudioChannel();
+            if (channel == null) {
+                McTalking.LOGGER.error("[Flash/TTS] Failed to create locational audio channel — aborting conversation");
+                setState(ConversationState.ENDED);
+                return;
+            }
+            stream = new GeminiStream(channel);
         }
 
         // Mark participants as busy so they can't be double-booked

@@ -179,11 +179,16 @@ public class GeminiStream implements Supplier<short[]> {
             player.stopPlaying();
             player = null;
         }
+        if (encoder != null) {
+            try { encoder.close(); } catch (Exception e) { /* swallow */ }
+            encoder = null;
+        }
     }
 
     public void close() {
-        if (player != null && player.isStopped() && encoder != null) {
-            encoder.close();
+        if (encoder != null) {
+            try { encoder.close(); } catch (Exception e) { /* swallow */ }
+            encoder = null;
         }
     }
 
