@@ -13,6 +13,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
@@ -63,9 +64,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     /**
-     * This variable is used to track if the quota has been exceeded
+     * Returns the model name string for quota tracking.
      */
-    private static boolean quotaExceeded;
+    protected abstract String getModelName();
 
     private boolean hasMadeInitialConnection = false;
     private long nextReconnectAllowedAt = 0;
@@ -179,7 +180,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private boolean canAttemptRecovery() {
-        return !intentionalClose && !quotaExceeded
+        return !intentionalClose && !QuotaTracker.isQuotaExceeded(getModelName())
                 && wsSessionState != WsSessionState.TERMINAL_ERROR
                 && wsSessionState != WsSessionState.CLOSED
                 && wsSessionState != WsSessionState.QUOTA_EXCEEDED;
@@ -240,7 +241,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
+        var setup = new BidiGenerateContentSetup("models/" + getModelName());
 
         var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
@@ -605,7 +606,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
-        quotaExceeded = true;
+        QuotaTracker.reportQuotaExceeded(getModelName());
         setWsSessionState(WsSessionState.QUOTA_EXCEEDED, "quota exceeded");
         onQuotaExceededEvent("Quota exceeded for Gemini API, please check your API key and usage limits.");
     }
@@ -623,7 +624,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return;
         }
 
-        if (quotaExceeded) {
+        if (QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
 
@@ -672,7 +673,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onError(Exception ex) {
         McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
-        if (intentionalClose || quotaExceeded) {
+        if (intentionalClose || QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
 
@@ -736,7 +737,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void reconnect() {
-        if (intentionalClose || quotaExceeded) {
+        if (intentionalClose || QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
         intentionalClose = false;

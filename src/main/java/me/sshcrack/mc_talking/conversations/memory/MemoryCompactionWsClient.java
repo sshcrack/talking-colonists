@@ -9,6 +9,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 
 import java.util.function.Consumer;
@@ -32,7 +33,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.CHEAP_LIVE_MODEL);
+        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.CHEAP_LIVE_MODEL.getName());
 
         setup.generationConfig.responseModalities = ModalityModes.TEXT_AND_AUDIO.getModalities();
         setup.outputAudioTranscription = new JsonObject();
@@ -45,7 +46,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
             var uuid = citizen.getUUID();
             setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
             setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
+            setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.CHEAP_LIVE_MODEL.getRandomVoice(uuid, female);
         }
 
         setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();
@@ -104,6 +105,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
     @Override
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("[MemoryCompaction] Quota exceeded during Live compaction");
+        QuotaTracker.reportQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
         onError.run();
         close();
     }

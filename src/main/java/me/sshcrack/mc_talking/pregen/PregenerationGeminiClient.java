@@ -8,8 +8,10 @@ import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,22 +26,26 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 public class PregenerationGeminiClient extends GeminiLiveClient {
     private final AbstractEntityCitizen entity;
     private final String promptText;
+    private final String modelName;
+    private final AvailableAI modelAi;
     private final Consumer<AudioChunk> onComplete;
     private final Runnable onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
     private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50 MB max
 
-    public PregenerationGeminiClient(AbstractEntityCitizen entity, String promptText, Consumer<AudioChunk> onComplete, Runnable onError) {
+    public PregenerationGeminiClient(AbstractEntityCitizen entity, String promptText, AvailableAI model, Consumer<AudioChunk> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
         this.promptText = promptText;
+        this.modelAi = model;
+        this.modelName = model.getName();
         this.onComplete = onComplete;
         this.onError = onError;
     }
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.CHEAP_LIVE_MODEL);
+        var setup = new BidiGenerateContentSetup("models/" + modelName);
         setup.generationConfig.responseModalities = ModalityModes.AUDIO.getModalities();
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
@@ -48,7 +54,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         var uuid = entity.getUUID();
         setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(uuid, female);
+        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = modelAi.getRandomVoice(uuid, female);
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(
@@ -127,6 +133,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
     @Override
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded during audio pregeneration");
+        QuotaTracker.reportQuotaExceeded(modelName);
         if (onError != null) onError.run();
         close();
     }

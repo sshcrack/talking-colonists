@@ -3,7 +3,9 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
+import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
@@ -112,6 +114,11 @@ public class ConversationManager {
      * conversation) so a player conversation can take over.
      */
     private static final Map<UUID, Runnable> abortHandlers = new ConcurrentHashMap<>();
+
+    // ---- Background pool (flash2.5 model) ----
+    private static final Set<UUID> backgroundSlots = new LinkedHashSet<>();
+    private static final Map<UUID, String> backgroundSlotTypes = new ConcurrentHashMap<>();
+    private static final Map<UUID, GeminiLiveClient> backgroundClients = new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
     // Slot management (priority-aware, synchronized)
@@ -223,6 +230,68 @@ public class ConversationManager {
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
         int free = max - addedEntities.size();
         return free >= slotsNeeded;
+    }
+
+    // ---- Background pool methods ----
+
+    public static synchronized boolean hasFreeBackgroundCapacity(int slotsNeeded) {
+        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
+        return (max - backgroundSlots.size()) >= slotsNeeded;
+    }
+
+    public static synchronized boolean claimBackgroundSlot(AbstractEntityCitizen citizen, String type) {
+        UUID id = citizen.getUUID();
+        if (backgroundSlots.contains(id)) return true;
+
+        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
+
+        if (backgroundSlots.size() < max) {
+            backgroundSlots.add(id);
+            backgroundSlotTypes.put(id, type);
+            McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", id, type);
+            return true;
+        }
+
+        if ("compaction".equals(type)) {
+            UUID victim = null;
+            for (UUID candidate : backgroundSlots) {
+                if ("pregen".equals(backgroundSlotTypes.get(candidate))) {
+                    victim = candidate;
+                    break;
+                }
+            }
+            if (victim != null) {
+                evictBackgroundSlot(victim);
+                backgroundSlots.add(id);
+                backgroundSlotTypes.put(id, type);
+                McTalking.LOGGER.info("[ConversationManager] Evicted pregen bg slot {} for compaction {}", victim, id);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static synchronized void releaseBackgroundSlot(UUID entityId) {
+        backgroundSlots.remove(entityId);
+        backgroundSlotTypes.remove(entityId);
+        backgroundClients.remove(entityId);
+    }
+
+    public static synchronized void registerBackgroundClient(UUID entityId, GeminiLiveClient client) {
+        backgroundClients.put(entityId, client);
+    }
+
+    private static void evictBackgroundSlot(UUID entityId) {
+        backgroundSlots.remove(entityId);
+        backgroundSlotTypes.remove(entityId);
+        GeminiLiveClient client = backgroundClients.remove(entityId);
+        if (client != null) {
+            try { client.close(); } catch (Exception e) {
+                McTalking.LOGGER.warn("[ConversationManager] Error closing evicted bg client {}", entityId, e);
+            }
+        }
+        McTalking.LOGGER.info("[ConversationManager] Evicted background slot for {}", entityId);
     }
 
     /**
@@ -343,7 +412,8 @@ public class ConversationManager {
      * Use this before starting any new session to avoid duplicates.
      */
     public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
-        return clients.containsKey(citizen.getUUID()) || addedEntities.contains(citizen.getUUID()) || busyEntities.contains(citizen.getUUID());
+        UUID id = citizen.getUUID();
+        return clients.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id) || backgroundSlots.contains(id);
     }
 
     /**
@@ -651,15 +721,22 @@ public class ConversationManager {
                 McTalking.LOGGER.error("Error closing client during cleanup", e);
             }
         }
+        for (GeminiLiveClient client : backgroundClients.values()) {
+            try { client.close(); } catch (Exception ignored) {}
+        }
         clients.clear();
         activeEntity.clear();
         playerConversationPartners.clear();
         citizenToPlayer.clear();
         addedEntities.clear();
+        backgroundSlots.clear();
+        backgroundSlotTypes.clear();
+        backgroundClients.clear();
         busyEntities.clear();
         abortHandlers.clear();
         lastSessionEndTime.clear();
         lastSessionNeedSignatures.clear();
+        QuotaTracker.clear();
         GeminiWsClient.shutdownExecutor();
     }
 }

@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.conversations;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
@@ -150,6 +151,11 @@ public class LiveConversationWsClient extends GeminiWsClient {
     protected ServerPlayer resolveActivePlayer() {
         // No player involved in a citizen-to-citizen live conversation.
         return null;
+    }
+
+    @Override
+    protected String getModelName() {
+        return McTalkingConfig.INSTANCE.instance().currentAiModel.getName();
     }
 
     @Override
