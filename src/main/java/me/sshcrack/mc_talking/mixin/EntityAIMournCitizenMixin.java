@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.mixin;
 
+import com.minecolonies.api.entity.ai.statemachine.states.CitizenAIState;
 import com.minecolonies.api.entity.ai.statemachine.states.IState;
 import com.minecolonies.core.entity.ai.minimal.EntityAIMournCitizen;
 import com.minecolonies.core.entity.citizen.EntityCitizen;
@@ -45,6 +46,11 @@ public class EntityAIMournCitizenMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
     }
 
+    @Unique
+    private static boolean mc_talking$isTerminal(IState ret) {
+        return ret == null || ret == CitizenAIState.IDLE || ret == EntityAIMournCitizen.MourningState.DECIDE;
+    }
+
     @Inject(
         method = "walkToTownHall",
         at = @At("HEAD")
@@ -55,7 +61,7 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "walkToTownHall", at = @At("RETURN"))
     private void mc_talking$onWalkToTownHallReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -68,7 +74,7 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "walkToGraveyard", at = @At("RETURN"))
     private void mc_talking$onWalkToGraveyardReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -81,7 +87,7 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "wanderAtGraveyard", at = @At("RETURN"))
     private void mc_talking$onWanderAtGraveyardReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -94,7 +100,7 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "walkToGrave", at = @At("RETURN"))
     private void mc_talking$onWalkToGraveReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -107,7 +113,7 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "wander", at = @At("RETURN"))
     private void mc_talking$onWanderReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -120,7 +126,7 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "stare", at = @At("RETURN"))
     private void mc_talking$onStareReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -133,6 +139,6 @@ public class EntityAIMournCitizenMixin {
 
     @Inject(method = "decide", at = @At("RETURN"))
     private void mc_talking$onDecideReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 }

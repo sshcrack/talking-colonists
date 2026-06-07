@@ -39,9 +39,19 @@ public class EntityAIWorkHealerMixin {
         mc_talking$treatmentType = "medicine";
     }
 
+    @Inject(method = "cure", at = @At("RETURN"))
+    private void mc_talking$cleanupCure(CallbackInfoReturnable<IAIState> cir) {
+        mc_talking$treatmentType = null;
+    }
+
     @Inject(method = "freeCure", at = @At("HEAD"))
     private void mc_talking$flagFreeCure(CallbackInfoReturnable<IAIState> cir) {
         mc_talking$treatmentType = "magic";
+    }
+
+    @Inject(method = "freeCure", at = @At("RETURN"))
+    private void mc_talking$cleanupFreeCure(CallbackInfoReturnable<IAIState> cir) {
+        mc_talking$treatmentType = null;
     }
 
     @Inject(method = "wander", at = @At("HEAD"))

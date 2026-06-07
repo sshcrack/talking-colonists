@@ -26,7 +26,8 @@
     "AbstractEntityAIStructureMixin",
     "EntityAIWorkTeacherMixin",
     "EntityAIWorkResearcherMixin",
-    "EntityAIWorkHealerMixin"
+    "EntityAIWorkHealerMixin",
+    "BuildingLibraryAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

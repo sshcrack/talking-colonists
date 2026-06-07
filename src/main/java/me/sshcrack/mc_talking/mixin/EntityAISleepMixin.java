@@ -60,7 +60,7 @@ public class EntityAISleepMixin {
 
     @Inject(method = "checkSleep", at = @At("RETURN"))
     private void mc_talking$onCheckSleepReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        // Always continues to WALKING_HOME — substate persists from HEAD
     }
 
     @Inject(
@@ -73,7 +73,7 @@ public class EntityAISleepMixin {
 
     @Inject(method = "walkHome", at = @At("RETURN"))
     private void mc_talking$onWalkHomeReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        // Always continues to FIND_BED or stays in WALKING_HOME — substate persists from HEAD
     }
 
     @Inject(
@@ -84,10 +84,9 @@ public class EntityAISleepMixin {
         mc_talking$setSubState(MinimalAISubState.SLEEP_FINDING_BED, "no spare bed in colony");
     }
 
-    @Inject(method = "findBedAndTryToSleep", at = @At("RETURN"))
-    private void mc_talking$onFindBedReturn(CallbackInfo ci) {
-        mc_talking$clearSubState();
-    }
+    // findBedAndTryToSleep is void and called as a sub-routine of findBed().
+    // The next HEAD inject (sleep, walkHome, etc.) overwrites the substate,
+    // so no RETURN-side clearing is needed here.
 
     @Inject(
         method = "sleep",
@@ -99,6 +98,6 @@ public class EntityAISleepMixin {
 
     @Inject(method = "sleep", at = @At("RETURN"))
     private void mc_talking$onSleepReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (cir.getReturnValue() == null) mc_talking$clearSubState();
     }
 }
