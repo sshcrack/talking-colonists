@@ -2,27 +2,38 @@ package me.sshcrack.mc_talking.manager.tools;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.buildings.IBuilding;
+import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
+import com.minecolonies.api.crafting.IRecipeStorage;
 import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
+import com.minecolonies.api.research.IGlobalResearchBranch;
+import com.minecolonies.api.research.IGlobalResearchTree;
+import com.minecolonies.api.research.ILocalResearch;
+import com.minecolonies.api.research.util.ResearchState;
 import com.minecolonies.api.util.FoodUtils;
 import com.minecolonies.core.colony.buildingextensions.FarmField;
+import com.minecolonies.core.colony.buildings.modules.AbstractCraftingBuildingModule;
 import com.minecolonies.core.colony.buildings.modules.BuildingExtensionsModule;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingBarracks;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingBuilder;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingFarmer;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingGraveyard;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingLibrary;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingMiner;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingNetherWorker;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingSchool;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingUniversity;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse;
-import com.minecolonies.core.colony.buildings.modules.BuildingModules;
-import com.minecolonies.api.colony.ICitizenData;
-import me.sshcrack.mc_talking.mixin.BuildingLibraryAccessor;
 import me.sshcrack.gemini_live_lib.gson.properties.EnumProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
+import me.sshcrack.mc_talking.mixin.BuildingLibraryAccessor;
+import me.sshcrack.mc_talking.mixin.BuildingNetherWorkerAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.Level;
@@ -41,14 +52,15 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         "baker", "fisherman", "lumberjack", "shepherd", "cowboy",
         "graveyard", "plantation", "beekeeper", "mechanic", "sifter",
         "crusher", "netherworker", "florist", "archery", "combatacademy",
-        "rabbithutch"
+        "rabbithutch", "own_building"
     );
 
     public DescribeBuildingAction() {
         super("describe_building",
             "Describes a colony building in detail: its type, level, assigned workers, and type-specific " +
-            "information (e.g. restaurant menu items, mine depth, farm crops, etc.). If multiple buildings of the " +
-            "same type exist, the nearest one to you is described.",
+            "information (e.g. restaurant menu items, mine depth, farm crops, builder projects, etc.). " +
+            "If multiple buildings of the same type exist, the nearest one to you is described. " +
+            "(\"own_building\" describes the building you work at)",
             new ObjectProperty(new HashMap<>() {{
                 put("type", new EnumProperty(BUILDING_TYPES, true));
             }})
@@ -68,8 +80,12 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
         IBuilding matched = findBuilding(colony, query, citizen);
         if (matched == null) {
-            result.addProperty("error", "No building found matching '" + query + "'.");
-            result.addProperty("hint", "This colony may not have that building type. Use get_colony to list all buildings.");
+            if (query.equals("own_building")) {
+                result.addProperty("error", "You are not assigned to any building.");
+            } else {
+                result.addProperty("error", "No building found matching '" + query + "'.");
+                result.addProperty("hint", "This colony may not have that building type. Use get_colony to list all buildings.");
+            }
             return result;
         }
 
@@ -81,6 +97,12 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
     @Nullable
     private IBuilding findBuilding(IColony colony, String query, AbstractEntityCitizen citizen) {
+        if (query.equals("own_building")) {
+            var data = citizen.getCitizenData();
+            if (data == null) return null;
+            return data.getWorkBuilding();
+        }
+
         var bm = colony.getServerBuildingManager();
         if (bm == null || query.isEmpty()) return null;
 
@@ -122,8 +144,43 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         }
     }
 
+    private static String formatResearchTime(int ticks) {
+        int totalSeconds = ticks * 25;
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        } else if (minutes > 0) {
+            return minutes + "m " + seconds + "s";
+        }
+        return seconds + "s";
+    }
+
+    private static void fillWorkOrderInfo(IBuilding building, JsonObject result) {
+        if (!(building instanceof BuildingBuilder) && !(building instanceof BuildingMiner)) return;
+
+        boolean hasWorkOrder = false;
+        var wo = building instanceof BuildingBuilder builder ? builder.getWorkOrder() :
+                 building instanceof BuildingMiner miner ? miner.getWorkOrder() : null;
+
+        hasWorkOrder = wo != null;
+        result.addProperty("has_work_order", hasWorkOrder);
+
+        if (wo != null) {
+            result.addProperty("work_order_type", wo.getWorkOrderType().name());
+            result.addProperty("target_name", wo.getDisplayName().getString());
+            result.addProperty("target_level", wo.getTargetLevel());
+            result.addProperty("current_level", wo.getCurrentLevel());
+            result.addProperty("work_order_position", wo.getLocation().toShortString());
+            result.addProperty("progress_stage", wo.getStage().name());
+        }
+    }
+
     private static void fillTypeSpecificInfo(IBuilding building, JsonObject result, AbstractEntityCitizen citizen) {
         var typePath = building.getBuildingType().getRegistryName().getPath();
+        boolean handled = true;
 
         if (building instanceof BuildingCook cook) {
             var menuModule = cook.getModule(BuildingModules.RESTAURANT_MENU);
@@ -147,6 +204,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         } else if (building instanceof BuildingMiner miner) {
             Level level = citizen.level();
             result.addProperty("max_depth", miner.getDepthLimit(level));
+            fillWorkOrderInfo(miner, result);
 
         } else if (building instanceof BuildingFarmer farmer) {
             JsonArray plantedCrops = new JsonArray();
@@ -172,8 +230,8 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
             var containers = warehouse.getContainers();
             result.addProperty("container_count", containers != null ? containers.size() : 0);
 
-        } else if (building instanceof BuildingBuilder) {
-            result.addProperty("mode", typePath);
+        } else if (building instanceof BuildingBuilder builder) {
+            fillWorkOrderInfo(builder, result);
 
         } else if ("townhall".equals(typePath)) {
             var col = building.getColony();
@@ -191,6 +249,110 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
         } else if (building instanceof BuildingLibrary library) {
             result.addProperty("bookshelves_count", ((BuildingLibraryAccessor) library).getBookCases().size());
+
+        } else if (building instanceof BuildingNetherWorker nw) {
+            var accessor = (BuildingNetherWorkerAccessor) nw;
+            int currentTrips = accessor.getCurrentTrips();
+            int currentPeriodDay = accessor.getCurrentPeriodDay();
+            int maxPerPeriod = BuildingNetherWorker.getMaxPerPeriod();
+            int periodDays = BuildingNetherWorker.getPeriodDays();
+
+            result.addProperty("is_ready_for_trip", nw.isReadyForTrip());
+            result.addProperty("trips_this_period", currentTrips);
+            result.addProperty("max_trips_per_period", maxPerPeriod);
+            result.addProperty("current_period_day", currentPeriodDay);
+            result.addProperty("period_days", periodDays);
+            result.addProperty("days_until_reset", periodDays - currentPeriodDay);
+            result.addProperty("portal_present", nw.getPortalLocation() != null);
+            result.addProperty("close_portal_on_return", nw.shallClosePortalOnReturn());
+
+        } else if (building instanceof BuildingGraveyard gy) {
+            var gravePositions = gy.getGravePositions();
+            result.addProperty("grave_count", gravePositions != null ? gravePositions.size() : 0);
+            var currentGrave = gy.getGraveToWorkOn();
+            if (currentGrave != null) {
+                result.addProperty("has_current_grave_task", true);
+                result.addProperty("current_grave_position", currentGrave.toShortString());
+            } else {
+                result.addProperty("has_current_grave_task", false);
+            }
+
+        } else if (building instanceof BuildingUniversity) {
+            var col = building.getColony();
+            if (col != null) {
+                var researchTree = col.getResearchManager().getResearchTree();
+                var inProgress = researchTree.getResearchInProgress();
+                result.addProperty("research_in_progress_count", inProgress.size());
+
+                if (!inProgress.isEmpty()) {
+                    JsonArray researchArray = new JsonArray();
+                    for (ILocalResearch research : inProgress) {
+                        JsonObject rObj = new JsonObject();
+                        var global = IGlobalResearchTree.getInstance().getResearch(research.getBranch(), research.getId());
+                        if (global != null) {
+                            var nameContents = global.getName();
+                            rObj.addProperty("name", Component.translatable(nameContents.getKey(), (Object[]) nameContents.getArgs()).getString());
+                        } else {
+                            rObj.addProperty("name", research.getId().toString());
+                        }
+                        rObj.addProperty("branch", research.getBranch().toString());
+                        rObj.addProperty("state", research.getState().name());
+                        rObj.addProperty("progress_ticks", research.getProgress());
+
+                        if (research.getState() == ResearchState.IN_PROGRESS) {
+                            var branchData = IGlobalResearchTree.getInstance().getBranchData(research.getBranch());
+                            if (branchData != null) {
+                                int totalTicks = branchData.getBaseTime(research.getDepth());
+                                int elapsed = research.getProgress();
+                                int remaining = Math.max(0, totalTicks - elapsed);
+                                rObj.addProperty("total_ticks", totalTicks);
+                                rObj.addProperty("time_elapsed", formatResearchTime(elapsed));
+                                rObj.addProperty("estimated_time_remaining", formatResearchTime(remaining));
+                                rObj.addProperty("completion_percentage", Math.min(100, (elapsed * 100) / Math.max(1, totalTicks)));
+                            }
+                        }
+
+                        researchArray.add(rObj);
+                    }
+                    result.add("research_in_progress", researchArray);
+                }
+            }
+
+        } else {
+            handled = false;
+        }
+
+        if (!handled) {
+            var craftingModules = building.getModulesByType(AbstractCraftingBuildingModule.class);
+            if (!craftingModules.isEmpty()) {
+                var recipeManager = IColonyManager.getInstance().getRecipeManager();
+                var allRecipes = recipeManager.getRecipes();
+
+                JsonArray recipesArray = new JsonArray();
+                int totalRecipeCount = 0;
+                final int MAX_DISPLAYED = 10;
+
+                for (var module : craftingModules) {
+                    var tokens = module.getRecipes();
+                    for (var token : tokens) {
+                        totalRecipeCount++;
+                        if (recipesArray.size() >= MAX_DISPLAYED) continue;
+
+                        var storage = allRecipes.get(token);
+                        if (storage != null) {
+                            var output = storage.getPrimaryOutput();
+                            recipesArray.add(output.getDisplayName().getString());
+                        }
+                    }
+                }
+
+                result.addProperty("crafting_module_count", craftingModules.size());
+                result.add("known_recipe_examples", recipesArray);
+                result.addProperty("total_recipe_count", totalRecipeCount);
+                if (totalRecipeCount > MAX_DISPLAYED) {
+                    result.addProperty("truncated_hint", "Only showing first " + MAX_DISPLAYED + " of " + totalRecipeCount + " recipes.");
+                }
+            }
         }
     }
 
