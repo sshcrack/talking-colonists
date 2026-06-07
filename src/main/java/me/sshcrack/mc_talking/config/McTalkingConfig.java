@@ -300,7 +300,7 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "rumor_mill")
     @DoubleField(min = 1.0, max = 50.0)
-    @SerialEntry(comment = "Maximum distance in blocks for a player to witness voiced rumors and broadcast announcements.")
+    @SerialEntry(comment = "Maximum distance in blocks for a player to witness voiced rumors.")
     public double rumorTalkingRange = 8.0;
 
     // Broadcast System
@@ -333,6 +333,11 @@ public class McTalkingConfig {
     @TickBox
     @SerialEntry(comment = "If true, citizens will announce broadcasts aloud when a player is nearby.")
     public boolean enableBroadcastYelling = true;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @DoubleField(min = 1.0, max = 50.0)
+    @SerialEntry(comment = "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.")
+    public double broadcastYellingRange = 8.0;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
     public int configVersion = 2;

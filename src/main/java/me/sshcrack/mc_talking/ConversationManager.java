@@ -450,7 +450,6 @@ public class ConversationManager {
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-        if (!canCitizenSpeak(citizen)) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildPrompt(citizen));
     }
 
@@ -465,7 +464,6 @@ public class ConversationManager {
      */
     public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-        if (!canCitizenSpeak(citizen)) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
         if (clients.containsKey(citizen.getUUID())) {
             urgentContactConversations.add(citizen.getUUID());
@@ -476,7 +474,8 @@ public class ConversationManager {
      * Starts a low-priority, one-sided AI session for the given citizen.
      * The citizen speaks the prompt aloud once and the session ends.
      *
-     * <p>Guards: API key, {@link #canCitizenSpeak}, and
+     * <p>Guards: API key, {@link #canCitizenSpeak} (which subsumes busy,
+     * cooldown, sleeping, and visitor checks), and
      * {@link #claimSlot}(low-priority). Silently returns if any guard fails.</p>
      */
     public static void startLowPrioritySession(AbstractEntityCitizen citizen, String prompt) {

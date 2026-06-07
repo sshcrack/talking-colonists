@@ -231,7 +231,7 @@
   "yacl3.config.mc_talking:config.rumorTalkingChance": "Rumor Talking Chance",
   "yacl3.config.mc_talking:config.rumorTalkingChance.desc": "Per-propagation chance that a rumor is spoken aloud when a player is in range.",
   "yacl3.config.mc_talking:config.rumorTalkingRange": "Rumor Talking Range",
-  "yacl3.config.mc_talking:config.rumorTalkingRange.desc": "Maximum distance in blocks from the source citizen for a player to witness a voiced rumor or broadcast announcement.",
+  "yacl3.config.mc_talking:config.rumorTalkingRange.desc": "Maximum distance in blocks from the source citizen for a player to witness a voiced rumor.",
 
   "yacl3.config.mc_talking:config.category.citizens.group.broadcast": "Colony Broadcast System",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation": "Enable Broadcast Propagation",
@@ -247,6 +247,9 @@
 
   "yacl3.config.mc_talking:config.enableBroadcastYelling": "Enable Broadcast Yelling",
   "yacl3.config.mc_talking:config.enableBroadcastYelling.desc": "If enabled, citizens announce broadcasts aloud when a player is nearby.",
+
+  "yacl3.config.mc_talking:config.broadcastYellingRange": "Broadcast Yelling Range",
+  "yacl3.config.mc_talking:config.broadcastYellingRange.desc": "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.",
 
   "yacl3.config.mc_talking:config.category.citizens.group.memory": "Memory Compaction",
   "yacl3.config.mc_talking:config.memoryMode": "Memory Mode",
