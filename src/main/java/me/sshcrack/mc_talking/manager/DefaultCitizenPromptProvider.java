@@ -1,6 +1,8 @@
 package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
+import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
@@ -239,8 +241,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
-        String citizenAiState = view.citizenAiState();
-        String workAiState = view.workAiState();
+        CitizenAIState citizenAiState = view.citizenAiState();
+        AIWorkerState workAiState = view.workAiState();
         String nameTagDescription = view.nameTagDescription();
         String aiDesc = describeAiState(citizenAiState, workAiState, nameTagDescription, view);
         if (aiDesc != null) {
@@ -300,7 +302,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private static void addJobContext(CitizenPromptView view, StringBuilder prompt) {
         String job = view.jobName();
         if (job == null) return;
-        String ws = view.workAiState();
+        AIWorkerState ws = view.workAiState();
 
         String block = switch (job.toLowerCase()) {
             case "courier", "deliveryman" -> """
@@ -314,7 +316,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                       automatically around your deliveries.
                     """;
 
-            case "miner" -> (ws != null && ws.contains("NEEDS_ITEM")) ? """
+            case "miner" -> (ws != null && ws == AIWorkerState.NEEDS_ITEM) ? """
 
                     ## JOB CONTEXT — MINER
                     - You are waiting for mining equipment (pickaxe, torches, etc.) to be
@@ -322,7 +324,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     - Once supplied, you will resume work in the mine shaft.
                     """ : null;
 
-            case "builder", "mechanic" -> (ws != null && ws.contains("NEEDS_ITEM")) ? """
+            case "builder", "mechanic" -> (ws != null && ws == AIWorkerState.NEEDS_ITEM) ? """
 
                     ## JOB CONTEXT — BUILDER
                     - You are waiting on building materials before you can continue construction.
@@ -346,58 +348,62 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     private static String describeAiState(
-            String citizenAiState, String workAiState,
+            CitizenAIState citizenAiState, AIWorkerState workAiState,
             String nameTagDescription, CitizenPromptView view) {
 
         if (citizenAiState == null && workAiState == null) return null;
 
-        if ("EATING".equals(citizenAiState)) {
+        if (citizenAiState == CitizenAIState.EATING) {
             return "Taking a break to eat or waiting at the restaurant for a meal.";
         }
 
-        if ("SLEEP".equals(citizenAiState)) {
+        if (citizenAiState == CitizenAIState.SLEEP) {
             return "Sleeping — resting for the night.";
         }
 
-        if ("SICK".equals(citizenAiState)) {
+        if (citizenAiState == CitizenAIState.SICK) {
             return "Too sick to work. Needs medical attention at the hospital.";
         }
 
-        if ("MOURN".equals(citizenAiState)) {
+        if (citizenAiState == CitizenAIState.MOURN) {
             return "Mourning the loss of a fellow colonist. Cannot focus on work right now.";
         }
 
-        if ("WORKING".equals(citizenAiState) || "WORK".equals(citizenAiState)) {
-            String ws = workAiState != null ? workAiState : "";
-            return switch (ws) {
-                case "NEEDS_ITEM"
+        if (citizenAiState == CitizenAIState.WORKING || citizenAiState == CitizenAIState.WORK) {
+            if (workAiState == null) {
+                return nameTagDescription != null
+                        ? "Working — " + nameTagDescription + "."
+                        : "Working.";
+            }
+            return switch (workAiState) {
+                case NEEDS_ITEM
                     -> "Waiting at " + (view.workBuildingDisplayName() != null
                         ? view.workBuildingDisplayName() : "the workplace")
                         + " for missing supplies to be delivered before work can continue.";
-                case "START_WORKING"
+                case START_WORKING
                     -> "Walking to " + (view.workBuildingDisplayName() != null
                         ? view.workBuildingDisplayName() : "work") + ".";
-                case "IDLE", "DECIDE"
+                case IDLE, DECIDE
                     -> "At work, deciding what to do next.";
-                case "PREPARE_DELIVERY"
+                case PREPARE_DELIVERY
                     -> "Collecting items from the warehouse for a delivery.";
-                case "DELIVERY"
+                case DELIVERY
                     -> "Currently delivering items to a colony building.";
-                case "PICKUP"
+                case PICKUP
                     -> "Picking up surplus items from a building to bring back to the warehouse.";
-                case "DUMPING"
+                case DUMPING
                     -> "Dropping off collected items at the warehouse.";
-                case "GUARD_PATROL"  -> "Patrolling the colony perimeter.";
-                case "GUARD_GUARD"   -> "Standing guard at an assigned post.";
-                case "GUARD_FOLLOW"  -> "Following and protecting a player.";
-                case "GUARD_REGEN"   -> "Resting at the guard tower to recover health.";
-                case "HELP_CITIZEN"  -> "Rushing to help a citizen who is in danger.";
-                case "FARMER_HOE"     -> "Hoeing the fields.";
-                case "FARMER_PLANT"   -> "Planting seeds.";
-                case "FARMER_HARVEST" -> "Harvesting crops.";
-                case "MINER_MINING_NODE", "MINER_MINING_SHAFT" -> "Mining underground.";
-                case "BUILDING_STEP", "START_BUILDING" -> "Building or repairing a structure.";
-                case "COOK_SERVE_FOOD_TO_CITIZEN" -> "Preparing and serving food to colonists.";
+                case GUARD_PATROL  -> "Patrolling the colony perimeter.";
+                case GUARD_GUARD   -> "Standing guard at an assigned post.";
+                case GUARD_FOLLOW  -> "Following and protecting a player.";
+                case GUARD_REGEN   -> "Resting at the guard tower to recover health.";
+                case HELP_CITIZEN  -> "Rushing to help a citizen who is in danger.";
+                case FARMER_HOE     -> "Hoeing the fields.";
+                case FARMER_PLANT   -> "Planting seeds.";
+                case FARMER_HARVEST -> "Harvesting crops.";
+                case MINER_MINING_NODE, MINER_MINING_SHAFT -> "Mining underground.";
+                case BUILDING_STEP, START_BUILDING -> "Building or repairing a structure.";
+                case COOK_SERVE_FOOD_TO_CITIZEN -> "Preparing and serving food to colonists.";
                 default -> nameTagDescription != null
                         ? "Working — " + nameTagDescription + "."
                         : "Working.";

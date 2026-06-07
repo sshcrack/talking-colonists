@@ -15,6 +15,8 @@ import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
+import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
@@ -111,8 +113,8 @@ public final class CitizenPromptViewFactory {
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
         List<String> colonyConnections = extractColonyConnections(data);
         List<String> recentEvents = extractRecentEvents(data);
-        String citizenAiState = extractCitizenAiState(data);
-        String workAiState = extractWorkAiState(data);
+        CitizenAIState citizenAiState = extractCitizenAiState(data);
+        AIWorkerState workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
         String colonyFoodSituation = extractFoodSituation(data, citizenAiState);
         List<String> recentActions = extractRecentActions(data);
@@ -176,7 +178,7 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static String extractCitizenAiState(ICitizenData data) {
+    private static CitizenAIState extractCitizenAiState(ICitizenData data) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
         var entity = entityOpt.get();
@@ -184,11 +186,16 @@ public final class CitizenPromptViewFactory {
         var ai = citizen.getCitizenAI();
         if (ai == null) return null;
         var state = ai.getState();
-        return state != null ? state.toString() : null;
+        if (state == null) return null;
+        try {
+            return CitizenAIState.valueOf(state.toString());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     @Nullable
-    private static String extractWorkAiState(ICitizenData data) {
+    private static AIWorkerState extractWorkAiState(ICitizenData data) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
         var entity = entityOpt.get();
@@ -199,7 +206,12 @@ public final class CitizenPromptViewFactory {
         var stateAi = workAi.getStateAI();
         if (stateAi == null) return null;
         var state = stateAi.getState();
-        return state != null ? state.toString() : null;
+        if (state == null) return null;
+        try {
+            return AIWorkerState.valueOf(state.toString());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     @Nullable
@@ -209,9 +221,9 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static String extractFoodSituation(ICitizenData data, String citizenAiState) {
+    private static String extractFoodSituation(ICitizenData data, CitizenAIState citizenAiState) {
         if (data.getSaturation() > 5.0) return null;
-        if ("EATING".equals(citizenAiState)) return "already_eating";
+        if (citizenAiState == CitizenAIState.EATING) return "already_eating";
 
         var colony = data.getColony();
         var bm = colony.getServerBuildingManager();
