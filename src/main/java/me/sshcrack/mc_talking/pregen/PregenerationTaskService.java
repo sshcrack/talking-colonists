@@ -86,6 +86,27 @@ public class PregenerationTaskService {
                     }
                 }
             }
+
+            // Fallback: no heatmap data yet or all pairs were busy/cached — pick any
+            // online player and any non-busy citizen to seed the greeting cache.
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                for (ServerLevel level : server.getAllLevels()) {
+                    for (Entity entity : level.getEntities().getAll()) {
+                        if (!(entity instanceof AbstractEntityCitizen citizen)) continue;
+                        if (ConversationManager.isCitizenBusy(citizen)) continue;
+
+                        String cacheKey = citizen.getUUID() + ":" + player.getUUID();
+                        if (!playerGreetingCache.containsKey(cacheKey)) {
+                            String playerName = player.getName().getString();
+                            startPregenerationIfPossible(citizen,
+                                    "Generate a brief 1-sentence greeting for " + playerName + " who is approaching you. Greet them by name and say hello, you're happy to see them.",
+                                    (audio) -> putPlayerGreeting(citizen.getUUID(), player.getUUID(), audio),
+                                    false, true);
+                            return;
+                        }
+                    }
+                }
+            }
         }
 
         // Priority 2: Citizen↔citizen greeting pregen — if background pool has capacity
