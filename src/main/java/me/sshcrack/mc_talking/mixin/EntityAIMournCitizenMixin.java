@@ -38,12 +38,24 @@ public class EntityAIMournCitizenMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state, mc_talking$getDeceasedName());
     }
 
+    @Unique
+    private void mc_talking$clearSubState() {
+        var data = citizen.getCitizenData();
+        if (data == null) return;
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
+    }
+
     @Inject(
         method = "walkToTownHall",
         at = @At("HEAD")
     )
     private void mc_talking$onWalkToTownHall(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.MOURN_AT_TOWNHALL);
+    }
+
+    @Inject(method = "walkToTownHall", at = @At("RETURN"))
+    private void mc_talking$onWalkToTownHallReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -54,12 +66,22 @@ public class EntityAIMournCitizenMixin {
         mc_talking$setSubState(MinimalAISubState.MOURN_WALKING_TO_GRAVEYARD);
     }
 
+    @Inject(method = "walkToGraveyard", at = @At("RETURN"))
+    private void mc_talking$onWalkToGraveyardReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "wanderAtGraveyard",
         at = @At("HEAD")
     )
     private void mc_talking$onWanderAtGraveyard(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.MOURN_AT_GRAVE);
+    }
+
+    @Inject(method = "wanderAtGraveyard", at = @At("RETURN"))
+    private void mc_talking$onWanderAtGraveyardReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -70,12 +92,22 @@ public class EntityAIMournCitizenMixin {
         mc_talking$setSubState(MinimalAISubState.MOURN_AT_GRAVE);
     }
 
+    @Inject(method = "walkToGrave", at = @At("RETURN"))
+    private void mc_talking$onWalkToGraveReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "wander",
         at = @At("HEAD")
     )
     private void mc_talking$onWander(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.MOURN_WALKING);
+    }
+
+    @Inject(method = "wander", at = @At("RETURN"))
+    private void mc_talking$onWanderReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -86,11 +118,21 @@ public class EntityAIMournCitizenMixin {
         mc_talking$setSubState(MinimalAISubState.MOURN_STARING);
     }
 
+    @Inject(method = "stare", at = @At("RETURN"))
+    private void mc_talking$onStareReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "decide",
         at = @At("HEAD")
     )
     private void mc_talking$onDecide(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.MOURN_WALKING);
+    }
+
+    @Inject(method = "decide", at = @At("RETURN"))
+    private void mc_talking$onDecideReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 }

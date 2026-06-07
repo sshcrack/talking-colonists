@@ -28,12 +28,24 @@ public class EntityAICitizenAvoidEntityMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state);
     }
 
+    @Unique
+    private void mc_talking$clearSubState() {
+        var data = citizen.getCitizenData();
+        if (data == null) return;
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
+    }
+
     @Inject(
         method = "isEntityClose",
         at = @At("HEAD")
     )
     private void mc_talking$onIsEntityClose(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.FLEE_CHECKING);
+    }
+
+    @Inject(method = "isEntityClose", at = @At("RETURN"))
+    private void mc_talking$onIsEntityCloseReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -44,11 +56,21 @@ public class EntityAICitizenAvoidEntityMixin {
         mc_talking$setSubState(MinimalAISubState.FLEE_RUNNING);
     }
 
+    @Inject(method = "performMoveAway", at = @At("RETURN"))
+    private void mc_talking$onPerformMoveAwayReturn(CallbackInfoReturnable<Boolean> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "updateMoving",
         at = @At("HEAD")
     )
     private void mc_talking$onUpdateMoving(CallbackInfoReturnable<Boolean> cir) {
         mc_talking$setSubState(MinimalAISubState.FLEE_RUNNING);
+    }
+
+    @Inject(method = "updateMoving", at = @At("RETURN"))
+    private void mc_talking$onUpdateMovingReturn(CallbackInfoReturnable<Boolean> cir) {
+        mc_talking$clearSubState();
     }
 }

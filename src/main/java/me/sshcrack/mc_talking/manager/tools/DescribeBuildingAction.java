@@ -33,7 +33,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         "baker", "fisherman", "lumberjack", "shepherd", "cowboy",
         "undertaker", "planter", "beekeeper", "mechanic", "sifter",
         "crusher", "netherworker", "florist", "archery", "combat",
-        "cookoo", "rabbbit"
+        "rabbit"
     );
 
     public DescribeBuildingAction() {

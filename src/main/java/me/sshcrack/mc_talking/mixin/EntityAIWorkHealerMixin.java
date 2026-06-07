@@ -77,6 +77,8 @@ public class EntityAIWorkHealerMixin {
 
         ((CitizenRecentActionsProvider) citizenData)
             .mc_talking$pushRecentAction(entry);
+
+        mc_talking$treatmentType = null;
     }
 
     @Inject(method = "curePlayer", at = @At("RETURN"))
@@ -110,5 +112,7 @@ public class EntityAIWorkHealerMixin {
 
         ((CitizenRecentActionsProvider) citizenData)
             .mc_talking$pushRecentAction(entry);
+
+        mc_talking$wanderPatientName = null;
     }
 }
