@@ -60,6 +60,7 @@
   "mc_talking.debug.no_connections": "No active Gemini connections.",
   "mc_talking.debug.no_colony_specified": "Specify a colony ID or execute near a colony.",
   "mc_talking.debug.no_colony_found": "Could not find a colony for you. Specify a colony ID.",
+  "mc_talking.debug.prompt_triggered": "Started low-priority session for %s with prompt: \"%s\"",
   "mc_talking.debug.memory_disabled": "Citizen memory is disabled in config.",
   "mc_talking.debug.memory_empty": "No memories stored for this citizen.",
 

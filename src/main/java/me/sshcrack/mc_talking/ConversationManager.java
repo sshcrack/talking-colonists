@@ -219,7 +219,8 @@ public class ConversationManager {
 
     /**
      * Returns {@code true} if at least {@code slotsNeeded} slots can be granted
-     * */
+     *
+     */
     public static synchronized boolean hasFreeCapacity(int slotsNeeded) {
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
         int free = max - addedEntities.size();
@@ -380,6 +381,14 @@ public class ConversationManager {
 
         long cooldownMs = McTalkingConfig.INSTANCE.instance().citizenCooldownSeconds * 1000L;
         return (System.currentTimeMillis() - lastEnd) < cooldownMs;
+    }
+
+    /**
+     * ONLY used when a debug command is invoked that explicitly tells to remove the cooldown.
+     * @param citizen the citizen to remove the cooldown for
+     */
+    public static void forceRemoveCooldown(AbstractEntityCitizen citizen) {
+        lastSessionEndTime.remove(citizen.getUUID());
     }
 
     /**
