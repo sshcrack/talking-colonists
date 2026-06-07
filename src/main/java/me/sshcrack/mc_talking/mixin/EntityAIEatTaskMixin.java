@@ -61,6 +61,13 @@ public class EntityAIEatTaskMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state, mc_talking$getRestaurantContext());
     }
 
+    @Unique
+    private void mc_talking$clearSubState() {
+        var data = citizen.getCitizenData();
+        if (data == null) return;
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
+    }
+
     @Inject(
         method = "eat",
         at = @At("HEAD")
@@ -82,12 +89,22 @@ public class EntityAIEatTaskMixin {
         ((CitizenRecentActionsProvider) data).mc_talking$pushRecentAction("Finished eating and returned to full saturation.");
     }
 
+    @Inject(method = "eat", at = @At("RETURN"))
+    private void mc_talking$onEatReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "searchRestaurant",
         at = @At("HEAD")
     )
     private void mc_talking$onSearchRestaurant(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
         mc_talking$setSubState(MinimalAISubState.EAT_SEARCH_RESTAURANT);
+    }
+
+    @Inject(method = "searchRestaurant", at = @At("RETURN"))
+    private void mc_talking$onSearchRestaurantReturn(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -98,12 +115,22 @@ public class EntityAIEatTaskMixin {
         mc_talking$setSubState(MinimalAISubState.EAT_GET_FOOD);
     }
 
+    @Inject(method = "getFood", at = @At("RETURN"))
+    private void mc_talking$onGetFoodReturn(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "goToRestaurant",
         at = @At("HEAD")
     )
     private void mc_talking$onGoToRestaurant(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
         mc_talking$setSubState(MinimalAISubState.EAT_GET_FOOD);
+    }
+
+    @Inject(method = "goToRestaurant", at = @At("RETURN"))
+    private void mc_talking$onGoToRestaurantReturn(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -114,6 +141,11 @@ public class EntityAIEatTaskMixin {
         mc_talking$setSubState(MinimalAISubState.EAT_WAITING_FOOD);
     }
 
+    @Inject(method = "waitForFood", at = @At("RETURN"))
+    private void mc_talking$onWaitForFoodReturn(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "getFoodYourself",
         at = @At("HEAD")
@@ -122,11 +154,21 @@ public class EntityAIEatTaskMixin {
         mc_talking$setSubState(MinimalAISubState.EAT_GET_FOOD);
     }
 
+    @Inject(method = "getFoodYourself", at = @At("RETURN"))
+    private void mc_talking$onGetFoodYourselfReturn(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "goToEatingPlace",
         at = @At("HEAD")
     )
     private void mc_talking$onGoToEatingPlace(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
-        mc_talking$setSubState(MinimalAISubState.EAT_EATING);
+        mc_talking$setSubState(MinimalAISubState.EAT_GET_FOOD);
+    }
+
+    @Inject(method = "goToEatingPlace", at = @At("RETURN"))
+    private void mc_talking$onGoToEatingPlaceReturn(CallbackInfoReturnable<EntityAIEatTask.EatingState> cir) {
+        mc_talking$clearSubState();
     }
 }

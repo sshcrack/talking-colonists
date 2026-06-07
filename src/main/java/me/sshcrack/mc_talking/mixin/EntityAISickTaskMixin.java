@@ -38,12 +38,24 @@ public class EntityAISickTaskMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state, mc_talking$getDiseaseName());
     }
 
+    @Unique
+    private void mc_talking$clearSubState() {
+        var data = citizen.getCitizenData();
+        if (data == null) return;
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
+    }
+
     @Inject(
         method = "checkForCure",
         at = @At("HEAD")
     )
     private void mc_talking$onCheckForCure(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SICK_CHECKING_FOR_CURE);
+    }
+
+    @Inject(method = "checkForCure", at = @At("RETURN"))
+    private void mc_talking$onCheckForCureReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -54,12 +66,22 @@ public class EntityAISickTaskMixin {
         mc_talking$setSubState(MinimalAISubState.SICK_WALKING_TO_HOSPITAL);
     }
 
+    @Inject(method = "goToHut", at = @At("RETURN"))
+    private void mc_talking$onGoToHutReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "goToHospital",
         at = @At("HEAD")
     )
     private void mc_talking$onGoToHospital(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SICK_WALKING_TO_HOSPITAL);
+    }
+
+    @Inject(method = "goToHospital", at = @At("RETURN"))
+    private void mc_talking$onGoToHospitalReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -70,12 +92,22 @@ public class EntityAISickTaskMixin {
         mc_talking$setSubState(MinimalAISubState.SICK_AT_HOSPITAL);
     }
 
+    @Inject(method = "searchHospital", at = @At("RETURN"))
+    private void mc_talking$onSearchHospitalReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "waitForCure",
         at = @At("HEAD")
     )
     private void mc_talking$onWaitForCure(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SICK_AT_HOSPITAL);
+    }
+
+    @Inject(method = "waitForCure", at = @At("RETURN"))
+    private void mc_talking$onWaitForCureReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -86,6 +118,11 @@ public class EntityAISickTaskMixin {
         mc_talking$setSubState(MinimalAISubState.SICK_AT_HOSPITAL);
     }
 
+    @Inject(method = "findEmptyBed", at = @At("RETURN"))
+    private void mc_talking$onFindEmptyBedReturn(CallbackInfoReturnable<EntityAISickTask.DiseaseState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "applyCure",
         at = @At("HEAD")
@@ -94,11 +131,21 @@ public class EntityAISickTaskMixin {
         mc_talking$setSubState(MinimalAISubState.SICK_RECEIVING_CURE);
     }
 
+    @Inject(method = "applyCure", at = @At("RETURN"))
+    private void mc_talking$onApplyCureReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "wander",
         at = @At("HEAD")
     )
     private void mc_talking$onWander(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SICK_WANDERING);
+    }
+
+    @Inject(method = "wander", at = @At("RETURN"))
+    private void mc_talking$onWanderReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 }

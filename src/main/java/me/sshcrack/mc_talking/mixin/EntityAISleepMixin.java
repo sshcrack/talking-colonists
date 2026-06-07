@@ -43,12 +43,24 @@ public class EntityAISleepMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state, context);
     }
 
+    @Unique
+    private void mc_talking$clearSubState() {
+        var data = citizen.getCitizenData();
+        if (data == null) return;
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
+    }
+
     @Inject(
         method = "checkSleep",
         at = @At("HEAD")
     )
     private void mc_talking$onCheckSleep(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SLEEP_WALKING_TO_BED, mc_talking$getHomeName());
+    }
+
+    @Inject(method = "checkSleep", at = @At("RETURN"))
+    private void mc_talking$onCheckSleepReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 
     @Inject(
@@ -59,6 +71,11 @@ public class EntityAISleepMixin {
         mc_talking$setSubState(MinimalAISubState.SLEEP_WALKING_TO_BED, mc_talking$getHomeName());
     }
 
+    @Inject(method = "walkHome", at = @At("RETURN"))
+    private void mc_talking$onWalkHomeReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "findBedAndTryToSleep",
         at = @At("HEAD")
@@ -67,11 +84,21 @@ public class EntityAISleepMixin {
         mc_talking$setSubState(MinimalAISubState.SLEEP_FINDING_BED, "no spare bed in colony");
     }
 
+    @Inject(method = "findBedAndTryToSleep", at = @At("RETURN"))
+    private void mc_talking$onFindBedReturn(CallbackInfo ci) {
+        mc_talking$clearSubState();
+    }
+
     @Inject(
         method = "sleep",
         at = @At("HEAD")
     )
     private void mc_talking$onSleep(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SLEEP_IN_BED, null);
+    }
+
+    @Inject(method = "sleep", at = @At("RETURN"))
+    private void mc_talking$onSleepReturn(CallbackInfoReturnable<IState> cir) {
+        mc_talking$clearSubState();
     }
 }
