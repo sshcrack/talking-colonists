@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 
-public class AddEventToMemory extends FunctionAction {
+public class AddEventToMemory extends GeneralFunctionAction {
     public AddEventToMemory() {
         super("add_event_to_memory", """
                         Adds a message to your memory, so you remember it in ongoing conversations.

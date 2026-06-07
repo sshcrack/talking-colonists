@@ -23,7 +23,7 @@ import java.util.Set;
  * immediate surroundings: time, weather, nearby players, other citizens,
  * animals, hostile mobs, and visible colony buildings.
  */
-public class DescribeSurroundingsAction extends FunctionAction {
+public class DescribeSurroundingsAction extends GeneralFunctionAction {
 
     private static final double SCAN_RADIUS = 20.0;
 
