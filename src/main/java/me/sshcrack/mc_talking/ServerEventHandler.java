@@ -353,6 +353,9 @@ public class ServerEventHandler {
 
     private void playPregeneratedGreetings(List<AbstractEntityCitizen> citizens,
                                             Set<Long> processedPairs) {
+        int maxPerInterval = McTalkingConfig.INSTANCE.instance().maxGreetingsPerTickInterval;
+        int greetingsThisCall = 0;
+
         for (int i = 0; i < citizens.size(); i++) {
             AbstractEntityCitizen citizenOne = citizens.get(i);
             for (int j = i + 1; j < citizens.size(); j++) {
@@ -378,24 +381,22 @@ public class ServerEventHandler {
 
                 if (PregenerationTaskService.hasGreeting(citizenOne.getUUID(), citizenTwo.getUUID())) {
                     if (!PregenerationTaskService.isGreetingOnCooldown(citizenOne.getUUID(), citizenTwo.getUUID())) {
-                        AudioChunk audio = PregenerationTaskService.popGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
-                        if (audio != null) {
-                            if (PregenerationPlayback.playAudioIfPossible(citizenOne, audio)) {
-                                PregenerationTaskService.recordGreetingPlayed(citizenOne.getUUID(), citizenTwo.getUUID());
-                            } else {
-                                PregenerationTaskService.putGreeting(citizenOne.getUUID(), citizenTwo.getUUID(), audio);
-                            }
+                        AudioChunk audio = PregenerationTaskService.peekGreeting(citizenOne.getUUID(), citizenTwo.getUUID());
+                        if (audio != null && PregenerationPlayback.playAudioIfPossible(citizenOne, audio)) {
+                            PregenerationTaskService.recordGreetingPlayed(citizenOne.getUUID(), citizenTwo.getUUID());
+                            PregenerationTaskService.scheduleGreetingRegen(citizenOne, citizenTwo);
+                            greetingsThisCall++;
+                            if (greetingsThisCall >= maxPerInterval) return;
                         }
                     }
                 } else if (PregenerationTaskService.hasGreeting(citizenTwo.getUUID(), citizenOne.getUUID())) {
                     if (!PregenerationTaskService.isGreetingOnCooldown(citizenTwo.getUUID(), citizenOne.getUUID())) {
-                        AudioChunk audio = PregenerationTaskService.popGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
-                        if (audio != null) {
-                            if (PregenerationPlayback.playAudioIfPossible(citizenTwo, audio)) {
-                                PregenerationTaskService.recordGreetingPlayed(citizenTwo.getUUID(), citizenOne.getUUID());
-                            } else {
-                                PregenerationTaskService.putGreeting(citizenTwo.getUUID(), citizenOne.getUUID(), audio);
-                            }
+                        AudioChunk audio = PregenerationTaskService.peekGreeting(citizenTwo.getUUID(), citizenOne.getUUID());
+                        if (audio != null && PregenerationPlayback.playAudioIfPossible(citizenTwo, audio)) {
+                            PregenerationTaskService.recordGreetingPlayed(citizenTwo.getUUID(), citizenOne.getUUID());
+                            PregenerationTaskService.scheduleGreetingRegen(citizenTwo, citizenOne);
+                            greetingsThisCall++;
+                            if (greetingsThisCall >= maxPerInterval) return;
                         }
                     }
                 }
@@ -421,12 +422,11 @@ public class ServerEventHandler {
             if (PregenerationTaskService.isPlayerGreetingOnCooldown(citizenId, playerId)) continue;
 
             if (PregenerationTaskService.hasPlayerGreeting(citizenId, playerId)) {
-                var audio = PregenerationTaskService.popPlayerGreeting(citizenId, playerId);
+                var audio = PregenerationTaskService.peekPlayerGreeting(citizenId, playerId);
                 if (audio != null) {
                     if (PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
                         PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
-                    } else {
-                        PregenerationTaskService.putPlayerGreeting(citizenId, playerId, audio);
+                        PregenerationTaskService.schedulePlayerGreetingRegen(citizen, player);
                     }
                     return;
                 }
@@ -546,11 +546,10 @@ public class ServerEventHandler {
                 // Try pregenerated greeting first
                 if (PregenerationTaskService.hasPlayerGreeting(citizenId, playerId)
                         && !PregenerationTaskService.isPlayerGreetingOnCooldown(citizenId, playerId)) {
-                    var audio = PregenerationTaskService.popPlayerGreeting(citizenId, playerId);
+                    var audio = PregenerationTaskService.peekPlayerGreeting(citizenId, playerId);
                     if (audio != null && PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
                         PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
-                    } else if (audio != null) {
-                        PregenerationTaskService.putPlayerGreeting(citizenId, playerId, audio);
+                        PregenerationTaskService.schedulePlayerGreetingRegen(citizen, player);
                     }
                 } else {
                     // Fallback: generate on-demand and play when complete

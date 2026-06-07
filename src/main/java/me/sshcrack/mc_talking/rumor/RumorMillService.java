@@ -7,7 +7,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -22,7 +22,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.jetbrains.annotations.Nullable;
 
 public class RumorMillService {
-    private RumorMillService() {}
+    private RumorMillService() {
+    }
 
     public static void tick(MinecraftServer server) {
         var cfg = McTalkingConfig.INSTANCE.instance();

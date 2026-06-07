@@ -200,6 +200,11 @@ public class CitizenWsClient extends GeminiWsClient {
     }
 
     @Override
+    protected String getModelName() {
+        return McTalkingConfig.INSTANCE.instance().currentAiModel.getName();
+    }
+
+    @Override
     protected void onQuotaExceededEvent(String message) {
         if (player != null) {
             Objects.requireNonNull(player.getServer()).execute(() -> {
