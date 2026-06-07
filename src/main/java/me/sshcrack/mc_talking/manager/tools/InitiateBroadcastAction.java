@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
+import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
@@ -12,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.UUID;
 
 public class InitiateBroadcastAction extends PlayerFunctionAction {
@@ -41,7 +43,19 @@ public class InitiateBroadcastAction extends PlayerFunctionAction {
         String originatorName = citizen.getCitizenData() != null ? citizen.getCitizenData().getName() : "Unknown";
         String broadcastId = UUID.randomUUID().toString();
 
-        ColonyBroadcast broadcast = new ColonyBroadcast(broadcastId, originatorName, message, System.currentTimeMillis());
+        String senderPlayerName = "Unknown Player";
+        var playerUUID = ConversationManager.getPlayerForEntity(citizen.getUUID());
+        if (playerUUID != null) {
+            var server = citizen.level().getServer();
+            if (server != null) {
+                var player = server.getPlayerList().getPlayer(playerUUID);
+                if (player != null) {
+                    senderPlayerName = player.getScoreboardName();
+                }
+            }
+        }
+
+        ColonyBroadcast broadcast = new ColonyBroadcast(broadcastId, originatorName, message, System.currentTimeMillis(), senderPlayerName);
 
         var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
         memory.addBroadcast(broadcast);

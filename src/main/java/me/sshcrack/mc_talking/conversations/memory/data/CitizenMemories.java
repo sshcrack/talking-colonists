@@ -256,8 +256,9 @@ public class CitizenMemories {
             int count = 0;
             for (ColonyBroadcast b : receivedBroadcasts) {
                 if (count >= broadcastCap) break;
-                prompt.append("- ").append(b.getOriginatorName())
-                    .append(" sent word: ").append(b.getMessage()).append("\n");
+                prompt.append("- ").append(b.getSenderPlayerName())
+                    .append(" sent word via ").append(b.getOriginatorName())
+                    .append(": ").append(b.getMessage()).append("\n");
                 count++;
             }
         }

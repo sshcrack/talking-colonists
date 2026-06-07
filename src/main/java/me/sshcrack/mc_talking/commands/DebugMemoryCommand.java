@@ -127,6 +127,7 @@ public class DebugMemoryCommand {
                     String idStr = b.getId().length() > 8 ? b.getId().substring(0, 8) + "…" : b.getId();
                     msg.append(Component.literal("    §f" + i + ". §7" + idStr
                                     + " §8| §f" + b.getOriginatorName()
+                                    + " §8via §f" + b.getSenderPlayerName()
                                     + " §8| §7\"" + b.getMessage() + "\""
                                     + " §8(" + ageStr + ")")
                             .append(Component.literal("\n")));
