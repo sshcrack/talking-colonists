@@ -101,10 +101,10 @@ public class CitizenMemories {
     public void addRumor(Rumor rumor) {
         if (knownRumorIds.contains(rumor.getId())) return;
         knownRumorIds.add(rumor.getId());
-        receivedRumors.add(rumor);
+        receivedRumors.add(0, rumor);
         int max = McTalkingConfig.INSTANCE.instance().maxRumorsStored;
         while (receivedRumors.size() > max) {
-            Rumor removed = receivedRumors.remove(0);
+            Rumor removed = receivedRumors.remove(receivedRumors.size() - 1);
             knownRumorIds.remove(removed.getId());
         }
     }
@@ -269,7 +269,7 @@ public class CitizenMemories {
 
         int rumorCap = McTalkingConfig.INSTANCE.instance().maxRumorsInPrompt;
         if (!receivedRumors.isEmpty() && rumorCap > 0) {
-            prompt.append(" Rumors (heard via the grapevine):\n");
+            prompt.append(" Rumors (heard via the grapevine, most recent first):\n");
             int count = 0;
             for (Rumor r : receivedRumors) {
                 if (count >= rumorCap) break;

@@ -143,6 +143,7 @@ public class RumorMillService {
         String id = UUID.randomUUID().toString();
 
         Rumor newRumor = new Rumor(id, originatorName, content);
+        sourceMem.addRumor(newRumor);
         targetMem.addRumor(newRumor);
         return newRumor;
     }

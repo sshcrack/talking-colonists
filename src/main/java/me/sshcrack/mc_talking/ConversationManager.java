@@ -520,7 +520,7 @@ public class ConversationManager {
      * @param userPrompt a system-prompt addition written as a directive to the AI
      *                   model; see authoring contract above
      */
-    public static void startLowPrioritySession(AbstractEntityCitizen citizen, String prompt) {
+    public static void startLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
         if (!canCitizenSpeak(citizen)) return;
 
@@ -542,7 +542,7 @@ public class ConversationManager {
                     }
                     recordCooldown(citizen);
                 });
-        client.addPromptTextAfterTalkingComplete(prompt);
+        client.addPromptTextAfterTalkingComplete(userPrompt);
         clients.put(citizenId, client);
     }
 
