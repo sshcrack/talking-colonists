@@ -310,6 +310,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     @Override
     public String generateConversationalInfoPrompt(@NotNull CitizenPromptView view) {
+        // Currently identical to getDetailedCitizenInfoPrompt; kept separate per
+        // the interface contract so alternate implementations can diverge.
         return getGeneralCitizenPrompt(view, false);
     }
 
@@ -318,18 +320,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         StringBuilder prompt = new StringBuilder();
         prompt.append("You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.\n");
         prompt.append(getGeneralCitizenPrompt(view, true));
-
-        if (view.guard()) {
-            prompt.append("""
-                    
-                    ## GUARD DUTY
-                    - You are a guard — brave, tough, and sworn to protect the colony.
-                    - You are not afraid of monsters or threats; you stand your ground and fight.
-                    - You take pride in your duty to defend your fellow colonists.
-                    - Your tone is confident and resolute; panic and cowardice are beneath you.
-                    
-                    """);
-        }
+        appendGuardDuty(prompt, view.guard());
 
         prompt.append("""
                         ## GUIDELINES
@@ -350,18 +341,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));
-
-        if (view.guard()) {
-            prompt.append("""
-                    
-                    ## GUARD DUTY
-                    - You are a guard — brave, tough, and sworn to protect the colony.
-                    - You are not afraid of monsters or threats; you stand your ground and fight.
-                    - You take pride in your duty to defend your fellow colonists.
-                    - Your tone is confident and resolute; panic and cowardice are beneath you.
-                    
-                    """);
-        }
+        appendGuardDuty(prompt, view.guard());
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
@@ -390,6 +370,20 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
 
         return prompt.toString();
+    }
+
+    private static void appendGuardDuty(StringBuilder prompt, boolean isGuard) {
+        if (isGuard) {
+            prompt.append("""
+                    
+                    ## GUARD DUTY
+                    - You are a guard — brave, tough, and sworn to protect the colony.
+                    - You are not afraid of monsters or threats; you stand your ground and fight.
+                    - You take pride in your duty to defend your fellow colonists.
+                    - Your tone is confident and resolute; panic and cowardice are beneath you.
+                    
+                    """);
+        }
     }
 
     private static void addColonyDiplomacy(@NotNull CitizenPromptView view, StringBuilder prompt) {

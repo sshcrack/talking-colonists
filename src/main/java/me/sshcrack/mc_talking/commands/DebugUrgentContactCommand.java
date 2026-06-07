@@ -4,7 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import me.sshcrack.mc_talking.ServerEventHandler;
+import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -39,7 +39,7 @@ public class DebugUrgentContactCommand {
             throw NOT_A_PLAYER.create();
         }
 
-        ServerEventHandler.triggerWalkToPlayer(citizen, player);
+        UrgentContactHandler.triggerWalkToPlayer(citizen, player);
 
         String citizenName = citizen.getCitizenData() != null
                 ? citizen.getCitizenData().getName()

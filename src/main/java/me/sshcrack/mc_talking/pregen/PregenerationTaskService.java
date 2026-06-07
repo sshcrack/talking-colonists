@@ -308,6 +308,28 @@ public class PregenerationTaskService {
         pendingRegen.remove(regenKey);
     }
 
+    /**
+     * Removes and returns the cached greeting for (citizenId, friendId), or null.
+     * The caller is expected to re-insert via {@link #putGreeting} if playback fails.
+     */
+    public static AudioChunk popGreeting(UUID citizenId, UUID friendId) {
+        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
+        if (friends == null) return null;
+        synchronized (friends) {
+            return friends.remove(friendId);
+        }
+    }
+
+    /**
+     * Stores a greeting back into the cache after a failed playback attempt.
+     */
+    public static void putGreeting(UUID citizenId, UUID friendId, AudioChunk audio) {
+        Map<UUID, AudioChunk> friends = greetingCache.computeIfAbsent(citizenId, k -> Collections.synchronizedMap(new LinkedHashMap<>()));
+        synchronized (friends) {
+            friends.put(friendId, audio);
+        }
+    }
+
     public static boolean hasPlayerGreeting(UUID citizenId, UUID playerId) {
         return playerGreetingCache.containsKey(citizenId + ":" + playerId);
     }
@@ -327,6 +349,21 @@ public class PregenerationTaskService {
     public static void replacePlayerGreeting(UUID citizenId, UUID playerId, AudioChunk newAudio) {
         playerGreetingCache.put(citizenId + ":" + playerId, newAudio);
         pendingRegen.remove(citizenId + ":" + playerId);
+    }
+
+    /**
+     * Removes and returns the cached player greeting for (citizenId, playerId), or null.
+     * The caller is expected to re-insert via {@link #putPlayerGreeting} if playback fails.
+     */
+    public static AudioChunk popPlayerGreeting(UUID citizenId, UUID playerId) {
+        return playerGreetingCache.remove(citizenId + ":" + playerId);
+    }
+
+    /**
+     * Stores a player greeting back into the cache after a failed playback attempt.
+     */
+    public static void putPlayerGreeting(UUID citizenId, UUID playerId, AudioChunk audio) {
+        playerGreetingCache.put(citizenId + ":" + playerId, audio);
     }
 
     public static boolean isPlayerGreetingOnCooldown(UUID citizenId, UUID playerId) {
@@ -408,13 +445,7 @@ public class PregenerationTaskService {
     }
 
     private static AbstractEntityCitizen findCitizen(MinecraftServer server, java.util.UUID uuid) {
-        for (ServerLevel level : server.getAllLevels()) {
-            Entity entity = level.getEntity(uuid);
-            if (entity instanceof AbstractEntityCitizen citizen) {
-                return citizen;
-            }
-        }
-        return null;
+        return CitizenHelper.findCitizen(server, uuid);
     }
 
     private static ServerPlayer findPlayer(MinecraftServer server, java.util.UUID uuid) {

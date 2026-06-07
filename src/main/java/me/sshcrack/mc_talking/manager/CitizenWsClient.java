@@ -7,7 +7,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
-import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
+import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.network.chat.Component;
@@ -76,7 +76,7 @@ public class CitizenWsClient extends GeminiWsClient {
      * @param onSystemConversationEnded callback invoked when each mumbling turn ends
      */
     public CitizenWsClient(AbstractEntityCitizen entity, @Nullable Consumer<CitizenWsClient> onSystemConversationEnded) {
-        super(new CitzienEntityAudioProvider(entity, null), entity);
+        super(new CitizenEntityAudioProvider(entity, null), entity);
         this.player = null;
         this.onSystemConversationEnded = onSystemConversationEnded;
         this.startedInSystemMode = true;
