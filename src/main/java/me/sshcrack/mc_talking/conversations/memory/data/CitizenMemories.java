@@ -68,6 +68,15 @@ public class CitizenMemories {
         return pendingRumorPropagations.isEmpty() ? null : pendingRumorPropagations.remove(0);
     }
 
+    public int getPendingRumorCount() {
+        return pendingRumorPropagations.size();
+    }
+
+    public String peekPendingRumor(int index) {
+        if (index < 0 || index >= pendingRumorPropagations.size()) return null;
+        return pendingRumorPropagations.get(index);
+    }
+
     public void setSummarizedMemory(String summarizedMemory) {
         this.summarizedMemory = summarizedMemory == null ? "" : summarizedMemory;
     }
