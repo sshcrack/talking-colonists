@@ -30,6 +30,7 @@ import java.util.List;
 public class McTalkingConfig {
     public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
+    public static final String CHEAP_LIVE_MODEL = "gemini-live-2.5-flash-native-audio";
 
     /** Movement speed multiplier when a citizen walks to the player on urgent contact. */
     public static final double CITIZEN_URGENT_WALK_SPEED = 1.2;

@@ -32,7 +32,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
+        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.CHEAP_LIVE_MODEL);
 
         setup.generationConfig.responseModalities = ModalityModes.TEXT_AND_AUDIO.getModalities();
         setup.outputAudioTranscription = new JsonObject();

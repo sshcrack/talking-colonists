@@ -39,7 +39,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
+        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.CHEAP_LIVE_MODEL);
         setup.generationConfig.responseModalities = ModalityModes.AUDIO.getModalities();
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
