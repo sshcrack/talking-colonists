@@ -80,6 +80,10 @@
   "mc_talking.debug.status_pregeneration": "Pregeneration: %s (%s)",
   "mc_talking.debug.status_compaction": "MemCompaction: %s [%s] (%d active)",
 
+  "mc_talking.debug.status_quota": "Live Model Quota: %s",
+
+  "mc_talking.debug.status_bg_slots": "Background Slots: %d/%d",
+
   "mc_talking.debug.connections_header": "--- Active Connections (%d) ---",
 
   "mc_talking.debug.citizen_header": "--- Citizen Info: %s ---",
@@ -125,6 +129,8 @@
   "yacl3.config.mc_talking:config.sendMumblingAndConversationsToChat.desc": "If enabled, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.",
   "yacl3.config.mc_talking:config.maxConcurrentAgents": "Max Concurrent Agents",
   "yacl3.config.mc_talking:config.maxConcurrentAgents.desc": "Maximum number of simultaneous citizen AI sessions. Player conversations have priority and can evict non-player sessions when full.",
+  "yacl3.config.mc_talking:config.maxConcurrentBackground": "Max Concurrent Background",
+  "yacl3.config.mc_talking:config.maxConcurrentBackground.desc": "Maximum concurrent background connections for the flash2.5 live model used by memory compaction and greeting pregeneration.",
   "yacl3.config.mc_talking:config.maxConversationDistance": "Max Conversation Distance",
   "yacl3.config.mc_talking:config.maxConversationDistance.desc": "If you move farther than this many blocks from your active citizen, the player conversation ends automatically.",
   "yacl3.config.mc_talking:config.modality": "Modality",

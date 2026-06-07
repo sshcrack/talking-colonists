@@ -6,7 +6,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.core.colony.requestsystem.requests.AbstractRequest;
-import me.sshcrack.mc_talking.mixin.support.PlayerFulfillmentHandler;
+import me.sshcrack.mc_talking.support.PlayerFulfillmentHandler;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

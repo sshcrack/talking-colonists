@@ -19,7 +19,8 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class RumorMillService {
-    private RumorMillService() {}
+    private RumorMillService() {
+    }
 
     public static void tick(MinecraftServer server) {
         var cfg = McTalkingConfig.INSTANCE.instance();
@@ -89,7 +90,7 @@ public class RumorMillService {
         var sourceMem = sourceData.mc_talking$getMemory();
         if (sourceMem == null) return false;
 
-        String content = null;
+        String content;
 
         if (sourceMem.hasPendingRumor()) {
             content = sourceMem.drainPendingRumor();
@@ -99,7 +100,7 @@ public class RumorMillService {
 
             List<String> firstHand = new ArrayList<>();
             for (String e : events) {
-                if (!e.startsWith("Rumor:")) {
+                if (!e.startsWith("Rumor:") && !e.startsWith(CitizenMemories.SYSTEM_EVENT_PREFIX)) {
                     firstHand.add(e);
                 }
             }
