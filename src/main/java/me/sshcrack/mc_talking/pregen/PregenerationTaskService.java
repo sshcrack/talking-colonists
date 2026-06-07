@@ -83,8 +83,7 @@ public class PregenerationTaskService {
 
                 // Check if we need greeting for c1 -> c2
                 String key12 = c1.getUUID() + ":" + c2.getUUID();
-                boolean needsRegen12 = !hasGreeting(c1.getUUID(), c2.getUUID())
-                    || isGreetingOnCooldown(c1.getUUID(), c2.getUUID());
+                boolean needsRegen12 = !hasGreeting(c1.getUUID(), c2.getUUID());
                 if (needsRegen12 && !pendingRegen.contains(key12)) {
                     scheduleGreetingRegen(c1, c2);
                     return;
@@ -92,8 +91,7 @@ public class PregenerationTaskService {
 
                 // Check if we need greeting for c2 -> c1
                 String key21 = c2.getUUID() + ":" + c1.getUUID();
-                boolean needsRegen21 = !hasGreeting(c2.getUUID(), c1.getUUID())
-                    || isGreetingOnCooldown(c2.getUUID(), c1.getUUID());
+                boolean needsRegen21 = !hasGreeting(c2.getUUID(), c1.getUUID());
                 if (needsRegen21 && !pendingRegen.contains(key21)) {
                     scheduleGreetingRegen(c2, c1);
                     return;
@@ -114,8 +112,7 @@ public class PregenerationTaskService {
                     }
 
                     String cacheKey = pair.citizenId() + ":" + pair.playerId();
-                    boolean needsPlayerRegen = !hasPlayerGreeting(pair.citizenId(), pair.playerId())
-                        || isPlayerGreetingOnCooldown(pair.citizenId(), pair.playerId());
+                    boolean needsPlayerRegen = !hasPlayerGreeting(pair.citizenId(), pair.playerId());
                     if (needsPlayerRegen && !pendingRegen.contains(cacheKey)) {
                         schedulePlayerGreetingRegen(citizen, player);
                         return;
@@ -233,37 +230,6 @@ public class PregenerationTaskService {
         lastGreetingPlayTime.put(greeterId + ":" + greetedId, System.currentTimeMillis());
     }
 
-    public static void putGreeting(UUID citizenId, UUID friendId, AudioChunk audioData) {
-        Map<UUID, AudioChunk> friends = greetingCache.computeIfAbsent(citizenId, k -> Collections.synchronizedMap(new LinkedHashMap<>()));
-        synchronized (friends) {
-            friends.put(friendId, audioData);
-            int max = McTalkingConfig.INSTANCE.instance().maxPregeneratedGreetingsPerCitizen;
-            if (max > 0 && friends.size() > max) {
-                Iterator<UUID> it = friends.keySet().iterator();
-                if (it.hasNext()) {
-                    @SuppressWarnings("unused")
-                    UUID oldest = it.next();
-
-                    it.remove();
-                }
-            }
-        }
-    }
-
-    public static AudioChunk popGreeting(UUID citizenId, UUID friendId) {
-        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
-        if (friends != null) {
-            synchronized (friends) {
-                AudioChunk data = friends.remove(friendId);
-                if (friends.isEmpty()) {
-                    greetingCache.remove(citizenId);
-                }
-                return data;
-            }
-        }
-        return null;
-    }
-
     public static boolean hasGreeting(UUID citizenId, UUID friendId) {
         Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
         return friends != null && friends.containsKey(friendId);
@@ -304,14 +270,6 @@ public class PregenerationTaskService {
 
     public static boolean hasPlayerGreeting(UUID citizenId, UUID playerId) {
         return playerGreetingCache.containsKey(citizenId + ":" + playerId);
-    }
-
-    public static AudioChunk popPlayerGreeting(UUID citizenId, UUID playerId) {
-        return playerGreetingCache.remove(citizenId + ":" + playerId);
-    }
-
-    public static void putPlayerGreeting(UUID citizenId, UUID playerId, AudioChunk audioData) {
-        playerGreetingCache.put(citizenId + ":" + playerId, audioData);
     }
 
     /**
