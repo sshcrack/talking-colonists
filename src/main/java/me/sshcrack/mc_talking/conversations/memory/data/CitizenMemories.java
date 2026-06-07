@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public class CitizenMemories {
+    public static final String SYSTEM_EVENT_PREFIX = "[SYSTEM]";
+
     private static final String TAG_FACTS_KEY = "facts";
     private static final String TAG_EVENTS_KEY = "events";
     private static final String TAG_RELATIONSHIPS_KEY = "relationships";

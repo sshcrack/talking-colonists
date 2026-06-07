@@ -30,6 +30,7 @@ import java.util.List;
 public class McTalkingConfig {
     public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
+    public static final AvailableAI CHEAP_LIVE_MODEL = AvailableAI.Flash2_5;
 
     /** Movement speed multiplier when a citizen walks to the player on urgent contact. */
     public static final double CITIZEN_URGENT_WALK_SPEED = 1.2;
@@ -145,6 +146,11 @@ public class McTalkingConfig {
     @IntField(min = 1, max = 100)
     @SerialEntry(comment = "Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
     public int maxConcurrentAgents = 3;
+
+    @AutoGen(category = "general", group = "resource_management")
+    @IntField(min = 1, max = 10)
+    @SerialEntry(comment = "Maximum concurrent background connections for the flash2.5 cheap live model (memory compaction, greeting pregeneration). The API allows 3 concurrent connections.")
+    public int maxConcurrentBackground = 3;
 
     @AutoGen(category = "general", group = "interaction")
     @DoubleField(min = 1.0, max = 100.0)

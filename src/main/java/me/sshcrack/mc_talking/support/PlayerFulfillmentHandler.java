@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.mixin.support;
+package me.sshcrack.mc_talking.support;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
@@ -7,13 +7,15 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.level.ServerPlayer;
 
 public class PlayerFulfillmentHandler {
     private static final ThreadLocal<ServerPlayer> CURRENT_FULFILLER = new ThreadLocal<>();
 
-    private PlayerFulfillmentHandler() {}
+    private PlayerFulfillmentHandler() {
+    }
 
     public static void setPendingFulfiller(ServerPlayer player) {
         CURRENT_FULFILLER.set(player);
@@ -36,14 +38,7 @@ public class PlayerFulfillmentHandler {
         ServerPlayer player = consumePendingFulfiller();
         if (player == null) return;
 
-        String itemName = "something";
-        if (request.getRequest() instanceof IDeliverable deliverable) {
-            var result = deliverable.getResult();
-            if (result != null && !result.isEmpty()) {
-                itemName = result.getHoverName().getString();
-            }
-        }
-
+        String itemName = request.getShortDisplayString().getString();
         String playerName = player.getName().getString();
         ICitizenData foundCitizen = null;
 
@@ -65,10 +60,10 @@ public class PlayerFulfillmentHandler {
 
         var mem = ((CitizenDataMemoryExtended) foundCitizen).mc_talking$getOrInitializeMemory();
         mem.addEvent(String.format(
-            "The player %s brought me the %s I needed. I'm grateful.",
-            playerName, itemName));
+                CitizenMemories.SYSTEM_EVENT_PREFIX + " The player %s brought me the %s I needed. I'm grateful.",
+                playerName, itemName));
 
         McTalking.LOGGER.info("[Fulfillment] Citizen {} remembers fulfillment by {} of {}",
-            foundCitizen.getName(), playerName, itemName);
+                foundCitizen.getName(), playerName, itemName);
     }
 }

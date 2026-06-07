@@ -12,6 +12,7 @@ import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -121,6 +122,10 @@ public class DebugCitizenCommand {
             msg.append(field("isChild", String.valueOf(data.isChild())));
             msg.append(field("isSick", String.valueOf(data.getCitizenDiseaseHandler().isSick())));
             msg.append(field("isHomeless", String.valueOf(data.getHomeBuilding() == null)));
+
+            int greetingCount = PregenerationTaskService.getGreetingCount(citizenId);
+            int playerGreetingCount = PregenerationTaskService.getPlayerGreetingCount(citizenId);
+            msg.append(field("Greetings", greetingCount + " citizen, " + playerGreetingCount + " player"));
 
             return msg;
         }, false);
