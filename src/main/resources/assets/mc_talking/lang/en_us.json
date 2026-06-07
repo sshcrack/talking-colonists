@@ -47,8 +47,11 @@
   "mc_talking.commands.invalid_tool": "Invalid tool name: %s",
   "mc_talking.commands.tool_not_found": "Tool not found.",
   "mc_talking.commands.no_tools_available": "No tools available.",
-  "mc_talking.commands.tool_description": "The description of tool %s is:\n%s\nProperties:%s",
-  "mc_talking.commands.list_tools": "List of available tools:\n%s",
+  "mc_talking.commands.tool_description": "The description of tool %s (%s) is:\n%s\nProperties:%s",
+  "mc_talking.commands.list_tools_header": "List of available tools:",
+  "mc_talking.commands.tool_entry": "  %s (%s)",
+  "mc_talking.commands.tool_category_player": "player-only",
+  "mc_talking.commands.tool_category_general": "general",
 
   "mc_talking.debug.not_citizen": "Target must be a MineColonies citizen.",
   "mc_talking.debug.not_player": "Command must be executed by a player.",

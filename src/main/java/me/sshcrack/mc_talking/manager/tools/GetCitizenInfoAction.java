@@ -11,7 +11,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 
-public class GetCitizenInfoAction extends FunctionAction {
+public class GetCitizenInfoAction extends GeneralFunctionAction {
     public GetCitizenInfoAction() {
         super(
                 "get_citizen_info",

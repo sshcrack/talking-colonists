@@ -18,15 +18,17 @@ public abstract class FunctionAction {
     private final String name;
     private final String description;
     private final Property property;
+    private final boolean isPlayerOnly;
 
-    public FunctionAction(String name, String description) {
-        this(name, description, null);
+    public FunctionAction(String name, String description, boolean isPlayerOnly) {
+        this(name, description, null, isPlayerOnly);
     }
 
-    public FunctionAction(String name, String description, Property property) {
+    public FunctionAction(String name, String description, Property property, boolean isPlayerOnly) {
         this.name = name;
         this.description = description;
         this.property = property;
+        this.isPlayerOnly = isPlayerOnly;
     }
 
     public Property getProperty() {
@@ -39,6 +41,10 @@ public abstract class FunctionAction {
 
     public String getDescription() {
         return description;
+    }
+
+    public boolean isPlayerOnly() {
+        return isPlayerOnly;
     }
 
     public boolean isEnabled() {
