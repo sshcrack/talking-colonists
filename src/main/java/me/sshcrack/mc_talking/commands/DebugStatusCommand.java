@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.commands;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import net.minecraft.ChatFormatting;
@@ -90,6 +91,20 @@ public class DebugStatusCommand {
                             McTalkingDebugCommand.booleanToStr(config.enableMemoryCompaction),
                             config.memoryMode.name(),
                             MemoryCompactionService.getActiveCount()))
+                    .withStyle(ChatFormatting.GRAY)
+                    .append(Component.literal("\n"));
+
+            boolean liveQuotaExceeded = QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
+            msg.append(Component.literal("  "))
+                    .append(Component.translatable("mc_talking.debug.status_quota",
+                            liveQuotaExceeded ? "§cexceeded" : "§aok"))
+                    .withStyle(ChatFormatting.GRAY)
+                    .append(Component.literal("\n"));
+
+            int usedBg = ConversationManager.getUsedBackgroundSlots();
+            int maxBg = ConversationManager.getMaxBackgroundSlots();
+            msg.append(Component.literal("  "))
+                    .append(Component.translatable("mc_talking.debug.status_bg_slots", usedBg, maxBg))
                     .withStyle(ChatFormatting.GRAY);
 
             return msg;

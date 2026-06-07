@@ -12,6 +12,7 @@ import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitzienEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -117,7 +118,7 @@ public class ConversationManager {
 
     // ---- Background pool (flash2.5 model) ----
     private static final Set<UUID> backgroundSlots = new LinkedHashSet<>();
-    private static final Map<UUID, String> backgroundSlotTypes = new ConcurrentHashMap<>();
+    private static final Map<UUID, BackgroundSlotType> backgroundSlotTypes = new ConcurrentHashMap<>();
     private static final Map<UUID, GeminiLiveClient> backgroundClients = new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
@@ -235,11 +236,22 @@ public class ConversationManager {
     // ---- Background pool methods ----
 
     public static synchronized boolean hasFreeBackgroundCapacity(int slotsNeeded) {
+        purgeStaleBackgroundSlots();
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
         return (max - backgroundSlots.size()) >= slotsNeeded;
     }
 
-    public static synchronized boolean claimBackgroundSlot(AbstractEntityCitizen citizen, String type) {
+    public static synchronized int getUsedBackgroundSlots() {
+        return backgroundSlots.size();
+    }
+
+    public static synchronized int getMaxBackgroundSlots() {
+        return McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
+    }
+
+    public static synchronized boolean claimBackgroundSlot(AbstractEntityCitizen citizen, BackgroundSlotType type) {
+        purgeStaleBackgroundSlots();
+
         UUID id = citizen.getUUID();
         if (backgroundSlots.contains(id)) return true;
 
@@ -252,10 +264,10 @@ public class ConversationManager {
             return true;
         }
 
-        if ("compaction".equals(type)) {
+        if (type == BackgroundSlotType.COMPACTION) {
             UUID victim = null;
             for (UUID candidate : backgroundSlots) {
-                if ("pregen".equals(backgroundSlotTypes.get(candidate))) {
+                if (backgroundSlotTypes.get(candidate) == BackgroundSlotType.PREGEN) {
                     victim = candidate;
                     break;
                 }
@@ -275,11 +287,29 @@ public class ConversationManager {
     public static synchronized void releaseBackgroundSlot(UUID entityId) {
         backgroundSlots.remove(entityId);
         backgroundSlotTypes.remove(entityId);
-        backgroundClients.remove(entityId);
+        GeminiLiveClient client = backgroundClients.remove(entityId);
+        if (client != null) {
+            try { client.close(); } catch (Exception e) {
+                McTalking.LOGGER.warn("[ConversationManager] Error closing released bg client {}", entityId, e);
+            }
+        }
     }
 
     public static synchronized void registerBackgroundClient(UUID entityId, GeminiLiveClient client) {
         backgroundClients.put(entityId, client);
+    }
+
+    private static void purgeStaleBackgroundSlots() {
+        var stale = backgroundClients.entrySet().stream()
+                .filter(e -> e.getValue().isClosed())
+                .map(Map.Entry::getKey)
+                .toList();
+        for (UUID id : stale) {
+            McTalking.LOGGER.info("[ConversationManager] Purging stale background slot for {}", id);
+            backgroundSlots.remove(id);
+            backgroundSlotTypes.remove(id);
+            backgroundClients.remove(id);
+        }
     }
 
     private static void evictBackgroundSlot(UUID entityId) {

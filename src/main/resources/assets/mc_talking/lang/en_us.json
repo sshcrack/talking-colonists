@@ -80,6 +80,10 @@
   "mc_talking.debug.status_pregeneration": "Pregeneration: %s (%s)",
   "mc_talking.debug.status_compaction": "MemCompaction: %s [%s] (%d active)",
 
+  "mc_talking.debug.status_quota": "Live Model Quota: %s",
+
+  "mc_talking.debug.status_bg_slots": "Background Slots: %d/%d",
+
   "mc_talking.debug.connections_header": "--- Active Connections (%d) ---",
 
   "mc_talking.debug.citizen_header": "--- Citizen Info: %s ---",

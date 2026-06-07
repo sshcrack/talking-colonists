@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
+import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.CitizenHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -129,7 +130,7 @@ public class PregenerationTaskService {
         } else {
             model = McTalkingConfig.CHEAP_LIVE_MODEL;
             if (QuotaTracker.isQuotaExceeded(model.getName())) return;
-            if (!ConversationManager.claimBackgroundSlot(citizen, "pregen")) return;
+            if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return;
         }
 
         generatingCount.incrementAndGet();
@@ -299,6 +300,17 @@ public class PregenerationTaskService {
 
     public static boolean isPregenerating() {
         return generatingCount.get() > 0;
+    }
+
+    public static int getGreetingCount(UUID citizenId) {
+        Map<UUID, AudioChunk> friends = greetingCache.get(citizenId);
+        return friends != null ? friends.size() : 0;
+    }
+
+    public static int getPlayerGreetingCount(UUID citizenId) {
+        return (int) playerGreetingCache.keySet().stream()
+                .filter(k -> k.startsWith(citizenId + ":"))
+                .count();
     }
 
     public static void cleanup() {

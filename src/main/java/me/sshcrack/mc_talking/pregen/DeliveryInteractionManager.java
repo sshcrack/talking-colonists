@@ -14,6 +14,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
+import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -364,7 +365,7 @@ public class DeliveryInteractionManager {
 
     private static void startPregeneration(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
         if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return;
-        if (!ConversationManager.claimBackgroundSlot(citizen, "pregen")) return;
+        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return;
 
         PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, McTalkingConfig.CHEAP_LIVE_MODEL,
                 audio -> {

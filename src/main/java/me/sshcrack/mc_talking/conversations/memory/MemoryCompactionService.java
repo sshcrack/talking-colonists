@@ -9,6 +9,7 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.MemoryMode;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -144,7 +145,7 @@ public class MemoryCompactionService {
         UUID citizenId = citizen.getUUID();
 
         if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return;
-        if (!ConversationManager.claimBackgroundSlot(citizen, "compaction")) return;
+        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.COMPACTION)) return;
 
         activeCompactionCitizens.add(citizenId);
 
