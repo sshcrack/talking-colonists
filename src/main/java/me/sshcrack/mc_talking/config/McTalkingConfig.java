@@ -135,6 +135,11 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Maximum number of pregenerated greetings to store per citizen. Oldest greetings are discarded when limit is reached.")
     public int maxPregeneratedGreetingsPerCitizen = 5;
 
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 1, max = 10)
+    @SerialEntry(comment = "Maximum number of pregenerated citizen-to-citizen greetings that may play in a single tick interval (default: 1). Increase only if you have a very large colony and want more ambient chatter.")
+    public int maxGreetingsPerTickInterval = 1;
+
     // Resource Management
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)
