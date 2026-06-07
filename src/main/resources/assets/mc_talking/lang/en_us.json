@@ -240,6 +240,9 @@
   "yacl3.config.mc_talking:config.broadcastPropagationIntervalTicks.desc": "How often the server checks for broadcast propagation. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.broadcastMaxPropagationsPerTick": "Broadcast Max Propagations Per Tick",
   "yacl3.config.mc_talking:config.broadcastMaxPropagationsPerTick.desc": "Maximum number of broadcast propagations per tick to bound server cost.",
+
+  "yacl3.config.mc_talking:config.broadcastPropagationRange": "Broadcast Propagation Range",
+  "yacl3.config.mc_talking:config.broadcastPropagationRange.desc": "Maximum distance in blocks between citizens for a broadcast to propagate. Broadcasts spread through proximity like rumors.",
   "yacl3.config.mc_talking:config.maxBroadcastsInPrompt": "Max Broadcasts In Prompt",
   "yacl3.config.mc_talking:config.maxBroadcastsInPrompt.desc": "How many recent broadcasts to include in a citizen's prompt. Set to 0 to disable.",
   "yacl3.config.mc_talking:config.maxBroadcastsStored": "Max Broadcasts Stored",

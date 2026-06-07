@@ -320,6 +320,11 @@ public class McTalkingConfig {
     public int broadcastMaxPropagationsPerTick = 5;
 
     @AutoGen(category = "citizens", group = "broadcast")
+    @DoubleField(min = 1.0, max = 50.0)
+    @SerialEntry(comment = "Maximum distance in blocks between citizens for broadcast propagation. Broadcasts spread through proximity like rumors.")
+    public double broadcastPropagationRange = 8.0;
+
+    @AutoGen(category = "citizens", group = "broadcast")
     @IntField(min = 0, max = 20)
     @SerialEntry(comment = "How many of the most recent broadcasts to include in a citizen's prompt.")
     public int maxBroadcastsInPrompt = 3;
