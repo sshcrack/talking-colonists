@@ -28,6 +28,7 @@ import java.util.UUID;
  * @param workAiState           Current work AI state, or {@code null} if entity not loaded
  * @param nameTagDescription    Job nametag description, the citizen's current activity text — from {@code /mc citizens info}, or {@code null} if unavailable
  * @param minimalAiSubState     Fine-grained sub-state from the entity's minimal AI (eating/sleep/mourn/sick/flee phases), or {@code null} if entity not loaded or no sub-state is active
+ * @param minimalAiSubStateContext Context string associated with the sub-state, e.g. deceased citizen name during mourning, disease name when sick, or {@code null} if none
  */
 public record CitizenPromptView(
         String name,
@@ -74,6 +75,7 @@ public record CitizenPromptView(
         @Nullable String nameTagDescription,
         @Nullable String colonyFoodSituation,
         @Nullable List<String> recentActions,
-        @Nullable MinimalAISubState minimalAiSubState
+        @Nullable MinimalAISubState minimalAiSubState,
+        @Nullable String minimalAiSubStateContext
 ) {
 }

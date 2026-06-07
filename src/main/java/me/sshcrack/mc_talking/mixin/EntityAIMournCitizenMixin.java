@@ -21,10 +21,21 @@ public class EntityAIMournCitizenMixin {
     private EntityCitizen citizen;
 
     @Unique
+    private String mc_talking$getDeceasedName() {
+        var data = citizen.getCitizenData();
+        if (data == null) return null;
+        var mournHandler = data.getCitizenMournHandler();
+        if (mournHandler == null) return null;
+        var deceased = mournHandler.getDeceasedCitizens();
+        if (deceased == null || deceased.isEmpty()) return null;
+        return deceased.iterator().next();
+    }
+
+    @Unique
     private void mc_talking$setSubState(MinimalAISubState state) {
         var data = citizen.getCitizenData();
         if (data == null) return;
-        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state);
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state, mc_talking$getDeceasedName());
     }
 
     @Inject(
