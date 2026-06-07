@@ -159,6 +159,13 @@ publishing {
 
 dependencies {
     annotationProcessor("org.spongepowered:mixin:${libs.versions.mixin.get()}:processor")
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4") as Any)
+
+    jarJar("io.github.llamalad7:mixinextras-forge:0.5.4") {
+        version {
+            strictly("[0.5.4,)")
+        }
+    }
 
     implementation(libs.moulberry.mixinconstraints)
     jarJar(libs.moulberry.mixinconstraints)
