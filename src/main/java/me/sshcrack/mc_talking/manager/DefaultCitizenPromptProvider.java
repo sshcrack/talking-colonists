@@ -356,27 +356,60 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         if (citizenAiState == null && workAiState == null) return null;
 
         MinimalAISubState sub = view.minimalAiSubState();
+        String ctx = view.minimalAiSubStateContext();
         if (sub != null && isSubStateConsistentWithAiState(sub, citizenAiState)) {
             return switch (sub) {
-                case EAT_SEARCH_RESTAURANT -> "Hungry and walking to the restaurant, hoping to find a free table.";
-                case EAT_GET_FOOD          -> "At the restaurant, waiting for food to be served.";
-                case EAT_WAITING_FOOD      -> "Standing at the restaurant, waiting for the cook to prepare a meal.";
-                case EAT_EATING            -> "Sitting down and eating a meal at the restaurant.";
-                case SLEEP_WALKING_TO_BED  -> "Walking home to go to sleep for the night.";
-                case SLEEP_FINDING_BED     -> "Looking for a free bed to sleep in.";
-                case SLEEP_IN_BED          -> "Fast asleep — dreaming the night away.";
-                case MOURN_WALKING         -> "Walking aimlessly while mourning.";
-                case MOURN_AT_TOWNHALL     -> "Gathering at the town hall to mourn a fallen colonist.";
-                case MOURN_WALKING_TO_GRAVEYARD -> "Walking to pay respects at a fallen colonist's grave.";
-                case MOURN_AT_GRAVE        -> "Standing quietly at a grave, grieving.";
-                case MOURN_STARING         -> "Staring into the distance, lost in grief.";
-                case SICK_CHECKING_FOR_CURE -> "Checking their pockets desperately for medicine.";
-                case SICK_WALKING_TO_HOSPITAL -> "Feeling very ill and making their way to the hospital.";
-                case SICK_AT_HOSPITAL      -> "Resting in bed at the hospital, receiving treatment.";
-                case SICK_RECEIVING_CURE   -> "Receiving medical treatment from the colony's healer.";
-                case SICK_WANDERING        -> "Too sick to function, wandering around aimlessly.";
-                case FLEE_CHECKING         -> "Looking around nervously for threats.";
-                case FLEE_RUNNING          -> "Running away from a threat!";
+                case EAT_SEARCH_RESTAURANT -> ctx != null
+                        ? "Walking to " + ctx + " to eat."
+                        : "Hungry and walking to the restaurant, hoping to find a free table.";
+                case EAT_GET_FOOD -> ctx != null
+                        ? "At " + ctx + ", waiting for food to be served."
+                        : "At the restaurant, waiting for food to be served.";
+                case EAT_WAITING_FOOD -> ctx != null
+                        ? "At " + ctx + ", waiting for the cook to prepare a meal."
+                        : "Standing at the restaurant, waiting for the cook to prepare a meal.";
+                case EAT_EATING -> ctx != null
+                        ? "Eating a meal at " + ctx + "."
+                        : "Sitting down and eating a meal at the restaurant.";
+                case SLEEP_WALKING_TO_BED -> ctx != null
+                        ? "Walking to " + ctx + " to sleep for the night."
+                        : "Walking home to go to sleep for the night.";
+                case SLEEP_FINDING_BED -> ctx != null
+                        ? "Looking for a spare bed — " + ctx + "."
+                        : "Looking for a free bed to sleep in.";
+                case SLEEP_IN_BED -> "Fast asleep — dreaming the night away.";
+                case MOURN_WALKING -> ctx != null
+                        ? "Walking aimlessly while mourning " + ctx + "."
+                        : "Walking aimlessly while mourning.";
+                case MOURN_AT_TOWNHALL -> ctx != null
+                        ? "Gathering at the town hall to mourn " + ctx + "."
+                        : "Gathering at the town hall to mourn a fallen colonist.";
+                case MOURN_WALKING_TO_GRAVEYARD -> ctx != null
+                        ? "Walking to pay respects at " + ctx + "'s grave."
+                        : "Walking to pay respects at a fallen colonist's grave.";
+                case MOURN_AT_GRAVE -> ctx != null
+                        ? "Standing quietly at " + ctx + "'s grave, grieving."
+                        : "Standing quietly at a grave, grieving.";
+                case MOURN_STARING -> ctx != null
+                        ? "Staring into the distance, lost in grief over " + ctx + "."
+                        : "Staring into the distance, lost in grief.";
+                case SICK_CHECKING_FOR_CURE -> ctx != null
+                        ? "Checking pockets desperately for medicine to treat " + ctx + "."
+                        : "Checking their pockets desperately for medicine.";
+                case SICK_WALKING_TO_HOSPITAL -> ctx != null
+                        ? "Feeling ill with " + ctx + ", heading to the hospital."
+                        : "Feeling very ill and making their way to the hospital.";
+                case SICK_AT_HOSPITAL -> ctx != null
+                        ? "Resting in bed at the hospital, being treated for " + ctx + "."
+                        : "Resting in bed at the hospital, receiving treatment.";
+                case SICK_RECEIVING_CURE -> ctx != null
+                        ? "Receiving treatment for " + ctx + " — the medicine is starting to work."
+                        : "Receiving medical treatment from the colony's healer.";
+                case SICK_WANDERING -> ctx != null
+                        ? "Too sick with " + ctx + " to function, wandering around aimlessly."
+                        : "Too sick to function, wandering around aimlessly.";
+                case FLEE_CHECKING -> "Looking around nervously for threats.";
+                case FLEE_RUNNING -> "Running away from a threat!";
             };
         }
 

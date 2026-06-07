@@ -55,6 +55,10 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     @Nullable
     private MinimalAISubState mc_talking$minimalAiSubState;
 
+    @Unique
+    @Nullable
+    private String mc_talking$minimalAiSubStateContext;
+
     @Override
     public void mc_talking$setMinimalAiSubState(@Nullable MinimalAISubState state) {
         mc_talking$minimalAiSubState = state;
@@ -64,6 +68,17 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     @Nullable
     public MinimalAISubState mc_talking$getMinimalAiSubState() {
         return mc_talking$minimalAiSubState;
+    }
+
+    @Override
+    public void mc_talking$setMinimalAiSubStateContext(@Nullable String context) {
+        mc_talking$minimalAiSubStateContext = context;
+    }
+
+    @Override
+    @Nullable
+    public String mc_talking$getMinimalAiSubStateContext() {
+        return mc_talking$minimalAiSubStateContext;
     }
 
     @Override

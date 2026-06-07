@@ -98,10 +98,10 @@ public final class CitizenPromptViewFactory {
         List<String> siblingNames = extractSiblingNames(data);
         String colonyName = data.getColony().getName();
         IBuilding homeBuilding = data.getHomeBuilding();
-        String homeBuildingDisplayName = homeBuilding != null ? homeBuilding.getBuildingDisplayName() : null;
+        String homeBuildingDisplayName = getReadableBuildingName(homeBuilding);
         int homeBuildingLevel = homeBuilding != null ? homeBuilding.getBuildingLevel() : 0;
         IBuilding workBuilding = data.getWorkBuilding();
-        String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
+        String workBuildingDisplayName = getReadableBuildingName(workBuilding);
         int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
         var personalityExt = (CitizenDataPersonalityExtended) data;
         personalityExt.mc_talking$assignPersonality();
@@ -121,6 +121,7 @@ public final class CitizenPromptViewFactory {
         String colonyFoodSituation = extractFoodSituation(data, citizenAiState);
         List<String> recentActions = extractRecentActions(data);
         MinimalAISubState minimalAiSubState = extractMinimalAiSubState(data);
+        String minimalAiSubStateContext = extractMinimalAiSubStateContext(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -167,7 +168,8 @@ public final class CitizenPromptViewFactory {
                 nameTagDescription,
                 colonyFoodSituation,
                 recentActions,
-                minimalAiSubState
+                minimalAiSubState,
+                minimalAiSubStateContext
         );
     }
 
@@ -258,6 +260,22 @@ public final class CitizenPromptViewFactory {
     private static MinimalAISubState extractMinimalAiSubState(ICitizenData data) {
         if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
         return provider.mc_talking$getMinimalAiSubState();
+    }
+
+    @Nullable
+    private static String extractMinimalAiSubStateContext(ICitizenData data) {
+        if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
+        return provider.mc_talking$getMinimalAiSubStateContext();
+    }
+
+    @Nullable
+    private static String getReadableBuildingName(@Nullable IBuilding building) {
+        if (building == null) return null;
+        String displayName = building.getBuildingDisplayName();
+        if (displayName != null && !displayName.isEmpty() && !displayName.contains(".") && !displayName.contains("/")) {
+            return displayName;
+        }
+        return Component.translatable(building.getBuildingType().getTranslationKey()).getString();
     }
 
     private static List<String> extractParents(ICitizenData data) {

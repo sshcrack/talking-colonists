@@ -24,6 +24,7 @@ public class EntityAICitizenAvoidEntityMixin {
     private void mc_talking$setSubState(MinimalAISubState state) {
         var data = citizen.getCitizenData();
         if (data == null) return;
+        // TODO: Set threat entity name as context once closestLivingEntity is exposed via accessor
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state);
     }
 

@@ -21,10 +21,21 @@ public class EntityAISickTaskMixin {
     private EntityCitizen citizen;
 
     @Unique
+    private String mc_talking$getDiseaseName() {
+        var data = citizen.getCitizenData();
+        if (data == null) return null;
+        var handler = data.getCitizenDiseaseHandler();
+        if (handler == null) return null;
+        var disease = handler.getDisease();
+        if (disease == null) return null;
+        return disease.name().getString();
+    }
+
+    @Unique
     private void mc_talking$setSubState(MinimalAISubState state) {
         var data = citizen.getCitizenData();
         if (data == null) return;
-        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state);
+        ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(state, mc_talking$getDiseaseName());
     }
 
     @Inject(
@@ -87,7 +98,7 @@ public class EntityAISickTaskMixin {
         method = "wander",
         at = @At("HEAD")
     )
-    private void mc_talking$onWander(CallbackInfoReturnable<EntityAISickTask.DiseaseState> cir) {
+    private void mc_talking$onWander(CallbackInfoReturnable<IState> cir) {
         mc_talking$setSubState(MinimalAISubState.SICK_WANDERING);
     }
 }
