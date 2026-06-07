@@ -627,7 +627,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return;
         }
 
-        if (reason != null && reason.contains("BidiGenerateContent session")) {
+        // Maybe we'll need to just reset the session token in general if more errors like this occur
+        if ((reason != null && reason.contains("BidiGenerateContent session")) || (code == 1007 && reason != null && reason.contains("invalid argument"))) {
             McTalking.LOGGER.info("Session token invalidated, clearing and forcing reconnect. Can attempt recovery? {} with state {}", canAttemptRecovery(), wsSessionState);
             wsSessionState = WsSessionState.INVALID_SESSION_TOKEN;
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
