@@ -484,7 +484,7 @@ public class ConversationManager {
     /**
      * Starts a low-priority, one-sided AI voice session for {@code citizen}.
      *
-     * <h3>How it works under the hood</h3>
+     * <h4>How it works under the hood</h4>
      * <p>This method opens a <em>Gemini Live WebSocket</em> in system-controlled
      * (mumbling) mode.  The session uses
      * {@link me.sshcrack.mc_talking.api.prompt.CitizenPromptService#generateSystemControlledRoleplayPrompt}
@@ -492,7 +492,7 @@ public class ConversationManager {
      * prompt before sending the first turn.  The model then speaks aloud as the
      * citizen, and the session closes automatically when talking is complete.</p>
      *
-     * <h3>Prompt authoring contract — IMPORTANT</h3>
+     * <h4>Prompt authoring contract — IMPORTANT</h4>
      * <p>{@code userPrompt} is injected <strong>into the system prompt</strong>, not
      * sent as a user chat message.  It must therefore be written as a directive
      * addressed to the AI model — second person, imperative — describing what the
@@ -509,7 +509,7 @@ public class ConversationManager {
      * yelling prompt) and
      * {@link me.sshcrack.mc_talking.rumor.RumorMillService#attemptRumorTalking}.</p>
      *
-     * <h3>Guards</h3>
+     * <h4>Guards</h4>
      * <ul>
      *   <li>API key must be configured.</li>
      *   <li>{@link #canCitizenSpeak} must return {@code true} (subsumes busy,
