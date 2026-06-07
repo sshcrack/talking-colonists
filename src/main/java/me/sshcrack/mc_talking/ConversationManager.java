@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -226,7 +227,8 @@ public class ConversationManager {
 
     /**
      * Returns {@code true} if at least {@code slotsNeeded} slots can be granted
-     * */
+     *
+     */
     public static synchronized boolean hasFreeCapacity(int slotsNeeded) {
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
         int free = max - addedEntities.size();
@@ -482,6 +484,16 @@ public class ConversationManager {
     }
 
     /**
+     * ONLY used when a debug command is invoked that explicitly tells to remove the cooldown.
+     * @param citizen the citizen to remove the cooldown for
+     */
+    public static void forceRemoveCooldown(AbstractEntityCitizen citizen) {
+        UUID id = citizen.getUUID();
+        lastSessionEndTime.remove(id);
+        lastSessionNeedSignatures.remove(id);
+    }
+
+    /**
      * Computes a signature string representing the citizen's current urgent needs.
      * If this signature changes between sessions, the cooldown is cleared so the
      * citizen can immediately contact about a new problem.
@@ -549,7 +561,6 @@ public class ConversationManager {
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-        if (!canCitizenSpeak(citizen)) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildPrompt(citizen));
     }
 
@@ -564,7 +575,6 @@ public class ConversationManager {
      */
     public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-        if (!canCitizenSpeak(citizen)) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
         if (clients.containsKey(citizen.getUUID())) {
             urgentContactConversations.add(citizen.getUUID());
@@ -572,13 +582,52 @@ public class ConversationManager {
     }
 
     /**
-     * Helper method for starting low-priority sessions (mumbling or urgent contact).
-     * Handles slot claiming, client creation, and cooldown recording.
+     * Starts a low-priority, one-sided AI voice session for {@code citizen}.
+     *
+     * <h4>How it works under the hood</h4>
+     * <p>This method opens a <em>Gemini Live WebSocket</em> in system-controlled
+     * (mumbling) mode.  The session uses
+     * {@link me.sshcrack.mc_talking.api.prompt.CitizenPromptService#generateSystemControlledRoleplayPrompt}
+     * as the base system prompt, then appends {@code userPrompt} to that system
+     * prompt before sending the first turn.  The model then speaks aloud as the
+     * citizen, and the session closes automatically when talking is complete.</p>
+     *
+     * <h4>Prompt authoring contract — IMPORTANT</h4>
+     * <p>{@code userPrompt} is injected <strong>into the system prompt</strong>, not
+     * sent as a user chat message.  It must therefore be written as a directive
+     * addressed to the AI model — second person, imperative — describing what the
+     * citizen should say or do in this turn.  Examples of correct phrasing:</p>
+     * <pre>{@code
+     * // ✓ Correct — system directive style:
+     * "## CURRENT TASK\nTurn to Aldric and mention the food shortage you heard about. One sentence."
+     *
+     * // ✗ Wrong — reads like a user chat message:
+     * "Tell Aldric about this: Rumor: I heard from ... that ..."
+     * }</pre>
+     * <p>For a reference implementation see
+     * {@link me.sshcrack.mc_talking.broadcast.BroadcastPropagationService} (broadcast
+     * yelling prompt) and
+     * {@link me.sshcrack.mc_talking.rumor.RumorMillService#attemptRumorTalking}.</p>
+     *
+     * <h4>Guards</h4>
+     * <ul>
+     *   <li>API key must be configured.</li>
+     *   <li>{@link #canCitizenSpeak} must return {@code true} (subsumes busy,
+     *       cooldown, sleeping, and visitor checks).</li>
+     *   <li>A low-priority slot must be available via {@link #claimSlot}.</li>
+     * </ul>
+     * <p>Silently returns without throwing if any guard fails.</p>
+     *
+     * @param citizen    the citizen who will speak
+     * @param userPrompt a system-prompt addition written as a directive to the AI
+     *                   model; see authoring contract above
      */
-    private static void startLowPrioritySession(AbstractEntityCitizen citizen, String prompt) {
+    public static void startLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (!canCitizenSpeak(citizen)) return;
+
         UUID citizenId = citizen.getUUID();
 
-        // Low-priority: refuse if doing so would evict a player session
         if (!claimSlot(citizen, false)) {
             McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for session for citizen {}", citizenId);
             return;
@@ -593,11 +642,24 @@ public class ConversationManager {
                             releaseSlot(citizen);
                         }
                     }
-                    // Record cooldown so this citizen won't be immediately re-selected
                     recordCooldown(citizen);
                 });
-        client.addPromptTextAfterTalkingComplete(prompt);
+        client.addPromptTextAfterTalkingComplete(userPrompt);
         clients.put(citizenId, client);
+    }
+
+    /**
+     * Returns {@code true} if any online player is within {@code range} blocks
+     * of the given citizen in the same dimension.
+     */
+    public static boolean hasPlayerNearby(AbstractEntityCitizen citizen, MinecraftServer server, double range) {
+        double rangeSqr = range * range;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.level() == citizen.level() && player.distanceToSqr(citizen) <= rangeSqr) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

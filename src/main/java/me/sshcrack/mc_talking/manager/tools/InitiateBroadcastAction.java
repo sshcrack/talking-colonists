@@ -13,12 +13,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.UUID;
 
 public class InitiateBroadcastAction extends PlayerFunctionAction {
     public InitiateBroadcastAction() {
-        super("initiate_broadcast", "Records a message to broadcast across the colony for other citizens to hear. Only invoke this when the player explicitly requests a formal colony-wide announcement.",
+        super("initiate_broadcast", "Records a message to broadcast across the colony for other citizens to hear. Only invoke this when the player explicitly requests a formal colony-wide announcement. In addition to this tool you'll also need to shout out the message",
                 new ObjectProperty(new HashMap<>() {{
                     put("message", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
                 }}));
@@ -59,7 +58,6 @@ public class InitiateBroadcastAction extends PlayerFunctionAction {
 
         var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
         memory.addBroadcast(broadcast);
-        memory.addEvent("I sent a broadcast to the colony: " + message);
 
         obj.addProperty("success", true);
         obj.addProperty("broadcast_id", broadcastId);

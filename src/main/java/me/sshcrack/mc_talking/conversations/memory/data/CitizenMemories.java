@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.conversations.memory.data;
 
 import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.rumor.Rumor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -26,13 +27,14 @@ public class CitizenMemories {
     private static final String TAG_SESSION_TOKEN = "gemini_session_token";
     private static final String TAG_SUMMARIZED_MEMORY = "summarized_memory";
     private static final String TAG_BROADCASTS = "mc_talking_broadcasts";
-    private static final String TAG_PENDING_RUMORS = "pending_rumors";
+    private static final String TAG_RUMORS = "mc_talking_rumors";
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<CitizenRelationshipMemory> relationships = new ArrayList<>();
     private final List<ColonyBroadcast> receivedBroadcasts = new ArrayList<>();
     private final Set<String> knownBroadcastIds = new HashSet<>();
-    private final List<String> pendingRumorPropagations = new ArrayList<>();
+    private final List<Rumor> receivedRumors = new ArrayList<>();
+    private final Set<String> knownRumorIds = new HashSet<>();
     private String sessionToken = "";
     private String summarizedMemory = "";
 
@@ -57,26 +59,6 @@ public class CitizenMemories {
 
     public void addEvent(String event) {
         events.add(event);
-        if (event.startsWith("Rumor:")) {
-            pendingRumorPropagations.add(event);
-        }
-    }
-
-    public boolean hasPendingRumor() {
-        return !pendingRumorPropagations.isEmpty();
-    }
-
-    public String drainPendingRumor() {
-        return pendingRumorPropagations.isEmpty() ? null : pendingRumorPropagations.remove(0);
-    }
-
-    public int getPendingRumorCount() {
-        return pendingRumorPropagations.size();
-    }
-
-    public String peekPendingRumor(int index) {
-        if (index < 0 || index >= pendingRumorPropagations.size()) return null;
-        return pendingRumorPropagations.get(index);
     }
 
     public void setSummarizedMemory(String summarizedMemory) {
@@ -118,6 +100,25 @@ public class CitizenMemories {
         return Collections.unmodifiableList(receivedBroadcasts);
     }
 
+    public void addRumor(Rumor rumor) {
+        if (knownRumorIds.contains(rumor.getId())) return;
+        knownRumorIds.add(rumor.getId());
+        receivedRumors.add(0, rumor);
+        int max = McTalkingConfig.INSTANCE.instance().maxRumorsStored;
+        while (receivedRumors.size() > max) {
+            Rumor removed = receivedRumors.remove(receivedRumors.size() - 1);
+            knownRumorIds.remove(removed.getId());
+        }
+    }
+
+    public boolean hasHeardRumor(String id) {
+        return knownRumorIds.contains(id);
+    }
+
+    public List<Rumor> getReceivedRumors() {
+        return Collections.unmodifiableList(receivedRumors);
+    }
+
     public CompoundTag serializeNbt() {
         CompoundTag tag = new CompoundTag();
         ListTag factsTag = new ListTag();
@@ -146,11 +147,11 @@ public class CitizenMemories {
         }
         tag.put(TAG_BROADCASTS, broadcastsNbt);
 
-        ListTag pendingNbt = new ListTag();
-        for (String r : pendingRumorPropagations) {
-            pendingNbt.add(StringTag.valueOf(r));
+        ListTag rumorsNbt = new ListTag();
+        for (Rumor r : receivedRumors) {
+            rumorsNbt.add(r.serialize());
         }
-        tag.put(TAG_PENDING_RUMORS, pendingNbt);
+        tag.put(TAG_RUMORS, rumorsNbt);
 
         if (sessionToken != null && !sessionToken.isBlank()) {
             tag.putString(TAG_SESSION_TOKEN, sessionToken);
@@ -167,7 +168,8 @@ public class CitizenMemories {
         relationships.clear();
         receivedBroadcasts.clear();
         knownBroadcastIds.clear();
-        pendingRumorPropagations.clear();
+        receivedRumors.clear();
+        knownRumorIds.clear();
 
         ListTag factsNbt = tag.getList(TAG_FACTS_KEY, Tag.TAG_STRING);
         for (int i = 0; i < factsNbt.size(); i++) {
@@ -193,9 +195,11 @@ public class CitizenMemories {
             knownBroadcastIds.add(broadcast.getId());
         }
 
-        ListTag pendingNbt = tag.getList(TAG_PENDING_RUMORS, Tag.TAG_STRING);
-        for (int i = 0; i < pendingNbt.size(); i++) {
-            pendingRumorPropagations.add(pendingNbt.getString(i));
+        ListTag rumorsNbt = tag.getList(TAG_RUMORS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < rumorsNbt.size(); i++) {
+            Rumor rumor = Rumor.deserialize(rumorsNbt.getCompound(i));
+            receivedRumors.add(rumor);
+            knownRumorIds.add(rumor.getId());
         }
 
         if (tag.contains(TAG_SESSION_TOKEN)) {
@@ -261,6 +265,21 @@ public class CitizenMemories {
                 prompt.append("- ").append(b.getSenderPlayerName())
                     .append(" sent word via ").append(b.getOriginatorName())
                     .append(": ").append(b.getMessage()).append("\n");
+                count++;
+            }
+        }
+
+        int rumorCap = McTalkingConfig.INSTANCE.instance().maxRumorsInPrompt;
+        if (!receivedRumors.isEmpty() && rumorCap > 0) {
+            prompt.append(" Rumors (heard via the grapevine, most recent first):\n");
+            int count = 0;
+            for (Rumor r : receivedRumors) {
+                if (count >= rumorCap) break;
+                prompt.append("- You heard (originally from ")
+                    .append(r.getOriginatorName())
+                    .append("): ")
+                    .append(r.getContent())
+                    .append("\n");
                 count++;
             }
         }

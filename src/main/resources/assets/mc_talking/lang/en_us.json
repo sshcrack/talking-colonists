@@ -60,6 +60,7 @@
   "mc_talking.debug.no_connections": "No active Gemini connections.",
   "mc_talking.debug.no_colony_specified": "Specify a colony ID or execute near a colony.",
   "mc_talking.debug.no_colony_found": "Could not find a colony for you. Specify a colony ID.",
+  "mc_talking.debug.prompt_triggered": "Started low-priority session for %s with prompt: \"%s\"",
   "mc_talking.debug.memory_disabled": "Citizen memory is disabled in config.",
   "mc_talking.debug.memory_empty": "No memories stored for this citizen.",
 
@@ -174,9 +175,6 @@
   "yacl3.config.mc_talking:config.playerGreetingDistance": "Player Greeting Distance",
   "yacl3.config.mc_talking:config.playerGreetingDistance.desc": "Distance in blocks within which a citizen will trigger their pregenerated player greeting on first approach.",
 
-  "yacl3.config.mc_talking:config.playerGreetingCooldownSeconds": "Player Greeting Cooldown (seconds)",
-  "yacl3.config.mc_talking:config.playerGreetingCooldownSeconds.desc": "Cooldown in seconds between pregenerated player greetings for the same citizen-player pair.",
-
   "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer": "Walk to Player on Urgent Contact",
   "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer.desc": "When enabled, urgent citizens walk toward you over a larger search range, follow you until close, then auto-start the conversation. They stop following when the need resolves.",
 
@@ -235,6 +233,18 @@
   "yacl3.config.mc_talking:config.rumorMillMaxPropagationsPerTick": "Rumor Max Propagations Per Tick",
   "yacl3.config.mc_talking:config.rumorMillMaxPropagationsPerTick.desc": "Maximum number of rumor propagations per tick to bound server cost.",
 
+  "yacl3.config.mc_talking:config.enableRumorTalking": "Enable Rumor Talking",
+  "yacl3.config.mc_talking:config.enableRumorTalking.desc": "If enabled, citizens voice rumors aloud when a player is nearby.",
+  "yacl3.config.mc_talking:config.rumorTalkingChance": "Rumor Talking Chance",
+  "yacl3.config.mc_talking:config.rumorTalkingChance.desc": "Per-propagation chance that a rumor is spoken aloud when a player is in range.",
+  "yacl3.config.mc_talking:config.rumorTalkingRange": "Rumor Talking Range",
+  "yacl3.config.mc_talking:config.rumorTalkingRange.desc": "Maximum distance in blocks from the source citizen for a player to witness a voiced rumor.",
+
+  "yacl3.config.mc_talking:config.maxRumorsStored": "Max Rumors Stored",
+  "yacl3.config.mc_talking:config.maxRumorsStored.desc": "Maximum rumors a citizen remembers. Oldest are discarded first.",
+  "yacl3.config.mc_talking:config.maxRumorsInPrompt": "Max Rumors in Prompt",
+  "yacl3.config.mc_talking:config.maxRumorsInPrompt.desc": "How many rumors appear in the citizen system prompt. Set to 0 to disable.",
+
   "yacl3.config.mc_talking:config.category.citizens.group.broadcast": "Colony Broadcast System",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation": "Enable Broadcast Propagation",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation.desc": "If enabled, players can ask citizens to broadcast messages across the colony. The message spreads from citizen to citizen over time.",
@@ -242,10 +252,19 @@
   "yacl3.config.mc_talking:config.broadcastPropagationIntervalTicks.desc": "How often the server checks for broadcast propagation. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.broadcastMaxPropagationsPerTick": "Broadcast Max Propagations Per Tick",
   "yacl3.config.mc_talking:config.broadcastMaxPropagationsPerTick.desc": "Maximum number of broadcast propagations per tick to bound server cost.",
+
+  "yacl3.config.mc_talking:config.broadcastPropagationRange": "Broadcast Propagation Range",
+  "yacl3.config.mc_talking:config.broadcastPropagationRange.desc": "Maximum distance in blocks between citizens for a broadcast to propagate. Broadcasts spread through proximity like rumors.",
   "yacl3.config.mc_talking:config.maxBroadcastsInPrompt": "Max Broadcasts In Prompt",
   "yacl3.config.mc_talking:config.maxBroadcastsInPrompt.desc": "How many recent broadcasts to include in a citizen's prompt. Set to 0 to disable.",
   "yacl3.config.mc_talking:config.maxBroadcastsStored": "Max Broadcasts Stored",
   "yacl3.config.mc_talking:config.maxBroadcastsStored.desc": "Maximum number of broadcasts stored per citizen. Oldest are discarded when limit is reached.",
+
+  "yacl3.config.mc_talking:config.enableBroadcastYelling": "Enable Broadcast Yelling",
+  "yacl3.config.mc_talking:config.enableBroadcastYelling.desc": "If enabled, citizens announce broadcasts aloud when a player is nearby.",
+
+  "yacl3.config.mc_talking:config.broadcastYellingRange": "Broadcast Yelling Range",
+  "yacl3.config.mc_talking:config.broadcastYellingRange.desc": "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.",
 
   "yacl3.config.mc_talking:config.category.citizens.group.memory": "Memory Compaction",
   "yacl3.config.mc_talking:config.memoryMode": "Memory Mode",

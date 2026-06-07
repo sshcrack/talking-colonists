@@ -8,6 +8,7 @@ import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.rumor.Rumor;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipMemory;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.ChatFormatting;
@@ -135,17 +136,20 @@ public class DebugMemoryCommand {
                 }
             }
 
-            // Pending Rumors
-            int pendingRumors = mem.getPendingRumorCount();
-            msg.append(Component.literal("  §7Pending Rumors (" + pendingRumors + "):\n"));
-            if (pendingRumors == 0) {
-                msg.append(Component.literal("    §8(none)"));
+            // Received Rumors
+            var receivedRumors = mem.getReceivedRumors();
+            msg.append(Component.literal("  §7Rumors (" + receivedRumors.size() + "):\n"));
+            if (receivedRumors.isEmpty()) {
+                msg.append(Component.literal("    §8(none)\n"));
             } else {
-                for (int i = 0; i < pendingRumors; i++) {
-                    String rumor = mem.peekPendingRumor(i);
-                    msg.append(Component.literal("    §f" + (i + 1) + ". ")
-                            .append(Component.literal(rumor).withStyle(ChatFormatting.WHITE))
+                int i = 1;
+                for (Rumor r : receivedRumors) {
+                    String idStr = r.getId().length() > 8 ? r.getId().substring(0, 8) + "…" : r.getId();
+                    msg.append(Component.literal("    §f" + i + ". §7" + idStr
+                                    + " §8| §f" + r.getOriginatorName()
+                                    + " §8| §7\"" + r.getContent() + "\"")
                             .append(Component.literal("\n")));
+                    i++;
                 }
             }
 
