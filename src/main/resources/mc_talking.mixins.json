@@ -17,7 +17,12 @@
     "AbstractRequestMixin",
     "UpdateRequestStateMixin",
     "EntityAIEatTaskMixin",
-    "JobDeliverymanMixin"
+    "JobDeliverymanMixin",
+    "AbstractJobCrafterMixin",
+    "AbstractEntityAIStructureMixin",
+    "EntityAIWorkTeacherMixin",
+    "EntityAIWorkResearcherMixin",
+    "EntityAIWorkHealerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
