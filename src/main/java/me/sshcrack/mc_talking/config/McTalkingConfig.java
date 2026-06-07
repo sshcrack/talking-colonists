@@ -288,6 +288,21 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Maximum number of rumor propagations per tick to bound server cost.")
     public int rumorMillMaxPropagationsPerTick = 3;
 
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will voice rumors aloud when a player is nearby, creating immersive gossip.")
+    public boolean enableRumorTalking = true;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Chance (0.0-1.0) that a rumor propagation is voiced aloud when a player is nearby.")
+    public double rumorTalkingChance = 0.5;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleField(min = 1.0, max = 50.0)
+    @SerialEntry(comment = "Maximum distance in blocks for a player to witness voiced rumors and broadcast announcements.")
+    public double rumorTalkingRange = 8.0;
+
     // Broadcast System
     @AutoGen(category = "citizens", group = "broadcast")
     @TickBox
@@ -313,6 +328,11 @@ public class McTalkingConfig {
     @IntField(min = 1, max = 100)
     @SerialEntry(comment = "Maximum broadcasts stored per citizen. Oldest discarded when limit reached.")
     public int maxBroadcastsStored = 20;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will announce broadcasts aloud when a player is nearby.")
+    public boolean enableBroadcastYelling = true;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
     public int configVersion = 2;

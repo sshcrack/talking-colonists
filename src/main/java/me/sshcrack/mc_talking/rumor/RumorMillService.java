@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jetbrains.annotations.Nullable;
+
 public class RumorMillService {
     private RumorMillService() {}
 
@@ -65,16 +67,24 @@ public class RumorMillService {
 
                         if (ThreadLocalRandom.current().nextDouble() >= chance) continue;
 
-                        if (propagated < maxPropagations && propagateRumor(c1, c2)) {
-                            propagated++;
-                            McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
-                                    c1.getCitizenData().getName(), c2.getCitizenData().getName());
+                        if (propagated < maxPropagations) {
+                            String rumor = propagateRumor(c1, c2);
+                            if (rumor != null) {
+                                propagated++;
+                                McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
+                                        c1.getCitizenData().getName(), c2.getCitizenData().getName());
+                                attemptRumorTalking(c1, c2, rumor, server, cfg);
+                            }
                         }
 
-                        if (propagated < maxPropagations && propagateRumor(c2, c1)) {
-                            propagated++;
-                            McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
-                                    c2.getCitizenData().getName(), c1.getCitizenData().getName());
+                        if (propagated < maxPropagations) {
+                            String rumor = propagateRumor(c2, c1);
+                            if (rumor != null) {
+                                propagated++;
+                                McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
+                                        c2.getCitizenData().getName(), c1.getCitizenData().getName());
+                                attemptRumorTalking(c2, c1, rumor, server, cfg);
+                            }
                         }
                     }
                 }
@@ -82,20 +92,31 @@ public class RumorMillService {
         }
     }
 
-    private static boolean propagateRumor(AbstractEntityCitizen source, AbstractEntityCitizen target) {
+    private static void attemptRumorTalking(AbstractEntityCitizen source, AbstractEntityCitizen target, String content, MinecraftServer server, McTalkingConfig cfg) {
+        if (!cfg.enableRumorTalking) return;
+        if (ThreadLocalRandom.current().nextDouble() >= cfg.rumorTalkingChance) return;
+        if (!ConversationManager.hasPlayerNearby(source, server, cfg.rumorTalkingRange)) return;
+
+        String targetName = target.getCitizenData().getName();
+        String prompt = "Tell " + targetName + " about this: " + content;
+        ConversationManager.startLowPrioritySession(source, prompt);
+    }
+
+    @Nullable
+    private static String propagateRumor(AbstractEntityCitizen source, AbstractEntityCitizen target) {
         var sourceData = (CitizenDataMemoryExtended) source.getCitizenData();
         var targetData = (CitizenDataMemoryExtended) target.getCitizenData();
 
         var sourceMem = sourceData.mc_talking$getMemory();
-        if (sourceMem == null) return false;
+        if (sourceMem == null) return null;
 
-        String content = null;
+        String content;
 
         if (sourceMem.hasPendingRumor()) {
             content = sourceMem.drainPendingRumor();
         } else {
             List<String> events = sourceMem.getEvents();
-            if (events.isEmpty()) return false;
+            if (events.isEmpty()) return null;
 
             List<String> firstHand = new ArrayList<>();
             for (String e : events) {
@@ -103,7 +124,7 @@ public class RumorMillService {
                     firstHand.add(e);
                 }
             }
-            if (firstHand.isEmpty()) return false;
+            if (firstHand.isEmpty()) return null;
 
             content = firstHand.get(ThreadLocalRandom.current().nextInt(firstHand.size()));
         }
@@ -112,6 +133,6 @@ public class RumorMillService {
         targetMem.addEvent(String.format("Rumor: I heard from %s that \"%s\"",
                 source.getCitizenData().getName(), content));
 
-        return true;
+        return content;
     }
 }

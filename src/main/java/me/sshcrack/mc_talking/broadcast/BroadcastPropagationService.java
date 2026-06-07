@@ -3,6 +3,8 @@ package me.sshcrack.mc_talking.broadcast;
 import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
@@ -12,6 +14,7 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class BroadcastPropagationService {
     private BroadcastPropagationService() {}
@@ -42,17 +45,30 @@ public class BroadcastPropagationService {
                         ICitizenData recipient = citizens.get(j);
                         CitizenMemories recipientMem = ((CitizenDataMemoryExtended) recipient).mc_talking$getOrInitializeMemory();
 
-                        boolean sharedAny = false;
+                        ColonyBroadcast firstShared = null;
                         for (ColonyBroadcast broadcast : carrierMem.getReceivedBroadcasts()) {
                             if (recipientMem.hasHeardBroadcast(broadcast.getId())) continue;
                             recipientMem.addBroadcast(broadcast);
-                            sharedAny = true;
+                            if (firstShared == null) firstShared = broadcast;
                         }
 
-                        if (sharedAny) {
+                        if (firstShared != null) {
                             McTalking.LOGGER.info("[Broadcast] {} → {}: shared broadcasts",
                                     carrier.getName(), recipient.getName());
                             propagationsLeft--;
+
+                            if (cfg.enableBroadcastYelling) {
+                                Optional<AbstractEntityCitizen> carrierEntityOpt = carrier.getEntity();
+                                if (carrierEntityOpt.isPresent() && carrierEntityOpt.get().isAlive()
+                                        && ConversationManager.hasPlayerNearby(carrierEntityOpt.get(), server, cfg.rumorTalkingRange)) {
+                                    String prompt = "You have news to share. A player named "
+                                            + firstShared.getSenderPlayerName()
+                                            + " sent this to the colony: \""
+                                            + firstShared.getMessage()
+                                            + "\". Spread this news loudly to those nearby.";
+                                    ConversationManager.startLowPrioritySession(carrierEntityOpt.get(), prompt);
+                                }
+                            }
                         }
                     }
                 }

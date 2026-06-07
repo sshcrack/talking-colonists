@@ -13,6 +13,7 @@ import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -472,13 +473,18 @@ public class ConversationManager {
     }
 
     /**
-     * Helper method for starting low-priority sessions (mumbling or urgent contact).
-     * Handles slot claiming, client creation, and cooldown recording.
+     * Starts a low-priority, one-sided AI session for the given citizen.
+     * The citizen speaks the prompt aloud once and the session ends.
+     *
+     * <p>Guards: API key, {@link #canCitizenSpeak}, and
+     * {@link #claimSlot}(low-priority). Silently returns if any guard fails.</p>
      */
-    private static void startLowPrioritySession(AbstractEntityCitizen citizen, String prompt) {
+    public static void startLowPrioritySession(AbstractEntityCitizen citizen, String prompt) {
+        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (!canCitizenSpeak(citizen)) return;
+
         UUID citizenId = citizen.getUUID();
 
-        // Low-priority: refuse if doing so would evict a player session
         if (!claimSlot(citizen, false)) {
             McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for session for citizen {}", citizenId);
             return;
@@ -493,11 +499,24 @@ public class ConversationManager {
                             releaseSlot(citizen);
                         }
                     }
-                    // Record cooldown so this citizen won't be immediately re-selected
                     recordCooldown(citizen);
                 });
         client.addPromptTextAfterTalkingComplete(prompt);
         clients.put(citizenId, client);
+    }
+
+    /**
+     * Returns {@code true} if any online player is within {@code range} blocks
+     * of the given citizen in the same dimension.
+     */
+    public static boolean hasPlayerNearby(AbstractEntityCitizen citizen, MinecraftServer server, double range) {
+        double rangeSqr = range * range;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.level() == citizen.level() && player.distanceToSqr(citizen) <= rangeSqr) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
