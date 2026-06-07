@@ -84,12 +84,13 @@ public class BroadcastPropagationService {
                             propagationsLeft--;
 
                             if (cfg.enableBroadcastYelling) {
-                                if (ConversationManager.hasPlayerNearby(carrierEntity, server, cfg.broadcastYellingRange)) {
+                                if (ConversationManager.hasPlayerNearby(carrierEntity, server, cfg.broadcastYellingRange)
+                                        && !ConversationManager.isCitizenBusy(carrierEntity)) {
                                     String prompt = "A message has arrived from "
                                             + firstShared.getSenderPlayerName()
                                             + " for the colony: ["
                                             + firstShared.getMessage()
-                                            + "]. Spread the word to those nearby. ONLY spread the word. DONT MENTION ANYTHING BLOCKING YOU";
+                                            + "]. Spread the word to those nearby. Don't mention obstacles or anything blocking you.";
                                     ConversationManager.startLowPrioritySession(carrierEntity, prompt);
                                 }
                             }

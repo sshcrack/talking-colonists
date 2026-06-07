@@ -169,9 +169,6 @@
   "yacl3.config.mc_talking:config.playerGreetingDistance": "Player Greeting Distance",
   "yacl3.config.mc_talking:config.playerGreetingDistance.desc": "Distance in blocks within which a citizen will trigger their pregenerated player greeting on first approach.",
 
-  "yacl3.config.mc_talking:config.playerGreetingCooldownSeconds": "Player Greeting Cooldown (seconds)",
-  "yacl3.config.mc_talking:config.playerGreetingCooldownSeconds.desc": "Cooldown in seconds between pregenerated player greetings for the same citizen-player pair.",
-
   "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer": "Walk to Player on Urgent Contact",
   "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer.desc": "When enabled, urgent citizens walk toward you over a larger search range, follow you until close, then auto-start the conversation. They stop following when the need resolves.",
 

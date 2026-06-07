@@ -132,13 +132,20 @@ public class RumorMillService {
             }
         }
 
-        // No unheard rumors — promote a first-hand event to a new rumor.
-        List<String> firstHandEvents = sourceMem.getEvents().stream()
-                .filter(e -> !e.startsWith("Rumor:"))
-                .toList();
-        if (firstHandEvents.isEmpty()) return null;
+        // No unheard rumors — promote a first-hand event to a new rumor and
+        // remove it from the events list to prevent the same event being
+        // rumorized twice.  The event is now reflected in receivedRumors.
+        List<String> events = sourceMem.getEvents();
+        List<Integer> firstHandIndices = new ArrayList<>();
+        for (int idx = 0; idx < events.size(); idx++) {
+            if (!events.get(idx).startsWith("Rumor:")) {
+                firstHandIndices.add(idx);
+            }
+        }
+        if (firstHandIndices.isEmpty()) return null;
 
-        String content = firstHandEvents.get(ThreadLocalRandom.current().nextInt(firstHandEvents.size()));
+        int pickIdx = firstHandIndices.get(ThreadLocalRandom.current().nextInt(firstHandIndices.size()));
+        String content = events.remove(pickIdx);
         String originatorName = source.getCitizenData().getName();
         String id = UUID.randomUUID().toString();
 

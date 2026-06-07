@@ -388,7 +388,9 @@ public class ConversationManager {
      * @param citizen the citizen to remove the cooldown for
      */
     public static void forceRemoveCooldown(AbstractEntityCitizen citizen) {
-        lastSessionEndTime.remove(citizen.getUUID());
+        UUID id = citizen.getUUID();
+        lastSessionEndTime.remove(id);
+        lastSessionNeedSignatures.remove(id);
     }
 
     /**
