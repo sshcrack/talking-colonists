@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.core.network.messages.server.colony.UpdateRequestStateMessage;
 import me.sshcrack.mc_talking.support.PlayerFulfillmentHandler;
 import net.minecraft.server.level.ServerPlayer;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,18 +23,19 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public class UpdateRequestStateMixin {
 
     @Shadow
+    @Final
     private RequestState state;
 
     /*? if neoforge {*/
     @Inject(method = "onExecute", at = @At("HEAD"))
-    private void mc_talking$onExecuteHead(IPayloadContext ctx, ServerPlayer player, IColony colony, CallbackInfo ci) {
+    private void mc_talking$onExecuteHead(IPayloadContext ctxIn, ServerPlayer player, IColony colony, CallbackInfo ci) {
         if (state == RequestState.OVERRULED) {
             PlayerFulfillmentHandler.setPendingFulfiller(player);
         }
     }
 
     @Inject(method = "onExecute", at = @At("RETURN"))
-    private void mc_talking$onExecuteReturn(IPayloadContext ctx, ServerPlayer player, IColony colony, CallbackInfo ci) {
+    private void mc_talking$onExecuteReturn(IPayloadContext ctxIn, ServerPlayer player, IColony colony, CallbackInfo ci) {
         if (state == RequestState.OVERRULED) {
             PlayerFulfillmentHandler.tryClearPending();
         }
