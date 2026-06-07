@@ -4,8 +4,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
+import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
+import com.minecolonies.api.util.FoodUtils;
 import com.minecolonies.core.colony.buildingextensions.FarmField;
 import com.minecolonies.core.colony.buildings.modules.BuildingExtensionsModule;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingBarracks;
@@ -22,6 +24,7 @@ import me.sshcrack.mc_talking.mixin.BuildingLibraryAccessor;
 import me.sshcrack.gemini_live_lib.gson.properties.EnumProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -63,7 +66,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
         String query = parameters.get("type").getAsString().trim().toLowerCase();
 
-        IBuilding matched = findBuilding(colony, query);
+        IBuilding matched = findBuilding(colony, query, citizen);
         if (matched == null) {
             result.addProperty("error", "No building found matching '" + query + "'.");
             result.addProperty("hint", "This colony may not have that building type. Use get_colony to list all buildings.");
@@ -77,16 +80,24 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
     }
 
     @Nullable
-    private IBuilding findBuilding(IColony colony, String query) {
+    private IBuilding findBuilding(IColony colony, String query, AbstractEntityCitizen citizen) {
         var bm = colony.getServerBuildingManager();
         if (bm == null || query.isEmpty()) return null;
 
+        var citizenPos = citizen.blockPosition();
+        IBuilding nearest = null;
+        double nearestDist = Double.MAX_VALUE;
+
         for (var b : bm.getBuildings().values()) {
             if (b.getBuildingType().getRegistryName().getPath().equals(query)) {
-                return b;
+                double dist = citizenPos.distSqr(b.getPosition());
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = b;
+                }
             }
         }
-        return null;
+        return nearest;
     }
 
     private static void fillBasicInfo(IBuilding building, JsonObject result) {
@@ -119,8 +130,12 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
             if (menuModule != null) {
                 var menu = menuModule.getMenu();
                 JsonArray items = new JsonArray();
-                for (var storage : menu) {
-                    items.add(storage.getItemStack().getDisplayName().getString() + " (x" + storage.getAmount() + ")");
+                for (ItemStorage storage : menu) {
+                    var stack = storage.getItemStack();
+                    FoodProperties food = stack.getItem().getFoodProperties(stack, null);
+                    double foodValue = FoodUtils.getFoodValue(stack, food, 0);
+                    int tier = FoodUtils.getFoodTier(foodValue);
+                    items.add(stack.getDisplayName().getString() + " (tier " + tier + ", x" + storage.getAmount() + ")");
                 }
                 result.add("menu_items", items);
             }

@@ -302,54 +302,6 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
-    private static void addJobContext(CitizenPromptView view, StringBuilder prompt) {
-        String job = view.jobName();
-        if (job == null) return;
-        AIWorkerState ws = view.workAiState();
-
-        String block = switch (job.toLowerCase()) {
-            case "courier", "deliveryman" -> """
-
-                    ## JOB CONTEXT — COURIER
-                    - Your job is to carry goods between the warehouse and colony buildings.
-                    - You do not produce anything yourself — you keep everyone else supplied.
-                    - When you mention "missing supplies", you mean unfulfilled delivery requests
-                      in the request system, not items you personally need.
-                    - If you are hungry, you can eat at the restaurant — it is scheduled
-                      automatically around your deliveries.
-                    """;
-
-            case "miner" -> (ws != null && ws == AIWorkerState.NEEDS_ITEM) ? """
-
-                    ## JOB CONTEXT — MINER
-                    - You are waiting for mining equipment (pickaxe, torches, etc.) to be
-                      delivered before you can continue. A courier should bring them soon.
-                    - Once supplied, you will resume work in the mine shaft.
-                    """ : null;
-
-            case "builder", "mechanic" -> (ws != null && ws == AIWorkerState.NEEDS_ITEM) ? """
-
-                    ## JOB CONTEXT — BUILDER
-                    - You are waiting on building materials before you can continue construction.
-                      This is a request in the colony system — a courier is assigned to it.
-                    """ : null;
-
-            case "cook", "chef" -> """
-
-                    ## JOB CONTEXT — COOK
-                    - Your primary role is to feed the colony. Citizens come to the restaurant
-                      when they are hungry; you prepare and serve meals to them.
-                    - If citizens complain about food, it may mean the restaurant is out of
-                      ingredients — check if a delivery of food items is pending.
-                    """;
-
-            case "knight", "ranger", "archer" -> null;
-            default -> null;
-        };
-
-        if (block != null) prompt.append(block);
-    }
-
     private static String describeAiState(
             CitizenAIState citizenAiState, AIWorkerState workAiState,
             String nameTagDescription, CitizenPromptView view) {
@@ -532,7 +484,6 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.\n");
         prompt.append(getGeneralCitizenPrompt(view, true));
         appendGuardDuty(prompt, view.guard());
-        addJobContext(view, prompt);
 
         prompt.append("""
                         ## GUIDELINES
@@ -554,7 +505,6 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));
         appendGuardDuty(prompt, view.guard());
-        addJobContext(view, prompt);
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
