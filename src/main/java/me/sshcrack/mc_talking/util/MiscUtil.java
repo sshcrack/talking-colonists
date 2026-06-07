@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.util;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 public class MiscUtil {
     public static String describeTime(long dayTime) {
         if (dayTime < 1000) return "early morning (sunrise)";
@@ -10,5 +12,9 @@ public class MiscUtil {
         if (dayTime < 18000) return "night";
         if (dayTime < 22000) return "late night";
         return "pre-dawn";
+    }
+
+    public static String pick(String... options) {
+        return options[ThreadLocalRandom.current().nextInt(options.length)];
     }
 }

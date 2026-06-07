@@ -7,7 +7,6 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 public final class ColonyStatsHelper {
 
@@ -74,10 +73,6 @@ public final class ColonyStatsHelper {
         }
 
         if (eligible.isEmpty()) return null;
-        return pick(eligible.toArray(new String[0]));
-    }
-
-    private static String pick(String... options) {
-        return options[ThreadLocalRandom.current().nextInt(options.length)];
+        return MiscUtil.pick(eligible.toArray(new String[0]));
     }
 }
