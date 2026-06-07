@@ -24,11 +24,13 @@ public class CitizenMemories {
     private static final String TAG_SESSION_TOKEN = "gemini_session_token";
     private static final String TAG_SUMMARIZED_MEMORY = "summarized_memory";
     private static final String TAG_BROADCASTS = "mc_talking_broadcasts";
+    private static final String TAG_PENDING_RUMORS = "pending_rumors";
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<CitizenRelationshipMemory> relationships = new ArrayList<>();
     private final List<ColonyBroadcast> receivedBroadcasts = new ArrayList<>();
     private final Set<String> knownBroadcastIds = new HashSet<>();
+    private final List<String> pendingRumorPropagations = new ArrayList<>();
     private String sessionToken = "";
     private String summarizedMemory = "";
 
@@ -53,6 +55,17 @@ public class CitizenMemories {
 
     public void addEvent(String event) {
         events.add(event);
+        if (event.startsWith("Rumor:")) {
+            pendingRumorPropagations.add(event);
+        }
+    }
+
+    public boolean hasPendingRumor() {
+        return !pendingRumorPropagations.isEmpty();
+    }
+
+    public String drainPendingRumor() {
+        return pendingRumorPropagations.isEmpty() ? null : pendingRumorPropagations.remove(0);
     }
 
     public void setSummarizedMemory(String summarizedMemory) {
@@ -122,6 +135,12 @@ public class CitizenMemories {
         }
         tag.put(TAG_BROADCASTS, broadcastsNbt);
 
+        ListTag pendingNbt = new ListTag();
+        for (String r : pendingRumorPropagations) {
+            pendingNbt.add(StringTag.valueOf(r));
+        }
+        tag.put(TAG_PENDING_RUMORS, pendingNbt);
+
         if (sessionToken != null && !sessionToken.isBlank()) {
             tag.putString(TAG_SESSION_TOKEN, sessionToken);
         }
@@ -137,6 +156,7 @@ public class CitizenMemories {
         relationships.clear();
         receivedBroadcasts.clear();
         knownBroadcastIds.clear();
+        pendingRumorPropagations.clear();
 
         ListTag factsNbt = tag.getList(TAG_FACTS_KEY, Tag.TAG_STRING);
         for (int i = 0; i < factsNbt.size(); i++) {
@@ -160,6 +180,11 @@ public class CitizenMemories {
             ColonyBroadcast broadcast = ColonyBroadcast.deserialize(broadcastsNbt.getCompound(i));
             receivedBroadcasts.add(broadcast);
             knownBroadcastIds.add(broadcast.getId());
+        }
+
+        ListTag pendingNbt = tag.getList(TAG_PENDING_RUMORS, Tag.TAG_STRING);
+        for (int i = 0; i < pendingNbt.size(); i++) {
+            pendingRumorPropagations.add(pendingNbt.getString(i));
         }
 
         if (tag.contains(TAG_SESSION_TOKEN)) {

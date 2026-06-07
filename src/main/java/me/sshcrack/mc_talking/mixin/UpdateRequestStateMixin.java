@@ -31,6 +31,13 @@ public class UpdateRequestStateMixin {
             PlayerFulfillmentHandler.setPendingFulfiller(player);
         }
     }
+
+    @Inject(method = "onExecute", at = @At("RETURN"))
+    private void mc_talking$onExecuteReturn(IPayloadContext ctx, ServerPlayer player, IColony colony, CallbackInfo ci) {
+        if (state == RequestState.OVERRULED) {
+            PlayerFulfillmentHandler.tryClearPending();
+        }
+    }
     /*?}*/
 
     /*? if forge {*/
@@ -38,6 +45,13 @@ public class UpdateRequestStateMixin {
     private void mc_talking$onExecuteHead(NetworkEvent.Context ctx, boolean isLogicalServer, IColony colony, CallbackInfo ci) {
         if (state == RequestState.OVERRULED) {
             PlayerFulfillmentHandler.setPendingFulfiller(ctx.getSender());
+        }
+    }
+
+    @Inject(method = "onExecute", at = @At("RETURN"))
+    private void mc_talking$onExecuteReturn(NetworkEvent.Context ctx, boolean isLogicalServer, IColony colony, CallbackInfo ci) {
+        if (state == RequestState.OVERRULED) {
+            PlayerFulfillmentHandler.tryClearPending();
         }
     }
     *//*?}*/

@@ -16,7 +16,7 @@ import java.util.UUID;
 
 public class InitiateBroadcastAction extends FunctionAction {
     public InitiateBroadcastAction() {
-        super("initiate_broadcast", "Records a message to broadcast across the colony for other citizens to hear. Use if a player wants a message to be shared with the entire colony.",
+        super("initiate_broadcast", "Records a message to broadcast across the colony for other citizens to hear. Only invoke this when the player explicitly requests a formal colony-wide announcement.",
                 new ObjectProperty(new HashMap<>() {{
                     put("message", new PrimitiveProperty(PrimitiveProperty.Type.STRING, true));
                 }}));

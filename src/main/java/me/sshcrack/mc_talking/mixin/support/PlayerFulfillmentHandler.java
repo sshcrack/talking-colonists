@@ -25,6 +25,12 @@ public class PlayerFulfillmentHandler {
         return p;
     }
 
+    public static void tryClearPending() {
+        if (CURRENT_FULFILLER.get() != null) {
+            CURRENT_FULFILLER.remove();
+        }
+    }
+
     public static void onRequestOverruled(IRequestManager manager, IRequest<?> request) {
         IColony colony = manager.getColony();
         ServerPlayer player = consumePendingFulfiller();
@@ -51,11 +57,11 @@ public class PlayerFulfillmentHandler {
             }
         }
 
-        if (foundCitizen == null && !colony.getCitizenManager().getCitizens().isEmpty()) {
-            foundCitizen = colony.getCitizenManager().getCitizens().iterator().next();
+        if (foundCitizen == null) {
+            McTalking.LOGGER.warn("[Fulfillment] No citizen found for requester at {}; request {} not attributed.",
+                    requesterPos, request.getId());
+            return;
         }
-
-        if (foundCitizen == null) return;
 
         var mem = ((CitizenDataMemoryExtended) foundCitizen).mc_talking$getOrInitializeMemory();
         mem.addEvent(String.format(

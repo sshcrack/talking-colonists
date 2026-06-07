@@ -42,13 +42,16 @@ public class BroadcastPropagationService {
                         ICitizenData recipient = citizens.get(j);
                         CitizenMemories recipientMem = ((CitizenDataMemoryExtended) recipient).mc_talking$getOrInitializeMemory();
 
+                        boolean sharedAny = false;
                         for (ColonyBroadcast broadcast : carrierMem.getReceivedBroadcasts()) {
-                            if (propagationsLeft <= 0) break;
                             if (recipientMem.hasHeardBroadcast(broadcast.getId())) continue;
-
                             recipientMem.addBroadcast(broadcast);
-                            McTalking.LOGGER.debug("[Broadcast] {} → {}: '{}'",
-                                carrier.getName(), recipient.getName(), broadcast.getId());
+                            sharedAny = true;
+                        }
+
+                        if (sharedAny) {
+                            McTalking.LOGGER.info("[Broadcast] {} → {}: shared broadcasts",
+                                    carrier.getName(), recipient.getName());
                             propagationsLeft--;
                         }
                     }

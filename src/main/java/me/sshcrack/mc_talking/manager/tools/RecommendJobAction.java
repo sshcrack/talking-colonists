@@ -19,6 +19,8 @@ public class RecommendJobAction extends FunctionAction {
 
     private static final Map<String, JobRequirement> JOB_REQUIREMENTS = new LinkedHashMap<>();
 
+    // Weights derived from MineColonies' internal job-to-skill mappings (colony_pam.xml / schematics).
+    // Update when MineColonies adds, removes, or rebalances job skill requirements.
     static {
         JOB_REQUIREMENTS.put("Builder", new JobRequirement(Skill.Strength, 1.0, Skill.Agility, 0.5));
         JOB_REQUIREMENTS.put("Miner", new JobRequirement(Skill.Strength, 1.0, Skill.Stamina, 0.5));

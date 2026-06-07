@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.broadcast;
 
 import net.minecraft.nbt.CompoundTag;
 
+// equals/hashCode intentionally omitted — identity is id-based, managed via knownBroadcastIds (HashSet<String>) in CitizenMemories.
 public class ColonyBroadcast {
     private static final String TAG_ID = "id";
     private static final String TAG_ORIGINATOR = "originator";
