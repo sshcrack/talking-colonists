@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashMap;
 import java.util.UUID;
 
-public class InitiateBroadcastAction extends FunctionAction {
+public class InitiateBroadcastAction extends PlayerFunctionAction {
     public InitiateBroadcastAction() {
         super("initiate_broadcast", "Records a message to broadcast across the colony for other citizens to hear. Only invoke this when the player explicitly requests a formal colony-wide announcement.",
                 new ObjectProperty(new HashMap<>() {{
