@@ -2,12 +2,16 @@ package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.IBuilding;
+import com.minecolonies.api.colony.buildings.ICommonBuilding;
+import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
+import com.minecolonies.api.util.InventoryUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
 
@@ -540,12 +544,16 @@ public final class MumblingTopicHelper {
                         "You can't continue your job as a " + jobName + " because you're missing something important: " + needed + ". Call out to %s by name and ask for assistance.",
                         "As a " + jobName + ", you're stuck waiting for supplies: " + needed + ". Call out to %s by name and plead for help to get back to work."
                 ));
-            } else {
-                return format(playerName, MiscUtil.pick(
-                        "You're completely stuck and can't do your work as a " + jobName + ". Call out to %s by name and urgently explain what's wrong and ask for help.",
-                        "You can't continue your job as a " + jobName + " because you're blocked by missing supplies. Call out to %s by name and ask for assistance."
-                ));
             }
+
+            // If there ARE open requests but all were filtered out (warehouse has stock),
+            // skip STUCK prompt — delivery is in progress, fall through to other checks.
+            if (workBuildingHasOpenRequests(data)) return buildGenericUrgentPrompt(playerName);
+
+            return format(playerName, MiscUtil.pick(
+                    "You're completely stuck and can't do your work as a " + jobName + ". Call out to %s by name and urgently explain what's wrong and ask for help.",
+                    "You can't continue your job as a " + jobName + " because you're blocked by missing supplies. Call out to %s by name and ask for assistance."
+            ));
         }
 
         // ── CRITICAL: sickness ───────────────────────────
@@ -621,6 +629,8 @@ public final class MumblingTopicHelper {
                 items.add("...and more");
                 break;
             }
+            if (warehouseHasStock(data, req)) continue;
+
             String display = req.getShortDisplayString().getString();
             if (display != null && !display.isEmpty()) {
                 items.add(display);
@@ -629,6 +639,41 @@ public final class MumblingTopicHelper {
 
         if (items.isEmpty()) return "";
         return String.join(", ", items);
+    }
+
+    /**
+     * Checks whether the requested items are sufficiently stocked in any colony warehouse.
+     * Uses the same matching logic as {@link com.minecolonies.core.colony.requestsystem.resolvers.WarehouseRequestResolver}.
+     */
+    private static boolean warehouseHasStock(ICitizenData data, IRequest<?> request) {
+        if (!(request.getRequest() instanceof IDeliverable deliverable)) return false;
+
+        var colony = data.getColony();
+        int requiredCount = deliverable.getCount();
+
+        for (var entry : colony.getServerBuildingManager().getBuildings().entrySet()) {
+            var building = entry.getValue();
+            if (building.getBuildingType() != ModBuildings.wareHouse.get()) continue;
+
+            int available = InventoryUtils.hasBuildingEnoughElseCount(
+                    (ICommonBuilding) building,
+                    deliverable::matches,
+                    requiredCount
+            );
+            if (available >= requiredCount) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the citizen's work building has any open requests.
+     * Used to distinguish "no open requests" from "all filtered out by warehouse check".
+     */
+    private static boolean workBuildingHasOpenRequests(ICitizenData data) {
+        IBuilding workBuilding = data.getWorkBuilding();
+        if (workBuilding == null) return false;
+        var open = workBuilding.getOpenRequests(data.getId());
+        return open != null && !open.isEmpty();
     }
 
     private static String format(String playerName, String template) {
