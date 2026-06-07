@@ -427,7 +427,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         } else if (McTalkingConfig.INSTANCE.instance().sendMumblingAndConversationsToChat) {
             var server = entity.level().getServer();
             if (server != null) {
-                double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
+                double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange * 2;
                 for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                     if (player.level() == entity.level() && player.distanceTo(entity) <= range) {
                         player.sendSystemMessage(message);

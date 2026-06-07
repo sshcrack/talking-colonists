@@ -345,7 +345,7 @@ public class DeliveryInteractionManager {
     }
 
     private static AbstractEntityCitizen findNearestCitizen(ServerLevel world, double x, double y, double z) {
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+        double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
         AABB searchBox = new AABB(x - range, y - range, z - range, x + range, y + range, z + range);
         AbstractEntityCitizen nearest = null;
         double nearestDistSq = Double.MAX_VALUE;

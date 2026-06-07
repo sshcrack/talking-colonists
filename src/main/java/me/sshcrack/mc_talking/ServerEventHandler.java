@@ -31,7 +31,8 @@ import me.sshcrack.mc_talking.pregen.PlayerHeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
-
+import me.sshcrack.mc_talking.broadcast.BroadcastPropagationService;
+import me.sshcrack.mc_talking.rumor.RumorMillService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /*? if neoforge {*/
@@ -177,8 +178,12 @@ public class ServerEventHandler {
                 && (tickCounter % McTalkingConfig.INSTANCE.instance().randomConversationCheckIntervalTicks == 0);
         boolean doContactCheck = McTalkingConfig.INSTANCE.instance().enableCitizenInitiatedContact
                 && (tickCounter % McTalkingConfig.INSTANCE.instance().citizenContactCheckIntervalTicks == 0);
+        boolean doRumorCheck = McTalkingConfig.INSTANCE.instance().enableRumorMill
+                && (tickCounter % McTalkingConfig.INSTANCE.instance().rumorMillCheckIntervalTicks == 0);
+        boolean doBroadcastPropagation = McTalkingConfig.INSTANCE.instance().enableBroadcastPropagation
+                && (tickCounter % McTalkingConfig.INSTANCE.instance().broadcastPropagationIntervalTicks == 0);
 
-        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck && !doContactCheck) {
+        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck && !doContactCheck && !doRumorCheck && !doBroadcastPropagation) {
             return;
         }
 
@@ -203,7 +208,7 @@ public class ServerEventHandler {
             if (McTalkingVoicechatPlugin.shouldDisableColoniesTicks(player))
                 continue;
 
-            double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+            double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
             var aabb = player.getBoundingBox().inflate(range);
             var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
@@ -274,6 +279,14 @@ public class ServerEventHandler {
 
         if (McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) {
             MemoryCompactionService.tick(server);
+        }
+
+        if (doRumorCheck) {
+            RumorMillService.tick(server);
+        }
+
+        if (doBroadcastPropagation) {
+            BroadcastPropagationService.tick(server);
         }
     }
 
@@ -678,7 +691,7 @@ public class ServerEventHandler {
             // Check if in voice range to start conversation
             // Must be in the same dimension for distance checks to be meaningful
             if (citizen.level() == player.level()) {
-                double voiceRange = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+                double voiceRange = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
                 if (citizen.distanceToSqr(player) <= voiceRange * voiceRange) {
                     McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
                             citizen.getCitizenData().getName());
@@ -748,7 +761,7 @@ public class ServerEventHandler {
     private void checkForRandomConversations(MinecraftServer server) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
 
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
+        double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange * 2;
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             var nearbyBox = player.getBoundingBox().inflate(range);

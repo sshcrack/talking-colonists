@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.conversations.memory.data;
 
+import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -7,8 +9,12 @@ import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class CitizenMemories {
@@ -17,15 +23,18 @@ public class CitizenMemories {
     private static final String TAG_RELATIONSHIPS_KEY = "relationships";
     private static final String TAG_SESSION_TOKEN = "gemini_session_token";
     private static final String TAG_SUMMARIZED_MEMORY = "summarized_memory";
+    private static final String TAG_BROADCASTS = "mc_talking_broadcasts";
+    private static final String TAG_PENDING_RUMORS = "pending_rumors";
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<CitizenRelationshipMemory> relationships = new ArrayList<>();
+    private final List<ColonyBroadcast> receivedBroadcasts = new ArrayList<>();
+    private final Set<String> knownBroadcastIds = new HashSet<>();
+    private final List<String> pendingRumorPropagations = new ArrayList<>();
     private String sessionToken = "";
     private String summarizedMemory = "";
 
     public CitizenMemories() {
-        // We do not initialize these memories because at first it is empty.
-        // You can however deserialize it using @deserializeNbt if you have saved data
     }
 
     public List<String> getFacts() {
@@ -46,6 +55,26 @@ public class CitizenMemories {
 
     public void addEvent(String event) {
         events.add(event);
+        if (event.startsWith("Rumor:")) {
+            pendingRumorPropagations.add(event);
+        }
+    }
+
+    public boolean hasPendingRumor() {
+        return !pendingRumorPropagations.isEmpty();
+    }
+
+    public String drainPendingRumor() {
+        return pendingRumorPropagations.isEmpty() ? null : pendingRumorPropagations.remove(0);
+    }
+
+    public int getPendingRumorCount() {
+        return pendingRumorPropagations.size();
+    }
+
+    public String peekPendingRumor(int index) {
+        if (index < 0 || index >= pendingRumorPropagations.size()) return null;
+        return pendingRumorPropagations.get(index);
     }
 
     public void setSummarizedMemory(String summarizedMemory) {
@@ -65,6 +94,26 @@ public class CitizenMemories {
         }
 
         relationships.add(new CitizenRelationshipMemory(targetUUID, type, change));
+    }
+
+    public void addBroadcast(ColonyBroadcast broadcast) {
+        if (knownBroadcastIds.contains(broadcast.getId())) return;
+        knownBroadcastIds.add(broadcast.getId());
+        receivedBroadcasts.add(broadcast);
+        receivedBroadcasts.sort(Comparator.comparingLong(ColonyBroadcast::getCreatedAtMs).reversed());
+        int max = McTalkingConfig.INSTANCE.instance().maxBroadcastsStored;
+        while (receivedBroadcasts.size() > max) {
+            ColonyBroadcast removed = receivedBroadcasts.remove(receivedBroadcasts.size() - 1);
+            knownBroadcastIds.remove(removed.getId());
+        }
+    }
+
+    public boolean hasHeardBroadcast(String id) {
+        return knownBroadcastIds.contains(id);
+    }
+
+    public List<ColonyBroadcast> getReceivedBroadcasts() {
+        return Collections.unmodifiableList(receivedBroadcasts);
     }
 
     public CompoundTag serializeNbt() {
@@ -88,6 +137,19 @@ public class CitizenMemories {
         }
 
         tag.put(TAG_RELATIONSHIPS_KEY, relationshipsNbt);
+
+        ListTag broadcastsNbt = new ListTag();
+        for (ColonyBroadcast broadcast : receivedBroadcasts) {
+            broadcastsNbt.add(broadcast.serialize());
+        }
+        tag.put(TAG_BROADCASTS, broadcastsNbt);
+
+        ListTag pendingNbt = new ListTag();
+        for (String r : pendingRumorPropagations) {
+            pendingNbt.add(StringTag.valueOf(r));
+        }
+        tag.put(TAG_PENDING_RUMORS, pendingNbt);
+
         if (sessionToken != null && !sessionToken.isBlank()) {
             tag.putString(TAG_SESSION_TOKEN, sessionToken);
         }
@@ -101,6 +163,9 @@ public class CitizenMemories {
         facts.clear();
         events.clear();
         relationships.clear();
+        receivedBroadcasts.clear();
+        knownBroadcastIds.clear();
+        pendingRumorPropagations.clear();
 
         ListTag factsNbt = tag.getList(TAG_FACTS_KEY, Tag.TAG_STRING);
         for (int i = 0; i < factsNbt.size(); i++) {
@@ -118,6 +183,19 @@ public class CitizenMemories {
             CitizenRelationshipMemory relationship = new CitizenRelationshipMemory(relationshipTag);
             relationships.add(relationship);
         }
+
+        ListTag broadcastsNbt = tag.getList(TAG_BROADCASTS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < broadcastsNbt.size(); i++) {
+            ColonyBroadcast broadcast = ColonyBroadcast.deserialize(broadcastsNbt.getCompound(i));
+            receivedBroadcasts.add(broadcast);
+            knownBroadcastIds.add(broadcast.getId());
+        }
+
+        ListTag pendingNbt = tag.getList(TAG_PENDING_RUMORS, Tag.TAG_STRING);
+        for (int i = 0; i < pendingNbt.size(); i++) {
+            pendingRumorPropagations.add(pendingNbt.getString(i));
+        }
+
         if (tag.contains(TAG_SESSION_TOKEN)) {
             sessionToken = tag.getString(TAG_SESSION_TOKEN);
         }
@@ -134,12 +212,6 @@ public class CitizenMemories {
         this.sessionToken = token == null ? "" : token;
     }
 
-    /**
-     * Formats the memories into a prompt string that can be used for LLM input. This includes facts, events, and relationship changes. The interestedParties parameter can be used to filter or prioritize certain memories based on the parties involved, but for simplicity, this implementation includes all memories.
-     *
-     * @param interestedParties a map with keys of the entity UUID, the value is the LLM name, that should be added from the relationships
-     * @return a formatted string representing the memories, suitable for prompting an LLM
-     */
     public String toPrompt(Map<UUID, String> interestedParties) {
         StringBuilder prompt = new StringBuilder();
 
@@ -175,6 +247,18 @@ public class CitizenMemories {
 
                 prompt.append("- Your ").append(relationship.getType()).append(" towards ")
                         .append(name).append(" is at factor ").append(relationship.getFactor()).append("\n");
+            }
+        }
+
+        int broadcastCap = McTalkingConfig.INSTANCE.instance().maxBroadcastsInPrompt;
+        if (!receivedBroadcasts.isEmpty() && broadcastCap > 0) {
+            prompt.append(" Colony Broadcasts (most recent first):\n");
+            int count = 0;
+            for (ColonyBroadcast b : receivedBroadcasts) {
+                if (count >= broadcastCap) break;
+                prompt.append("- ").append(b.getOriginatorName())
+                    .append(" sent word: ").append(b.getMessage()).append("\n");
+                count++;
             }
         }
 
