@@ -12,6 +12,7 @@ import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
+import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -150,6 +151,11 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         byte[] opusData = packet.getOpusEncodedData();
         boolean hasVoiceActivity = hasVoiceActivity(opusData);
         long currentTime = System.currentTimeMillis();
+
+        // Announce the speaker so the AI knows whose voice this is
+        if (manager instanceof CitizenWsClient cws) {
+            cws.announcePlayerIfChanged(player);
+        }
 
         // Forward the voice data to the AI regardless of silence detection
         manager.promptAudioOpus(opusData);

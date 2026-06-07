@@ -13,6 +13,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
@@ -63,9 +64,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     /**
-     * This variable is used to track if the quota has been exceeded
+     * Returns the model name string for quota tracking.
      */
-    private static boolean quotaExceeded;
+    protected abstract String getModelName();
 
     private boolean hasMadeInitialConnection = false;
     private long nextReconnectAllowedAt = 0;
@@ -82,6 +83,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      */
     private boolean sentGeneratingStatus = false;
     protected boolean shouldEndConversation = false;
+
+    /**
+     * The most recent text submitted via {@link #addPromptTextAfterTalkingComplete}.
+     * Saved so that after a session-token invalidation and reconnect the prompt can
+     * be re-queued, preventing system-controlled sessions (mumbling / urgent contact)
+     * from falling silent.
+     */
+    @Nullable
+    private String lastPromptText = null;
 
     /**
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
@@ -179,7 +189,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private boolean canAttemptRecovery() {
-        return !intentionalClose && !quotaExceeded
+        return !intentionalClose && !QuotaTracker.isQuotaExceeded(getModelName())
                 && wsSessionState != WsSessionState.TERMINAL_ERROR
                 && wsSessionState != WsSessionState.CLOSED
                 && wsSessionState != WsSessionState.QUOTA_EXCEEDED;
@@ -240,7 +250,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public BidiGenerateContentSetup getSetup() {
-        var setup = new BidiGenerateContentSetup("models/" + McTalkingConfig.INSTANCE.instance().currentAiModel.getName());
+        var setup = new BidiGenerateContentSetup("models/" + getModelName());
 
         var modality = getEffectiveModality();
         setup.generationConfig.responseModalities = modality.getModalities();
@@ -287,9 +297,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         setup.systemInstruction = sys;
 
-        boolean isPlayer = resolveActivePlayer() != null;
-        McTalking.LOGGER.info("Adding tools (player enabled {})", isPlayer);
-        setup.tools.addAll(AITools.getEnabledTools(isPlayer));
+        setup.tools.addAll(AITools.getEnabledTools());
 
         return setup;
     }
@@ -429,7 +437,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         } else if (McTalkingConfig.INSTANCE.instance().sendMumblingAndConversationsToChat) {
             var server = entity.level().getServer();
             if (server != null) {
-                double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
+                double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange * 2;
                 for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                     if (player.level() == entity.level() && player.distanceTo(entity) <= range) {
                         player.sendSystemMessage(message);
@@ -573,11 +581,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public JsonObject onFunctionCall(String name, @Nullable JsonObject args) {
         var colony = this.entity.getCitizenColonyHandler().getColony();
 
-        var action = AITools.registeredFunctions.get(name);
+        var action = AITools.getAction(name);
         if (action == null) {
             McTalking.LOGGER.warn("Unknown function call: {}", name);
             var error = new JsonObject();
             error.addProperty("error", "Unknown function: " + name);
+            return error;
+        }
+
+        if (AITools.isPlayerOnlyAction(name) && resolveActivePlayer() == null) {
+            McTalking.LOGGER.warn("Player-only tool {} called without active player", name);
+            var error = new JsonObject();
+            error.addProperty("error", "You cannot use this tool until a player is speaking to you directly.");
             return error;
         }
 
@@ -600,7 +615,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
-        quotaExceeded = true;
+        QuotaTracker.reportQuotaExceeded(getModelName());
         setWsSessionState(WsSessionState.QUOTA_EXCEEDED, "quota exceeded");
         onQuotaExceededEvent("Quota exceeded for Gemini API, please check your API key and usage limits.");
     }
@@ -618,15 +633,28 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return;
         }
 
-        if (quotaExceeded) {
+        if (QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
 
-        if (reason != null && reason.contains("BidiGenerateContent session")) {
+        // Maybe we'll need to just reset the session token in general if more errors like this occur
+        if ((reason != null && reason.contains("BidiGenerateContent session")) || (code == 1007 && reason != null && reason.contains("invalid argument"))) {
             McTalking.LOGGER.info("Session token invalidated, clearing and forcing reconnect. Can attempt recovery? {} with state {}", canAttemptRecovery(), wsSessionState);
             wsSessionState = WsSessionState.INVALID_SESSION_TOKEN;
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
+
+            // If a system-controlled prompt (mumbling / urgent contact) was previously
+            // submitted, re-queue it so the AI is re-prompted after the new connection
+            // establishes, rather than sitting in LISTENING state silently.
+            if (lastPromptText != null) {
+                synchronized (pendingSystemText) {
+                    if (!pendingSystemText.contains(lastPromptText)) {
+                        pendingSystemText.add(lastPromptText);
+                    }
+                }
+            }
+
             ensureConnectionForQueuedInput("session token invalidated");
             return;
         }
@@ -666,7 +694,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onError(Exception ex) {
         McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
-        if (intentionalClose || quotaExceeded) {
+        if (intentionalClose || QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
 
@@ -704,7 +732,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         send(ClientMessages.input(input));
     }
 
+    /**
+     * Queues {@code text} to be sent to the API after the current AI turn finishes.
+     * If the session is not yet ready the text is buffered in {@link #pendingSystemText}
+     * and sent once setup completes.
+     *
+     * <p>The text is also saved to {@link #lastPromptText} so that if the session
+     * token is later invalidated the prompt can be replayed on the new connection,
+     * preventing system-controlled conversations from going silent.</p>
+     *
+     * @param text the text prompt to send after the current AI turn completes
+     */
     public void addPromptTextAfterTalkingComplete(String text) {
+        this.lastPromptText = text;
+
         if (sentGeneratingStatus)
             onGenerationPaused();
 
@@ -730,7 +771,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void reconnect() {
-        if (intentionalClose || quotaExceeded) {
+        if (intentionalClose || QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
         intentionalClose = false;

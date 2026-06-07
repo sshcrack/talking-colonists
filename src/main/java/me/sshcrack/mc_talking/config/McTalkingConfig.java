@@ -30,6 +30,7 @@ import java.util.List;
 public class McTalkingConfig {
     public static final String FLASH_MODEL = "gemini-flash-lite-latest";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
+    public static final AvailableAI CHEAP_LIVE_MODEL = AvailableAI.Flash2_5;
 
     /** Movement speed multiplier when a citizen walks to the player on urgent contact. */
     public static final double CITIZEN_URGENT_WALK_SPEED = 1.2;
@@ -135,11 +136,21 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Maximum number of pregenerated greetings to store per citizen. Oldest greetings are discarded when limit is reached.")
     public int maxPregeneratedGreetingsPerCitizen = 5;
 
+    @AutoGen(category = "citizens", group = "pregeneration")
+    @IntField(min = 1, max = 10)
+    @SerialEntry(comment = "Maximum number of pregenerated citizen-to-citizen greetings that may play in a single tick interval (default: 1). Increase only if you have a very large colony and want more ambient chatter.")
+    public int maxGreetingsPerTickInterval = 1;
+
     // Resource Management
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)
     @SerialEntry(comment = "Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
     public int maxConcurrentAgents = 3;
+
+    @AutoGen(category = "general", group = "resource_management")
+    @IntField(min = 1, max = 10)
+    @SerialEntry(comment = "Maximum concurrent background connections for the flash2.5 cheap live model (memory compaction, greeting pregeneration). The API allows 3 concurrent connections.")
+    public int maxConcurrentBackground = 3;
 
     @AutoGen(category = "general", group = "interaction")
     @DoubleField(min = 1.0, max = 100.0)
@@ -171,7 +182,7 @@ public class McTalkingConfig {
     @DoubleField(min = 1.0, max = 100.0)
     @SerialEntry(comment = "Distance in blocks within which a citizen can be triggered to mumble/start a conversation etc when a player is nearby")
     //TODO this is also used for greetings between citizens
-    public double mumblingDetectionRange = 10.0;
+    public double citizenInteractionRange = 10.0;
 
     @AutoGen(category = "citizens", group = "mumbling")
     @IntField(min = 1, max = 10000)
@@ -229,11 +240,6 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Distance in blocks within which a citizen will trigger their pregenerated player greeting.")
     public double playerGreetingDistance = 8.0;
 
-    @AutoGen(category = "citizens", group = "pregeneration")
-    @IntField(min = 0, max = 600)
-    @SerialEntry(comment = "Cooldown in seconds between pregenerated player greetings for the same citizen-player pair.")
-    public int playerGreetingCooldownSeconds = 60;
-
     @AutoGen(category = "citizens", group = "voice_chat")
     @TickBox
     @SerialEntry(comment = "If true, citizens will whisper when talking")
@@ -261,6 +267,99 @@ public class McTalkingConfig {
     @IntField(min = 0, max = 7200)
     @SerialEntry(comment = "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.")
     public int colonyEventWindowSeconds = 1200;
+
+    // Rumor Mill
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will share memories with each other as rumors, creating a living information ecosystem.")
+    public boolean enableRumorMill = true;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 1, max = 72000)
+    @SerialEntry(comment = "How often (in server ticks) to check for rumor propagation between nearby citizens. 20 ticks = 1 second.")
+    public int rumorMillCheckIntervalTicks = 600;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleField(min = 1.0, max = 100.0)
+    @SerialEntry(comment = "Maximum distance in blocks for rumor propagation between citizens.")
+    public double rumorMillRange = 12.0;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Chance (0.0-1.0) that rumors are shared between a pair of nearby citizens per check.")
+    public double rumorMillChancePerPair = 0.4;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum number of rumor propagations per tick to bound server cost.")
+    public int rumorMillMaxPropagationsPerTick = 3;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will voice rumors aloud when a player is nearby, creating immersive gossip.")
+    public boolean enableRumorTalking = true;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Chance (0.0-1.0) that a rumor propagation is voiced aloud when a player is nearby.")
+    public double rumorTalkingChance = 0.5;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @DoubleField(min = 1.0, max = 50.0)
+    @SerialEntry(comment = "Maximum distance in blocks for a player to witness voiced rumors.")
+    public double rumorTalkingRange = 12.0;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum rumors stored per citizen. Oldest discarded when limit reached.")
+    public int maxRumorsStored = 10;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
+    @IntField(min = 0, max = 20)
+    @SerialEntry(comment = "How many rumors to include in a citizen's prompt. Set to 0 to disable.")
+    public int maxRumorsInPrompt = 3;
+
+    // Broadcast System
+    @AutoGen(category = "citizens", group = "broadcast")
+    @TickBox
+    @SerialEntry(comment = "If true, players can ask citizens to broadcast messages across the colony, which propagate through citizen-to-citizen interactions.")
+    public boolean enableBroadcastPropagation = true;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 1, max = 72000)
+    @SerialEntry(comment = "How often (in server ticks) to check for broadcast propagation between citizens. 20 ticks = 1 second.")
+    public int broadcastPropagationIntervalTicks = 300;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum number of broadcast propagations per tick.")
+    public int broadcastMaxPropagationsPerTick = 5;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @DoubleField(min = 1.0, max = 1000.0)
+    @SerialEntry(comment = "Maximum distance in blocks between citizens for broadcast propagation. Broadcasts spread through proximity like rumors.")
+    public double broadcastPropagationRange = 24.0;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 0, max = 20)
+    @SerialEntry(comment = "How many of the most recent broadcasts to include in a citizen's prompt.")
+    public int maxBroadcastsInPrompt = 3;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @IntField(min = 1, max = 100)
+    @SerialEntry(comment = "Maximum broadcasts stored per citizen. Oldest discarded when limit reached.")
+    public int maxBroadcastsStored = 20;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens will announce broadcasts aloud when a player is nearby.")
+    public boolean enableBroadcastYelling = true;
+
+    @AutoGen(category = "citizens", group = "broadcast")
+    @DoubleField(min = 1.0, max = 10000.0)
+    @SerialEntry(comment = "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.")
+    // This is half of the default voice distance range
+    public double broadcastYellingRange = 24.0;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
     public int configVersion = 2;

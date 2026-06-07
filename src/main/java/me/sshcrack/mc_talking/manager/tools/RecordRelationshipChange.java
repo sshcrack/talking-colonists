@@ -17,7 +17,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 import java.util.HashMap;
 
-public class RecordRelationshipChange extends FunctionAction {
+public class RecordRelationshipChange extends GeneralFunctionAction {
     public RecordRelationshipChange() {
         super("record_relationship_change", """
                         Updates your emotional feelings and relationship in your memory targeting a citizen or the player you are talking to. Leave the citizen name, if you want to update the memory to the player (or manager)

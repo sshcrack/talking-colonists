@@ -6,7 +6,9 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.rumor.Rumor;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipMemory;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.ChatFormatting;
@@ -101,7 +103,7 @@ public class DebugMemoryCommand {
             // Relationships
             msg.append(Component.literal("  §7Relationships (" + relationships.size() + "):\n"));
             if (relationships.isEmpty()) {
-                msg.append(Component.literal("    §8(none)"));
+                msg.append(Component.literal("    §8(none)\n"));
             } else {
                 for (int i = 0; i < relationships.size(); i++) {
                     CitizenRelationshipMemory rel = relationships.get(i);
@@ -113,8 +115,57 @@ public class DebugMemoryCommand {
                 }
             }
 
+            // Broadcasts
+            var broadcasts = mem.getReceivedBroadcasts();
+            msg.append(Component.literal("  §7Broadcasts (" + broadcasts.size() + "):\n"));
+            if (broadcasts.isEmpty()) {
+                msg.append(Component.literal("    §8(none)\n"));
+            } else {
+                int i = 1;
+                for (ColonyBroadcast b : broadcasts) {
+                    long ageMs = System.currentTimeMillis() - b.getCreatedAtMs();
+                    String ageStr = formatAge(ageMs);
+                    String idStr = b.getId().length() > 8 ? b.getId().substring(0, 8) + "…" : b.getId();
+                    msg.append(Component.literal("    §f" + i + ". §7" + idStr
+                                    + " §8| §f" + b.getOriginatorName()
+                                    + " §8via §f" + b.getSenderPlayerName()
+                                    + " §8| §7\"" + b.getMessage() + "\""
+                                    + " §8(" + ageStr + ")")
+                            .append(Component.literal("\n")));
+                    i++;
+                }
+            }
+
+            // Received Rumors
+            var receivedRumors = mem.getReceivedRumors();
+            msg.append(Component.literal("  §7Rumors (" + receivedRumors.size() + "):\n"));
+            if (receivedRumors.isEmpty()) {
+                msg.append(Component.literal("    §8(none)\n"));
+            } else {
+                int i = 1;
+                for (Rumor r : receivedRumors) {
+                    String idStr = r.getId().length() > 8 ? r.getId().substring(0, 8) + "…" : r.getId();
+                    msg.append(Component.literal("    §f" + i + ". §7" + idStr
+                                    + " §8| §f" + r.getOriginatorName()
+                                    + " §8| §7\"" + r.getContent() + "\"")
+                            .append(Component.literal("\n")));
+                    i++;
+                }
+            }
+
             return msg;
         }, false);
         return 1;
+    }
+
+    private static String formatAge(long ageMs) {
+        long seconds = ageMs / 1000;
+        if (seconds < 60) return seconds + "s";
+        long minutes = seconds / 60;
+        seconds %= 60;
+        if (minutes < 60) return minutes + "m" + seconds + "s";
+        long hours = minutes / 60;
+        minutes %= 60;
+        return hours + "h" + minutes + "m";
     }
 }

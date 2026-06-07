@@ -23,7 +23,7 @@ public class ListToolsCommand {
     private static int get_description(CommandContext<CommandSourceStack> context, String toolName) throws CommandSyntaxException {
         var src = context.getSource();
 
-        var tool = AITools.registeredFunctions.get(toolName);
+        var tool = AITools.getAction(toolName);
         if (tool == null) {
             throw TOOL_NOT_FOUND.create();
         }
@@ -51,7 +51,15 @@ public class ListToolsCommand {
             });
         }
 
-        src.sendSuccess(() -> Component.translatable("mc_talking.commands.tool_description", toolName, tool.getDescription(), strWriter.toString()), true);
+        var categoryKey = AITools.isPlayerOnlyAction(toolName)
+                ? "mc_talking.commands.tool_category_player"
+                : "mc_talking.commands.tool_category_general";
+
+        src.sendSuccess(() -> Component.translatable("mc_talking.commands.tool_description",
+                toolName,
+                Component.translatable(categoryKey),
+                tool.getDescription(),
+                strWriter.toString()), true);
         return 0;
     }
 
@@ -72,7 +80,18 @@ public class ListToolsCommand {
                         throw NO_TOOLS.create();
                     }
 
-                    src.sendSuccess(() -> Component.translatable("mc_talking.commands.list_tools", String.join(", ", tools)), true);
+                    src.sendSuccess(() -> {
+                        var message = Component.translatable("mc_talking.commands.list_tools_header");
+                        for (var name : tools) {
+                            var categoryKey = AITools.isPlayerOnlyAction(name)
+                                    ? "mc_talking.commands.tool_category_player"
+                                    : "mc_talking.commands.tool_category_general";
+                            message = message.append("\n").append(Component.translatable("mc_talking.commands.tool_entry",
+                                    name,
+                                    Component.translatable(categoryKey)));
+                        }
+                        return message;
+                    }, true);
                     return 1;
                 }));
     }

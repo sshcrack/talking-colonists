@@ -150,7 +150,7 @@ public class UrgentContactHandler {
             }
 
             if (citizen.level() == player.level()) {
-                double voiceRange = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+                double voiceRange = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
                 if (citizen.distanceToSqr(player) <= voiceRange * voiceRange) {
                     McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
                             citizen.getCitizenData().getName());

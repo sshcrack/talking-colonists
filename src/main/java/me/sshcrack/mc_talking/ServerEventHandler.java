@@ -4,11 +4,13 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.commands.McTalkingDebugCommand;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
+import me.sshcrack.mc_talking.broadcast.BroadcastPropagationService;
 import me.sshcrack.mc_talking.handler.CasualGreetingHandler;
 import me.sshcrack.mc_talking.handler.CitizenMumblingHandler;
 import me.sshcrack.mc_talking.handler.PregeneratedGreetingHandler;
 import me.sshcrack.mc_talking.handler.RandomConversationHandler;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
+import me.sshcrack.mc_talking.rumor.RumorMillService;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
@@ -25,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+
 
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
@@ -136,8 +139,12 @@ public class ServerEventHandler {
                 && (tickCounter % McTalkingConfig.INSTANCE.instance().randomConversationCheckIntervalTicks == 0);
         boolean doContactCheck = McTalkingConfig.INSTANCE.instance().enableCitizenInitiatedContact
                 && (tickCounter % McTalkingConfig.INSTANCE.instance().citizenContactCheckIntervalTicks == 0);
+        boolean doRumorCheck = McTalkingConfig.INSTANCE.instance().enableRumorMill
+                && (tickCounter % McTalkingConfig.INSTANCE.instance().rumorMillCheckIntervalTicks == 0);
+        boolean doBroadcastPropagation = McTalkingConfig.INSTANCE.instance().enableBroadcastPropagation
+                && (tickCounter % McTalkingConfig.INSTANCE.instance().broadcastPropagationIntervalTicks == 0);
 
-        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck && !doContactCheck) {
+        if (!doDistanceCheck && !doMumblingCheck && !doRandomConvCheck && !doContactCheck && !doRumorCheck && !doBroadcastPropagation) {
             return;
         }
 
@@ -158,7 +165,7 @@ public class ServerEventHandler {
             if (McTalkingVoicechatPlugin.shouldDisableColoniesTicks(player))
                 continue;
 
-            double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+            double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
             var aabb = player.getBoundingBox().inflate(range);
             var citizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, aabb);
 
@@ -222,6 +229,14 @@ public class ServerEventHandler {
         if (McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) {
             MemoryCompactionService.tick(server);
         }
+
+        if (doRumorCheck) {
+            RumorMillService.tick(server);
+        }
+
+        if (doBroadcastPropagation) {
+            BroadcastPropagationService.tick(server);
+        }
     }
 
     @SubscribeEvent
@@ -281,6 +296,7 @@ public class ServerEventHandler {
             }
         }
     }
+
 
     @SubscribeEvent
     public void onCitizenTargetChanged(LivingChangeTargetEvent event) {

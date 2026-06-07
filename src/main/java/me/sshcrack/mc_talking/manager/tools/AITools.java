@@ -14,36 +14,42 @@ public class AITools {
         /* This utility class should not be instantiated */
     }
 
-    public static final Map<String, FunctionAction> registeredFunctions = new HashMap<>();
-    public static final Map<String, FunctionAction> playerConversationOnlyTools = new HashMap<>();
+    private static final Map<String, FunctionAction> registeredFunctions = new HashMap<>();
+    private static final Map<String, FunctionAction> playerConversationOnlyTools = new HashMap<>();
 
-    public static void add(Map<String, FunctionAction> map, FunctionAction action) {
-        map.put(action.getName(), action);
-    }
-
-    public static void addAll(Map<String, FunctionAction> map, List<FunctionAction> actions) {
+    private static void addAll(Map<String, FunctionAction> map, List<FunctionAction> actions) {
         for (var action : actions) {
-            add(map, action);
+            map.put(action.getName(), action);
         }
     }
 
-    public static List<String> getRegisteredFunctionNames() {
-        return new ArrayList<>(registeredFunctions.keySet());
+    public static FunctionAction getAction(String name) {
+        var action = registeredFunctions.get(name);
+        if (action != null) return action;
+        return playerConversationOnlyTools.get(name);
     }
 
-    public static List<BidiGenerateContentSetup.Tool> getEnabledTools(boolean isPlayerConversation) {
+    public static boolean isPlayerOnlyAction(String name) {
+        var action = getAction(name);
+        return action != null && action.isPlayerOnly();
+    }
+
+    public static List<String> getRegisteredFunctionNames() {
+        var names = new ArrayList<>(registeredFunctions.keySet());
+        names.addAll(playerConversationOnlyTools.keySet());
+        return names;
+    }
+
+    public static List<BidiGenerateContentSetup.Tool> getEnabledTools() {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
 
         var tool = new BidiGenerateContentSetup.Tool();
         var rawToolsDisabled = McTalkingConfig.INSTANCE.instance().disabledTools;
 
-        var functions = registeredFunctions
-                .values()
-                .stream();
-
-        if (isPlayerConversation) {
-            functions = Stream.concat(functions, playerConversationOnlyTools.values().stream());
-        }
+        var functions = Stream.concat(
+                registeredFunctions.values().stream(),
+                playerConversationOnlyTools.values().stream()
+        );
 
         tool.functionDeclarations.addAll(
                 functions
@@ -72,12 +78,14 @@ public class AITools {
                 new DescribeSurroundingsAction(),
                 new EndConversationAction(),
                 new RecordRelationshipChange(),
-                new AddEventToMemory()
+                new AddEventToMemory(),
+                new RecommendJobAction()
 //                new JobSpecificAction()
         ));
         addAll(playerConversationOnlyTools, List.of(
                 new DropItemAction(),
-                new LeaveColonyAction()
+                new LeaveColonyAction(),
+                new InitiateBroadcastAction()
         ));
     }
 }

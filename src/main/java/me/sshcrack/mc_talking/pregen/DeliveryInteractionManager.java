@@ -13,6 +13,8 @@ import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.QuotaTracker;
+import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -345,7 +347,7 @@ public class DeliveryInteractionManager {
     }
 
     private static AbstractEntityCitizen findNearestCitizen(ServerLevel world, double x, double y, double z) {
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange;
+        double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
         AABB searchBox = new AABB(x - range, y - range, z - range, x + range, y + range, z + range);
         AbstractEntityCitizen nearest = null;
         double nearestDistSq = Double.MAX_VALUE;
@@ -362,21 +364,24 @@ public class DeliveryInteractionManager {
     }
 
     private static void startPregeneration(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
-        if (!ConversationManager.hasFreeCapacity(1)) return;
-        if (!ConversationManager.claimSlot(citizen, false)) return;
+        if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return;
+        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return;
 
-        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, audio -> {
-            ConversationManager.releaseSlot(citizen);
-            onComplete.accept(audio);
-        }, () -> {
-            ConversationManager.releaseSlot(citizen);
-        });
+        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, McTalkingConfig.CHEAP_LIVE_MODEL,
+                audio -> {
+                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+                    onComplete.accept(audio);
+                },
+                () -> {
+                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+                });
 
         try {
             client.connect();
+            ConversationManager.registerBackgroundClient(citizen.getUUID(), client);
         } catch (Exception e) {
             McTalking.LOGGER.error("[DeliveryInteraction] Failed to connect for citizen {}", citizen.getUUID(), e);
-            ConversationManager.releaseSlot(citizen);
+            ConversationManager.releaseBackgroundSlot(citizen.getUUID());
         }
     }
 }

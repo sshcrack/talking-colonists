@@ -25,7 +25,7 @@ public class RandomConversationHandler {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty())
             return;
 
-        double range = McTalkingConfig.INSTANCE.instance().mumblingDetectionRange * 2;
+        double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange * 2;
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             var nearbyBox = player.getBoundingBox().inflate(range);

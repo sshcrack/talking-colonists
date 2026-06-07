@@ -1,5 +1,8 @@
 package me.sshcrack.mc_talking.conversations.memory.data;
 
+import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.rumor.Rumor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
@@ -7,25 +10,35 @@ import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class CitizenMemories {
+    public static final String SYSTEM_EVENT_PREFIX = "[SYSTEM]";
+
     private static final String TAG_FACTS_KEY = "facts";
     private static final String TAG_EVENTS_KEY = "events";
     private static final String TAG_RELATIONSHIPS_KEY = "relationships";
     private static final String TAG_SESSION_TOKEN = "gemini_session_token";
     private static final String TAG_SUMMARIZED_MEMORY = "summarized_memory";
+    private static final String TAG_BROADCASTS = "mc_talking_broadcasts";
+    private static final String TAG_RUMORS = "mc_talking_rumors";
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<CitizenRelationshipMemory> relationships = new ArrayList<>();
+    private final List<ColonyBroadcast> receivedBroadcasts = new ArrayList<>();
+    private final Set<String> knownBroadcastIds = new HashSet<>();
+    private final List<Rumor> receivedRumors = new ArrayList<>();
+    private final Set<String> knownRumorIds = new HashSet<>();
     private String sessionToken = "";
     private String summarizedMemory = "";
 
     public CitizenMemories() {
-        // We do not initialize these memories because at first it is empty.
-        // You can however deserialize it using @deserializeNbt if you have saved data
     }
 
     public List<String> getFacts() {
@@ -67,6 +80,45 @@ public class CitizenMemories {
         relationships.add(new CitizenRelationshipMemory(targetUUID, type, change));
     }
 
+    public void addBroadcast(ColonyBroadcast broadcast) {
+        if (knownBroadcastIds.contains(broadcast.getId())) return;
+        knownBroadcastIds.add(broadcast.getId());
+        receivedBroadcasts.add(broadcast);
+        receivedBroadcasts.sort(Comparator.comparingLong(ColonyBroadcast::getCreatedAtMs).reversed());
+        int max = McTalkingConfig.INSTANCE.instance().maxBroadcastsStored;
+        while (receivedBroadcasts.size() > max) {
+            ColonyBroadcast removed = receivedBroadcasts.remove(receivedBroadcasts.size() - 1);
+            knownBroadcastIds.remove(removed.getId());
+        }
+    }
+
+    public boolean hasHeardBroadcast(String id) {
+        return knownBroadcastIds.contains(id);
+    }
+
+    public List<ColonyBroadcast> getReceivedBroadcasts() {
+        return Collections.unmodifiableList(receivedBroadcasts);
+    }
+
+    public void addRumor(Rumor rumor) {
+        if (knownRumorIds.contains(rumor.getId())) return;
+        knownRumorIds.add(rumor.getId());
+        receivedRumors.add(0, rumor);
+        int max = McTalkingConfig.INSTANCE.instance().maxRumorsStored;
+        while (receivedRumors.size() > max) {
+            Rumor removed = receivedRumors.remove(receivedRumors.size() - 1);
+            knownRumorIds.remove(removed.getId());
+        }
+    }
+
+    public boolean hasHeardRumor(String id) {
+        return knownRumorIds.contains(id);
+    }
+
+    public List<Rumor> getReceivedRumors() {
+        return Collections.unmodifiableList(receivedRumors);
+    }
+
     public CompoundTag serializeNbt() {
         CompoundTag tag = new CompoundTag();
         ListTag factsTag = new ListTag();
@@ -88,6 +140,19 @@ public class CitizenMemories {
         }
 
         tag.put(TAG_RELATIONSHIPS_KEY, relationshipsNbt);
+
+        ListTag broadcastsNbt = new ListTag();
+        for (ColonyBroadcast broadcast : receivedBroadcasts) {
+            broadcastsNbt.add(broadcast.serialize());
+        }
+        tag.put(TAG_BROADCASTS, broadcastsNbt);
+
+        ListTag rumorsNbt = new ListTag();
+        for (Rumor r : receivedRumors) {
+            rumorsNbt.add(r.serialize());
+        }
+        tag.put(TAG_RUMORS, rumorsNbt);
+
         if (sessionToken != null && !sessionToken.isBlank()) {
             tag.putString(TAG_SESSION_TOKEN, sessionToken);
         }
@@ -101,6 +166,10 @@ public class CitizenMemories {
         facts.clear();
         events.clear();
         relationships.clear();
+        receivedBroadcasts.clear();
+        knownBroadcastIds.clear();
+        receivedRumors.clear();
+        knownRumorIds.clear();
 
         ListTag factsNbt = tag.getList(TAG_FACTS_KEY, Tag.TAG_STRING);
         for (int i = 0; i < factsNbt.size(); i++) {
@@ -118,6 +187,21 @@ public class CitizenMemories {
             CitizenRelationshipMemory relationship = new CitizenRelationshipMemory(relationshipTag);
             relationships.add(relationship);
         }
+
+        ListTag broadcastsNbt = tag.getList(TAG_BROADCASTS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < broadcastsNbt.size(); i++) {
+            ColonyBroadcast broadcast = ColonyBroadcast.deserialize(broadcastsNbt.getCompound(i));
+            receivedBroadcasts.add(broadcast);
+            knownBroadcastIds.add(broadcast.getId());
+        }
+
+        ListTag rumorsNbt = tag.getList(TAG_RUMORS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < rumorsNbt.size(); i++) {
+            Rumor rumor = Rumor.deserialize(rumorsNbt.getCompound(i));
+            receivedRumors.add(rumor);
+            knownRumorIds.add(rumor.getId());
+        }
+
         if (tag.contains(TAG_SESSION_TOKEN)) {
             sessionToken = tag.getString(TAG_SESSION_TOKEN);
         }
@@ -134,12 +218,6 @@ public class CitizenMemories {
         this.sessionToken = token == null ? "" : token;
     }
 
-    /**
-     * Formats the memories into a prompt string that can be used for LLM input. This includes facts, events, and relationship changes. The interestedParties parameter can be used to filter or prioritize certain memories based on the parties involved, but for simplicity, this implementation includes all memories.
-     *
-     * @param interestedParties a map with keys of the entity UUID, the value is the LLM name, that should be added from the relationships
-     * @return a formatted string representing the memories, suitable for prompting an LLM
-     */
     public String toPrompt(Map<UUID, String> interestedParties) {
         StringBuilder prompt = new StringBuilder();
 
@@ -175,6 +253,34 @@ public class CitizenMemories {
 
                 prompt.append("- Your ").append(relationship.getType()).append(" towards ")
                         .append(name).append(" is at factor ").append(relationship.getFactor()).append("\n");
+            }
+        }
+
+        int broadcastCap = McTalkingConfig.INSTANCE.instance().maxBroadcastsInPrompt;
+        if (!receivedBroadcasts.isEmpty() && broadcastCap > 0) {
+            prompt.append(" Colony Broadcasts (most recent first):\n");
+            int count = 0;
+            for (ColonyBroadcast b : receivedBroadcasts) {
+                if (count >= broadcastCap) break;
+                prompt.append("- ").append(b.getSenderPlayerName())
+                    .append(" sent word via ").append(b.getOriginatorName())
+                    .append(": ").append(b.getMessage()).append("\n");
+                count++;
+            }
+        }
+
+        int rumorCap = McTalkingConfig.INSTANCE.instance().maxRumorsInPrompt;
+        if (!receivedRumors.isEmpty() && rumorCap > 0) {
+            prompt.append(" Rumors (heard via the grapevine, most recent first):\n");
+            int count = 0;
+            for (Rumor r : receivedRumors) {
+                if (count >= rumorCap) break;
+                prompt.append("- You heard (originally from ")
+                    .append(r.getOriginatorName())
+                    .append("): ")
+                    .append(r.getContent())
+                    .append("\n");
+                count++;
             }
         }
 

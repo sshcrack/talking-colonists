@@ -1,6 +1,55 @@
 name: build
 on: [ push, pull_request ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     uses: ./.github/workflows/build_reusable.yml
+
+  pr-comment:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: build-artifacts
+
+      - name: Generate PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[] | select(.name=="build-artifacts") | .id' | head -n1)
+          artifact_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          if [ -n "$artifact_id" ]; then
+            artifact_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/$artifact_id"
+          fi
+
+          echo "## Build Artifacts" > comment.md
+          echo "" >> comment.md
+          echo "These JARs were built from this PR:" >> comment.md
+          echo "" >> comment.md
+          echo "| File | Size |" >> comment.md
+          echo "|------|------|" >> comment.md
+          find build-artifacts -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" -type f | sort | while read jar; do
+            name=$(basename "$jar")
+            size=$(du -h "$jar" | cut -f1)
+            echo "| [\`$name\`]($artifact_url) | $size |" >> comment.md
+          done
+          echo "" >> comment.md
+          echo "Download from the [GitHub Actions run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)." >> comment.md
+          cat comment.md
+
+      - name: Post PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file comment.md

@@ -7,7 +7,9 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.MemoryMode;
+import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -41,7 +43,6 @@ public class MemoryCompactionService {
         if (tickCounter % interval != 0) return;
         if (McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
         if (!McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) return;
-        if (!activeCompactionCitizens.isEmpty()) return;
 
         var candidate = findBestCandidate(server);
         if (candidate == null) return;
@@ -143,8 +144,8 @@ public class MemoryCompactionService {
     private static void startLiveCompaction(AbstractEntityCitizen citizen) {
         UUID citizenId = citizen.getUUID();
 
-        if (!ConversationManager.hasFreeCapacity(1)) return;
-        if (!ConversationManager.claimSlot(citizen, false)) return;
+        if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return;
+        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.COMPACTION)) return;
 
         activeCompactionCitizens.add(citizenId);
 
@@ -154,7 +155,7 @@ public class MemoryCompactionService {
         MemoryCompactionWsClient client = new MemoryCompactionWsClient(citizen, mem,
                 summary -> {
                     activeCompactionCitizens.remove(citizenId);
-                    ConversationManager.releaseSlot(citizen);
+                    ConversationManager.releaseBackgroundSlot(citizenId);
                     if (summary != null && !summary.isBlank()) {
                         var server = citizen.level().getServer();
                         if (server != null) {
@@ -164,16 +165,17 @@ public class MemoryCompactionService {
                 },
                 () -> {
                     activeCompactionCitizens.remove(citizenId);
-                    ConversationManager.releaseSlot(citizen);
+                    ConversationManager.releaseBackgroundSlot(citizenId);
                     McTalking.LOGGER.warn("[MemoryCompaction] Live compaction failed for citizen {}", citizen.getCitizenData().getName());
                 });
 
         try {
             client.connect();
+            ConversationManager.registerBackgroundClient(citizenId, client);
         } catch (Exception e) {
             McTalking.LOGGER.error("[MemoryCompaction] Failed to connect Live client for citizen {}", citizen.getCitizenData().getName(), e);
             activeCompactionCitizens.remove(citizenId);
-            ConversationManager.releaseSlot(citizen);
+            ConversationManager.releaseBackgroundSlot(citizenId);
         }
     }
 
