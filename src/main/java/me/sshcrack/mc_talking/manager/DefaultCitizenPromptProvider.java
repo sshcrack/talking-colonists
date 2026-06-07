@@ -5,6 +5,7 @@ import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
@@ -185,22 +186,22 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         appendDetailedHappinessState(view, prompt);
 
         double saturation = view.saturation();
-        String foodSit = view.colonyFoodSituation();
+        ColonyFoodSituation foodSit = view.colonyFoodSituation();
         if (saturation <= 5) {
             String hungerLine = saturation <= 1 ? "Very hungry and weak from lack of food"
                     : saturation <= 3 ? "Hungry and thinking about food"
                     : "A bit peckish";
 
-            if ("already_eating".equals(foodSit)) {
+            if (foodSit == ColonyFoodSituation.ALREADY_EATING) {
                 // Suppress — the eating sub-state line already explains the situation
-            } else if ("staffed_restaurant".equals(foodSit)) {
+            } else if (foodSit == ColonyFoodSituation.STAFFED_RESTAURANT) {
                 prompt.append("- ").append(hungerLine)
                         .append(" — the colony has a staffed restaurant; ")
                         .append("eating will be scheduled automatically.\n");
-            } else if ("unstaffed_restaurant".equals(foodSit)) {
+            } else if (foodSit == ColonyFoodSituation.UNSTAFFED_RESTAURANT) {
                 prompt.append("- ").append(hungerLine)
                         .append(" — the colony has a restaurant but no cook is assigned yet.\n");
-            } else if ("no_restaurant".equals(foodSit)) {
+            } else if (foodSit == ColonyFoodSituation.NO_RESTAURANT) {
                 prompt.append("- ").append(hungerLine)
                         .append(" — the colony has no restaurant yet; ")
                         .append("you rely on whatever food is in your inventory or work building.\n");
@@ -342,7 +343,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                       ingredients — check if a delivery of food items is pending.
                     """;
 
-            case "guard", "knight", "archer" -> null;
+            case "knight", "ranger", "archer" -> null;
             default -> null;
         };
 

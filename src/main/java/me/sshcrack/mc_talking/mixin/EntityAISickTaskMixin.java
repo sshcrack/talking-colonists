@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.mixin;
 
+import com.minecolonies.api.entity.ai.statemachine.states.CitizenAIState;
 import com.minecolonies.api.entity.ai.statemachine.states.IState;
 import com.minecolonies.core.entity.ai.minimal.EntityAISickTask;
 import com.minecolonies.core.entity.citizen.EntityCitizen;
@@ -45,6 +46,11 @@ public class EntityAISickTaskMixin {
         ((CitizenMinimalAISubStateProvider) data).mc_talking$setMinimalAiSubState(null, null);
     }
 
+    @Unique
+    private static boolean mc_talking$isTerminal(IState ret) {
+        return ret == null || ret == CitizenAIState.IDLE;
+    }
+
     @Inject(
         method = "checkForCure",
         at = @At("HEAD")
@@ -55,7 +61,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "checkForCure", at = @At("RETURN"))
     private void mc_talking$onCheckForCureReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -68,7 +74,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "goToHut", at = @At("RETURN"))
     private void mc_talking$onGoToHutReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -81,7 +87,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "goToHospital", at = @At("RETURN"))
     private void mc_talking$onGoToHospitalReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -94,7 +100,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "searchHospital", at = @At("RETURN"))
     private void mc_talking$onSearchHospitalReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -107,7 +113,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "waitForCure", at = @At("RETURN"))
     private void mc_talking$onWaitForCureReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -120,7 +126,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "findEmptyBed", at = @At("RETURN"))
     private void mc_talking$onFindEmptyBedReturn(CallbackInfoReturnable<EntityAISickTask.DiseaseState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -133,7 +139,7 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "applyCure", at = @At("RETURN"))
     private void mc_talking$onApplyCureReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 
     @Inject(
@@ -146,6 +152,6 @@ public class EntityAISickTaskMixin {
 
     @Inject(method = "wander", at = @At("RETURN"))
     private void mc_talking$onWanderReturn(CallbackInfoReturnable<IState> cir) {
-        mc_talking$clearSubState();
+        if (mc_talking$isTerminal(cir.getReturnValue())) mc_talking$clearSubState();
     }
 }

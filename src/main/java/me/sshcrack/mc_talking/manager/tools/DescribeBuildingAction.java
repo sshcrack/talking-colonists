@@ -5,19 +5,24 @@ import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
-import com.minecolonies.core.colony.buildings.workerbuildings.BuildingMiner;
-import com.minecolonies.core.colony.buildings.workerbuildings.BuildingFarmer;
+import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
+import com.minecolonies.core.colony.buildingextensions.FarmField;
+import com.minecolonies.core.colony.buildings.modules.BuildingExtensionsModule;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingBarracks;
-import com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingBuilder;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingFarmer;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingLibrary;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingMiner;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingSchool;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.api.colony.ICitizenData;
+import me.sshcrack.mc_talking.mixin.BuildingLibraryAccessor;
 import me.sshcrack.gemini_live_lib.gson.properties.EnumProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,18 +34,17 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
     private static final List<String> BUILDING_TYPES = List.of(
         "cook", "miner", "farmer", "townhall", "barracks", "warehouse",
         "library", "school", "builder", "residence", "deliveryman",
-        "tavern", "hospital", "enchanter", "smelter", "composter",
+        "tavern", "hospital", "enchanter", "smeltery", "composter",
         "baker", "fisherman", "lumberjack", "shepherd", "cowboy",
-        "undertaker", "planter", "beekeeper", "mechanic", "sifter",
-        "crusher", "netherworker", "florist", "archery", "combat",
-        "rabbit"
+        "graveyard", "plantation", "beekeeper", "mechanic", "sifter",
+        "crusher", "netherworker", "florist", "archery", "combatacademy",
+        "rabbithutch"
     );
 
     public DescribeBuildingAction() {
         super("describe_building",
             "Describes a colony building in detail: its type, level, assigned workers, and type-specific " +
-            "information (e.g. restaurant menu items, mine depth, farm crops, etc.). Use the building type " +
-            "name as shown by get_colony (e.g. 'cook', 'miner', 'townhall'). If multiple buildings of the " +
+            "information (e.g. restaurant menu items, mine depth, farm crops, etc.). If multiple buildings of the " +
             "same type exist, the nearest one to you is described.",
             new ObjectProperty(new HashMap<>() {{
                 put("type", new EnumProperty(BUILDING_TYPES, true));
@@ -67,7 +71,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         }
 
         fillBasicInfo(matched, result);
-        fillTypeSpecificInfo(matched, result);
+        fillTypeSpecificInfo(matched, result, citizen);
 
         return result;
     }
@@ -107,7 +111,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         }
     }
 
-    private static void fillTypeSpecificInfo(IBuilding building, JsonObject result) {
+    private static void fillTypeSpecificInfo(IBuilding building, JsonObject result, AbstractEntityCitizen citizen) {
         var typePath = building.getBuildingType().getRegistryName().getPath();
 
         if (building instanceof BuildingCook cook) {
@@ -125,15 +129,29 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
             boolean hasCook = workModule != null && workModule.hasAssignedCitizen();
             result.addProperty("has_assigned_cook", hasCook);
 
-        } else if (building instanceof BuildingMiner) {
-            result.addProperty("max_depth", 100);
+        } else if (building instanceof BuildingMiner miner) {
+            Level level = citizen.level();
+            result.addProperty("max_depth", miner.getDepthLimit(level));
 
-        } else if (building instanceof BuildingFarmer) {
-            result.addProperty("field_count", 0);
-            result.add("planted_crops", new JsonArray());
+        } else if (building instanceof BuildingFarmer farmer) {
+            JsonArray plantedCrops = new JsonArray();
+            int fieldCount = 0;
+            var extModules = farmer.getModulesByType(BuildingExtensionsModule.class);
+            for (BuildingExtensionsModule module : extModules) {
+                for (IBuildingExtension ext : module.getOwnedExtensions()) {
+                    if (ext instanceof FarmField field) {
+                        fieldCount++;
+                        if (!field.getSeed().isEmpty()) {
+                            plantedCrops.add(field.getSeed().getDisplayName().getString());
+                        }
+                    }
+                }
+            }
+            result.addProperty("field_count", fieldCount);
+            result.add("planted_crops", plantedCrops);
 
-        } else if (building instanceof BuildingBarracks) {
-            result.addProperty("tower_count", 0);
+        } else if (building instanceof BuildingBarracks barracks) {
+            result.addProperty("tower_count", barracks.getTowers().size());
 
         } else if (building instanceof BuildingWareHouse warehouse) {
             var containers = warehouse.getContainers();
@@ -156,8 +174,8 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
             result.addProperty("student_count", Math.max(0, studentCount - 1));
             result.addProperty("has_teacher", studentCount > 0);
 
-        } else if (building instanceof BuildingLibrary) {
-            result.addProperty("bookshelves_count", 0);
+        } else if (building instanceof BuildingLibrary library) {
+            result.addProperty("bookshelves_count", ((BuildingLibraryAccessor) library).getBookCases().size());
         }
     }
 

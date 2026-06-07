@@ -73,7 +73,7 @@ public record CitizenPromptView(
         @Nullable CitizenAIState citizenAiState,
         @Nullable AIWorkerState workAiState,
         @Nullable String nameTagDescription,
-        @Nullable String colonyFoodSituation,
+        @Nullable ColonyFoodSituation colonyFoodSituation,
         @Nullable List<String> recentActions,
         @Nullable MinimalAISubState minimalAiSubState,
         @Nullable String minimalAiSubStateContext

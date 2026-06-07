@@ -18,6 +18,7 @@ import com.minecolonies.api.util.Tuple;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
@@ -118,7 +119,7 @@ public final class CitizenPromptViewFactory {
         CitizenAIState citizenAiState = extractCitizenAiState(data);
         AIWorkerState workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
-        String colonyFoodSituation = extractFoodSituation(data, citizenAiState);
+        ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, citizenAiState);
         List<String> recentActions = extractRecentActions(data);
         MinimalAISubState minimalAiSubState = extractMinimalAiSubState(data);
         String minimalAiSubStateContext = extractMinimalAiSubStateContext(data);
@@ -196,6 +197,7 @@ public final class CitizenPromptViewFactory {
         try {
             return CitizenAIState.valueOf(state.toString());
         } catch (IllegalArgumentException e) {
+            McTalking.LOGGER.warn("Unknown citizen AI state: {} (raw: {})", state, state.toString());
             return null;
         }
     }
@@ -216,6 +218,7 @@ public final class CitizenPromptViewFactory {
         try {
             return AIWorkerState.valueOf(state.toString());
         } catch (IllegalArgumentException e) {
+            McTalking.LOGGER.warn("Unknown AI worker state: {} (raw: {})", state, state.toString());
             return null;
         }
     }
@@ -227,9 +230,9 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static String extractFoodSituation(ICitizenData data, CitizenAIState citizenAiState) {
+    private static ColonyFoodSituation extractFoodSituation(ICitizenData data, CitizenAIState citizenAiState) {
         if (data.getSaturation() > 5.0) return null;
-        if (citizenAiState == CitizenAIState.EATING) return "already_eating";
+        if (citizenAiState == CitizenAIState.EATING) return ColonyFoodSituation.ALREADY_EATING;
 
         var colony = data.getColony();
         var bm = colony.getServerBuildingManager();
@@ -240,13 +243,13 @@ public final class CitizenPromptViewFactory {
                         : BlockPos.ZERO);
 
         BlockPos best = bm.getBestBuilding(origin, BuildingCook.class);
-        if (best == null) return "no_restaurant";
+        if (best == null) return ColonyFoodSituation.NO_RESTAURANT;
 
         IBuilding rest = bm.getBuilding(best);
-        if (rest == null) return "no_restaurant";
+        if (rest == null) return ColonyFoodSituation.NO_RESTAURANT;
 
         boolean staffed = rest.getModule(BuildingModules.COOK_WORK).hasAssignedCitizen();
-        return staffed ? "staffed_restaurant" : "unstaffed_restaurant";
+        return staffed ? ColonyFoodSituation.STAFFED_RESTAURANT : ColonyFoodSituation.UNSTAFFED_RESTAURANT;
     }
 
     @Nullable
