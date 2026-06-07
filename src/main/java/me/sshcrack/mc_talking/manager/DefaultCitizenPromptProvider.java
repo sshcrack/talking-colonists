@@ -77,6 +77,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         addRelationships(view, prompt);
         addColonyDiplomacy(view, prompt);
         addCurrentState(view, prompt, view.sick());
+        addRecentActions(view, prompt);
         addObservations(view, prompt);
         addMemory(view, prompt);
 
@@ -133,6 +134,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
+    private static void addRecentActions(CitizenPromptView view, StringBuilder prompt) {
+        var actions = view.recentActions();
+        if (actions == null || actions.isEmpty()) return;
+        prompt.append("\n## RECENT ACTIVITY\n");
+        for (String action : actions) {
+            prompt.append("- ").append(action).append("\n");
+        }
+    }
+
     private void addObservations(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder obs = new StringBuilder();
 
@@ -171,12 +181,28 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         appendDetailedHappinessState(view, prompt);
 
         double saturation = view.saturation();
-        if (saturation <= 1) {
-            prompt.append("- Very hungry and weak from lack of food\n");
-        } else if (saturation <= 3) {
-            prompt.append("- Hungry and thinking about food\n");
-        } else if (saturation <= 5) {
-            prompt.append("- A bit peckish\n");
+        String foodSit = view.colonyFoodSituation();
+        if (saturation <= 5) {
+            String hungerLine = saturation <= 1 ? "Very hungry and weak from lack of food"
+                    : saturation <= 3 ? "Hungry and thinking about food"
+                    : "A bit peckish";
+
+            if ("already_eating".equals(foodSit)) {
+                // Suppress — the eating sub-state line already explains the situation
+            } else if ("staffed_restaurant".equals(foodSit)) {
+                prompt.append("- ").append(hungerLine)
+                        .append(" — the colony has a staffed restaurant; ")
+                        .append("eating will be scheduled automatically.\n");
+            } else if ("unstaffed_restaurant".equals(foodSit)) {
+                prompt.append("- ").append(hungerLine)
+                        .append(" — the colony has a restaurant but no cook is assigned yet.\n");
+            } else if ("no_restaurant".equals(foodSit)) {
+                prompt.append("- ").append(hungerLine)
+                        .append(" — the colony has no restaurant yet; ")
+                        .append("you rely on whatever food is in your inventory or work building.\n");
+            } else {
+                prompt.append("- ").append(hungerLine).append("\n");
+            }
         }
 
         if (view.healthPercent() != null) {
@@ -216,12 +242,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         String citizenAiState = view.citizenAiState();
         String workAiState = view.workAiState();
         String nameTagDescription = view.nameTagDescription();
-        if (citizenAiState != null || workAiState != null || nameTagDescription != null) {
-            prompt.append("- AI state: ");
-            if (citizenAiState != null) prompt.append(citizenAiState);
-            if (workAiState != null) prompt.append(" / ").append(workAiState);
-            if (nameTagDescription != null) prompt.append(" — ").append(nameTagDescription);
-            prompt.append("\n");
+        String aiDesc = describeAiState(citizenAiState, workAiState, nameTagDescription, view);
+        if (aiDesc != null) {
+            prompt.append("- Currently: ").append(aiDesc).append("\n");
         }
 
         if (view.environment() != null) {
@@ -274,6 +297,116 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
+    private static void addJobContext(CitizenPromptView view, StringBuilder prompt) {
+        String job = view.jobName();
+        if (job == null) return;
+        String ws = view.workAiState();
+
+        String block = switch (job.toLowerCase()) {
+            case "courier", "deliveryman" -> """
+
+                    ## JOB CONTEXT — COURIER
+                    - Your job is to carry goods between the warehouse and colony buildings.
+                    - You do not produce anything yourself — you keep everyone else supplied.
+                    - When you mention "missing supplies", you mean unfulfilled delivery requests
+                      in the request system, not items you personally need.
+                    - If you are hungry, you can eat at the restaurant — it is scheduled
+                      automatically around your deliveries.
+                    """;
+
+            case "miner" -> (ws != null && ws.contains("NEEDS_ITEM")) ? """
+
+                    ## JOB CONTEXT — MINER
+                    - You are waiting for mining equipment (pickaxe, torches, etc.) to be
+                      delivered before you can continue. A courier should bring them soon.
+                    - Once supplied, you will resume work in the mine shaft.
+                    """ : null;
+
+            case "builder", "mechanic" -> (ws != null && ws.contains("NEEDS_ITEM")) ? """
+
+                    ## JOB CONTEXT — BUILDER
+                    - You are waiting on building materials before you can continue construction.
+                      This is a request in the colony system — a courier is assigned to it.
+                    """ : null;
+
+            case "cook", "chef" -> """
+
+                    ## JOB CONTEXT — COOK
+                    - Your primary role is to feed the colony. Citizens come to the restaurant
+                      when they are hungry; you prepare and serve meals to them.
+                    - If citizens complain about food, it may mean the restaurant is out of
+                      ingredients — check if a delivery of food items is pending.
+                    """;
+
+            case "guard", "knight", "archer" -> null;
+            default -> null;
+        };
+
+        if (block != null) prompt.append(block);
+    }
+
+    private static String describeAiState(
+            String citizenAiState, String workAiState,
+            String nameTagDescription, CitizenPromptView view) {
+
+        if (citizenAiState == null && workAiState == null) return null;
+
+        if ("EATING".equals(citizenAiState)) {
+            return "Taking a break to eat or waiting at the restaurant for a meal.";
+        }
+
+        if ("SLEEP".equals(citizenAiState)) {
+            return "Sleeping — resting for the night.";
+        }
+
+        if ("SICK".equals(citizenAiState)) {
+            return "Too sick to work. Needs medical attention at the hospital.";
+        }
+
+        if ("MOURN".equals(citizenAiState)) {
+            return "Mourning the loss of a fellow colonist. Cannot focus on work right now.";
+        }
+
+        if ("WORKING".equals(citizenAiState) || "WORK".equals(citizenAiState)) {
+            String ws = workAiState != null ? workAiState : "";
+            return switch (ws) {
+                case "NEEDS_ITEM"
+                    -> "Waiting at " + (view.workBuildingDisplayName() != null
+                        ? view.workBuildingDisplayName() : "the workplace")
+                        + " for missing supplies to be delivered before work can continue.";
+                case "START_WORKING"
+                    -> "Walking to " + (view.workBuildingDisplayName() != null
+                        ? view.workBuildingDisplayName() : "work") + ".";
+                case "IDLE", "DECIDE"
+                    -> "At work, deciding what to do next.";
+                case "PREPARE_DELIVERY"
+                    -> "Collecting items from the warehouse for a delivery.";
+                case "DELIVERY"
+                    -> "Currently delivering items to a colony building.";
+                case "PICKUP"
+                    -> "Picking up surplus items from a building to bring back to the warehouse.";
+                case "DUMPING"
+                    -> "Dropping off collected items at the warehouse.";
+                case "GUARD_PATROL"  -> "Patrolling the colony perimeter.";
+                case "GUARD_GUARD"   -> "Standing guard at an assigned post.";
+                case "GUARD_FOLLOW"  -> "Following and protecting a player.";
+                case "GUARD_REGEN"   -> "Resting at the guard tower to recover health.";
+                case "HELP_CITIZEN"  -> "Rushing to help a citizen who is in danger.";
+                case "FARMER_HOE"     -> "Hoeing the fields.";
+                case "FARMER_PLANT"   -> "Planting seeds.";
+                case "FARMER_HARVEST" -> "Harvesting crops.";
+                case "MINER_MINING_NODE", "MINER_MINING_SHAFT" -> "Mining underground.";
+                case "BUILDING_STEP", "START_BUILDING" -> "Building or repairing a structure.";
+                case "COOK_SERVE_FOOD_TO_CITIZEN" -> "Preparing and serving food to colonists.";
+                default -> nameTagDescription != null
+                        ? "Working — " + nameTagDescription + "."
+                        : "Working.";
+            };
+        }
+
+        return nameTagDescription != null ? nameTagDescription + "." : null;
+    }
+
     private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder relationshipPrompt = new StringBuilder();
 
@@ -321,6 +454,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.\n");
         prompt.append(getGeneralCitizenPrompt(view, true));
         appendGuardDuty(prompt, view.guard());
+        addJobContext(view, prompt);
 
         prompt.append("""
                         ## GUIDELINES
@@ -342,6 +476,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));
         appendGuardDuty(prompt, view.guard());
+        addJobContext(view, prompt);
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");

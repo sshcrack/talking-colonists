@@ -15,7 +15,9 @@
     "ServerEntityMixin",
     "SoundUtilsMixin",
     "AbstractRequestMixin",
-    "UpdateRequestStateMixin"
+    "UpdateRequestStateMixin",
+    "EntityAIEatTaskMixin",
+    "JobDeliverymanMixin"
   ],
   "injectors": {
     "defaultRequire": 1

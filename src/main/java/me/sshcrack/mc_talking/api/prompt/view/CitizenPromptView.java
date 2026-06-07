@@ -70,6 +70,8 @@ public record CitizenPromptView(
         @Nullable String colonyMilestone,
         @Nullable String citizenAiState,
         @Nullable String workAiState,
-        @Nullable String nameTagDescription
+        @Nullable String nameTagDescription,
+        @Nullable String colonyFoodSituation,
+        @Nullable List<String> recentActions
 ) {
 }

@@ -3,6 +3,8 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
 import com.minecolonies.api.colony.connections.ColonyConnection;
 import com.minecolonies.api.colony.connections.DiplomacyStatus;
 import com.minecolonies.api.colony.connections.IColonyConnectionManager;
@@ -25,6 +27,7 @@ import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
+import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.network.chat.Component;
@@ -63,6 +66,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT
 
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import net.minecraft.core.BlockPos;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -110,6 +114,8 @@ public final class CitizenPromptViewFactory {
         String citizenAiState = extractCitizenAiState(data);
         String workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
+        String colonyFoodSituation = extractFoodSituation(data, citizenAiState);
+        List<String> recentActions = extractRecentActions(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -153,7 +159,9 @@ public final class CitizenPromptViewFactory {
                 colonyMilestone,
                 citizenAiState,
                 workAiState,
-                nameTagDescription
+                nameTagDescription,
+                colonyFoodSituation,
+                recentActions
         );
     }
 
@@ -198,6 +206,36 @@ public final class CitizenPromptViewFactory {
     private static String extractNameTagDescription(ICitizenData data) {
         if (data.getJob() == null) return null;
         return data.getJob().getNameTagDescription();
+    }
+
+    @Nullable
+    private static String extractFoodSituation(ICitizenData data, String citizenAiState) {
+        if (data.getSaturation() > 5.0) return null;
+        if ("EATING".equals(citizenAiState)) return "already_eating";
+
+        var colony = data.getColony();
+        var bm = colony.getServerBuildingManager();
+        var origin = data.getEntity()
+                .map(e -> e.blockPosition())
+                .orElseGet(() -> data.getWorkBuilding() != null
+                        ? data.getWorkBuilding().getPosition()
+                        : BlockPos.ZERO);
+
+        BlockPos best = bm.getBestBuilding(origin, BuildingCook.class);
+        if (best == null) return "no_restaurant";
+
+        IBuilding rest = bm.getBuilding(best);
+        if (rest == null) return "no_restaurant";
+
+        boolean staffed = rest.getModule(BuildingModules.COOK_WORK).hasAssignedCitizen();
+        return staffed ? "staffed_restaurant" : "unstaffed_restaurant";
+    }
+
+    @Nullable
+    private static List<String> extractRecentActions(ICitizenData data) {
+        if (!(data instanceof CitizenRecentActionsProvider provider)) return null;
+        var actions = provider.mc_talking$getRecentActions();
+        return actions.isEmpty() ? null : actions;
     }
 
     private static List<String> extractParents(ICitizenData data) {

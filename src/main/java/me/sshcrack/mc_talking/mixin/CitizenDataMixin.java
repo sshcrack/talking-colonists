@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
+import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -21,12 +22,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 
 @Mixin(value = CitizenData.class, remap = false)
-public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended {
+public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended, CitizenRecentActionsProvider {
     @Unique
     private static final String TAG_MEMORY_KEY = "mc_talking_memory";
     @Unique
@@ -41,6 +43,24 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     @Unique
     @Nullable
     private String mc_talking$customPersonality;
+
+    @Unique
+    private static final int MAX_RECENT_ACTIONS = 5;
+    @Unique
+    private final ArrayDeque<String> mc_talking$recentActions = new ArrayDeque<>(MAX_RECENT_ACTIONS);
+
+    @Override
+    public void mc_talking$pushRecentAction(String entry) {
+        if (mc_talking$recentActions.size() >= MAX_RECENT_ACTIONS) {
+            mc_talking$recentActions.removeLast();
+        }
+        mc_talking$recentActions.addFirst(entry);
+    }
+
+    @Override
+    public List<String> mc_talking$getRecentActions() {
+        return List.copyOf(mc_talking$recentActions);
+    }
 
     @Inject(method = "setVisibleStatus", at = @At("HEAD"))
     private void mc_talking$onSetVisibleStatus(VisibleCitizenStatus status, CallbackInfo ci) {
