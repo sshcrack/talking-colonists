@@ -185,23 +185,33 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
     }
 
     private static void fillTypeSpecificInfo(IBuilding building, JsonObject result, AbstractEntityCitizen citizen) {
-        switch (building) {
-            case BuildingCook cook -> fillCookInfo(cook, result);
-            case BuildingMiner miner -> {
-                result.addProperty("max_depth", miner.getDepthLimit(citizen.level()));
-                fillWorkOrderInfo(miner, result);
-            }
-            case BuildingFarmer farmer -> fillFarmerInfo(farmer, result);
-            case BuildingBarracks barracks -> result.addProperty("tower_count", barracks.getTowers().size());
-            case BuildingWareHouse warehouse -> fillWareHouseInfo(warehouse, result);
-            case BuildingBuilder builder -> fillWorkOrderInfo(builder, result);
-            case BuildingTownHall ignored -> fillTownHallInfo(building, result);
-            case BuildingSchool school -> fillSchoolInfo(school, result);
-            case BuildingLibrary library -> fillLibraryInfo(library, result);
-            case BuildingNetherWorker nw -> fillNetherWorkerInfo(nw, result);
-            case BuildingGraveyard gy -> fillGraveyardInfo(gy, result);
-            case BuildingUniversity ignored -> fillUniversityInfo(building, result);
-            default -> fillCraftingInfo(building, result);
+        if (building instanceof BuildingCook cook) {
+            fillCookInfo(cook, result);
+        } else if (building instanceof BuildingMiner miner) {
+            result.addProperty("max_depth", miner.getDepthLimit(citizen.level()));
+            fillWorkOrderInfo(miner, result);
+        } else if (building instanceof BuildingFarmer farmer) {
+            fillFarmerInfo(farmer, result);
+        } else if (building instanceof BuildingBarracks barracks) {
+            result.addProperty("tower_count", barracks.getTowers().size());
+        } else if (building instanceof BuildingWareHouse warehouse) {
+            fillWareHouseInfo(warehouse, result);
+        } else if (building instanceof BuildingBuilder builder) {
+            fillWorkOrderInfo(builder, result);
+        } else if (building instanceof BuildingTownHall) {
+            fillTownHallInfo(building, result);
+        } else if (building instanceof BuildingSchool school) {
+            fillSchoolInfo(school, result);
+        } else if (building instanceof BuildingLibrary library) {
+            fillLibraryInfo(library, result);
+        } else if (building instanceof BuildingNetherWorker nw) {
+            fillNetherWorkerInfo(nw, result);
+        } else if (building instanceof BuildingGraveyard gy) {
+            fillGraveyardInfo(gy, result);
+        } else if (building instanceof BuildingUniversity) {
+            fillUniversityInfo(building, result);
+        } else {
+            fillCraftingInfo(building, result);
         }
     }
 
