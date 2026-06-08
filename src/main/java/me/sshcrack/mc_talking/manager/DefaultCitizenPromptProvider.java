@@ -1,15 +1,20 @@
 package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
+import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
+import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -77,6 +82,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         addRelationships(view, prompt);
         addColonyDiplomacy(view, prompt);
         addCurrentState(view, prompt, view.sick());
+        addRecentActions(view, prompt);
         addObservations(view, prompt);
         addMemory(view, prompt);
 
@@ -133,6 +139,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
+    private static void addRecentActions(CitizenPromptView view, StringBuilder prompt) {
+        var actions = view.recentActions();
+        if (actions == null || actions.isEmpty()) return;
+        prompt.append("\n## RECENT ACTIVITY\n");
+        for (String action : actions) {
+            prompt.append("- ").append(action).append("\n");
+        }
+    }
+
     private void addObservations(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder obs = new StringBuilder();
 
@@ -150,12 +165,20 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("- Recently noted: ").append(view.colonyMilestone()).append(" This may come up in conversation.\n");
         }
 
-        if (view.activeItemRequests() != null && !view.activeItemRequests().isEmpty()) {
-            obs.append("- You are currently waiting for:\n");
-            for (String req : view.activeItemRequests()) {
+        if (view.blockedItemRequests() != null && !view.blockedItemRequests().isEmpty()) {
+            obs.append("- IMPORTANT: You are currently blocked and cannot work because these items are missing from the colony — no warehouse stock and no deliverer has been assigned:\n");
+            for (String req : view.blockedItemRequests()) {
                 obs.append("  - ").append(req).append("\n");
             }
-            obs.append("- Since you need these materials, naturally mention what you are waiting for if the player asks how you are doing.\n");
+            obs.append("- Urgently mention this if the player asks how you are doing or why you are not working.\n");
+        }
+
+        if (view.fulfillableItemRequests() != null && !view.fulfillableItemRequests().isEmpty()) {
+            obs.append("- Some items are in the warehouse or already being delivered to you:\n");
+            for (String req : view.fulfillableItemRequests()) {
+                obs.append("  - ").append(req).append("\n");
+            }
+            obs.append("- The supply system is handling these; no need to raise an alarm, but you can mention it casually if asked.\n");
         }
 
         if (view.activeQuests() != null && !view.activeQuests().isEmpty()) {
@@ -177,12 +200,28 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         appendDetailedHappinessState(view, prompt);
 
         double saturation = view.saturation();
-        if (saturation <= 1) {
-            prompt.append("- Very hungry and weak from lack of food\n");
-        } else if (saturation <= 3) {
-            prompt.append("- Hungry and thinking about food\n");
-        } else if (saturation <= 5) {
-            prompt.append("- A bit peckish\n");
+        ColonyFoodSituation foodSit = view.colonyFoodSituation();
+        if (saturation <= 5) {
+            String hungerLine = saturation <= 1 ? "Very hungry and weak from lack of food"
+                    : saturation <= 3 ? "Hungry and thinking about food"
+                    : "A bit peckish";
+
+            if (foodSit == ColonyFoodSituation.ALREADY_EATING) {
+                // Suppress — the eating sub-state line already explains the situation
+            } else if (foodSit == ColonyFoodSituation.STAFFED_RESTAURANT) {
+                prompt.append("- ").append(hungerLine)
+                        .append(" — the colony has a staffed restaurant; ")
+                        .append("eating will be scheduled automatically.\n");
+            } else if (foodSit == ColonyFoodSituation.UNSTAFFED_RESTAURANT) {
+                prompt.append("- ").append(hungerLine)
+                        .append(" — the colony has a restaurant but no cook is assigned yet.\n");
+            } else if (foodSit == ColonyFoodSituation.NO_RESTAURANT) {
+                prompt.append("- ").append(hungerLine)
+                        .append(" — the colony has no restaurant yet; ")
+                        .append("you rely on whatever food is in your inventory or work building.\n");
+            } else {
+                prompt.append("- ").append(hungerLine).append("\n");
+            }
         }
 
         if (view.healthPercent() != null) {
@@ -219,15 +258,12 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
-        String citizenAiState = view.citizenAiState();
-        String workAiState = view.workAiState();
+        CitizenAIState citizenAiState = view.citizenAiState();
+        AIWorkerState workAiState = view.workAiState();
         String nameTagDescription = view.nameTagDescription();
-        if (citizenAiState != null || workAiState != null || nameTagDescription != null) {
-            prompt.append("- AI state: ");
-            if (citizenAiState != null) prompt.append(citizenAiState);
-            if (workAiState != null) prompt.append(" / ").append(workAiState);
-            if (nameTagDescription != null) prompt.append(" — ").append(nameTagDescription);
-            prompt.append("\n");
+        String aiDesc = describeAiState(citizenAiState, workAiState, nameTagDescription, view);
+        if (aiDesc != null && !aiDesc.isEmpty()) {
+            prompt.append("- Currently: ").append(aiDesc).append("\n");
         }
 
         if (view.environment() != null) {
@@ -278,6 +314,16 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 prompt.append("- ").append(event).append("\n");
             }
         }
+    }
+
+    private static String describeAiState(
+            CitizenAIState citizenAiState, AIWorkerState workAiState,
+            String nameTagDescription, CitizenPromptView view) {
+        return AIStateDescriber.describeAiState(citizenAiState, workAiState, nameTagDescription, view);
+    }
+
+    private static boolean isSubStateConsistentWithAiState(MinimalAISubState sub, @Nullable CitizenAIState aiState) {
+        return AIStateDescriber.isSubStateConsistentWithAiState(sub, aiState);
     }
 
     private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
@@ -381,13 +427,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private static void appendGuardDuty(StringBuilder prompt, boolean isGuard) {
         if (isGuard) {
             prompt.append("""
-                    
+
                     ## GUARD DUTY
                     - You are a guard — brave, tough, and sworn to protect the colony.
                     - You are not afraid of monsters or threats; you stand your ground and fight.
                     - You take pride in your duty to defend your fellow colonists.
                     - Your tone is confident and resolute; panic and cowardice are beneath you.
-                    
+
                     """);
         }
     }

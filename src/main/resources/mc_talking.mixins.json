@@ -15,7 +15,21 @@
     "ServerEntityMixin",
     "SoundUtilsMixin",
     "AbstractRequestMixin",
-    "UpdateRequestStateMixin"
+    "UpdateRequestStateMixin",
+    "EntityAIEatTaskMixin",
+    "EntityAISleepMixin",
+    "EntityAIMournCitizenMixin",
+    "EntityAISickTaskMixin",
+    "EntityAICitizenAvoidEntityMixin",
+    "JobDeliverymanMixin",
+    "AbstractJobCrafterMixin",
+    "AbstractEntityAIStructureMixin",
+    "EntityAIWorkTeacherMixin",
+    "EntityAIWorkResearcherMixin",
+    "EntityAIWorkHealerMixin",
+    "BuildingLibraryAccessor",
+    "BuildingNetherWorkerAccessor",
+    "AbstractEntityAIInteractAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

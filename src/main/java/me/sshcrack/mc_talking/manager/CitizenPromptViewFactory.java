@@ -3,17 +3,24 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
 import com.minecolonies.api.colony.connections.ColonyConnection;
 import com.minecolonies.api.colony.connections.DiplomacyStatus;
 import com.minecolonies.api.colony.connections.IColonyConnectionManager;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
+import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
+import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.util.ColonyStatsHelper;
@@ -25,6 +32,8 @@ import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
+import me.sshcrack.mc_talking.duck.CitizenMinimalAISubStateProvider;
+import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.network.chat.Component;
@@ -63,6 +72,8 @@ import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT
 
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.util.MumblingTopicHelper;
+import net.minecraft.core.BlockPos;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -70,6 +81,13 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 public final class CitizenPromptViewFactory {
 
     private CitizenPromptViewFactory() {
+    }
+
+    private record CategorizedRequests(
+            @Nullable List<String> fulfillable,
+            @Nullable List<String> blocked
+    ) {
+        static final CategorizedRequests EMPTY = new CategorizedRequests(null, null);
     }
 
     public static CitizenPromptView create(ICitizenData data, @NotNull Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
@@ -90,10 +108,10 @@ public final class CitizenPromptViewFactory {
         List<String> siblingNames = extractSiblingNames(data);
         String colonyName = data.getColony().getName();
         IBuilding homeBuilding = data.getHomeBuilding();
-        String homeBuildingDisplayName = homeBuilding != null ? homeBuilding.getBuildingDisplayName() : null;
+        String homeBuildingDisplayName = getReadableBuildingName(homeBuilding);
         int homeBuildingLevel = homeBuilding != null ? homeBuilding.getBuildingLevel() : 0;
         IBuilding workBuilding = data.getWorkBuilding();
-        String workBuildingDisplayName = workBuilding != null ? workBuilding.getBuildingDisplayName() : null;
+        String workBuildingDisplayName = getReadableBuildingName(workBuilding);
         int workBuildingLevel = workBuilding != null ? workBuilding.getBuildingLevel() : 0;
         var personalityExt = (CitizenDataPersonalityExtended) data;
         personalityExt.mc_talking$assignPersonality();
@@ -102,16 +120,20 @@ public final class CitizenPromptViewFactory {
         String playerState = extractPlayerState(speakingTo);
         var envInfo = extractEnvironmentInfo(data);
         String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
-        List<String> activeItemRequests = extractActiveItemRequests(data, workBuilding);
+        CategorizedRequests categorizedRequests = extractCategorizedItemRequests(data, workBuilding);
         List<String> activeQuests = extractActiveQuests(data);
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
         List<String> colonyConnections = extractColonyConnections(data);
         List<String> recentEvents = extractRecentEvents(data);
-        String citizenAiState = extractCitizenAiState(data);
-        String workAiState = extractWorkAiState(data);
+        CitizenAIState citizenAiState = extractCitizenAiState(data);
+        AIWorkerState workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
         String colonyFoundingPlayer = data.getColony().getPermissions().getOwnerName();
         int colonyAgeDays = data.getColony().getDay();
+        ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, citizenAiState);
+        List<String> recentActions = extractRecentActions(data);
+        MinimalAISubState minimalAiSubState = extractMinimalAiSubState(data);
+        String minimalAiSubStateContext = extractMinimalAiSubStateContext(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -148,7 +170,8 @@ public final class CitizenPromptViewFactory {
                 customPersonalityText,
                 playerState,
                 envInfo.description(),
-                activeItemRequests,
+                categorizedRequests.fulfillable(),
+                categorizedRequests.blocked(),
                 activeQuests,
                 recentEvents,
                 colonyConnections,
@@ -157,7 +180,11 @@ public final class CitizenPromptViewFactory {
                 workAiState,
                 nameTagDescription,
                 colonyFoundingPlayer,
-                colonyAgeDays
+                colonyAgeDays,
+                colonyFoodSituation,
+                recentActions,
+                minimalAiSubState,
+                minimalAiSubStateContext
         );
     }
 
@@ -172,7 +199,7 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static String extractCitizenAiState(ICitizenData data) {
+    private static CitizenAIState extractCitizenAiState(ICitizenData data) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
         var entity = entityOpt.get();
@@ -180,11 +207,17 @@ public final class CitizenPromptViewFactory {
         var ai = citizen.getCitizenAI();
         if (ai == null) return null;
         var state = ai.getState();
-        return state != null ? state.toString() : null;
+        if (state == null) return null;
+        try {
+            return CitizenAIState.valueOf(state.toString());
+        } catch (IllegalArgumentException e) {
+            McTalking.LOGGER.warn("Unknown citizen AI state: {} (raw: {})", state, state.toString());
+            return null;
+        }
     }
 
     @Nullable
-    private static String extractWorkAiState(ICitizenData data) {
+    private static AIWorkerState extractWorkAiState(ICitizenData data) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
         var entity = entityOpt.get();
@@ -195,13 +228,71 @@ public final class CitizenPromptViewFactory {
         var stateAi = workAi.getStateAI();
         if (stateAi == null) return null;
         var state = stateAi.getState();
-        return state != null ? state.toString() : null;
+        if (state == null) return null;
+        try {
+            return AIWorkerState.valueOf(state.toString());
+        } catch (IllegalArgumentException e) {
+            McTalking.LOGGER.warn("Unknown AI worker state: {} (raw: {})", state, state.toString());
+            return null;
+        }
     }
 
     @Nullable
     private static String extractNameTagDescription(ICitizenData data) {
         if (data.getJob() == null) return null;
         return data.getJob().getNameTagDescription();
+    }
+
+    @Nullable
+    private static ColonyFoodSituation extractFoodSituation(ICitizenData data, CitizenAIState citizenAiState) {
+        if (data.getSaturation() > 5.0) return null;
+        if (citizenAiState == CitizenAIState.EATING) return ColonyFoodSituation.ALREADY_EATING;
+
+        var colony = data.getColony();
+        var bm = colony.getServerBuildingManager();
+        var origin = data.getEntity()
+                .map(e -> e.blockPosition())
+                .orElseGet(() -> data.getWorkBuilding() != null
+                        ? data.getWorkBuilding().getPosition()
+                        : BlockPos.ZERO);
+
+        BlockPos best = bm.getBestBuilding(origin, BuildingCook.class);
+        if (best == null) return ColonyFoodSituation.NO_RESTAURANT;
+
+        IBuilding rest = bm.getBuilding(best);
+        if (rest == null) return ColonyFoodSituation.NO_RESTAURANT;
+
+        boolean staffed = rest.getModule(BuildingModules.COOK_WORK).hasAssignedCitizen();
+        return staffed ? ColonyFoodSituation.STAFFED_RESTAURANT : ColonyFoodSituation.UNSTAFFED_RESTAURANT;
+    }
+
+    @Nullable
+    private static List<String> extractRecentActions(ICitizenData data) {
+        if (!(data instanceof CitizenRecentActionsProvider provider)) return null;
+        var actions = provider.mc_talking$getRecentActions();
+        return actions.isEmpty() ? null : actions;
+    }
+
+    @Nullable
+    private static MinimalAISubState extractMinimalAiSubState(ICitizenData data) {
+        if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
+        return provider.mc_talking$getMinimalAiSubState();
+    }
+
+    @Nullable
+    private static String extractMinimalAiSubStateContext(ICitizenData data) {
+        if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
+        return provider.mc_talking$getMinimalAiSubStateContext();
+    }
+
+    @Nullable
+    private static String getReadableBuildingName(@Nullable IBuilding building) {
+        if (building == null) return null;
+        String displayName = building.getBuildingDisplayName();
+        if (displayName != null && !displayName.isEmpty() && !displayName.contains(".") && !displayName.contains("/")) {
+            return displayName;
+        }
+        return Component.translatable(building.getBuildingType().getTranslationKey()).getString();
     }
 
     private static List<String> extractParents(ICitizenData data) {
@@ -358,27 +449,53 @@ public final class CitizenPromptViewFactory {
         return new EnvironmentInfo(description, peaceful);
     }
 
-    @Nullable
-    private static List<String> extractActiveItemRequests(ICitizenData data, @Nullable IBuilding workBuilding) {
+    private static CategorizedRequests extractCategorizedItemRequests(ICitizenData data, @Nullable IBuilding workBuilding) {
         if (workBuilding == null) {
-            return null;
+            return CategorizedRequests.EMPTY;
         }
         Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
         if (openRequests == null || openRequests.isEmpty()) {
-            return null;
+            return CategorizedRequests.EMPTY;
         }
-        List<String> requests = new ArrayList<>();
+
+        // Terminal states — request is closed, nothing to report
+        java.util.Set<RequestState> terminalStates = java.util.EnumSet.of(
+                RequestState.CANCELLED,
+                RequestState.FAILED,
+                RequestState.COMPLETED,
+                RequestState.OVERRULED,
+                RequestState.RECEIVED
+        );
+
+        List<String> fulfillable = new ArrayList<>();
+        List<String> blocked = new ArrayList<>();
+
         for (IRequest<?> request : openRequests) {
+            if (terminalStates.contains(request.getState())) {
+                continue;
+            }
+
+            String display;
             var requestable = request.getRequest();
             if (requestable instanceof Stack stackReq) {
-                ItemStack itemStack = stackReq.getStack();
-                int count = stackReq.getCount();
-                requests.add(count + "x " + itemStack.getDisplayName().getString());
+                display = stackReq.getCount() + "x " + stackReq.getStack().getDisplayName().getString();
             } else {
-                requests.add(request.getShortDisplayString().getString());
+                display = request.getShortDisplayString().getString();
+            }
+
+            boolean isFulfillable = request.getState().ordinal() >= RequestState.ASSIGNED.ordinal()
+                    || MumblingTopicHelper.warehouseHasStock(data, request);
+            if (isFulfillable) {
+                fulfillable.add(display);
+            } else {
+                blocked.add(display);
             }
         }
-        return requests;
+
+        return new CategorizedRequests(
+                fulfillable.isEmpty() ? null : fulfillable,
+                blocked.isEmpty() ? null : blocked
+        );
     }
 
     @Nullable

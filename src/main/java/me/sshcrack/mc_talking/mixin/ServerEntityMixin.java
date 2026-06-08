@@ -58,6 +58,8 @@ public class ServerEntityMixin {
             return;
         }
 
+        if (citizen.getCitizenData() == null) return;
+
         McTalking.LOGGER.info("Citizen {} has dirty AI status {}, sending update to clients", citizen.getCitizenData().getName(), provider.mc_talking$getAiStatus());
         mc_talking$sendToPlayersTrackingEntity(citizen, provider.mc_talking$getAiStatus());
         provider.mc_talking$markStatusClean();

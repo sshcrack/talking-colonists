@@ -57,6 +57,9 @@ public class RandomConversationHandler {
 
                 AbstractEntityCitizen partner = partners.get((int) (Math.random() * partners.size()));
 
+                if (citizen.getCitizenData() == null || partner.getCitizenData() == null)
+                    continue;
+
                 McTalking.LOGGER.info("[RandomConv] Starting conversation between {} and {}",
                         citizen.getCitizenData().getName(), partner.getCitizenData().getName());
 
