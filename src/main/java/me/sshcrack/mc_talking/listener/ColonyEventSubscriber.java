@@ -13,7 +13,6 @@ import com.minecolonies.api.eventbus.events.colony.citizens.CitizenJobChangedMod
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingConstructionModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingRemovedModEvent;
-import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.network.chat.Component;
 
@@ -34,8 +33,8 @@ public final class ColonyEventSubscriber {
             int colonyId = colony.getID();
             String ownerName = colony.getPermissions().getOwnerName();
             int day = colony.getDay();
-            ColonyEventBuffer.recordFounding(colonyId, ownerName, day);
-            McTalking.LOGGER.debug("Recorded colony foundation: colony {} founded by {} on day {}", colonyId, ownerName, day);
+            ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.COLONY_FOUNDED,
+                    "Colony was founded by " + ownerName + " on day " + day);
         });
 
         bus.subscribe(CitizenDiedModEvent.class, event -> {

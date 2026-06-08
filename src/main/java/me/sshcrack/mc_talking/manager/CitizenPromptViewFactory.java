@@ -110,16 +110,7 @@ public final class CitizenPromptViewFactory {
         String citizenAiState = extractCitizenAiState(data);
         String workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
-        var foundingInfo = ColonyEventBuffer.getFoundingInfo(data.getColony().getID());
-        if (foundingInfo == null) {
-            var colony = data.getColony();
-            String ownerName = colony.getPermissions().getOwnerName();
-            int day = colony.getDay();
-            ColonyEventBuffer.recordFounding(colony.getID(), ownerName, day);
-            foundingInfo = ColonyEventBuffer.getFoundingInfo(colony.getID());
-        }
-        String colonyFoundingPlayer = foundingInfo != null ? foundingInfo.foundingPlayerName() : null;
-        int colonyFoundingDay = foundingInfo != null ? foundingInfo.foundingDay() : 0;
+        String colonyFoundingPlayer = data.getColony().getPermissions().getOwnerName();
         int colonyAgeDays = data.getColony().getDay();
 
         return new CitizenPromptView(
@@ -166,7 +157,6 @@ public final class CitizenPromptViewFactory {
                 workAiState,
                 nameTagDescription,
                 colonyFoundingPlayer,
-                colonyFoundingDay,
                 colonyAgeDays
         );
     }

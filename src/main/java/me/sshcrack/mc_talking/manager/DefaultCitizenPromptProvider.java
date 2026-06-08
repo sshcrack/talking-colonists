@@ -142,8 +142,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         if (McTalkingConfig.INSTANCE.instance().enableFoundingReferences && view.colonyFoundingPlayer() != null) {
             obs.append("## COLONY HISTORY\n");
-            obs.append("- This colony was founded by ").append(view.colonyFoundingPlayer())
-                    .append(" on day ").append(view.colonyFoundingDay()).append(".\n");
+            obs.append("- This colony was founded by ").append(view.colonyFoundingPlayer()).append(".\n");
             obs.append("- The colony is now ").append(view.colonyAgeDays()).append(" days old.\n");
         }
 
