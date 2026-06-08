@@ -53,6 +53,10 @@ public class GetColonyAction extends GeneralFunctionAction {
         colonyInfo.addProperty("textureStyle", colony.getTextureStyleId());
         colonyInfo.addProperty("nameStyle", colony.getNameStyle());
 
+        // Founding information
+        colonyInfo.addProperty("foundedBy", colony.getPermissions().getOwnerName());
+        colonyInfo.addProperty("ageInDays", colony.getDay());
+
         // Buildings information
         final JsonArray buildingsArray = new JsonArray();
         for (final var building : colony.getServerBuildingManager().getBuildings().values()) {
