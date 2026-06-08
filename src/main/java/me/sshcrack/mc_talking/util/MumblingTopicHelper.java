@@ -1,19 +1,24 @@
 package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IAnimalData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ICommonBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
+import com.minecolonies.api.colony.managers.interfaces.IAnimalManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.util.InventoryUtils;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
+
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -110,6 +115,13 @@ public final class MumblingTopicHelper {
         var job = data.getJob().getJobRegistryEntry();
         String base = buildJobThought(job);
         if (base == null) return null;
+
+        if (isHerderJob(job)) {
+            String animalCtx = buildAnimalContext(citizen);
+            if (animalCtx != null) {
+                base = animalCtx + " " + java.lang.Character.toLowerCase(base.charAt(0)) + base.substring(1);
+            }
+        }
 
         return applyMoodTint(base, happiness);
     }
@@ -525,6 +537,36 @@ public final class MumblingTopicHelper {
     private static boolean isPeaceful(AbstractEntityCitizen citizen) {
         var level = citizen.level();
         return level != null && level.getDifficulty() == Difficulty.PEACEFUL;
+    }
+
+    private static boolean isHerderJob(JobEntry job) {
+        return job == ModJobs.shepherd.get()
+                || job == ModJobs.cowboy.get()
+                || job == ModJobs.swineHerder.get()
+                || job == ModJobs.chickenHerder.get()
+                || job == ModJobs.rabbitHerder.get();
+    }
+
+    @Nullable
+    private static String buildAnimalContext(AbstractEntityCitizen citizen) {
+        if (!McTalkingConfig.INSTANCE.instance().enableAnimalAwareness) return null;
+        var data = citizen.getCitizenData();
+        if (data == null) return null;
+        var colony = data.getColony();
+        if (colony == null) return null;
+        var mgr = colony.getAnimalManager();
+        if (mgr == null) return null;
+        int count = mgr.getCurrentAnimalCount();
+        if (count == 0) return null;
+
+        var animals = mgr.getAnimals();
+        long readyCount = animals.stream()
+                .filter(a -> a.getCombatCooldown() <= 0)
+                .count();
+
+        return "There " + (count == 1 ? "is" : "are") + " " + count
+                + " horse" + (count != 1 ? "s" : "") + " in the colony's stables — "
+                + readyCount + " " + (readyCount == 1 ? "is" : "are") + " ready for combat.";
     }
 
     public static String buildUrgentContactPrompt(AbstractEntityCitizen citizen, String playerName) {

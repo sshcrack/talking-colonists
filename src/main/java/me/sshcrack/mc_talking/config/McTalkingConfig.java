@@ -381,6 +381,12 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, citizens will reference neighboring colonies and their diplomatic standing (allies, enemies, etc.) in conversations.")
     public boolean enableColonyDiplomacy = true;
 
+    // Animal Awareness
+    @AutoGen(category = "citizens", group = "animal_awareness")
+    @TickBox
+    @SerialEntry(comment = "If enabled, citizens reference the colony's animals in idle thoughts and conversations. Herders get data-driven content about actual livestock instead of generic job thoughts.")
+    public boolean enableAnimalAwareness = true;
+
     // Memory Compaction
     @AutoGen(category = "citizens", group = "memory")
     @EnumCycler

@@ -27,6 +27,7 @@ import java.util.UUID;
  * @param citizenAiState        Current CitizenAI state, e.g. "WORKING", "IDLE", "SLEEP", "EATING" — from {@code /mc citizens info}, or {@code null} if entity not loaded
  * @param workAiState           Current work AI state, e.g. "IDLE", "START_WORKING", "NEEDS_ITEM" — from {@code /mc citizens info}, or {@code null} if entity not loaded
  * @param nameTagDescription    Job nametag description, the citizen's current activity text — from {@code /mc citizens info}, or {@code null} if unavailable
+ * @param animalSummary         Summary of colony managed animals (count, readiness), or {@code null} if none or feature disabled
  */
 public record CitizenPromptView(
         String name,
@@ -70,6 +71,7 @@ public record CitizenPromptView(
         @Nullable String colonyMilestone,
         @Nullable String citizenAiState,
         @Nullable String workAiState,
-        @Nullable String nameTagDescription
+        @Nullable String nameTagDescription,
+        @Nullable String animalSummary
 ) {
 }

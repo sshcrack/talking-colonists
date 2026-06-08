@@ -274,5 +274,9 @@
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks": "Memory Compaction Interval (ticks)",
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks.desc": "How often the server checks for memory compaction candidates. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.memoryCompactionThreshold": "Memory Compaction Threshold",
-  "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen."
+  "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen.",
+
+  "yacl3.config.mc_talking:config.category.citizens.group.animal_awareness": "Animal Awareness",
+  "yacl3.config.mc_talking:config.enableAnimalAwareness": "Enable Animal Awareness",
+  "yacl3.config.mc_talking:config.enableAnimalAwareness.desc": "If enabled, citizens reference the colony's animals in idle thoughts and conversations. Herders get data-driven content about actual livestock instead of generic job thoughts."
 }

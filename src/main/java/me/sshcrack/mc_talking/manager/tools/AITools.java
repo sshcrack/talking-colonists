@@ -76,6 +76,7 @@ public class AITools {
                 new GetInventoryAction(),
                 new GetColonyAction(),
                 new DescribeSurroundingsAction(),
+                new DescribeBuildingAction(),
                 new EndConversationAction(),
                 new RecordRelationshipChange(),
                 new AddEventToMemory(),

@@ -1,11 +1,13 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IAnimalData;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.connections.ColonyConnection;
 import com.minecolonies.api.colony.connections.DiplomacyStatus;
 import com.minecolonies.api.colony.connections.IColonyConnectionManager;
+import com.minecolonies.api.colony.managers.interfaces.IAnimalManager;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
@@ -110,6 +112,7 @@ public final class CitizenPromptViewFactory {
         String citizenAiState = extractCitizenAiState(data);
         String workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
+        String animalSummary = extractAnimalInfo(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -153,7 +156,8 @@ public final class CitizenPromptViewFactory {
                 colonyMilestone,
                 citizenAiState,
                 workAiState,
-                nameTagDescription
+                nameTagDescription,
+                animalSummary
         );
     }
 
@@ -582,5 +586,17 @@ public final class CitizenPromptViewFactory {
         if (level.isThundering()) return "thundering";
         if (level.isRaining()) return "rainy";
         return "clear";
+    }
+
+    @Nullable
+    private static String extractAnimalInfo(ICitizenData data) {
+        if (!McTalkingConfig.INSTANCE.instance().enableAnimalAwareness) return null;
+        var colony = data.getColony();
+        if (colony == null) return null;
+        IAnimalManager mgr = colony.getAnimalManager();
+        if (mgr == null) return null;
+        int count = mgr.getCurrentAnimalCount();
+        if (count == 0) return null;
+        return count + " managed animal(s)";
     }
 }

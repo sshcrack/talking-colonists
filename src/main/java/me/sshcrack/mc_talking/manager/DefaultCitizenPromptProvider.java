@@ -160,6 +160,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("- Since you have ongoing quests, you can naturally mention them if the topic comes up.\n");
         }
 
+        if (view.animalSummary() != null) {
+            String jobName = view.jobName();
+            if (jobName != null && isHerderJob(jobName)) {
+                obs.append("- You work with animals. The colony has ").append(view.animalSummary()).append(".\n");
+            } else {
+                obs.append("- Colony animals: ").append(view.animalSummary()).append("\n");
+            }
+        }
+
         if (!obs.isEmpty()) {
             prompt.append("\n## OBSERVATIONS\n").append(obs);
         }
@@ -370,6 +379,12 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
 
         return prompt.toString();
+    }
+
+    private static boolean isHerderJob(String jobName) {
+        String lower = jobName.toLowerCase();
+        return lower.contains("shepherd") || lower.contains("cowboy") || lower.contains("swine herder")
+                || lower.contains("chicken herder") || lower.contains("rabbit herder");
     }
 
     private static void appendGuardDuty(StringBuilder prompt, boolean isGuard) {
