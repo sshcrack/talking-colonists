@@ -248,7 +248,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         AIWorkerState workAiState = view.workAiState();
         String nameTagDescription = view.nameTagDescription();
         String aiDesc = describeAiState(citizenAiState, workAiState, nameTagDescription, view);
-        if (aiDesc != null) {
+        if (aiDesc != null && !aiDesc.isEmpty()) {
             prompt.append("- Currently: ").append(aiDesc).append("\n");
         }
 
@@ -538,13 +538,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private static void appendGuardDuty(StringBuilder prompt, boolean isGuard) {
         if (isGuard) {
             prompt.append("""
-                    
+
                     ## GUARD DUTY
                     - You are a guard — brave, tough, and sworn to protect the colony.
                     - You are not afraid of monsters or threats; you stand your ground and fight.
                     - You take pride in your duty to defend your fellow colonists.
                     - Your tone is confident and resolute; panic and cowardice are beneath you.
-                    
+
                     """);
         }
     }

@@ -28,6 +28,7 @@ import com.minecolonies.core.colony.buildings.workerbuildings.BuildingLibrary;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingMiner;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingNetherWorker;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingSchool;
+import com.minecolonies.core.colony.buildings.workerbuildings.BuildingTownHall;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingUniversity;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse;
 import me.sshcrack.gemini_live_lib.gson.properties.EnumProperty;
@@ -45,6 +46,7 @@ import java.util.List;
 
 public class DescribeBuildingAction extends GeneralFunctionAction {
 
+    private static final String OWN_BUILDING_IDENTIFIER = "own_building";
     private static final List<String> BUILDING_TYPES = List.of(
         "cook", "miner", "farmer", "townhall", "barracks", "warehouse",
         "library", "school", "builder", "residence", "deliveryman",
@@ -52,7 +54,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         "baker", "fisherman", "lumberjack", "shepherd", "cowboy",
         "graveyard", "plantation", "beekeeper", "mechanic", "sifter",
         "crusher", "netherworker", "florist", "archery", "combatacademy",
-        "rabbithutch", "own_building"
+        "rabbithutch", OWN_BUILDING_IDENTIFIER
     );
 
     public DescribeBuildingAction() {
@@ -60,7 +62,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
             "Describes a colony building in detail: its type, level, assigned workers, and type-specific " +
             "information (e.g. restaurant menu items, mine depth, farm crops, builder projects, etc.). " +
             "If multiple buildings of the same type exist, the nearest one to you is described. " +
-            "(\"own_building\" describes the building you work at)",
+            "(\"own_building\" describes the building you work at.)",
             new ObjectProperty(new HashMap<>() {{
                 put("type", new EnumProperty(BUILDING_TYPES, true));
             }})
@@ -209,7 +211,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         } else if (building instanceof BuildingFarmer farmer) {
             JsonArray plantedCrops = new JsonArray();
             int fieldCount = 0;
-            var extModules = farmer.getModulesByType(BuildingExtensionsModule.class);
+            var extModules = farmer.getModules(BuildingExtensionsModule.class);
             for (BuildingExtensionsModule module : extModules) {
                 for (IBuildingExtension ext : module.getOwnedExtensions()) {
                     if (ext instanceof FarmField field) {
@@ -232,8 +234,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
         } else if (building instanceof BuildingBuilder builder) {
             fillWorkOrderInfo(builder, result);
-
-        } else if ("townhall".equals(typePath)) {
+        } else if (building instanceof BuildingTownHall) {
             var col = building.getColony();
             if (col != null) {
                 result.addProperty("citizen_count", col.getCitizenManager().getCurrentCitizenCount());
@@ -323,7 +324,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
         }
 
         if (!handled) {
-            var craftingModules = building.getModulesByType(AbstractCraftingBuildingModule.class);
+            var craftingModules = building.getModules(AbstractCraftingBuildingModule.class);
             if (!craftingModules.isEmpty()) {
                 var recipeManager = IColonyManager.getInstance().getRecipeManager();
                 var allRecipes = recipeManager.getRecipes();
