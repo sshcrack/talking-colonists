@@ -59,6 +59,8 @@ public class PlayerFulfillmentHandler {
         }
 
         var mem = ((CitizenDataMemoryExtended) foundCitizen).mc_talking$getOrInitializeMemory();
+        String fulfillmentPrefix = CitizenMemories.SYSTEM_EVENT_PREFIX + " The player ";
+        mem.removeEventsIf(e -> e.startsWith(fulfillmentPrefix));
         mem.addEvent(String.format(
                 CitizenMemories.SYSTEM_EVENT_PREFIX + " The player %s brought me the %s I needed. I'm grateful.",
                 playerName, itemName));

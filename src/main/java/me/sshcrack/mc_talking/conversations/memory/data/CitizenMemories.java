@@ -61,6 +61,10 @@ public class CitizenMemories {
         events.add(event);
     }
 
+    public void removeEventsIf(java.util.function.Predicate<String> predicate) {
+        events.removeIf(predicate);
+    }
+
     public void setSummarizedMemory(String summarizedMemory) {
         this.summarizedMemory = summarizedMemory == null ? "" : summarizedMemory;
     }

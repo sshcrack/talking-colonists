@@ -177,6 +177,14 @@ public class GeminiStream implements Supplier<short[]> {
         isPreBuffering = true;
         if (player != null) {
             player.stopPlaying();
+            long deadline = System.currentTimeMillis() + 2000;
+            try {
+                while (!player.isStopped() && System.currentTimeMillis() < deadline) {
+                    Thread.sleep(1);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             player = null;
         }
         if (encoder != null) {
@@ -186,10 +194,7 @@ public class GeminiStream implements Supplier<short[]> {
     }
 
     public void close() {
-        if (encoder != null) {
-            try { encoder.close(); } catch (Exception e) { /* swallow */ }
-            encoder = null;
-        }
+        stop();
     }
 
     @Override
