@@ -11,6 +11,7 @@ import com.minecolonies.api.colony.connections.IColonyConnectionManager;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
@@ -71,6 +72,7 @@ import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT
 
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.core.BlockPos;
 
 /**
@@ -79,6 +81,13 @@ import net.minecraft.core.BlockPos;
 public final class CitizenPromptViewFactory {
 
     private CitizenPromptViewFactory() {
+    }
+
+    private record CategorizedRequests(
+            @Nullable List<String> fulfillable,
+            @Nullable List<String> blocked
+    ) {
+        static final CategorizedRequests EMPTY = new CategorizedRequests(null, null);
     }
 
     public static CitizenPromptView create(ICitizenData data, @NotNull Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
@@ -111,7 +120,7 @@ public final class CitizenPromptViewFactory {
         String playerState = extractPlayerState(speakingTo);
         var envInfo = extractEnvironmentInfo(data);
         String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
-        List<String> activeItemRequests = extractActiveItemRequests(data, workBuilding);
+        CategorizedRequests categorizedRequests = extractCategorizedItemRequests(data, workBuilding);
         List<String> activeQuests = extractActiveQuests(data);
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
         List<String> colonyConnections = extractColonyConnections(data);
@@ -159,7 +168,8 @@ public final class CitizenPromptViewFactory {
                 customPersonalityText,
                 playerState,
                 envInfo.description(),
-                activeItemRequests,
+                categorizedRequests.fulfillable(),
+                categorizedRequests.blocked(),
                 activeQuests,
                 recentEvents,
                 colonyConnections,
@@ -435,27 +445,53 @@ public final class CitizenPromptViewFactory {
         return new EnvironmentInfo(description, peaceful);
     }
 
-    @Nullable
-    private static List<String> extractActiveItemRequests(ICitizenData data, @Nullable IBuilding workBuilding) {
+    private static CategorizedRequests extractCategorizedItemRequests(ICitizenData data, @Nullable IBuilding workBuilding) {
         if (workBuilding == null) {
-            return null;
+            return CategorizedRequests.EMPTY;
         }
         Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
         if (openRequests == null || openRequests.isEmpty()) {
-            return null;
+            return CategorizedRequests.EMPTY;
         }
-        List<String> requests = new ArrayList<>();
+
+        // Terminal states — request is closed, nothing to report
+        java.util.Set<RequestState> terminalStates = java.util.EnumSet.of(
+                RequestState.CANCELLED,
+                RequestState.FAILED,
+                RequestState.COMPLETED,
+                RequestState.OVERRULED,
+                RequestState.RECEIVED
+        );
+
+        List<String> fulfillable = new ArrayList<>();
+        List<String> blocked = new ArrayList<>();
+
         for (IRequest<?> request : openRequests) {
+            if (terminalStates.contains(request.getState())) {
+                continue;
+            }
+
+            String display;
             var requestable = request.getRequest();
             if (requestable instanceof Stack stackReq) {
-                ItemStack itemStack = stackReq.getStack();
-                int count = stackReq.getCount();
-                requests.add(count + "x " + itemStack.getDisplayName().getString());
+                display = stackReq.getCount() + "x " + stackReq.getStack().getDisplayName().getString();
             } else {
-                requests.add(request.getShortDisplayString().getString());
+                display = request.getShortDisplayString().getString();
+            }
+
+            boolean isFulfillable = request.getState().ordinal() >= RequestState.ASSIGNED.ordinal()
+                    || MumblingTopicHelper.warehouseHasStock(data, request);
+            if (isFulfillable) {
+                fulfillable.add(display);
+            } else {
+                blocked.add(display);
             }
         }
-        return requests;
+
+        return new CategorizedRequests(
+                fulfillable.isEmpty() ? null : fulfillable,
+                blocked.isEmpty() ? null : blocked
+        );
     }
 
     @Nullable

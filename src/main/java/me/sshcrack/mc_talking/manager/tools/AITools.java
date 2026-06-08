@@ -80,7 +80,8 @@ public class AITools {
                 new EndConversationAction(),
                 new RecordRelationshipChange(),
                 new AddEventToMemory(),
-                new RecommendJobAction()
+                new RecommendJobAction(),
+                new GetCurrentSituationAction()
 //                new JobSpecificAction()
         ));
         addAll(playerConversationOnlyTools, List.of(
