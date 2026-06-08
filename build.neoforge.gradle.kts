@@ -133,7 +133,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "me.sshcrack"
             artifactId = prop("mod.id")
-            version = "${prop("mod.version")}-${prop("deps.minecraft")}-${loader}"
+            version = "${prop("mod.version")}${prop("mod.channel_tag")}-${prop("deps.minecraft")}-${loader}"
 
             artifact(tasks.named("jar"))
             tasks.findByName("sourcesJar")?.let { artifact(it) }
