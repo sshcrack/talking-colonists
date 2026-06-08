@@ -130,6 +130,7 @@ public class PregenerationTaskService {
 
                 if (c1 != null && c2 != null) {
                     if (ConversationManager.isCitizenBusy(c1) || ConversationManager.isCitizenBusy(c2)) continue;
+                    if (c1.getCitizenData() == null || c2.getCitizenData() == null) continue;
 
                     if (!hasGreeting(c1.getUUID(), c2.getUUID())) {
                         startPregenerationIfPossible(c1,
