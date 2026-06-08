@@ -18,7 +18,8 @@ import java.util.UUID;
  * @param customPersonalityText Freeform custom personality text, or {@code null} if a built-in is active
  * @param playerState           Description of the speaking player's health and armor, e.g. "healthy (20/20 HP) wearing iron armor
  * @param environment           Description of the current environment, e.g. "It is midday and sunny."
- * @param activeItemRequests    Human-readable descriptions of resources this citizen is waiting for, or {@code null} if none
+ * @param fulfillableItemRequests Human-readable descriptions of items in the warehouse or already assigned to a deliverer, or {@code null} if none
+ * @param blockedItemRequests     Human-readable descriptions of items that are missing from the colony entirely (no resolver found), or {@code null} if none
  * @param guard                 {@code true} when the citizen is a guard (knight/archer)
  * @param activeQuests Human-readable descriptions of active quests this citizen is involved in, or {@code null} if none
  * @param recentColonyEvents Descriptions of recent colony lifecycle events (deaths, births, building changes), or empty list if none
@@ -65,7 +66,8 @@ public record CitizenPromptView(
         @Nullable String customPersonalityText,
         @Nullable String playerState,
         @Nullable String environment,
-        @Nullable List<String> activeItemRequests,
+        @Nullable List<String> fulfillableItemRequests,
+        @Nullable List<String> blockedItemRequests,
         @Nullable List<String> activeQuests,
         List<String> recentColonyEvents,
         @Nullable List<String> colonyConnections,

@@ -645,7 +645,7 @@ public final class MumblingTopicHelper {
      * Checks whether the requested items are sufficiently stocked in any colony warehouse.
      * Uses the same matching logic as {@link com.minecolonies.core.colony.requestsystem.resolvers.WarehouseRequestResolver}.
      */
-    private static boolean warehouseHasStock(ICitizenData data, IRequest<?> request) {
+    public static boolean warehouseHasStock(ICitizenData data, IRequest<?> request) {
         if (!(request.getRequest() instanceof IDeliverable deliverable)) return false;
 
         var colony = data.getColony();
