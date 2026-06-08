@@ -14,6 +14,8 @@ import java.util.UUID;
  * @param interestedParties     Parties that may be included in the prompt for the memory of this citizen
  * @param colonyId              MineColonies colony ID — used for raid-trauma and personality lookups
  * @param peaceful              {@code true} when the colony's world is on peaceful difficulty — suppresses raid-related prompt content
+ * @param lastRaidEndTimeMs     Timestamp of the most recent raid end, or {@code null} if no raid has occurred
+ * @param lastRaidLostCitizens  Number of citizens lost in the most recent raid
  * @param personality           Built-in personality archetype, or {@code null} if a custom one is active
  * @param customPersonalityText Freeform custom personality text, or {@code null} if a built-in is active
  * @param playerState           Description of the speaking player's health and armor, e.g. "healthy (20/20 HP) wearing iron armor
@@ -64,6 +66,8 @@ public record CitizenPromptView(
         int workBuildingLevel,
         int colonyId,
         boolean peaceful,
+        @Nullable Long lastRaidEndTimeMs,
+        int lastRaidLostCitizens,
         @Nullable PersonalityArchetype personality,
         @Nullable String customPersonalityText,
         @Nullable String playerState,

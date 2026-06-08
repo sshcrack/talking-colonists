@@ -1,10 +1,14 @@
 package me.sshcrack.mc_talking.util;
 
+import com.minecolonies.api.colony.IColony;
+import me.sshcrack.mc_talking.duck.ColonyEventDataProvider;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 public final class ColonyEventBuffer {
@@ -24,33 +28,52 @@ public final class ColonyEventBuffer {
         COLONY_FOUNDED
     }
 
-    public record ColonyEvent(EventType type, String description, long timestampMs) {}
+    public record ColonyEvent(EventType type, String description, long timestampMs) {
+        public CompoundTag serialize() {
+            CompoundTag tag = new CompoundTag();
+            tag.putString("type", type.name());
+            tag.putString("description", description);
+            tag.putLong("timestamp", timestampMs);
+            return tag;
+        }
 
-    private static final int MAX_EVENTS = 20;
-    private static final Map<Integer, ConcurrentLinkedDeque<ColonyEvent>> events = new ConcurrentHashMap<>();
-
-    private static final Map<Integer, Long> lastRaidEndTime = new ConcurrentHashMap<>();
-    private static final Map<Integer, Integer> lastRaidLostCitizens = new ConcurrentHashMap<>();
-
-    public static void recordRaid(int colonyId, int lostCitizens) {
-        long now = System.currentTimeMillis();
-        lastRaidEndTime.put(colonyId, now);
-        lastRaidLostCitizens.put(colonyId, lostCitizens);
-        recordEvent(colonyId, EventType.RAID, lostCitizens + " citizens lost in raid");
+        public static ColonyEvent deserialize(CompoundTag tag) {
+            return new ColonyEvent(
+                    EventType.valueOf(tag.getString("type")),
+                    tag.getString("description"),
+                    tag.getLong("timestamp")
+            );
+        }
     }
 
-    public static void recordEvent(int colonyId, EventType type, String description) {
+    private static final int MAX_EVENTS = 20;
+
+    private static ColonyEventDataProvider getProvider(IColony colony) {
+        return (ColonyEventDataProvider) colony;
+    }
+
+    public static void recordRaid(IColony colony, int lostCitizens) {
         long now = System.currentTimeMillis();
-        var buffer = events.computeIfAbsent(colonyId, k -> new ConcurrentLinkedDeque<>());
+        var provider = getProvider(colony);
+        provider.mc_talking$setLastRaidEndTime(now);
+        provider.mc_talking$setLastRaidLostCitizens(lostCitizens);
+        recordEvent(colony, EventType.RAID, lostCitizens + " citizens lost in raid");
+    }
+
+    public static void recordEvent(IColony colony, EventType type, String description) {
+        long now = System.currentTimeMillis();
+        var provider = getProvider(colony);
+        var buffer = provider.mc_talking$getOrCreateEvents();
         buffer.addFirst(new ColonyEvent(type, description, now));
         while (buffer.size() > MAX_EVENTS) {
             buffer.pollLast();
         }
     }
 
-    public static List<ColonyEvent> getRecentEvents(int colonyId, int maxAgeSeconds) {
-        var buffer = events.get(colonyId);
-        if (buffer == null) return List.of();
+    public static List<ColonyEvent> getRecentEvents(IColony colony, int maxAgeSeconds) {
+        var provider = getProvider(colony);
+        var buffer = provider.mc_talking$getOrCreateEvents();
+        if (buffer.isEmpty()) return List.of();
         long cutoff = System.currentTimeMillis() - (maxAgeSeconds * 1000L);
         List<ColonyEvent> result = new ArrayList<>();
         for (ColonyEvent event : buffer) {
@@ -61,38 +84,40 @@ public final class ColonyEventBuffer {
         return Collections.unmodifiableList(result);
     }
 
-    public static boolean isInTrauma(int colonyId, int durationSeconds) {
+    public static boolean isInTrauma(IColony colony, int durationSeconds) {
         if (durationSeconds <= 0) return false;
-        Long lastEnd = lastRaidEndTime.get(colonyId);
-        if (lastEnd == null) return false;
+        var provider = getProvider(colony);
+        long lastEnd = provider.mc_talking$getLastRaidEndTime();
+        if (lastEnd == Long.MAX_VALUE) return false;
         return (System.currentTimeMillis() - lastEnd) < (durationSeconds * 1000L);
     }
 
-    public static long millisSinceRaid(int colonyId) {
-        Long lastEnd = lastRaidEndTime.get(colonyId);
-        if (lastEnd == null) return Long.MAX_VALUE;
+    public static long millisSinceRaid(IColony colony) {
+        var provider = getProvider(colony);
+        long lastEnd = provider.mc_talking$getLastRaidEndTime();
+        if (lastEnd == Long.MAX_VALUE) return Long.MAX_VALUE;
         return System.currentTimeMillis() - lastEnd;
     }
 
-    public static int getLostCitizens(int colonyId) {
-        return lastRaidLostCitizens.getOrDefault(colonyId, 0);
+    public static int getLostCitizens(IColony colony) {
+        var provider = getProvider(colony);
+        return provider.mc_talking$getLastRaidLostCitizens();
+    }
+
+    public static long getLastRaidEndTime(IColony colony) {
+        var provider = getProvider(colony);
+        return provider.mc_talking$getLastRaidEndTime();
     }
 
     /**
-     * Removes all stored data for a specific colony.
-     * Call this when a colony is deleted to prevent memory leaks.
-     *
-     * <p>Wired up via {@link me.sshcrack.mc_talking.listener.ColonyEventSubscriber}.</p>
+     * @deprecated No-op. Data now lives on colony instances via {@link ColonyEventDataProvider}.
      */
-    public static void removeColony(int colonyId) {
-        events.remove(colonyId);
-        lastRaidEndTime.remove(colonyId);
-        lastRaidLostCitizens.remove(colonyId);
-    }
+    @Deprecated(forRemoval = true)
+    public static void removeColony(int colonyId) {}
 
-    public static void clear() {
-        events.clear();
-        lastRaidEndTime.clear();
-        lastRaidLostCitizens.clear();
-    }
+    /**
+     * @deprecated No-op. Data now lives on colony instances via {@link ColonyEventDataProvider}.
+     */
+    @Deprecated(forRemoval = true)
+    public static void clear() {}
 }

@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
@@ -124,6 +125,10 @@ public final class CitizenPromptViewFactory {
         List<String> activeQuests = extractActiveQuests(data);
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
         List<String> colonyConnections = extractColonyConnections(data);
+        IColony colony = data.getColony();
+        long lastRaidEndTime = ColonyEventBuffer.getLastRaidEndTime(colony);
+        Long lastRaidEndTimeMs = lastRaidEndTime != Long.MAX_VALUE ? lastRaidEndTime : null;
+        int lastRaidLostCitizens = ColonyEventBuffer.getLostCitizens(colony);
         List<String> recentEvents = extractRecentEvents(data);
         CitizenAIState citizenAiState = extractCitizenAiState(data);
         AIWorkerState workAiState = extractWorkAiState(data);
@@ -166,6 +171,8 @@ public final class CitizenPromptViewFactory {
                 workBuildingLevel,
                 data.getColony().getID(),
                 envInfo.peaceful(),
+                lastRaidEndTimeMs,
+                lastRaidLostCitizens,
                 personality,
                 customPersonalityText,
                 playerState,
@@ -575,12 +582,12 @@ public final class CitizenPromptViewFactory {
     }
 
     private static List<String> extractRecentEvents(ICitizenData data) {
-        int colonyId = data.getColony().getID();
+        IColony colony = data.getColony();
         int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
         if (eventWindow <= 0) {
             return List.of();
         }
-        return ColonyEventBuffer.getRecentEvents(colonyId, eventWindow).stream()
+        return ColonyEventBuffer.getRecentEvents(colony, eventWindow).stream()
                 .map(ColonyEventBuffer.ColonyEvent::description)
                 .toList();
     }

@@ -29,7 +29,8 @@
     "EntityAIWorkHealerMixin",
     "BuildingLibraryAccessor",
     "BuildingNetherWorkerAccessor",
-    "AbstractEntityAIInteractAccessor"
+    "AbstractEntityAIInteractAccessor",
+    "ColonyDataMixin"
   ],
   "injectors": {
     "defaultRequire": 1

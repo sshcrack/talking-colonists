@@ -11,7 +11,6 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -271,11 +270,12 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         // Post-raid trauma
-        if (!view.peaceful()) {
+        Long lastRaidEndTimeMs = view.lastRaidEndTimeMs();
+        if (!view.peaceful() && lastRaidEndTimeMs != null) {
             int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-            if (traumaDuration > 0 && ColonyEventBuffer.isInTrauma(view.colonyId(), traumaDuration)) {
-                long sinceMs = ColonyEventBuffer.millisSinceRaid(view.colonyId());
-                int lost = ColonyEventBuffer.getLostCitizens(view.colonyId());
+            long sinceMs = System.currentTimeMillis() - lastRaidEndTimeMs;
+            if (traumaDuration > 0 && sinceMs < traumaDuration * 1000L) {
+                int lost = view.lastRaidLostCitizens();
                 prompt.append("\n## POST-RAID TRAUMA\n");
 
                 if (view.guard()) {

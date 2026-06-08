@@ -45,15 +45,18 @@ public class DebugEventsCommand {
             colonyId = colony.getID();
         }
 
-        final int fColonyId = colonyId;
-
         IColony colony = IColonyManager.getInstance().getColonyByWorld(colonyId, source.getLevel());
-        String colonyName = colony != null ? colony.getName() : "unknown";
+        if (colony == null) {
+            source.sendFailure(Component.translatable("mc_talking.debug.no_colony_found"));
+            return 0;
+        }
+        String colonyName = colony.getName();
         int eventWindow = me.sshcrack.mc_talking.config.McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
-        List<ColonyEventBuffer.ColonyEvent> recentEvents = ColonyEventBuffer.getRecentEvents(fColonyId, eventWindow > 0 ? eventWindow : 300);
+        List<ColonyEventBuffer.ColonyEvent> recentEvents = ColonyEventBuffer.getRecentEvents(colony, eventWindow > 0 ? eventWindow : 300);
 
-        long millisSinceRaid = ColonyEventBuffer.millisSinceRaid(fColonyId);
-        int lostCitizens = ColonyEventBuffer.getLostCitizens(fColonyId);
+        long millisSinceRaid = ColonyEventBuffer.millisSinceRaid(colony);
+        int lostCitizens = ColonyEventBuffer.getLostCitizens(colony);
+        final int fColonyId = colonyId;
 
         source.sendSuccess(() -> {
             var msg = Component.literal("")
@@ -76,7 +79,7 @@ public class DebugEventsCommand {
             }
 
             if (me.sshcrack.mc_talking.config.McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds > 0) {
-                boolean inTrauma = ColonyEventBuffer.isInTrauma(fColonyId,
+                boolean inTrauma = ColonyEventBuffer.isInTrauma(colony,
                         me.sshcrack.mc_talking.config.McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds);
                 msg.append(Component.literal("  §7Raid trauma: ")
                         .append(Component.literal(inTrauma ? "§cACTIVE" : "§ainactive"))

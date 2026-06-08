@@ -30,6 +30,6 @@ public class RaidManagerMixin {
         var world = colony.getWorld();
         if (world != null && world.getDifficulty() == Difficulty.PEACEFUL) return;
         int lostCitizens = ((RaidManager) (Object) this).getLostCitizen();
-        ColonyEventBuffer.recordRaid(colony.getID(), lostCitizens);
+        ColonyEventBuffer.recordRaid(colony, lostCitizens);
     }
 }

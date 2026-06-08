@@ -17,7 +17,7 @@ import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PlayerHeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.util.CitizenHelper;
-import me.sshcrack.mc_talking.util.ColonyEventBuffer;
+
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -89,7 +89,6 @@ public class ServerEventHandler {
         PregenerationTaskService.cleanup();
         DeliveryInteractionManager.cleanup();
         ConversationManager.cleanup();
-        ColonyEventBuffer.clear();
 
         MinecraftServer server = event.getServer();
         UrgentContactHandler.onServerStop(server);
