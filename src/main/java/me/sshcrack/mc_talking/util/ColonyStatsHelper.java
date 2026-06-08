@@ -72,6 +72,19 @@ public final class ColonyStatsHelper {
             eligible.add("There are over " + citizenCount + " of us now — the colony is thriving.");
         }
 
+        int day = colony.getDay();
+        if (day >= 365) {
+            eligible.add("A full year — over " + day + " days! Who would have thought this place would grow so much?");
+        } else if (day >= 100) {
+            eligible.add("Over 100 days! This colony has come so far.");
+        } else if (day >= 30) {
+            eligible.add("A whole month — the colony is really settling in.");
+        } else if (day >= 7) {
+            eligible.add("We've been here for a week already.");
+        } else if (day >= 1) {
+            eligible.add("The colony was just founded — everything is new and exciting.");
+        }
+
         if (eligible.isEmpty()) return null;
         return MiscUtil.pick(eligible.toArray(new String[0]));
     }

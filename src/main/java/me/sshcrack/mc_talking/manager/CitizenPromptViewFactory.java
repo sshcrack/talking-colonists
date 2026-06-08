@@ -128,6 +128,8 @@ public final class CitizenPromptViewFactory {
         CitizenAIState citizenAiState = extractCitizenAiState(data);
         AIWorkerState workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
+        String colonyFoundingPlayer = data.getColony().getPermissions().getOwnerName();
+        int colonyAgeDays = data.getColony().getDay();
         ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, citizenAiState);
         List<String> recentActions = extractRecentActions(data);
         MinimalAISubState minimalAiSubState = extractMinimalAiSubState(data);
@@ -177,6 +179,8 @@ public final class CitizenPromptViewFactory {
                 citizenAiState,
                 workAiState,
                 nameTagDescription,
+                colonyFoundingPlayer,
+                colonyAgeDays,
                 colonyFoodSituation,
                 recentActions,
                 minimalAiSubState,

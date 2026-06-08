@@ -2,8 +2,10 @@ package me.sshcrack.mc_talking.listener;
 
 import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
+import com.minecolonies.api.eventbus.events.colony.ColonyCreatedModEvent;
 import com.minecolonies.api.eventbus.events.colony.ColonyDeletedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenDiedModEvent;
@@ -25,6 +27,15 @@ public final class ColonyEventSubscriber {
         registered = true;
 
         var bus = IMinecoloniesAPI.getInstance().getEventBus();
+
+        bus.subscribe(ColonyCreatedModEvent.class, event -> {
+            IColony colony = event.getColony();
+            int colonyId = colony.getID();
+            String ownerName = colony.getPermissions().getOwnerName();
+            int day = colony.getDay();
+            ColonyEventBuffer.recordEvent(colonyId, ColonyEventBuffer.EventType.COLONY_FOUNDED,
+                    "Colony was founded by " + ownerName + " on day " + day);
+        });
 
         bus.subscribe(CitizenDiedModEvent.class, event -> {
             ICitizenData citizen = (ICitizenData) event.getCitizen();

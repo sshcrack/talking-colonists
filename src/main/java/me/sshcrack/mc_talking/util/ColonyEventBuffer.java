@@ -20,7 +20,8 @@ public final class ColonyEventBuffer {
         CITIZEN_JOB_CHANGE,
         BUILDING_ADDED,
         BUILDING_REMOVED,
-        BUILDING_UPGRADED
+        BUILDING_UPGRADED,
+        COLONY_FOUNDED
     }
 
     public record ColonyEvent(EventType type, String description, long timestampMs) {}
