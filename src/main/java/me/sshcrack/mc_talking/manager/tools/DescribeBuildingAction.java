@@ -5,12 +5,11 @@ import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
-import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
-import com.minecolonies.api.crafting.IRecipeStorage;
+import com.minecolonies.api.colony.buildings.IBuilding;
+import com.minecolonies.api.colony.workorders.IBuilderWorkOrder;
 import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import com.minecolonies.api.research.IGlobalResearchBranch;
 import com.minecolonies.api.research.IGlobalResearchTree;
 import com.minecolonies.api.research.ILocalResearch;
 import com.minecolonies.api.research.util.ResearchState;
@@ -37,7 +36,6 @@ import me.sshcrack.mc_talking.mixin.BuildingLibraryAccessor;
 import me.sshcrack.mc_talking.mixin.BuildingNetherWorkerAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.food.FoodProperties;
-import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,24 +46,24 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
     private static final String OWN_BUILDING_IDENTIFIER = "own_building";
     private static final List<String> BUILDING_TYPES = List.of(
-        "cook", "miner", "farmer", "townhall", "barracks", "warehouse",
-        "library", "school", "builder", "residence", "deliveryman",
-        "tavern", "hospital", "enchanter", "smeltery", "composter",
-        "baker", "fisherman", "lumberjack", "shepherd", "cowboy",
-        "graveyard", "plantation", "beekeeper", "mechanic", "sifter",
-        "crusher", "netherworker", "florist", "archery", "combatacademy",
-        "rabbithutch", OWN_BUILDING_IDENTIFIER
+            "cook", "miner", "farmer", "townhall", "barracks", "warehouse",
+            "library", "school", "builder", "residence", "deliveryman",
+            "tavern", "hospital", "enchanter", "smeltery", "composter",
+            "baker", "fisherman", "lumberjack", "shepherd", "cowboy",
+            "graveyard", "plantation", "beekeeper", "mechanic", "sifter",
+            "crusher", "netherworker", "florist", "archery", "combatacademy",
+            "rabbithutch", OWN_BUILDING_IDENTIFIER
     );
 
     public DescribeBuildingAction() {
         super("describe_building",
-            "Describes a colony building in detail: its type, level, assigned workers, and type-specific " +
-            "information (e.g. restaurant menu items, mine depth, farm crops, builder projects, etc.). " +
-            "If multiple buildings of the same type exist, the nearest one to you is described. " +
-            "(\"own_building\" describes the building you work at.)",
-            new ObjectProperty(new HashMap<>() {{
-                put("type", new EnumProperty(BUILDING_TYPES, true));
-            }})
+                "Describes a colony building in detail: its type, level, assigned workers, and type-specific " +
+                        "information (e.g. restaurant menu items, mine depth, farm crops, builder projects, etc.). " +
+                        "If multiple buildings of the same type exist, the nearest one to you is described. " +
+                        "(\"own_building\" describes the building you work at.)",
+                new ObjectProperty(new HashMap<>() {{
+                    put("type", new EnumProperty(BUILDING_TYPES, true));
+                }})
         );
     }
 
@@ -82,7 +80,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
         IBuilding matched = findBuilding(colony, query, citizen);
         if (matched == null) {
-            if (query.equals("own_building")) {
+            if (query.equals(OWN_BUILDING_IDENTIFIER)) {
                 result.addProperty("error", "You are not assigned to any building.");
             } else {
                 result.addProperty("error", "No building found matching '" + query + "'.");
@@ -126,7 +124,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
 
     private static void fillBasicInfo(IBuilding building, JsonObject result) {
         String name = building.getBuildingDisplayName();
-        if (name == null || name.contains(".") || name.contains("/")) {
+        if (name.contains(".") || name.contains("/")) {
             name = Component.translatable(building.getBuildingType().getTranslationKey()).getString();
         }
         result.addProperty("name", name);
@@ -163,9 +161,14 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
     private static void fillWorkOrderInfo(IBuilding building, JsonObject result) {
         if (!(building instanceof BuildingBuilder) && !(building instanceof BuildingMiner)) return;
 
-        boolean hasWorkOrder = false;
-        var wo = building instanceof BuildingBuilder builder ? builder.getWorkOrder() :
-                 building instanceof BuildingMiner miner ? miner.getWorkOrder() : null;
+        boolean hasWorkOrder;
+        IBuilderWorkOrder wo = null;
+        if (building instanceof BuildingBuilder builder) {
+            wo = builder.getWorkOrder();
+        } else if (building instanceof BuildingMiner miner) {
+            wo = miner.getWorkOrder();
+        }
+
 
         hasWorkOrder = wo != null;
         result.addProperty("has_work_order", hasWorkOrder);
@@ -181,180 +184,197 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
     }
 
     private static void fillTypeSpecificInfo(IBuilding building, JsonObject result, AbstractEntityCitizen citizen) {
-        var typePath = building.getBuildingType().getRegistryName().getPath();
-        boolean handled = true;
-
-        if (building instanceof BuildingCook cook) {
-            var menuModule = cook.getModule(BuildingModules.RESTAURANT_MENU);
-            if (menuModule != null) {
-                var menu = menuModule.getMenu();
-                JsonArray items = new JsonArray();
-                for (ItemStorage storage : menu) {
-                    var stack = storage.getItemStack();
-                    FoodProperties food = stack.getItem().getFoodProperties(stack, null);
-                    double foodValue = FoodUtils.getFoodValue(stack, food, 0);
-                    int tier = FoodUtils.getFoodTier(foodValue);
-                    items.add(stack.getDisplayName().getString() + " (tier " + tier + ", x" + storage.getAmount() + ")");
-                }
-                result.add("menu_items", items);
+        switch (building) {
+            case BuildingCook cook -> fillCookInfo(cook, result);
+            case BuildingMiner miner -> {
+                result.addProperty("max_depth", miner.getDepthLimit(citizen.level()));
+                fillWorkOrderInfo(miner, result);
             }
-
-            var workModule = cook.getModule(BuildingModules.COOK_WORK);
-            boolean hasCook = workModule != null && workModule.hasAssignedCitizen();
-            result.addProperty("has_assigned_cook", hasCook);
-
-        } else if (building instanceof BuildingMiner miner) {
-            Level level = citizen.level();
-            result.addProperty("max_depth", miner.getDepthLimit(level));
-            fillWorkOrderInfo(miner, result);
-
-        } else if (building instanceof BuildingFarmer farmer) {
-            JsonArray plantedCrops = new JsonArray();
-            int fieldCount = 0;
-            var extModules = farmer.getModules(BuildingExtensionsModule.class);
-            for (BuildingExtensionsModule module : extModules) {
-                for (IBuildingExtension ext : module.getOwnedExtensions()) {
-                    if (ext instanceof FarmField field) {
-                        fieldCount++;
-                        if (!field.getSeed().isEmpty()) {
-                            plantedCrops.add(field.getSeed().getDisplayName().getString());
-                        }
-                    }
-                }
-            }
-            result.addProperty("field_count", fieldCount);
-            result.add("planted_crops", plantedCrops);
-
-        } else if (building instanceof BuildingBarracks barracks) {
-            result.addProperty("tower_count", barracks.getTowers().size());
-
-        } else if (building instanceof BuildingWareHouse warehouse) {
-            var containers = warehouse.getContainers();
-            result.addProperty("container_count", containers != null ? containers.size() : 0);
-
-        } else if (building instanceof BuildingBuilder builder) {
-            fillWorkOrderInfo(builder, result);
-        } else if (building instanceof BuildingTownHall) {
-            var col = building.getColony();
-            if (col != null) {
-                result.addProperty("citizen_count", col.getCitizenManager().getCurrentCitizenCount());
-                result.addProperty("max_citizens", col.getCitizenManager().getMaxCitizens());
-                result.addProperty("overall_happiness", col.getOverallHappiness());
-            }
-
-        } else if (building instanceof BuildingSchool school) {
-            var assigned = school.getAllAssignedCitizen();
-            int studentCount = assigned != null ? assigned.size() : 0;
-            result.addProperty("student_count", Math.max(0, studentCount - 1));
-            result.addProperty("has_teacher", studentCount > 0);
-
-        } else if (building instanceof BuildingLibrary library) {
-            result.addProperty("bookshelves_count", ((BuildingLibraryAccessor) library).getBookCases().size());
-
-        } else if (building instanceof BuildingNetherWorker nw) {
-            var accessor = (BuildingNetherWorkerAccessor) nw;
-            int currentTrips = accessor.getCurrentTrips();
-            int currentPeriodDay = accessor.getCurrentPeriodDay();
-            int maxPerPeriod = BuildingNetherWorker.getMaxPerPeriod();
-            int periodDays = BuildingNetherWorker.getPeriodDays();
-
-            result.addProperty("is_ready_for_trip", nw.isReadyForTrip());
-            result.addProperty("trips_this_period", currentTrips);
-            result.addProperty("max_trips_per_period", maxPerPeriod);
-            result.addProperty("current_period_day", currentPeriodDay);
-            result.addProperty("period_days", periodDays);
-            result.addProperty("days_until_reset", periodDays - currentPeriodDay);
-            result.addProperty("portal_present", nw.getPortalLocation() != null);
-            result.addProperty("close_portal_on_return", nw.shallClosePortalOnReturn());
-
-        } else if (building instanceof BuildingGraveyard gy) {
-            var gravePositions = gy.getGravePositions();
-            result.addProperty("grave_count", gravePositions != null ? gravePositions.size() : 0);
-            var currentGrave = gy.getGraveToWorkOn();
-            if (currentGrave != null) {
-                result.addProperty("has_current_grave_task", true);
-                result.addProperty("current_grave_position", currentGrave.toShortString());
-            } else {
-                result.addProperty("has_current_grave_task", false);
-            }
-
-        } else if (building instanceof BuildingUniversity) {
-            var col = building.getColony();
-            if (col != null) {
-                var researchTree = col.getResearchManager().getResearchTree();
-                var inProgress = researchTree.getResearchInProgress();
-                result.addProperty("research_in_progress_count", inProgress.size());
-
-                if (!inProgress.isEmpty()) {
-                    JsonArray researchArray = new JsonArray();
-                    for (ILocalResearch research : inProgress) {
-                        JsonObject rObj = new JsonObject();
-                        var global = IGlobalResearchTree.getInstance().getResearch(research.getBranch(), research.getId());
-                        if (global != null) {
-                            var nameContents = global.getName();
-                            rObj.addProperty("name", Component.translatable(nameContents.getKey(), (Object[]) nameContents.getArgs()).getString());
-                        } else {
-                            rObj.addProperty("name", research.getId().toString());
-                        }
-                        rObj.addProperty("branch", research.getBranch().toString());
-                        rObj.addProperty("state", research.getState().name());
-                        rObj.addProperty("progress_ticks", research.getProgress());
-
-                        if (research.getState() == ResearchState.IN_PROGRESS) {
-                            var branchData = IGlobalResearchTree.getInstance().getBranchData(research.getBranch());
-                            if (branchData != null) {
-                                int totalTicks = branchData.getBaseTime(research.getDepth());
-                                int elapsed = research.getProgress();
-                                int remaining = Math.max(0, totalTicks - elapsed);
-                                rObj.addProperty("total_ticks", totalTicks);
-                                rObj.addProperty("time_elapsed", formatResearchTime(elapsed));
-                                rObj.addProperty("estimated_time_remaining", formatResearchTime(remaining));
-                                rObj.addProperty("completion_percentage", Math.min(100, (elapsed * 100) / Math.max(1, totalTicks)));
-                            }
-                        }
-
-                        researchArray.add(rObj);
-                    }
-                    result.add("research_in_progress", researchArray);
-                }
-            }
-
-        } else {
-            handled = false;
-        }
-
-        if (!handled) {
-            var craftingModules = building.getModules(AbstractCraftingBuildingModule.class);
-            if (!craftingModules.isEmpty()) {
-                var recipeManager = IColonyManager.getInstance().getRecipeManager();
-                var allRecipes = recipeManager.getRecipes();
-
-                JsonArray recipesArray = new JsonArray();
-                int totalRecipeCount = 0;
-                final int MAX_DISPLAYED = 10;
-
-                for (var module : craftingModules) {
-                    var tokens = module.getRecipes();
-                    for (var token : tokens) {
-                        totalRecipeCount++;
-                        if (recipesArray.size() >= MAX_DISPLAYED) continue;
-
-                        var storage = allRecipes.get(token);
-                        if (storage != null) {
-                            var output = storage.getPrimaryOutput();
-                            recipesArray.add(output.getDisplayName().getString());
-                        }
-                    }
-                }
-
-                result.addProperty("crafting_module_count", craftingModules.size());
-                result.add("known_recipe_examples", recipesArray);
-                result.addProperty("total_recipe_count", totalRecipeCount);
-                if (totalRecipeCount > MAX_DISPLAYED) {
-                    result.addProperty("truncated_hint", "Only showing first " + MAX_DISPLAYED + " of " + totalRecipeCount + " recipes.");
-                }
-            }
+            case BuildingFarmer farmer -> fillFarmerInfo(farmer, result);
+            case BuildingBarracks barracks -> result.addProperty("tower_count", barracks.getTowers().size());
+            case BuildingWareHouse warehouse -> fillWareHouseInfo(warehouse, result);
+            case BuildingBuilder builder -> fillWorkOrderInfo(builder, result);
+            case BuildingTownHall ignored -> fillTownHallInfo(building, result);
+            case BuildingSchool school -> fillSchoolInfo(school, result);
+            case BuildingLibrary library -> fillLibraryInfo(library, result);
+            case BuildingNetherWorker nw -> fillNetherWorkerInfo(nw, result);
+            case BuildingGraveyard gy -> fillGraveyardInfo(gy, result);
+            case BuildingUniversity ignored -> fillUniversityInfo(building, result);
+            default -> fillCraftingInfo(building, result);
         }
     }
 
+    private static void fillCookInfo(BuildingCook cook, JsonObject result) {
+        var menuModule = cook.getModule(BuildingModules.RESTAURANT_MENU);
+        if (menuModule != null) {
+            var menu = menuModule.getMenu();
+            JsonArray items = new JsonArray();
+            for (ItemStorage storage : menu) {
+                var stack = storage.getItemStack();
+                FoodProperties food = stack.getItem().getFoodProperties(stack, null);
+                double foodValue = FoodUtils.getFoodValue(stack, food, 0);
+                int tier = FoodUtils.getFoodTier(foodValue);
+                items.add(stack.getDisplayName().getString() + " (tier " + tier + ", x" + storage.getAmount() + ")");
+            }
+            result.add("menu_items", items);
+        }
+
+        var workModule = cook.getModule(BuildingModules.COOK_WORK);
+        boolean hasCook = workModule != null && workModule.hasAssignedCitizen();
+        result.addProperty("has_assigned_cook", hasCook);
+    }
+
+    private static void fillFarmerInfo(BuildingFarmer farmer, JsonObject result) {
+        JsonArray plantedCrops = new JsonArray();
+        int fieldCount = 0;
+        var extModules = farmer.getModules(BuildingExtensionsModule.class);
+        for (BuildingExtensionsModule module : extModules) {
+            for (IBuildingExtension ext : module.getOwnedExtensions()) {
+                if (ext instanceof FarmField field) {
+                    fieldCount++;
+                    if (!field.getSeed().isEmpty()) {
+                        plantedCrops.add(field.getSeed().getDisplayName().getString());
+                    }
+                }
+            }
+        }
+        result.addProperty("field_count", fieldCount);
+        result.add("planted_crops", plantedCrops);
+    }
+
+    private static void fillWareHouseInfo(BuildingWareHouse warehouse, JsonObject result) {
+        var containers = warehouse.getContainers();
+        result.addProperty("container_count", containers != null ? containers.size() : 0);
+    }
+
+    private static void fillTownHallInfo(IBuilding building, JsonObject result) {
+        var col = building.getColony();
+        if (col != null) {
+            result.addProperty("citizen_count", col.getCitizenManager().getCurrentCitizenCount());
+            result.addProperty("max_citizens", col.getCitizenManager().getMaxCitizens());
+            result.addProperty("overall_happiness", col.getOverallHappiness());
+        }
+    }
+
+    private static void fillSchoolInfo(BuildingSchool school, JsonObject result) {
+        var assigned = school.getAllAssignedCitizen();
+        int studentCount = assigned != null ? assigned.size() : 0;
+        result.addProperty("student_count", Math.max(0, studentCount - 1));
+        result.addProperty("has_teacher", studentCount > 0);
+    }
+
+    private static void fillLibraryInfo(BuildingLibrary library, JsonObject result) {
+        result.addProperty("bookshelves_count", ((BuildingLibraryAccessor) library).getBookCases().size());
+    }
+
+    private static void fillNetherWorkerInfo(BuildingNetherWorker nw, JsonObject result) {
+        var accessor = (BuildingNetherWorkerAccessor) nw;
+        int currentTrips = accessor.getCurrentTrips();
+        int currentPeriodDay = accessor.getCurrentPeriodDay();
+        int maxPerPeriod = BuildingNetherWorker.getMaxPerPeriod();
+        int periodDays = BuildingNetherWorker.getPeriodDays();
+
+        result.addProperty("is_ready_for_trip", nw.isReadyForTrip());
+        result.addProperty("trips_this_period", currentTrips);
+        result.addProperty("max_trips_per_period", maxPerPeriod);
+        result.addProperty("current_period_day", currentPeriodDay);
+        result.addProperty("period_days", periodDays);
+        result.addProperty("days_until_reset", periodDays - currentPeriodDay);
+        result.addProperty("portal_present", nw.getPortalLocation() != null);
+        result.addProperty("close_portal_on_return", nw.shallClosePortalOnReturn());
+    }
+
+    private static void fillGraveyardInfo(BuildingGraveyard gy, JsonObject result) {
+        var gravePositions = gy.getGravePositions();
+        result.addProperty("grave_count", gravePositions != null ? gravePositions.size() : 0);
+        var currentGrave = gy.getGraveToWorkOn();
+        if (currentGrave != null) {
+            result.addProperty("has_current_grave_task", true);
+            result.addProperty("current_grave_position", currentGrave.toShortString());
+        } else {
+            result.addProperty("has_current_grave_task", false);
+        }
+    }
+
+    private static void fillUniversityInfo(IBuilding building, JsonObject result) {
+        var col = building.getColony();
+        if (col == null) return;
+
+        var researchTree = col.getResearchManager().getResearchTree();
+        var inProgress = researchTree.getResearchInProgress();
+        result.addProperty("research_in_progress_count", inProgress.size());
+        if (inProgress.isEmpty()) return;
+
+        JsonArray researchArray = new JsonArray();
+        for (ILocalResearch research : inProgress) {
+            researchArray.add(buildResearchObject(research));
+        }
+        result.add("research_in_progress", researchArray);
+    }
+
+    private static JsonObject buildResearchObject(ILocalResearch research) {
+        JsonObject rObj = new JsonObject();
+        var globalTree = IGlobalResearchTree.getInstance();
+        var global = globalTree.getResearch(research.getBranch(), research.getId());
+        if (global != null) {
+            var nameContents = global.getName();
+            rObj.addProperty("name", Component.translatable(nameContents.getKey(), nameContents.getArgs()).getString());
+        } else {
+            rObj.addProperty("name", research.getId().toString());
+        }
+        rObj.addProperty("branch", research.getBranch().toString());
+        rObj.addProperty("state", research.getState().name());
+        rObj.addProperty("progress_ticks", research.getProgress());
+
+        if (research.getState() == ResearchState.IN_PROGRESS) {
+            addResearchProgress(research, rObj, globalTree);
+        }
+        return rObj;
+    }
+
+    private static void addResearchProgress(ILocalResearch research, JsonObject rObj, IGlobalResearchTree globalTree) {
+        var branchData = globalTree.getBranchData(research.getBranch());
+        if (branchData == null) return;
+
+        int totalTicks = branchData.getBaseTime(research.getDepth());
+        int elapsed = research.getProgress();
+        int remaining = Math.max(0, totalTicks - elapsed);
+        rObj.addProperty("total_ticks", totalTicks);
+        rObj.addProperty("time_elapsed", formatResearchTime(elapsed));
+        rObj.addProperty("estimated_time_remaining", formatResearchTime(remaining));
+        rObj.addProperty("completion_percentage", Math.min(100, (elapsed * 100) / Math.max(1, totalTicks)));
+    }
+
+    private static void fillCraftingInfo(IBuilding building, JsonObject result) {
+        var craftingModules = building.getModules(AbstractCraftingBuildingModule.class);
+        if (craftingModules.isEmpty()) return;
+
+        var recipeManager = IColonyManager.getInstance().getRecipeManager();
+        var allRecipes = recipeManager.getRecipes();
+
+        JsonArray recipesArray = new JsonArray();
+        int totalRecipeCount = 0;
+        final int MAX_DISPLAYED = 10;
+
+        for (var module : craftingModules) {
+            var tokens = module.getRecipes();
+            for (var token : tokens) {
+                totalRecipeCount++;
+                if (recipesArray.size() >= MAX_DISPLAYED) continue;
+
+                var storage = allRecipes.get(token);
+                if (storage != null) {
+                    var output = storage.getPrimaryOutput();
+                    recipesArray.add(output.getDisplayName().getString());
+                }
+            }
+        }
+
+        result.addProperty("crafting_module_count", craftingModules.size());
+        result.add("known_recipe_examples", recipesArray);
+        result.addProperty("total_recipe_count", totalRecipeCount);
+        if (totalRecipeCount > MAX_DISPLAYED) {
+            result.addProperty("truncated_hint", "Only showing first " + MAX_DISPLAYED + " of " + totalRecipeCount + " recipes.");
+        }
+    }
 }
