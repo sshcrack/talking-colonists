@@ -20,6 +20,7 @@ import me.sshcrack.mc_talking.util.CitizenHelper;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 
@@ -76,6 +77,10 @@ public class ServerEventHandler {
             McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
             McTalking.LOGGER.error("======================");
         }
+
+        var saveFile = event.getServer().getWorldPath(LevelResource.ROOT).resolve("data").resolve("mc_talking_colony_founding.json");
+        ColonyEventBuffer.setSavePath(saveFile);
+        ColonyEventBuffer.loadFromDisk();
     }
 
     @SubscribeEvent
@@ -89,6 +94,7 @@ public class ServerEventHandler {
         PregenerationTaskService.cleanup();
         DeliveryInteractionManager.cleanup();
         ConversationManager.cleanup();
+        ColonyEventBuffer.saveToDisk();
         ColonyEventBuffer.clear();
 
         MinecraftServer server = event.getServer();

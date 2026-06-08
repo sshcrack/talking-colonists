@@ -1,5 +1,8 @@
 package me.sshcrack.mc_talking.util;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,6 +10,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import me.sshcrack.mc_talking.McTalking;
 import org.jetbrains.annotations.Nullable;
 
 public final class ColonyEventBuffer {
@@ -37,6 +44,40 @@ public final class ColonyEventBuffer {
     private static final Map<Integer, Integer> lastRaidLostCitizens = new ConcurrentHashMap<>();
 
     private static final Map<Integer, FoundingInfo> colonyFoundingInfo = new ConcurrentHashMap<>();
+
+    // ── Persistent storage ──────────────────────────────────────────────
+
+    private static Path savePath = null;
+    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+    public static void setSavePath(Path path) {
+        savePath = path;
+    }
+
+    public static void loadFromDisk() {
+        if (savePath == null || !Files.exists(savePath)) return;
+        try {
+            String json = Files.readString(savePath);
+            var type = new TypeToken<Map<Integer, FoundingInfo>>() {}.getType();
+            Map<Integer, FoundingInfo> loaded = gson.fromJson(json, type);
+            if (loaded != null) {
+                colonyFoundingInfo.putAll(loaded);
+            }
+        } catch (Exception e) {
+            McTalking.LOGGER.error("Failed to load colony founding data from {}", savePath, e);
+        }
+    }
+
+    public static void saveToDisk() {
+        if (savePath == null) return;
+        try {
+            Files.createDirectories(savePath.getParent());
+            String json = gson.toJson(colonyFoundingInfo);
+            Files.writeString(savePath, json);
+        } catch (Exception e) {
+            McTalking.LOGGER.error("Failed to save colony founding data to {}", savePath, e);
+        }
+    }
 
     public static void recordRaid(int colonyId, int lostCitizens) {
         long now = System.currentTimeMillis();
@@ -88,6 +129,7 @@ public final class ColonyEventBuffer {
         long now = System.currentTimeMillis();
         colonyFoundingInfo.put(colonyId, new FoundingInfo(playerName, day, now));
         recordEvent(colonyId, EventType.COLONY_FOUNDED, "Colony was founded by " + playerName + " on day " + day);
+        saveToDisk();
     }
 
     @Nullable
