@@ -27,6 +27,9 @@ import java.util.UUID;
  * @param citizenAiState        Current CitizenAI state, e.g. "WORKING", "IDLE", "SLEEP", "EATING" — from {@code /mc citizens info}, or {@code null} if entity not loaded
  * @param workAiState           Current work AI state, e.g. "IDLE", "START_WORKING", "NEEDS_ITEM" — from {@code /mc citizens info}, or {@code null} if entity not loaded
  * @param nameTagDescription    Job nametag description, the citizen's current activity text — from {@code /mc citizens info}, or {@code null} if unavailable
+ * @param colonyFoundingPlayer  Name of the player who founded the colony, or {@code null} if not recorded
+ * @param colonyFoundingDay     The colony day on which the colony was founded (from {@code FoundingInfo.foundingDay}), or 0 if not recorded
+ * @param colonyAgeDays         Current age of the colony in days ({@code colony.getDay()})
  */
 public record CitizenPromptView(
         String name,
@@ -70,6 +73,9 @@ public record CitizenPromptView(
         @Nullable String colonyMilestone,
         @Nullable String citizenAiState,
         @Nullable String workAiState,
-        @Nullable String nameTagDescription
+        @Nullable String nameTagDescription,
+        @Nullable String colonyFoundingPlayer,
+        int colonyFoundingDay,
+        int colonyAgeDays
 ) {
 }

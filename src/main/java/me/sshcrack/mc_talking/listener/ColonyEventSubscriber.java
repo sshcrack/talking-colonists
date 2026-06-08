@@ -2,8 +2,10 @@ package me.sshcrack.mc_talking.listener;
 
 import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
+import com.minecolonies.api.eventbus.events.colony.ColonyCreatedModEvent;
 import com.minecolonies.api.eventbus.events.colony.ColonyDeletedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.citizens.CitizenDiedModEvent;
@@ -11,6 +13,7 @@ import com.minecolonies.api.eventbus.events.colony.citizens.CitizenJobChangedMod
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingConstructionModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingRemovedModEvent;
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.network.chat.Component;
 
@@ -25,6 +28,15 @@ public final class ColonyEventSubscriber {
         registered = true;
 
         var bus = IMinecoloniesAPI.getInstance().getEventBus();
+
+        bus.subscribe(ColonyCreatedModEvent.class, event -> {
+            IColony colony = event.getColony();
+            int colonyId = colony.getID();
+            String ownerName = colony.getPermissions().getOwnerName();
+            int day = colony.getDay();
+            ColonyEventBuffer.recordFounding(colonyId, ownerName, day);
+            McTalking.LOGGER.debug("Recorded colony foundation: colony {} founded by {} on day {}", colonyId, ownerName, day);
+        });
 
         bus.subscribe(CitizenDiedModEvent.class, event -> {
             ICitizenData citizen = (ICitizenData) event.getCitizen();

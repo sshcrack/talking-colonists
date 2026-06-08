@@ -110,6 +110,10 @@ public final class CitizenPromptViewFactory {
         String citizenAiState = extractCitizenAiState(data);
         String workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
+        var foundingInfo = ColonyEventBuffer.getFoundingInfo(data.getColony().getID());
+        String colonyFoundingPlayer = foundingInfo != null ? foundingInfo.foundingPlayerName() : null;
+        int colonyFoundingDay = foundingInfo != null ? foundingInfo.foundingDay() : 0;
+        int colonyAgeDays = data.getColony().getDay();
 
         return new CitizenPromptView(
                 data.getName(),
@@ -153,7 +157,10 @@ public final class CitizenPromptViewFactory {
                 colonyMilestone,
                 citizenAiState,
                 workAiState,
-                nameTagDescription
+                nameTagDescription,
+                colonyFoundingPlayer,
+                colonyFoundingDay,
+                colonyAgeDays
         );
     }
 

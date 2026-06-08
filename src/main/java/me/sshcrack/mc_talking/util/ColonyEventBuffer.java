@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import org.jetbrains.annotations.Nullable;
+
 public final class ColonyEventBuffer {
 
     private ColonyEventBuffer() {}
@@ -20,16 +22,21 @@ public final class ColonyEventBuffer {
         CITIZEN_JOB_CHANGE,
         BUILDING_ADDED,
         BUILDING_REMOVED,
-        BUILDING_UPGRADED
+        BUILDING_UPGRADED,
+        COLONY_FOUNDED
     }
 
     public record ColonyEvent(EventType type, String description, long timestampMs) {}
+
+    public record FoundingInfo(String foundingPlayerName, int foundingDay, long recorded) {}
 
     private static final int MAX_EVENTS = 20;
     private static final Map<Integer, ConcurrentLinkedDeque<ColonyEvent>> events = new ConcurrentHashMap<>();
 
     private static final Map<Integer, Long> lastRaidEndTime = new ConcurrentHashMap<>();
     private static final Map<Integer, Integer> lastRaidLostCitizens = new ConcurrentHashMap<>();
+
+    private static final Map<Integer, FoundingInfo> colonyFoundingInfo = new ConcurrentHashMap<>();
 
     public static void recordRaid(int colonyId, int lostCitizens) {
         long now = System.currentTimeMillis();
@@ -77,6 +84,17 @@ public final class ColonyEventBuffer {
         return lastRaidLostCitizens.getOrDefault(colonyId, 0);
     }
 
+    public static void recordFounding(int colonyId, String playerName, int day) {
+        long now = System.currentTimeMillis();
+        colonyFoundingInfo.put(colonyId, new FoundingInfo(playerName, day, now));
+        recordEvent(colonyId, EventType.COLONY_FOUNDED, "Colony was founded by " + playerName + " on day " + day);
+    }
+
+    @Nullable
+    public static FoundingInfo getFoundingInfo(int colonyId) {
+        return colonyFoundingInfo.get(colonyId);
+    }
+
     /**
      * Removes all stored data for a specific colony.
      * Call this when a colony is deleted to prevent memory leaks.
@@ -87,11 +105,13 @@ public final class ColonyEventBuffer {
         events.remove(colonyId);
         lastRaidEndTime.remove(colonyId);
         lastRaidLostCitizens.remove(colonyId);
+        colonyFoundingInfo.remove(colonyId);
     }
 
     public static void clear() {
         events.clear();
         lastRaidEndTime.clear();
         lastRaidLostCitizens.clear();
+        colonyFoundingInfo.clear();
     }
 }
