@@ -34,6 +34,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
+
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
@@ -98,6 +99,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      */
     protected String currentTurnTranscript = "";
 
+    private final String logPrefix;
     protected final GeminiStream stream;
     private final AbstractEntityCitizen entity;
     private final OpusDecoder decoder;
@@ -123,6 +125,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.entity = entity;
+        this.logPrefix = "[GeminiWsClient, " + entity.getUUID() + "]";
         AudioChannel channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
         stream = new GeminiStream(channel);
@@ -161,7 +164,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 try {
                     action.run();
                 } catch (Exception e) {
-                    McTalking.LOGGER.error("Error executing onClose action", e);
+                    McTalking.LOGGER.error("{} Error executing onClose action", logPrefix, e);
                 }
             }
         }
@@ -179,7 +182,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (this.wsSessionState == state) {
             return;
         }
-        McTalking.LOGGER.info("GeminiWsClient state {} -> {} ({})", this.wsSessionState, state, reason);
+        McTalking.LOGGER.info("{} GeminiWsClient state {} -> {} ({})", logPrefix, this.wsSessionState, state, reason);
         this.wsSessionState = state;
     }
 
@@ -206,7 +209,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
 
         if (!hasMadeInitialConnection) {
-            McTalking.LOGGER.info("Starting initial websocket connection ({})", source);
+            McTalking.LOGGER.info("{} Starting initial websocket connection ({})", logPrefix, source);
             connect();
             return;
         }
@@ -221,7 +224,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                         reconnectScheduled = false;
                         reconnectFuture = null;
                         if (!canAttemptRecovery() || GeminiWsClient.this.isOpen()) return;
-                        McTalking.LOGGER.warn("Connection lost, attempting delayed reconnect...");
+                        McTalking.LOGGER.warn("{} Connection lost, attempting delayed reconnect...", logPrefix);
                         reconnect();
                     }
                 }, remaining, TimeUnit.MILLISECONDS);
@@ -229,7 +232,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return;
         }
 
-        McTalking.LOGGER.warn("Connection lost, attempting to reconnect...");
+        McTalking.LOGGER.warn("{} Connection lost, attempting to reconnect...", logPrefix);
         reconnect();
     }
 
@@ -262,7 +265,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (modality != ModalityModes.TEXT) {
             var citizenData = entity.getCitizenData();
             if (citizenData == null) {
-                McTalking.LOGGER.warn("CitizenData not available for entity {} during setup, skipping audio config", entity.getUUID());
+                McTalking.LOGGER.warn("{} CitizenData not available for entity {} during setup, skipping audio config", logPrefix, entity.getUUID());
             } else {
                 setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
                 setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
@@ -383,13 +386,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!resumable || !shouldResumeAndSaveSession())
             return;
 
+        McTalking.LOGGER.info("{} Received session token {}. Saving...", logPrefix, newHandle);
         var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
         mem.setSessionToken(newHandle);
     }
 
     @Override
     public void onGenerationComplete() {
-        McTalking.LOGGER.info("Gemini generation complete");
+        McTalking.LOGGER.info("{} Gemini generation complete", logPrefix);
 
         stream.flushAudio();
 
@@ -408,7 +412,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onInterrupted() {
-        McTalking.LOGGER.info("Gemini generation interrupted");
+        McTalking.LOGGER.info("{} Gemini generation interrupted", logPrefix);
         stream.stop();
 
         if (!currentTurnTranscript.isBlank()) {
@@ -463,7 +467,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onTurnComplete() {
-        McTalking.LOGGER.info("Gemini turn complete");
+        McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
         generationComplete = true;
 
         // Send the transcript to chat and notify subclasses before clearing.
@@ -547,7 +551,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         setWsSessionState(WsSessionState.ACTIVE, "setup complete");
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
 
-        McTalking.LOGGER.info("Gemini setup complete");
+        McTalking.LOGGER.info("{} Gemini setup complete", logPrefix);
         synchronized (pendingSystemText) {
             if (!pendingSystemText.isEmpty()) {
                 List<String> textToProcess = new ArrayList<>(pendingSystemText);
@@ -563,7 +567,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         synchronized (pendingPrompt) {
             if (!pendingPrompt.isEmpty()) {
-                McTalking.LOGGER.info("Sending {} pending audio inputs", pendingPrompt.size());
+                McTalking.LOGGER.info("{} Sending {} pending audio inputs", logPrefix, pendingPrompt.size());
                 List<short[]> audioToProcess = new ArrayList<>(pendingPrompt);
                 pendingPrompt.clear();
 
@@ -583,38 +587,38 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         var action = AITools.getAction(name);
         if (action == null) {
-            McTalking.LOGGER.warn("Unknown function call: {}", name);
+            McTalking.LOGGER.warn("{} Unknown function call: {}", logPrefix, name);
             var error = new JsonObject();
             error.addProperty("error", "Unknown function: " + name);
             return error;
         }
 
         if (AITools.isPlayerOnlyAction(name) && resolveActivePlayer() == null) {
-            McTalking.LOGGER.warn("Player-only tool {} called without active player", name);
+            McTalking.LOGGER.warn("{} Player-only tool {} called without active player", logPrefix, name);
             var error = new JsonObject();
             error.addProperty("error", "You cannot use this tool until a player is speaking to you directly.");
             return error;
         }
 
-        McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {} with parameters {}", entity.getStringUUID(), name, new Gson().toJson(args));
+        McTalking.LOGGER.info("{} [TOOL-CALL] Entity {} has called tool {} with parameters {}", logPrefix, entity.getStringUUID(), name, new Gson().toJson(args));
         JsonObject result;
         try {
             result = action.execute(this.entity, colony, args);
         } catch (Exception e) {
-            McTalking.LOGGER.error("[TOOL-CALL] Tool threw an unexpected exception. Params are {}.", (new Gson()).toJson(args), e);
+            McTalking.LOGGER.error("{} [TOOL-CALL] Tool threw an unexpected exception. Params are {}.", logPrefix, (new Gson()).toJson(args), e);
             var error = new JsonObject();
             error.addProperty("error", "A fatal error occurred. Don't call this tool again.");
 
             return error;
         }
 
-        McTalking.LOGGER.info("[TOOL-CALL] Result of {}: {}", name, result);
+        McTalking.LOGGER.info("{} [TOOL-CALL] Result of {}: {}", logPrefix, name, result);
         return result;
     }
 
     @Override
     public void onQuotaExceeded() {
-        McTalking.LOGGER.warn("Quota exceeded for Gemini API, please check your API key and usage limits.");
+        McTalking.LOGGER.warn("{} Quota exceeded for Gemini API, please check your API key and usage limits.", logPrefix);
         QuotaTracker.reportQuotaExceeded(getModelName());
         setWsSessionState(WsSessionState.QUOTA_EXCEEDED, "quota exceeded");
         onQuotaExceededEvent("Quota exceeded for Gemini API, please check your API key and usage limits.");
@@ -625,7 +629,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         try {
             super.onClose(code, reason, remote);
         } catch (Exception e) {
-            McTalking.LOGGER.error("Error in GeminiLiveClient.onClose", e);
+            McTalking.LOGGER.error("{} Error in GeminiLiveClient.onClose", logPrefix, e);
         }
 
         if (intentionalClose) {
@@ -639,7 +643,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         // Maybe we'll need to just reset the session token in general if more errors like this occur
         if ((reason != null && reason.contains("BidiGenerateContent session")) || (code == 1007 && reason != null && reason.contains("invalid argument"))) {
-            McTalking.LOGGER.info("Session token invalidated, clearing and forcing reconnect. Can attempt recovery? {} with state {}", canAttemptRecovery(), wsSessionState);
+            McTalking.LOGGER.info("{} Session token invalidated, clearing and forcing reconnect. Can attempt recovery? {} with state {}", logPrefix, canAttemptRecovery(), wsSessionState);
             wsSessionState = WsSessionState.INVALID_SESSION_TOKEN;
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
@@ -661,14 +665,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         if (code == 1000) {
             setWsSessionState(WsSessionState.CLOSED, "normal close");
-            McTalking.LOGGER.info("GeminiWsClient closed normally: {}", reason);
+            McTalking.LOGGER.info("{} GeminiWsClient closed normally: {}", logPrefix, reason);
             fireOnCloseActions();
         } else if (code == 1001) {
             setWsSessionState(WsSessionState.CLOSED, "going away");
-            McTalking.LOGGER.info("GeminiWsClient closed (going away): {}", reason);
+            McTalking.LOGGER.info("{} GeminiWsClient closed (going away): {}", logPrefix, reason);
             fireOnCloseActions();
         } else {
-            McTalking.LOGGER.warn("GeminiWsClient closed: {} and code {}", reason, code);
+            McTalking.LOGGER.warn("{} GeminiWsClient closed: {} and code {}", logPrefix, reason, code);
             if (unrecognizedCloseRetryCount >= MAX_UNRECOGNIZED_CLOSE_RETRIES) {
                 setWsSessionState(WsSessionState.TERMINAL_ERROR, "retry cap exceeded for close code " + code);
                 fireOnCloseActions();
@@ -678,12 +682,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
 
             unrecognizedCloseRetryCount++;
-            McTalking.LOGGER.warn("Attempting reconnect after unrecognized close code {} (attempt {}/{})",
-                    code, unrecognizedCloseRetryCount, MAX_UNRECOGNIZED_CLOSE_RETRIES);
+            McTalking.LOGGER.warn("{} Attempting reconnect after unrecognized close code {} (attempt {}/{})",
+                    logPrefix, code, unrecognizedCloseRetryCount, MAX_UNRECOGNIZED_CLOSE_RETRIES);
             try {
                 ensureConnectionForQueuedInput("abnormal close code " + code + " attempt " + unrecognizedCloseRetryCount);
             } catch (Exception e) {
-                McTalking.LOGGER.error("Reconnect failed after close code {}", code, e);
+                McTalking.LOGGER.error("{} Reconnect failed after close code {}", logPrefix, code, e);
                 setWsSessionState(WsSessionState.TERMINAL_ERROR, "reconnect failed");
                 fireOnCloseActions();
                 AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
@@ -693,7 +697,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onError(Exception ex) {
-        McTalking.LOGGER.error("Error in GeminiWsClient: ", ex);
+        McTalking.LOGGER.error("{} Error in GeminiWsClient: ", logPrefix, ex);
         if (intentionalClose || QuotaTracker.isQuotaExceeded(getModelName())) {
             return;
         }
@@ -817,7 +821,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     public static void shutdownExecutor() {
-        if(RECONNECT_EXECUTOR == null) return;
+        if (RECONNECT_EXECUTOR == null) return;
         RECONNECT_EXECUTOR.shutdown();
         try {
             if (!RECONNECT_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
