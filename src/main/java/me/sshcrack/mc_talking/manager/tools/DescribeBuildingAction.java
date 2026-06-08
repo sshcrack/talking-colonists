@@ -180,6 +180,7 @@ public class DescribeBuildingAction extends GeneralFunctionAction {
             result.addProperty("current_level", wo.getCurrentLevel());
             result.addProperty("work_order_position", wo.getLocation().toShortString());
             result.addProperty("progress_stage", wo.getStage().name());
+            result.addProperty("note", "The target name is a internal name. Interpret the name accordingly.");
         }
     }
 

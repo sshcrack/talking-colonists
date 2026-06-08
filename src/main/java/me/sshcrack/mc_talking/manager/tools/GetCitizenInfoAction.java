@@ -24,7 +24,6 @@ public class GetCitizenInfoAction extends GeneralFunctionAction {
 
     @Override
     public @NotNull JsonObject execute(AbstractEntityCitizen citizen, IColony colony, JsonObject parameters) {
-        var level = citizen.level();
         if (parameters == null || !parameters.has("citizen_name")) {
             JsonObject errorResponse = new JsonObject();
             errorResponse.addProperty("success", false);
