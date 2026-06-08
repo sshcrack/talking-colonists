@@ -6,3 +6,8 @@ repos:
         entry: ./scripts/prevent-protected-files-change.sh
         language: script
         types: [file]
+      - id: check-mixin-registration
+        name: Checks if every mixin is added to the mixin list
+        entry: ./scripts/check-mixin-registration.sh
+        language: script
+        types: [file]
