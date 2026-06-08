@@ -596,7 +596,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             return error;
         }
 
-        McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {}", entity.getStringUUID(), name);
+        McTalking.LOGGER.info("[TOOL-CALL] Entity {} has called tool {} with parameters {}", entity.getStringUUID(), name, new Gson().toJson(args));
         JsonObject result;
         try {
             result = action.execute(this.entity, colony, args);
