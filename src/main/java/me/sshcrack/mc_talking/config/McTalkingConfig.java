@@ -268,11 +268,6 @@ public class McTalkingConfig {
     @SerialEntry(comment = "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.")
     public int colonyEventWindowSeconds = 1200;
 
-    @AutoGen(category = "citizens", group = "colony_events")
-    @TickBox
-    @SerialEntry(comment = "If true, citizens will reference the colony's founding and age in their prompts.")
-    public boolean enableFoundingReferences = true;
-
     // Rumor Mill
     @AutoGen(category = "citizens", group = "rumor_mill")
     @TickBox
