@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.colony.IColony;
+import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.duck.ColonyEventDataProvider;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -38,15 +39,26 @@ public final class ColonyEventBuffer {
         }
 
         public static ColonyEvent deserialize(CompoundTag tag) {
-            return new ColonyEvent(
-                    EventType.valueOf(tag.getString("type")),
-                    tag.getString("description"),
-                    tag.getLong("timestamp")
-            );
+            try {
+                return new ColonyEvent(
+                        EventType.valueOf(tag.getString("type")),
+                        tag.getString("description"),
+                        tag.getLong("timestamp")
+                );
+            } catch (IllegalArgumentException e) {
+                McTalking.LOGGER.warn("Skipping corrupt colony event: unknown type '{}'", tag.getString("type"));
+                return null;
+            }
         }
     }
 
-    private static final int MAX_EVENTS = 20;
+    static final int MAX_EVENTS = 20;
+
+    public static void trimEvents(ConcurrentLinkedDeque<ColonyEvent> buffer) {
+        while (buffer.size() > MAX_EVENTS) {
+            buffer.pollLast();
+        }
+    }
 
     private static ColonyEventDataProvider getProvider(IColony colony) {
         return (ColonyEventDataProvider) colony;

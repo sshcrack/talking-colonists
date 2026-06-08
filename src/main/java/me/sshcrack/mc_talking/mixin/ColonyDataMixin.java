@@ -30,9 +30,9 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
     @Unique
     private final ConcurrentLinkedDeque<ColonyEventBuffer.ColonyEvent> mc_talking$events = new ConcurrentLinkedDeque<>();
     @Unique
-    private long mc_talking$lastRaidEndTime = Long.MAX_VALUE;
+    private volatile long mc_talking$lastRaidEndTime = Long.MAX_VALUE;
     @Unique
-    private int mc_talking$lastRaidLostCitizens = 0;
+    private volatile int mc_talking$lastRaidLostCitizens = 0;
 
     @Override
     public ConcurrentLinkedDeque<ColonyEventBuffer.ColonyEvent> mc_talking$getOrCreateEvents() {
@@ -113,9 +113,13 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
 
         mc_talking$events.clear();
         ListTag eventsList = eventTag.getList(TAG_EVENTS_LIST, Tag.TAG_COMPOUND);
-        for (int i = 0; i < eventsList.size(); i++) {
-            mc_talking$events.addLast(ColonyEventBuffer.ColonyEvent.deserialize(eventsList.getCompound(i)));
+        for (int i = eventsList.size() - 1; i >= 0; i--) {
+            var event = ColonyEventBuffer.ColonyEvent.deserialize(eventsList.getCompound(i));
+            if (event != null) {
+                mc_talking$events.addFirst(event);
+            }
         }
+        ColonyEventBuffer.trimEvents(mc_talking$events);
 
         if (eventTag.contains(TAG_RAID_END)) {
             mc_talking$lastRaidEndTime = eventTag.getLong(TAG_RAID_END);
