@@ -16,6 +16,9 @@ import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -36,6 +39,8 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     @Unique
     private static final String TAG_PERSONALITY_KEY = "mc_talking_personality";
     @Unique
+    private static final String TAG_RECENT_ACTIONS_KEY = "mc_talking_recent_actions";
+    @Unique
     private static final String SLEEP_PROMPT = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
     @Unique
     private CitizenMemories mc_talking$memory;
@@ -47,7 +52,7 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     private String mc_talking$customPersonality;
 
     @Unique
-    private static final int MAX_RECENT_ACTIONS = 5;
+    private static final int MAX_RECENT_ACTIONS = 10;
     @Unique
     private final ArrayDeque<String> mc_talking$recentActions = new ArrayDeque<>(MAX_RECENT_ACTIONS);
 
@@ -162,6 +167,15 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
                 tag.put(TAG_MEMORY_KEY, mc_talking$memory.serializeNbt());
             }
         }
+        // Recent actions
+        if (!mc_talking$recentActions.isEmpty()) {
+            ListTag actionsTag = new ListTag();
+            for (String action : mc_talking$recentActions) {
+                actionsTag.add(StringTag.valueOf(action));
+            }
+            tag.put(TAG_RECENT_ACTIONS_KEY, actionsTag);
+        }
+
         // Personality
         if (mc_talking$personality != null) {
             tag.putString(TAG_PERSONALITY_KEY, mc_talking$personality.name());
@@ -176,6 +190,15 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
             mc_talking$memory = new CitizenMemories();
             mc_talking$memory.deserializeNbt(nbtTagCompound.getCompound(TAG_MEMORY_KEY));
         }
+        if (nbtTagCompound.contains(TAG_RECENT_ACTIONS_KEY)) {
+            mc_talking$recentActions.clear();
+            ListTag actionsTag = nbtTagCompound.getList(TAG_RECENT_ACTIONS_KEY, Tag.TAG_STRING);
+            int count = Math.min(actionsTag.size(), MAX_RECENT_ACTIONS);
+            for (int i = 0; i < count; i++) {
+                mc_talking$recentActions.addLast(actionsTag.getString(i));
+            }
+        }
+
         if (nbtTagCompound.contains(TAG_PERSONALITY_KEY)) {
             String raw = nbtTagCompound.getString(TAG_PERSONALITY_KEY);
             if (raw.startsWith("custom:")) {
