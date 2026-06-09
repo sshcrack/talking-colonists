@@ -53,3 +53,53 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file comment.md
+
+  mixin-smoke-test:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 25
+          distribution: 'microsoft'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Install Xvfb + Mesa for Minecraft rendering
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libgl1-mesa-glx \
+            libxrandr2 libxinerama1 libxcursor1 libxi6
+
+      - name: Download CI world
+        run: curl -L -o /tmp/CI_WORLD.zip "http://mc.sshcrack.me/CI_WORLD.zip"
+
+      - name: Extract CI world for each version
+        run: |
+          for version_dir in versions/*/; do
+            saves_dir="${version_dir}run/saves/CI_World"
+            mkdir -p "$saves_dir"
+            unzip -q -o /tmp/CI_WORLD.zip -d "$saves_dir"
+          done
+
+      - name: Run mixin smoke test
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' \
+          bash scripts/test-mixin-smoke.sh
