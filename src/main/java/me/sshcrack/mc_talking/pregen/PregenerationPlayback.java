@@ -32,6 +32,7 @@ public class PregenerationPlayback {
         if (ACTIVE_PREGENERATED_PLAYBACK.putIfAbsent(citizenId, Boolean.TRUE) != null) {
             return false;
         }
+        ConversationManager.markBusy(citizen);
 
         try {
             McTalking.LOGGER.info("Playing back pregenerated audio for {}", citizen.getCitizenData().getName());
@@ -39,11 +40,13 @@ public class PregenerationPlayback {
             AudioChannel channel = audioProvider.createChannel();
             if (channel == null) {
                 releasePlaybackSlot(citizenId);
+                ConversationManager.markNotBusy(citizen);
                 return false;
             }
 
             if (audioData == null || audioData.audioBytes().length == 0) {
                 releasePlaybackSlot(citizenId);
+                ConversationManager.markNotBusy(citizen);
                 return false;
             }
 
@@ -60,6 +63,7 @@ public class PregenerationPlayback {
                     stream.close();
                 } finally {
                     releasePlaybackSlot(citizenId);
+                    ConversationManager.markNotBusy(citizen);
                 }
             });
 
@@ -68,6 +72,7 @@ public class PregenerationPlayback {
             return true;
         } catch (RuntimeException e) {
             releasePlaybackSlot(citizenId);
+            ConversationManager.markNotBusy(citizen);
             throw e;
         }
     }
