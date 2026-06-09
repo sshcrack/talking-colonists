@@ -73,7 +73,10 @@ legacyForge {
                 ?.map { it.name }
                 ?.sorted()
                 ?.firstOrNull()
-                ?: error("No world found in run/saves/! Create a world first or use -Pmc_talking.world=<name>")
+                ?: run {
+                    logger.warn(":${sc.current.version} No world in run/saves/ for auto-quit. Use -Pmc_talking.world=<name> or create a world. Defaulting to 'CI_World'.")
+                    "CI_World"
+                }
         }
 
         register("clientAutoQuit") {
