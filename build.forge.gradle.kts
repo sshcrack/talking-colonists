@@ -65,6 +65,25 @@ legacyForge {
             gameDirectory = file("run/")
             ideName = "Forge Server (${sc.current.version})"
         }
+
+        val autoQuitWorld = providers.gradleProperty("mc_talking.world").orElse("").get().let { name ->
+            if (name.isNotEmpty()) name
+            else file("run/saves").listFiles()
+                ?.filter { it.isDirectory }
+                ?.map { it.name }
+                ?.sorted()
+                ?.firstOrNull()
+                ?: error("No world found in run/saves/! Create a world first or use -Pmc_talking.world=<name>")
+        }
+
+        register("clientAutoQuit") {
+            client()
+            gameDirectory = file("run/")
+            ideName = "Forge Client AutoQuit (${sc.current.version})"
+            programArgument("--username=Dev")
+            programArgument("--quickPlaySingleplayer=$autoQuitWorld")
+            jvmArgument("-Dmc_talking.autoQuit=true")
+        }
     }
 
 

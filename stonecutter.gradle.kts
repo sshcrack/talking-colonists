@@ -47,6 +47,12 @@ tasks.register("runActiveServer") {
 	dependsOn(stonecutter.current!!.project + ":runServer")
 }
 
+tasks.register("runAutoQuitClient") {
+	group = "stonecutter"
+	description = "Run client, auto-load first singleplayer world, then quit (dev mixin testing)"
+	dependsOn(stonecutter.current!!.project + ":runClientAutoQuit")
+}
+
 stonecutter parameters {
 	constants.match(node.metadata.project.substringAfterLast('-'), "fabric", "neoforge", "forge")
 	filters.include("**/*.fsh", "**/*.vsh")
@@ -56,6 +62,7 @@ stonecutter parameters {
 	swaps["mod_group"] = "\"${sc.properties.get<String>("mod.group")}\";"
 	swaps["minecraft"] = "\"${node.metadata.version}\";"
 	constants["release"] = sc.properties.get<String>("mod.id") != "modtemplate"
+	constants["devtools"] = providers.gradleProperty("mc_talking.devtools").orElse("false").map { it.toBoolean() }.get()
 }
 
 subprojects {

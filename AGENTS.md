@@ -31,6 +31,26 @@ When working with the Minecolonies API, look at the `scripts/MINECOLONIES_DOCS.m
 
 CI uses `./gradlew buildAndCollect --no-daemon`. JDK 25 (Microsoft) in CI.
 
+## Mixin Smoke Test
+
+After modifying any mixin class (in `src/main/java/me/sshcrack/mc_talking/mixin/`), you **must** verify it loads correctly on all supported versions. Run:
+
+```sh
+bash scripts/test-mixin-smoke.sh
+```
+
+This script:
+1. Discovers all version subprojects (1.21.1-neoforge, 1.20.1-forge) from `settings.gradle.kts`
+2. Launches each version's Minecraft client in parallel with `runClientAutoQuit`
+3. Each client auto-loads the first singleplayer world and quits after 60 ticks (~3s)
+4. Captures Gradle + Minecraft output to `/tmp/mixin-smoke-<version>-*.log`
+5. Copies each version's `run/logs/latest.log` alongside the Gradle output for deeper inspection
+6. Prints `[PASS]`/`[FAIL]` per version with the log file paths
+
+**What it tests:** The game starts, applies all mixins, enters a world, and shuts down cleanly without a crash. If a mixin has a bad target or causes a class-loading error, the game will fail to start or crash.
+
+**If a version fails:** Read the log file at the printed path and search for `mixin`, `error`, or `Exception`.
+
 ## Local Gemini Live Library
 
 For local development the Gemini Live Library can be included as a composite build at `../gemini-live-library`. When it exists, publishing tasks **fail** unless you confirm with:
