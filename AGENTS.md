@@ -63,6 +63,8 @@ git commit -m "verify mixin smoke test"
 
 The `mixin-smoke-verification` CI job checks that `.mixin-smoke-verified` exists and matches `HEAD`. This is a fast (~10s) required check that blocks PR merge if the smoke test isn't current.
 
+A pre-commit hook (`check-mixin-smoke-required`) will remind you when mixin files are staged.
+
 ## Local Gemini Live Library
 
 For local development the Gemini Live Library can be included as a composite build at `../gemini-live-library`. When it exists, publishing tasks **fail** unless you confirm with:

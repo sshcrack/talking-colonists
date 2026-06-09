@@ -11,3 +11,9 @@ repos:
         entry: ./scripts/check-mixin-registration.sh
         language: script
         types: [file]
+      - id: check-mixin-smoke-required
+        name: Remind to run mixin smoke test if mixins changed
+        entry: ./scripts/check-mixin-smoke-required.sh
+        language: script
+        always_run: true
+        pass_filenames: false
