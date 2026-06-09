@@ -23,6 +23,14 @@ for VERSION in $VERSIONS; do
 done
 echo ""
 
+cleanup() {
+    ./gradlew "Refresh active project" > /dev/null 2>&1 || true
+}
+
+trap cleanup EXIT
+
+./gradlew "Refresh active project" -Pmc_talking.devtools=true  > /dev/null 2>&1
+
 # Run each version in parallel, capture output to temp files
 declare -a LOG_FILES
 declare -a PIDS
