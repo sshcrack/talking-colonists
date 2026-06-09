@@ -9,7 +9,6 @@ public enum MinimalAISubState {
     EAT_GETTING_FOOD_SELF,
     EAT_GOING_TO_EAT_POS,
     EAT_EATING,
-    EAT_GET_FOOD,
 
     SLEEP_WALKING_TO_BED,
     SLEEP_FINDING_BED,

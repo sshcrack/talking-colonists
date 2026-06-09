@@ -49,9 +49,6 @@ public final class AIStateDescriber {
                 case EAT_EATING -> ctx != null
                         ? "Eating a meal at " + ctx + "."
                         : "Sitting down and eating a meal at the restaurant.";
-                case EAT_GET_FOOD -> ctx != null
-                        ? "At " + ctx + ", waiting for food to be served."
-                        : "At the restaurant, waiting for food to be served.";
                 case SLEEP_WALKING_TO_BED -> ctx != null
                         ? "Walking to " + ctx + " to sleep for the night."
                         : "Walking home to go to sleep for the night.";
@@ -161,7 +158,7 @@ public final class AIStateDescriber {
     public static boolean isSubStateConsistentWithAiState(MinimalAISubState sub, @Nullable CitizenAIState aiState) {
         if (aiState == null) return false;
         return switch (sub) {
-            case EAT_CHECKING_FOOD, EAT_GOING_TO_HUT, EAT_SEARCH_RESTAURANT, EAT_GOING_TO_RESTAURANT, EAT_WAITING_FOOD, EAT_GETTING_FOOD_SELF, EAT_GOING_TO_EAT_POS, EAT_EATING, EAT_GET_FOOD -> aiState == CitizenAIState.EATING;
+            case EAT_CHECKING_FOOD, EAT_GOING_TO_HUT, EAT_SEARCH_RESTAURANT, EAT_GOING_TO_RESTAURANT, EAT_WAITING_FOOD, EAT_GETTING_FOOD_SELF, EAT_GOING_TO_EAT_POS, EAT_EATING -> aiState == CitizenAIState.EATING;
             case SLEEP_WALKING_TO_BED, SLEEP_FINDING_BED, SLEEP_IN_BED -> aiState == CitizenAIState.SLEEP;
             case MOURN_WALKING, MOURN_AT_TOWNHALL, MOURN_WALKING_TO_GRAVEYARD, MOURN_AT_GRAVE, MOURN_STARING -> aiState == CitizenAIState.MOURN;
             case SICK_CHECKING_FOR_CURE, SICK_WALKING_TO_HOSPITAL, SICK_AT_HOSPITAL, SICK_RECEIVING_CURE, SICK_WANDERING -> aiState == CitizenAIState.SICK;
