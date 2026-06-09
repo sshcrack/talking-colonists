@@ -22,6 +22,7 @@ import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenSubState;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
@@ -34,7 +35,6 @@ import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
-import me.sshcrack.mc_talking.duck.CitizenMinimalAISubStateProvider;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import me.sshcrack.mc_talking.util.MiscUtil;
@@ -132,15 +132,13 @@ public final class CitizenPromptViewFactory {
         int lastRaidLostCitizens = ColonyEventBuffer.getLostCitizens(colony);
         long currentGameTimeTicks = colony.getWorld() != null ? colony.getWorld().getGameTime() : 0;
         List<String> recentEvents = extractRecentEvents(data);
-        CitizenAIState citizenAiState = extractCitizenAiState(data);
+        CitizenSubState subState = extractCitizenSubState(data);
         AIWorkerState workAiState = extractWorkAiState(data);
         String nameTagDescription = extractNameTagDescription(data);
         String colonyFoundingPlayer = data.getColony().getPermissions().getOwnerName();
         int colonyAgeDays = data.getColony().getDay();
-        ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, citizenAiState);
+        ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, subState != null ? subState.state() : null);
         List<String> recentActions = extractRecentActions(data);
-        MinimalAISubState minimalAiSubState = extractMinimalAiSubState(data);
-        String minimalAiSubStateContext = extractMinimalAiSubStateContext(data);
 
         return new CitizenPromptView(
                 data.getName(),
@@ -186,15 +184,14 @@ public final class CitizenPromptViewFactory {
                 recentEvents,
                 colonyConnections,
                 colonyMilestone,
-                citizenAiState,
+                subState != null ? subState.state() : null,
                 workAiState,
                 nameTagDescription,
                 colonyFoundingPlayer,
                 colonyAgeDays,
                 colonyFoodSituation,
                 recentActions,
-                minimalAiSubState,
-                minimalAiSubStateContext
+                subState
         );
     }
 
@@ -209,21 +206,90 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static CitizenAIState extractCitizenAiState(ICitizenData data) {
+    private static CitizenSubState extractCitizenSubState(ICitizenData data) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
-        var entity = entityOpt.get();
-        if (!(entity instanceof EntityCitizen citizen)) return null;
+        if (!(entityOpt.get() instanceof EntityCitizen citizen)) return null;
         var ai = citizen.getCitizenAI();
         if (ai == null) return null;
         var state = ai.getState();
         if (state == null) return null;
-        try {
-            return CitizenAIState.valueOf(state.toString());
-        } catch (IllegalArgumentException e) {
-            McTalking.LOGGER.warn("Unknown citizen AI state: {} (raw: {})", state, state.toString());
-            return null;
+
+        if (state instanceof com.minecolonies.api.entity.ai.statemachine.states.CitizenAIState cs) {
+            var ours = switch (cs) {
+                case IDLE -> CitizenAIState.IDLE;
+                case FLEE -> CitizenAIState.FLEE;
+                case EATING -> CitizenAIState.EATING;
+                case SICK -> CitizenAIState.SICK;
+                case SLEEP -> CitizenAIState.SLEEP;
+                case MOURN -> CitizenAIState.MOURN;
+                case WORK -> CitizenAIState.WORK;
+                case WORKING -> CitizenAIState.WORKING;
+                case INACTIVE -> CitizenAIState.INACTIVE;
+            };
+            return new CitizenSubState(ours, null, null);
         }
+
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAIEatTask.EatingState es) {
+            var sub = switch (es) {
+                case CHECK_FOR_FOOD -> MinimalAISubState.EAT_CHECKING_FOOD;
+                case GO_TO_HUT -> MinimalAISubState.EAT_GOING_TO_HUT;
+                case SEARCH_RESTAURANT -> MinimalAISubState.EAT_SEARCH_RESTAURANT;
+                case GO_TO_RESTAURANT -> MinimalAISubState.EAT_GOING_TO_RESTAURANT;
+                case WAIT_FOR_FOOD -> MinimalAISubState.EAT_WAITING_FOOD;
+                case GET_FOOD_YOURSELF -> MinimalAISubState.EAT_GETTING_FOOD_SELF;
+                case GO_TO_EAT_POS -> MinimalAISubState.EAT_GOING_TO_EAT_POS;
+                case EAT -> MinimalAISubState.EAT_EATING;
+                case DONE -> null;
+            };
+            return sub != null
+                    ? new CitizenSubState(CitizenAIState.EATING, sub, deriveRestaurantContext(data))
+                    : null;
+        }
+
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAISleep.SleepState ss) {
+            var sub = switch (ss) {
+                case WALKING_HOME -> MinimalAISubState.SLEEP_WALKING_TO_BED;
+                case FIND_BED -> MinimalAISubState.SLEEP_FINDING_BED;
+                case SLEEPING -> MinimalAISubState.SLEEP_IN_BED;
+            };
+            return new CitizenSubState(CitizenAIState.SLEEP, sub, deriveHomeName(data));
+        }
+
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAISickTask.DiseaseState ds) {
+            var sub = switch (ds) {
+                case CHECK_FOR_CURE -> MinimalAISubState.SICK_CHECKING_FOR_CURE;
+                case GO_TO_HUT, GO_TO_HOSPITAL, SEARCH_HOSPITAL, FIND_EMPTY_BED, WAIT_FOR_CURE -> MinimalAISubState.SICK_AT_HOSPITAL;
+                case APPLY_CURE -> MinimalAISubState.SICK_RECEIVING_CURE;
+                case WANDER -> MinimalAISubState.SICK_WANDERING;
+            };
+            return new CitizenSubState(CitizenAIState.SICK, sub, deriveDiseaseName(data));
+        }
+
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAIMournCitizen.MourningState ms) {
+            var sub = switch (ms) {
+                case DECIDE, WANDERING -> MinimalAISubState.MOURN_WALKING;
+                case WALKING_TO_TOWNHALL -> MinimalAISubState.MOURN_AT_TOWNHALL;
+                case WALKING_TO_GRAVEYARD, WANDER_AT_GRAVEYARD, WALK_TO_GRAVE -> MinimalAISubState.MOURN_WALKING_TO_GRAVEYARD;
+                case STARING -> MinimalAISubState.MOURN_STARING;
+            };
+            return new CitizenSubState(CitizenAIState.MOURN, sub, deriveDeceasedName(data));
+        }
+
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAICitizenAvoidEntity.FleeStates fs) {
+            var sub = switch (fs) {
+                case CHECK_ENTITIES -> MinimalAISubState.FLEE_CHECKING;
+                case RUNNING -> MinimalAISubState.FLEE_RUNNING;
+            };
+            return new CitizenSubState(CitizenAIState.FLEE, sub, null);
+        }
+
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAICitizenWander.WanderState) {
+            return new CitizenSubState(CitizenAIState.IDLE, null, null);
+        }
+
+        McTalking.LOGGER.warn("Unknown citizen AI state: {} (raw: {})", state, state);
+        return null;
     }
 
     @Nullable
@@ -239,10 +305,15 @@ public final class CitizenPromptViewFactory {
         if (stateAi == null) return null;
         var state = stateAi.getState();
         if (state == null) return null;
+
+        if (!(state instanceof com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState)) {
+            McTalking.LOGGER.warn("Unexpected IAIState type in work AI: {}", state);
+            return null;
+        }
         try {
             return AIWorkerState.valueOf(state.toString());
         } catch (IllegalArgumentException e) {
-            McTalking.LOGGER.warn("Unknown AI worker state: {} (raw: {})", state, state.toString());
+            McTalking.LOGGER.warn("Unknown AI worker state: {}", state);
             return null;
         }
     }
@@ -284,15 +355,61 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static MinimalAISubState extractMinimalAiSubState(ICitizenData data) {
-        if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
-        return provider.mc_talking$getMinimalAiSubState();
+    private static String deriveRestaurantContext(ICitizenData data) {
+        var entityOpt = data.getEntity();
+        if (entityOpt.isEmpty()) return null;
+        if (!(entityOpt.get() instanceof EntityCitizen citizen)) return null;
+        var colony = data.getColony();
+        if (colony == null) return null;
+        var bm = colony.getServerBuildingManager();
+        if (bm == null) return null;
+        var origin = citizen.blockPosition();
+        var best = bm.getBestBuilding(origin, BuildingCook.class);
+        if (best == null) return null;
+        var rest = bm.getBuilding(best);
+        if (!(rest instanceof BuildingCook cook)) return null;
+        String buildingName = Component.translatable(cook.getBuildingType().getTranslationKey()).getString();
+        var cookModule = cook.getModule(BuildingModules.COOK_WORK);
+        String cookName = null;
+        if (cookModule != null && cookModule.hasAssignedCitizen()) {
+            var citizens = cook.getAllAssignedCitizen();
+            if (citizens != null && !citizens.isEmpty()) {
+                cookName = citizens.iterator().next().getName();
+            }
+        }
+        if (cookName != null) {
+            return buildingName + " (" + cookName + ")";
+        }
+        return buildingName;
     }
 
     @Nullable
-    private static String extractMinimalAiSubStateContext(ICitizenData data) {
-        if (!(data instanceof CitizenMinimalAISubStateProvider provider)) return null;
-        return provider.mc_talking$getMinimalAiSubStateContext();
+    private static String deriveHomeName(ICitizenData data) {
+        var home = data.getHomeBuilding();
+        if (home == null) return null;
+        String displayName = home.getBuildingDisplayName();
+        if (displayName != null && !displayName.isEmpty() && !displayName.contains(".") && !displayName.contains("/")) {
+            return displayName;
+        }
+        return Component.translatable(home.getBuildingType().getTranslationKey()).getString();
+    }
+
+    @Nullable
+    private static String deriveDiseaseName(ICitizenData data) {
+        var handler = data.getCitizenDiseaseHandler();
+        if (handler == null) return null;
+        var disease = handler.getDisease();
+        if (disease == null) return null;
+        return disease.name().getString();
+    }
+
+    @Nullable
+    private static String deriveDeceasedName(ICitizenData data) {
+        var mournHandler = data.getCitizenMournHandler();
+        if (mournHandler == null) return null;
+        var deceased = mournHandler.getDeceasedCitizens();
+        if (deceased == null || deceased.isEmpty()) return null;
+        return deceased.iterator().next();
     }
 
     @Nullable

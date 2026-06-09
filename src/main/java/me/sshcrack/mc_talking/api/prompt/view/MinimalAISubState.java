@@ -1,10 +1,15 @@
 package me.sshcrack.mc_talking.api.prompt.view;
 
 public enum MinimalAISubState {
+    EAT_CHECKING_FOOD,
+    EAT_GOING_TO_HUT,
     EAT_SEARCH_RESTAURANT,
-    EAT_GET_FOOD,
+    EAT_GOING_TO_RESTAURANT,
     EAT_WAITING_FOOD,
+    EAT_GETTING_FOOD_SELF,
+    EAT_GOING_TO_EAT_POS,
     EAT_EATING,
+    EAT_GET_FOOD,
 
     SLEEP_WALKING_TO_BED,
     SLEEP_FINDING_BED,

@@ -28,22 +28,30 @@ public final class AIStateDescriber {
 
         if (citizenAiState == null && workAiState == null) return null;
 
-        MinimalAISubState sub = view.minimalAiSubState();
-        String ctx = view.minimalAiSubStateContext();
+        var cs = view.subState();
+        MinimalAISubState sub = cs != null ? cs.type() : null;
+        String ctx = cs != null ? cs.context() : null;
         if (sub != null && isSubStateConsistentWithAiState(sub, citizenAiState)) {
             return switch (sub) {
+                case EAT_CHECKING_FOOD -> "Checking pockets and inventory for food.";
+                case EAT_GOING_TO_HUT -> "Walking to the workplace to grab some food.";
                 case EAT_SEARCH_RESTAURANT -> ctx != null
-                        ? "Walking to " + ctx + " to eat."
+                        ? "Walking to " + ctx + " for a meal."
                         : "Hungry and walking to the restaurant, hoping to find a free table.";
-                case EAT_GET_FOOD -> ctx != null
-                        ? "At " + ctx + ", waiting for food to be served."
-                        : "At the restaurant, waiting for food to be served.";
+                case EAT_GOING_TO_RESTAURANT -> ctx != null
+                        ? "Walking to " + ctx + " for a meal."
+                        : "Walking to the restaurant for a meal.";
                 case EAT_WAITING_FOOD -> ctx != null
-                        ? "At " + ctx + ", waiting for the cook to prepare a meal."
+                        ? "At " + ctx + ", waiting for food to be served."
                         : "Standing at the restaurant, waiting for the cook to prepare a meal.";
+                case EAT_GETTING_FOOD_SELF -> "Too impatient to wait for the cook, grabbing food directly.";
+                case EAT_GOING_TO_EAT_POS -> "Looking for a place to sit down and eat.";
                 case EAT_EATING -> ctx != null
                         ? "Eating a meal at " + ctx + "."
                         : "Sitting down and eating a meal at the restaurant.";
+                case EAT_GET_FOOD -> ctx != null
+                        ? "At " + ctx + ", waiting for food to be served."
+                        : "At the restaurant, waiting for food to be served.";
                 case SLEEP_WALKING_TO_BED -> ctx != null
                         ? "Walking to " + ctx + " to sleep for the night."
                         : "Walking home to go to sleep for the night.";
@@ -153,7 +161,7 @@ public final class AIStateDescriber {
     public static boolean isSubStateConsistentWithAiState(MinimalAISubState sub, @Nullable CitizenAIState aiState) {
         if (aiState == null) return false;
         return switch (sub) {
-            case EAT_SEARCH_RESTAURANT, EAT_GET_FOOD, EAT_WAITING_FOOD, EAT_EATING -> aiState == CitizenAIState.EATING;
+            case EAT_CHECKING_FOOD, EAT_GOING_TO_HUT, EAT_SEARCH_RESTAURANT, EAT_GOING_TO_RESTAURANT, EAT_WAITING_FOOD, EAT_GETTING_FOOD_SELF, EAT_GOING_TO_EAT_POS, EAT_EATING, EAT_GET_FOOD -> aiState == CitizenAIState.EATING;
             case SLEEP_WALKING_TO_BED, SLEEP_FINDING_BED, SLEEP_IN_BED -> aiState == CitizenAIState.SLEEP;
             case MOURN_WALKING, MOURN_AT_TOWNHALL, MOURN_WALKING_TO_GRAVEYARD, MOURN_AT_GRAVE, MOURN_STARING -> aiState == CitizenAIState.MOURN;
             case SICK_CHECKING_FOR_CURE, SICK_WALKING_TO_HOSPITAL, SICK_AT_HOSPITAL, SICK_RECEIVING_CURE, SICK_WANDERING -> aiState == CitizenAIState.SICK;

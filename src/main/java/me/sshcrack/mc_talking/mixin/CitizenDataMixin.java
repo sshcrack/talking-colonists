@@ -8,10 +8,8 @@ import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
-import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
-import me.sshcrack.mc_talking.duck.CitizenMinimalAISubStateProvider;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.core.HolderLookup;
@@ -33,7 +31,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 
 @Mixin(value = CitizenData.class, remap = false)
-public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended, CitizenRecentActionsProvider, CitizenMinimalAISubStateProvider {
+public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended, CitizenRecentActionsProvider {
     @Unique
     private static final String TAG_MEMORY_KEY = "mc_talking_memory";
     @Unique
@@ -55,36 +53,6 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
     private static final int MAX_RECENT_ACTIONS = 10;
     @Unique
     private final ArrayDeque<String> mc_talking$recentActions = new ArrayDeque<>(MAX_RECENT_ACTIONS);
-
-    @Unique
-    @Nullable
-    private MinimalAISubState mc_talking$minimalAiSubState;
-
-    @Unique
-    @Nullable
-    private String mc_talking$minimalAiSubStateContext;
-
-    @Override
-    public void mc_talking$setMinimalAiSubState(@Nullable MinimalAISubState state) {
-        mc_talking$minimalAiSubState = state;
-    }
-
-    @Override
-    @Nullable
-    public MinimalAISubState mc_talking$getMinimalAiSubState() {
-        return mc_talking$minimalAiSubState;
-    }
-
-    @Override
-    public void mc_talking$setMinimalAiSubStateContext(@Nullable String context) {
-        mc_talking$minimalAiSubStateContext = context;
-    }
-
-    @Override
-    @Nullable
-    public String mc_talking$getMinimalAiSubStateContext() {
-        return mc_talking$minimalAiSubStateContext;
-    }
 
     @Override
     public void mc_talking$pushRecentAction(String entry) {
