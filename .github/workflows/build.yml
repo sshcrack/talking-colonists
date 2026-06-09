@@ -94,8 +94,7 @@ jobs:
 
       - name: Extract CI world for each version
         run: |
-          versions=$(grep 'match("[0-9]' settings.gradle.kts | sed 's/.*match("\(.*\)", "\(.*\)").*/\1-\2/')
-          for version in $versions; do
+          grep 'match("[0-9]' settings.gradle.kts | sed 's/.*match("\(.*\)", "\(.*\)").*/\1-\2/' | while read -r version; do
             saves_dir="versions/$version/run/saves/CI_World"
             mkdir -p "$saves_dir"
             unzip -q -o /tmp/CI_WORLD.zip -d "$saves_dir"
