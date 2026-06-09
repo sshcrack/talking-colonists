@@ -259,7 +259,8 @@ public final class CitizenPromptViewFactory {
         if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAISickTask.DiseaseState ds) {
             var sub = switch (ds) {
                 case CHECK_FOR_CURE -> MinimalAISubState.SICK_CHECKING_FOR_CURE;
-                case GO_TO_HUT, GO_TO_HOSPITAL, SEARCH_HOSPITAL, FIND_EMPTY_BED, WAIT_FOR_CURE -> MinimalAISubState.SICK_AT_HOSPITAL;
+                case GO_TO_HUT, GO_TO_HOSPITAL -> MinimalAISubState.SICK_WALKING_TO_HOSPITAL;
+                case SEARCH_HOSPITAL, FIND_EMPTY_BED, WAIT_FOR_CURE -> MinimalAISubState.SICK_AT_HOSPITAL;
                 case APPLY_CURE -> MinimalAISubState.SICK_RECEIVING_CURE;
                 case WANDER -> MinimalAISubState.SICK_WANDERING;
             };
@@ -270,7 +271,8 @@ public final class CitizenPromptViewFactory {
             var sub = switch (ms) {
                 case DECIDE, WANDERING -> MinimalAISubState.MOURN_WALKING;
                 case WALKING_TO_TOWNHALL -> MinimalAISubState.MOURN_AT_TOWNHALL;
-                case WALKING_TO_GRAVEYARD, WANDER_AT_GRAVEYARD, WALK_TO_GRAVE -> MinimalAISubState.MOURN_WALKING_TO_GRAVEYARD;
+                case WALKING_TO_GRAVEYARD -> MinimalAISubState.MOURN_WALKING_TO_GRAVEYARD;
+                case WANDER_AT_GRAVEYARD, WALK_TO_GRAVE -> MinimalAISubState.MOURN_AT_GRAVE;
                 case STARING -> MinimalAISubState.MOURN_STARING;
             };
             return new CitizenSubState(CitizenAIState.MOURN, sub, deriveDeceasedName(data));
