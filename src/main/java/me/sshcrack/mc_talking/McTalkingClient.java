@@ -55,8 +55,8 @@ public class McTalkingClient {
     public McTalkingClient(ModContainer container) {
         NeoForge.EVENT_BUS.register(this);
         /*? if devtools {*/
-        me.sshcrack.mc_talking.devtools.DevAutoQuit.init();
-        /*?}*/
+        /*me.sshcrack.mc_talking.devtools.DevAutoQuit.init();
+        *//*?}*/
     }
     /*?}*/
 
