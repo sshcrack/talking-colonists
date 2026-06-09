@@ -270,18 +270,18 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         // Post-raid trauma
-        Long lastRaidEndTimeMs = view.lastRaidEndTimeMs();
-        if (!view.peaceful() && lastRaidEndTimeMs != null) {
+        Long lastRaidEndTimeTicks = view.lastRaidEndTimeTicks();
+        if (!view.peaceful() && lastRaidEndTimeTicks != null) {
             int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-            long sinceMs = System.currentTimeMillis() - lastRaidEndTimeMs;
-            if (traumaDuration > 0 && sinceMs < traumaDuration * 1000L) {
+            long sinceTicks = view.currentGameTimeTicks() - lastRaidEndTimeTicks;
+            if (traumaDuration > 0 && sinceTicks < traumaDuration * 20L) {
                 int lost = view.lastRaidLostCitizens();
                 prompt.append("\n## POST-RAID TRAUMA\n");
 
                 if (view.guard()) {
-                    if (sinceMs < 5 * 60_000L) {
+                    if (sinceTicks < 5 * 60 * 20L) {
                         prompt.append("- Adrenaline is still pumping after the fight. You're angry the raid happened, not scared.\n");
-                    } else if (sinceMs < 15 * 60_000L) {
+                    } else if (sinceTicks < 15 * 60 * 20L) {
                         prompt.append("- You're still wired from the battle, replaying the fight and thinking about how to do better next time.\n");
                     } else {
                         prompt.append("- You've settled down but remain vigilant. Another attack won't catch you off guard.\n");
@@ -291,9 +291,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                                 .append(" of your fellow colonists didn't survive. You silently vow to protect the rest.\n");
                     }
                 } else {
-                    if (sinceMs < 5 * 60_000L) {
+                    if (sinceTicks < 5 * 60 * 20L) {
                         prompt.append("- Your hands are still shaking from the raid that just ended. You feel unsafe and terrified.\n");
-                    } else if (sinceMs < 15 * 60_000L) {
+                    } else if (sinceTicks < 15 * 60 * 20L) {
                         prompt.append("- The recent raid is still fresh in your mind. You're on edge and jumpy.\n");
                     } else {
                         prompt.append("- You're slowly calming down after the raid, but still feel uneasy.\n");

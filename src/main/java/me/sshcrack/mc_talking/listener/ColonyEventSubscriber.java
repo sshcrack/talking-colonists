@@ -112,10 +112,5 @@ public final class ColonyEventSubscriber {
             ColonyEventBuffer.recordEvent(colony, ColonyEventBuffer.EventType.BUILDING_REMOVED,
                     buildingName + " was destroyed");
         });
-
-        bus.subscribe(ColonyDeletedModEvent.class, event -> {
-            IColony colony = event.getColony();
-            ColonyEventBuffer.removeColony(colony.getID());
-        });
     }
 }

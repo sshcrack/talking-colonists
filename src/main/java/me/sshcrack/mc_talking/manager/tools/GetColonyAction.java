@@ -8,6 +8,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.constant.Constants;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Difficulty;
 import org.jetbrains.annotations.NotNull;
@@ -18,7 +20,7 @@ import java.util.List;
 
 public class GetColonyAction extends GeneralFunctionAction {
     public GetColonyAction() {
-        super("get_colony", "Gets information about the colony. If no colony ID is provided, it returns the colony the citizen is currently living in. This includes the name of the colony, buildings, maxCitizens, overallHappiness and other useful information.",
+        super("get_colony", "Gets information about the colony. If no colony ID is provided OR the colony ID is set to 0, it returns the colony the citizen is currently living in. This includes the name of the colony, buildings, maxCitizens, overallHappiness and other useful information.",
                 new ObjectProperty(new HashMap<>() {{
                     put("colony_id", new PrimitiveProperty(PrimitiveProperty.Type.INTEGER, false));
                 }})
@@ -105,6 +107,18 @@ public class GetColonyAction extends GeneralFunctionAction {
         eventsObj.addProperty("currentEventCount", colony.getEventManager().getEvents().size());
         colonyInfo.add("events", eventsObj);
 
+        // Recent colony lifecycle events (births, deaths, job changes, building changes)
+        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
+        if (eventWindow > 0) {
+            final JsonArray recentEventsArray = new JsonArray();
+            for (final var evt : ColonyEventBuffer.getRecentEvents(colony, eventWindow)) {
+                recentEventsArray.add("[" + evt.type().name() + "] " + evt.description());
+            }
+            colonyInfo.add("recent_events", recentEventsArray);
+        } else {
+            colonyInfo.add("recent_events", new JsonArray());
+        }
+
         // Add waypoints count
         colonyInfo.addProperty("waypointCount", colony.getWayPoints().size());
 
@@ -117,8 +131,12 @@ public class GetColonyAction extends GeneralFunctionAction {
                 ? parameters.get("colony_id").getAsInt()
                 : currColony.getID();
 
+        if (id == 0) {
+            id = currColony.getID();
+        }
+
         var colony = IColonyManager.getInstance().getColonyByWorld(id, citizen.level());
-        if(colony == null) {
+        if (colony == null) {
             JsonObject errorResponse = new JsonObject();
             errorResponse.addProperty("error", "Colony not found with ID: " + id);
             return errorResponse;

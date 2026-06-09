@@ -54,8 +54,9 @@ public class DebugEventsCommand {
         int eventWindow = me.sshcrack.mc_talking.config.McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
         List<ColonyEventBuffer.ColonyEvent> recentEvents = ColonyEventBuffer.getRecentEvents(colony, eventWindow > 0 ? eventWindow : 300);
 
-        long millisSinceRaid = ColonyEventBuffer.millisSinceRaid(colony);
+        long ticksSinceRaid = ColonyEventBuffer.ticksSinceRaid(colony);
         int lostCitizens = ColonyEventBuffer.getLostCitizens(colony);
+        long gameTicks = colony.getWorld() != null ? colony.getWorld().getGameTime() : 0;
         final int fColonyId = colonyId;
 
         source.sendSuccess(() -> {
@@ -65,8 +66,8 @@ public class DebugEventsCommand {
                     .append(Component.literal("\n"));
 
             // Raid info
-            if (millisSinceRaid < Long.MAX_VALUE) {
-                long secondsSinceRaid = millisSinceRaid / 1000;
+            if (ticksSinceRaid < Long.MAX_VALUE) {
+                long secondsSinceRaid = ticksSinceRaid / 20;
                 String raidStr;
                 if (secondsSinceRaid < 60) raidStr = secondsSinceRaid + "s ago";
                 else if (secondsSinceRaid < 3600) raidStr = (secondsSinceRaid / 60) + "m " + (secondsSinceRaid % 60) + "s ago";
@@ -93,7 +94,7 @@ public class DebugEventsCommand {
             } else {
                 for (int i = 0; i < recentEvents.size(); i++) {
                     ColonyEventBuffer.ColonyEvent evt = recentEvents.get(i);
-                    long ageSec = (System.currentTimeMillis() - evt.timestampMs()) / 1000;
+                    long ageSec = (gameTicks - evt.timestampTicks()) / 20;
                     String ageStr = ageSec < 60 ? ageSec + "s" : (ageSec / 60) + "m " + (ageSec % 60) + "s";
                     msg.append(Component.literal("    §f" + (i + 1) + ". §7[" + evt.type().name() + "] ")
                             .append(Component.literal(evt.description()).withStyle(ChatFormatting.WHITE))

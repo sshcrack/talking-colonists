@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.duck.ColonyEventDataProvider;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,12 +30,12 @@ public final class ColonyEventBuffer {
         COLONY_FOUNDED
     }
 
-    public record ColonyEvent(EventType type, String description, long timestampMs) {
+    public record ColonyEvent(EventType type, String description, long timestampTicks) {
         public CompoundTag serialize() {
             CompoundTag tag = new CompoundTag();
             tag.putString("type", type.name());
             tag.putString("description", description);
-            tag.putLong("timestamp", timestampMs);
+            tag.putLong("timestampTicks", timestampTicks);
             return tag;
         }
 
@@ -43,7 +44,7 @@ public final class ColonyEventBuffer {
                 return new ColonyEvent(
                         EventType.valueOf(tag.getString("type")),
                         tag.getString("description"),
-                        tag.getLong("timestamp")
+                        tag.getLong("timestampTicks")
                 );
             } catch (IllegalArgumentException e) {
                 McTalking.LOGGER.warn("Skipping corrupt colony event: unknown type '{}'", tag.getString("type"));
@@ -64,8 +65,14 @@ public final class ColonyEventBuffer {
         return (ColonyEventDataProvider) colony;
     }
 
+    private static long currentTick(IColony colony) {
+        Level world = colony.getWorld();
+        if (world == null) return 0;
+        return world.getGameTime();
+    }
+
     public static void recordRaid(IColony colony, int lostCitizens) {
-        long now = System.currentTimeMillis();
+        long now = currentTick(colony);
         var provider = getProvider(colony);
         provider.mc_talking$setLastRaidEndTime(now);
         provider.mc_talking$setLastRaidLostCitizens(lostCitizens);
@@ -73,7 +80,7 @@ public final class ColonyEventBuffer {
     }
 
     public static void recordEvent(IColony colony, EventType type, String description) {
-        long now = System.currentTimeMillis();
+        long now = currentTick(colony);
         var provider = getProvider(colony);
         var buffer = provider.mc_talking$getOrCreateEvents();
         buffer.addFirst(new ColonyEvent(type, description, now));
@@ -86,10 +93,11 @@ public final class ColonyEventBuffer {
         var provider = getProvider(colony);
         var buffer = provider.mc_talking$getOrCreateEvents();
         if (buffer.isEmpty()) return List.of();
-        long cutoff = System.currentTimeMillis() - (maxAgeSeconds * 1000L);
+        long gameTime = currentTick(colony);
+        long cutoff = gameTime - (maxAgeSeconds * 20L);
         List<ColonyEvent> result = new ArrayList<>();
         for (ColonyEvent event : buffer) {
-            if (event.timestampMs() >= cutoff) {
+            if (event.timestampTicks() >= cutoff) {
                 result.add(event);
             }
         }
@@ -101,14 +109,16 @@ public final class ColonyEventBuffer {
         var provider = getProvider(colony);
         long lastEnd = provider.mc_talking$getLastRaidEndTime();
         if (lastEnd == Long.MAX_VALUE) return false;
-        return (System.currentTimeMillis() - lastEnd) < (durationSeconds * 1000L);
+        long gameTime = currentTick(colony);
+        return (gameTime - lastEnd) < (durationSeconds * 20L);
     }
 
-    public static long millisSinceRaid(IColony colony) {
+    public static long ticksSinceRaid(IColony colony) {
         var provider = getProvider(colony);
         long lastEnd = provider.mc_talking$getLastRaidEndTime();
         if (lastEnd == Long.MAX_VALUE) return Long.MAX_VALUE;
-        return System.currentTimeMillis() - lastEnd;
+        long gameTime = currentTick(colony);
+        return gameTime - lastEnd;
     }
 
     public static int getLostCitizens(IColony colony) {
@@ -120,16 +130,4 @@ public final class ColonyEventBuffer {
         var provider = getProvider(colony);
         return provider.mc_talking$getLastRaidEndTime();
     }
-
-    /**
-     * @deprecated No-op. Data now lives on colony instances via {@link ColonyEventDataProvider}.
-     */
-    @Deprecated(forRemoval = true)
-    public static void removeColony(int colonyId) {}
-
-    /**
-     * @deprecated No-op. Data now lives on colony instances via {@link ColonyEventDataProvider}.
-     */
-    @Deprecated(forRemoval = true)
-    public static void clear() {}
 }

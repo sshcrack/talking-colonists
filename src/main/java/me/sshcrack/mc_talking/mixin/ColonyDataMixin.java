@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 @Mixin(value = Colony.class, remap = false)
 public class ColonyDataMixin implements ColonyEventDataProvider {
     @Unique
-    private static final String TAG_EVENTS_KEY = "mc_talking_events";
+    private static final String TAG_DATA_ROOT_KEY = "mc_talking_events";
     @Unique
     private static final String TAG_EVENTS_LIST = "events";
     @Unique
@@ -61,7 +61,7 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
 
     /*? if neoforge {*/
     @Inject(method = "write(Lnet/minecraft/nbt/CompoundTag;Lnet/minecraft/core/HolderLookup$Provider;)Lnet/minecraft/nbt/CompoundTag;", at = @At("RETURN"))
-    private void mc_talking$serializeNBT(HolderLookup.Provider provider, CallbackInfoReturnable<CompoundTag> cir) {
+    private void mc_talking$serializeNBT(CompoundTag compound, HolderLookup.Provider provider, CallbackInfoReturnable<CompoundTag> cir) {
         CompoundTag tag = cir.getReturnValue();
         mc_talking$writeNBT(tag);
     }
@@ -73,14 +73,14 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
     /*?}*/
 
     /*? if forge {*/
-    /*@Inject(method = "write(Lnet/minecraft/nbt/CompoundTag;)Lnet/minecraft/nbt/CompoundTag;", at = @At("RETURN"))
+    /*@Inject(method = "write", at = @At("RETURN"))
     private void mc_talking$serializeNBT(CallbackInfoReturnable<CompoundTag> cir) {
         CompoundTag tag = cir.getReturnValue();
         mc_talking$writeNBT(tag);
     }
 
-    @Inject(method = "read(Lnet/minecraft/nbt/CompoundTag;)V", at = @At("RETURN"))
-    private void mc_talking$deserializeNBT(CompoundTag compound, CallbackInfo ci) {
+    @Inject(method = "read", at = @At("RETURN"))
+    private void mc_talking$deserializeNBT(CompoundTag compound, HolderLookup.Provider provider, CallbackInfo ci) {
         mc_talking$readNBT(compound);
     }
     *//*?}*/
@@ -102,14 +102,14 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
             eventTag.putInt(TAG_RAID_LOST, mc_talking$lastRaidLostCitizens);
         }
 
-        tag.put(TAG_EVENTS_KEY, eventTag);
+        tag.put(TAG_DATA_ROOT_KEY, eventTag);
     }
 
     @Unique
     private void mc_talking$readNBT(CompoundTag compound) {
-        if (!compound.contains(TAG_EVENTS_KEY)) return;
+        if (!compound.contains(TAG_DATA_ROOT_KEY)) return;
 
-        CompoundTag eventTag = compound.getCompound(TAG_EVENTS_KEY);
+        CompoundTag eventTag = compound.getCompound(TAG_DATA_ROOT_KEY);
 
         mc_talking$events.clear();
         ListTag eventsList = eventTag.getList(TAG_EVENTS_LIST, Tag.TAG_COMPOUND);

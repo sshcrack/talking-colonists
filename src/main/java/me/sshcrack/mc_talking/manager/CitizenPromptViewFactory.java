@@ -17,6 +17,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
+import com.minecolonies.core.entity.citizen.EntityCitizen;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
@@ -127,8 +128,9 @@ public final class CitizenPromptViewFactory {
         List<String> colonyConnections = extractColonyConnections(data);
         IColony colony = data.getColony();
         long lastRaidEndTime = ColonyEventBuffer.getLastRaidEndTime(colony);
-        Long lastRaidEndTimeMs = lastRaidEndTime != Long.MAX_VALUE ? lastRaidEndTime : null;
+        Long lastRaidEndTimeTicks = lastRaidEndTime != Long.MAX_VALUE ? lastRaidEndTime : null;
         int lastRaidLostCitizens = ColonyEventBuffer.getLostCitizens(colony);
+        long currentGameTimeTicks = colony.getWorld() != null ? colony.getWorld().getGameTime() : 0;
         List<String> recentEvents = extractRecentEvents(data);
         CitizenAIState citizenAiState = extractCitizenAiState(data);
         AIWorkerState workAiState = extractWorkAiState(data);
@@ -171,8 +173,9 @@ public final class CitizenPromptViewFactory {
                 workBuildingLevel,
                 data.getColony().getID(),
                 envInfo.peaceful(),
-                lastRaidEndTimeMs,
+                lastRaidEndTimeTicks,
                 lastRaidLostCitizens,
+                currentGameTimeTicks,
                 personality,
                 customPersonalityText,
                 playerState,
@@ -210,7 +213,7 @@ public final class CitizenPromptViewFactory {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
         var entity = entityOpt.get();
-        if (!(entity instanceof com.minecolonies.core.entity.citizen.EntityCitizen citizen)) return null;
+        if (!(entity instanceof EntityCitizen citizen)) return null;
         var ai = citizen.getCitizenAI();
         if (ai == null) return null;
         var state = ai.getState();

@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -202,6 +203,11 @@ public class CitizenWsClient extends GeminiWsClient {
     @Override
     protected String getModelName() {
         return McTalkingConfig.INSTANCE.instance().currentAiModel.getName();
+    }
+
+    @Override
+    public boolean shouldResumeAndSaveSession() {
+        return McTalkingConfig.INSTANCE.instance().currentAiModel == AvailableAI.Flash3;
     }
 
     @Override
