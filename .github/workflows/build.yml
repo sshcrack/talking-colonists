@@ -83,14 +83,31 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/build.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
       - name: Install Xvfb + Mesa for Minecraft rendering
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb libgl1-mesa-dri libgl1 libglx-mesa0 \
             libxrandr2 libxinerama1 libxcursor1 libxi6
 
-      - name: Download CI world
-        run: curl -L -o /tmp/CI_WORLD.zip "http://mc.sshcrack.me/CI_WORLD.zip"
+      - name: Cache CI world
+        uses: actions/cache@v4
+        with:
+          path: /tmp/CI_WORLD.zip
+          key: ci-world
+
+      - name: Download CI world (if not cached)
+        run: |
+          if [ ! -f /tmp/CI_WORLD.zip ]; then
+            curl -L -o /tmp/CI_WORLD.zip "http://mc.sshcrack.me/CI_WORLD.zip"
+          fi
 
       - name: Extract CI world for each version
         run: |
@@ -100,6 +117,13 @@ jobs:
             unzip -q -o /tmp/CI_WORLD.zip -d "$saves_dir"
           done
 
-      - name: Run mixin smoke test
-        run: xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' \
+      - name: Start Xvfb and run mixin smoke test
+        run: |
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          XVFB_PID=$!
+          sleep 1
           bash scripts/test-mixin-smoke.sh
+          EXIT_CODE=$?
+          kill $XVFB_PID 2>/dev/null || true
+          exit $EXIT_CODE
