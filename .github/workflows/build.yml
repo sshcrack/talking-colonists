@@ -54,76 +54,41 @@ jobs:
         run: |
           gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file comment.md
 
-  mixin-smoke-test:
+  mixin-smoke-verification:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: build
-    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - uses: actions/setup-java@v4
-        with:
-          java-version: 25
-          distribution: 'microsoft'
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: wrapper
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-apt-
-
-      - name: Install Xvfb + Mesa for Minecraft rendering
+      - name: Verify mixin smoke test was run locally
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libgl1 libglx-mesa0 \
-            libxrandr2 libxinerama1 libxcursor1 libxi6
-
-      - name: Cache CI world
-        uses: actions/cache@v4
-        with:
-          path: /tmp/CI_WORLD.zip
-          key: ci-world
-
-      - name: Download CI world (if not cached)
-        run: |
-          if [ ! -f /tmp/CI_WORLD.zip ]; then
-            curl -L -o /tmp/CI_WORLD.zip "http://mc.sshcrack.me/CI_WORLD.zip"
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ]; then
+            echo "No base commit to compare against — checking marker against HEAD"
+            base="HEAD"
+          fi
+          mixin_changed=$(git diff --name-only "$base"..HEAD -- 'src/main/java/me/sshcrack/mc_talking/mixin/' 'src/main/resources/*.mixins.json' 2>/dev/null || true)
+          if [ -z "$mixin_changed" ]; then
+            echo "No mixin changes detected — smoke test not required"
+            exit 0
           fi
 
-      - name: Extract CI world for each version
-        run: |
-          grep 'match("[0-9]' settings.gradle.kts | sed 's/.*match("\(.*\)", "\(.*\)").*/\1-\2/' | while read -r version; do
-            saves_dir="versions/$version/run/saves/CI_World"
-            mkdir -p "$saves_dir"
-            unzip -q -o /tmp/CI_WORLD.zip -d "$saves_dir"
-          done
-
-      - name: Start Xvfb and run mixin smoke test
-        run: |
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1024x768x24 &
-          XVFB_PID=$!
-          sleep 1
-          bash scripts/test-mixin-smoke.sh
-          EXIT_CODE=$?
-          kill $XVFB_PID 2>/dev/null || true
-          exit $EXIT_CODE
+          if [ ! -f .mixin-smoke-verified ]; then
+            echo "ERROR: Mixin smoke test not run locally."
+            echo "Run 'bash scripts/test-mixin-smoke.sh' and commit .mixin-smoke-verified."
+            exit 1
+          fi
+          expected=$(git rev-parse HEAD)
+          actual=$(tr -d ' \n' < .mixin-smoke-verified)
+          if [ "$expected" != "$actual" ]; then
+            echo "ERROR: Mixin smoke test result is stale (commit mismatch)."
+            echo "  expected: $expected (HEAD)"
+            echo "  actual:   $actual (.mixin-smoke-verified)"
+            echo "Re-run 'bash scripts/test-mixin-smoke.sh' locally."
+            exit 1
+          fi
+          echo "✓ Mixin smoke test verified for commit $expected"

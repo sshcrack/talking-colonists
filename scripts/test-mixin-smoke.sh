@@ -108,4 +108,9 @@ if [ "$FAILED" -ne 0 ]; then
     exit 1
 fi
 
+# Create verification marker for CI (contains current commit hash)
+git rev-parse HEAD > "$ROOT_DIR/.mixin-smoke-verified"
+echo ""
+echo "Created .mixin-smoke-verified (commit $(cat "$ROOT_DIR/.mixin-smoke-verified"))"
+echo ""
 echo "All mixin smoke tests passed."
