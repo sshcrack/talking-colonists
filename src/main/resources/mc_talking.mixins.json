@@ -11,6 +11,7 @@
     "CitizenDataAccessor",
     "CitizenDataMixin",
     "EntityAICitizenWanderMixin",
+    "EntityAIEatTaskMixin",
     "RaidManagerMixin",
     "ServerEntityMixin",
     "SoundUtilsMixin",
