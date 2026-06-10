@@ -12,7 +12,13 @@ import org.jetbrains.annotations.Nullable;
 public class EndConversationAction extends GeneralFunctionAction {
     public EndConversationAction() {
         super("end_conversation", """
-                This will end the conversation. The peer you are talking to isn't able to respond after. Only use if you are sure you want to end the conversation.
+                Ends the conversation immediately. After calling this the
+                other person cannot respond.
+                IMPORTANT RULES:
+                - NEVER call this when a new conversation starts.
+                - Only call this if the person you are talking to explicitly
+                  says goodbye or walks away from you.
+                - Do NOT end the conversation on your own initiative.
                 """);
     }
 
