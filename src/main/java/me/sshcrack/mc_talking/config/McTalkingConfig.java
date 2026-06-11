@@ -225,6 +225,11 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Minimum cooldown in seconds between urgent citizen contacts for the same player. Set to 0 to disable.")
     public int playerUrgentContactCooldownSeconds = 60;
 
+    @AutoGen(category = "citizens")
+    @TickBox
+    @SerialEntry(comment = "If true, housing complaint severity is scaled by colony age. Young colonies get patient/mild texts; older colonies get the full range of concern.")
+    public boolean scaleHousingComplaintsByAge = true;
+
     @AutoGen(category = "citizens", group = "citizen_contact")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Base weight for casual greetings (0.0-1.0). Even content citizens get this small chance to wave/say hello per check interval. Multiplied by citizenContactBaseChance.")

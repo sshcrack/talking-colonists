@@ -45,7 +45,14 @@ public class CitizenNeedAssessor {
         }
 
         if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
-            weight += 0.7;
+            double homelessWeight = 0.7;
+            if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge) {
+                int colonyDay = data.getColony().getDay();
+                if (colonyDay < 7) {
+                    homelessWeight = 0.3;
+                }
+            }
+            weight += homelessWeight;
         }
 
         double saturation = data.getSaturation();
