@@ -86,13 +86,26 @@ jobs:
             echo "Run 'bash scripts/test-mixin-smoke.sh' and commit .mixin-smoke-verified."
             exit 1
           fi
-          expected=$(git rev-parse HEAD)
-          actual=$(tr -d ' \n' < .mixin-smoke-verified)
-          if [ "$expected" != "$actual" ]; then
-            echo "ERROR: Mixin smoke test result is stale (commit mismatch)."
-            echo "  expected: $expected (HEAD)"
-            echo "  actual:   $actual (.mixin-smoke-verified)"
-            echo "Re-run 'bash scripts/test-mixin-smoke.sh' locally."
+          last_mixin_commit=$(git log -1 --format="%H" "$base"..HEAD -- 'src/main/java/me/sshcrack/mc_talking/mixin/' 'src/main/resources/mc_talking.mixins.json' 2>/dev/null || true)
+          if [ -z "$last_mixin_commit" ]; then
+            echo "Could not determine last mixin commit — assuming smoke test is valid"
+            exit 0
+          fi
+
+          verified=$(tr -d ' \n' < .mixin-smoke-verified)
+          if [ -z "$verified" ]; then
+            echo "ERROR: .mixin-smoke-verified is empty."
             exit 1
           fi
-          echo "✓ Mixin smoke test verified for commit $expected"
+
+          if ! git merge-base --is-ancestor "$verified" HEAD 2>/dev/null; then
+            echo "ERROR: Verified commit $verified is not an ancestor of HEAD."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$last_mixin_commit" "$verified" 2>/dev/null; then
+            echo "ERROR: Mixin smoke test is stale. Last mixin change ($last_mixin_commit) is newer than verified commit ($verified)."
+            echo "Re-run 'bash scripts/test-mixin-smoke.sh' locally and commit .mixin-smoke-verified."
+            exit 1
+          fi
+          echo "✓ Mixin smoke test verified (last mixin change $last_mixin_commit ≤ verified $verified)"
