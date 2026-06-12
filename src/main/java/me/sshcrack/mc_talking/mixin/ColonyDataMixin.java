@@ -80,7 +80,7 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
     }
 
     @Inject(method = "read", at = @At("RETURN"))
-    private void mc_talking$deserializeNBT(CompoundTag compound, HolderLookup.Provider provider, CallbackInfo ci) {
+    private void mc_talking$deserializeNBT(CompoundTag compound, CallbackInfo ci) {
         mc_talking$readNBT(compound);
     }
     *//*?}*/
