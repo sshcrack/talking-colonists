@@ -74,7 +74,7 @@ public class CitizenNeedAssessor {
         }
 
         var config = McTalkingConfig.INSTANCE.instance();
-        if (config.enableFrustration && data != null) {
+        if (config.enableFrustration) {
             FrustrationData fd = ((CitizenDataFrustrationExtended) data)
                 .mc_talking$getFrustrationTracker()
                 .getLastResult();
