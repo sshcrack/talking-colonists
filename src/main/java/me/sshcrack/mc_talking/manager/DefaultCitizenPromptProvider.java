@@ -7,6 +7,8 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationData;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationTier;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
@@ -115,6 +117,31 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
             for (var message : view.blockingInteractionMessages()) {
                 prompt.append("- ").append(message);
+            }
+        }
+
+        // Frustration data
+        FrustrationData fd = view.frustrationData();
+        if (fd != null) {
+            if (fd.isInCooldown()) {
+                prompt.append("\n## NEW BEGINNINGS\n");
+                prompt.append("- You recently joined this colony and everything feels full of possibility.\n");
+                prompt.append("- You're eager to help build something from the ground up.\n");
+                prompt.append("- There are things you need, but you face them with hope and optimism.\n");
+            } else if (fd.overallTier() != FrustrationTier.NEUTRAL) {
+                prompt.append("\n## FRUSTRATION STATUS\n");
+                prompt.append("- Overall: ").append(fd.overallTier().name()).append("\n");
+                for (var mod : fd.modifiers()) {
+                    if (mod.tier() == FrustrationTier.NEUTRAL) continue;
+                    prompt.append("- ").append(mod.type().name())
+                          .append(": ").append(mod.tier().name())
+                          .append(" (").append(formatFrustrationDuration(mod.adjustedDurationTicks()))
+                          .append(")");
+                    if (mod.contextNote() != null) {
+                        prompt.append("\n  - ").append(mod.contextNote());
+                    }
+                    prompt.append("\n");
+                }
             }
         }
 
@@ -422,6 +449,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
 
         return prompt.toString();
+    }
+
+    private static String formatFrustrationDuration(long ticks) {
+        long minutes = ticks / (20 * 60);
+        if (minutes < 60) return minutes + "+ minutes";
+        long hours = minutes / 60;
+        return hours + "+ hours";
     }
 
     private static void appendGuardDuty(StringBuilder prompt, boolean isGuard) {

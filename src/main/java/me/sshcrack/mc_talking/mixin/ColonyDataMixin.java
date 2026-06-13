@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.mixin;
 
 import com.minecolonies.core.colony.Colony;
 import me.sshcrack.mc_talking.duck.ColonyEventDataProvider;
+import me.sshcrack.mc_talking.handler.ConstructionEventTracker;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -26,6 +27,8 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
     private static final String TAG_RAID_END = "raidEnd";
     @Unique
     private static final String TAG_RAID_LOST = "raidLost";
+    @Unique
+    private static final String TAG_CONSTRUCTION_EVENTS = "mc_talking_construction_events";
 
     @Unique
     private final ConcurrentLinkedDeque<ColonyEventBuffer.ColonyEvent> mc_talking$events = new ConcurrentLinkedDeque<>();
@@ -103,6 +106,10 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
         }
 
         tag.put(TAG_DATA_ROOT_KEY, eventTag);
+
+        int colonyId = ((com.minecolonies.api.colony.IColony)(Object)this).getID();
+        tag.put(TAG_CONSTRUCTION_EVENTS,
+            ConstructionEventTracker.serializeColony(colonyId));
     }
 
     @Unique
@@ -126,6 +133,12 @@ public class ColonyDataMixin implements ColonyEventDataProvider {
         }
         if (eventTag.contains(TAG_RAID_LOST)) {
             mc_talking$lastRaidLostCitizens = eventTag.getInt(TAG_RAID_LOST);
+        }
+
+        if (compound.contains(TAG_CONSTRUCTION_EVENTS)) {
+            int colonyId = ((com.minecolonies.api.colony.IColony)(Object)this).getID();
+            ConstructionEventTracker.deserializeColony(colonyId,
+                compound.getList(TAG_CONSTRUCTION_EVENTS, Tag.TAG_COMPOUND));
         }
     }
 }

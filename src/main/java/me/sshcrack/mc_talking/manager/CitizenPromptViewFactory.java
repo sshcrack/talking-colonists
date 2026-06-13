@@ -28,14 +28,18 @@ import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.util.ColonyStatsHelper;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationData;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
+import me.sshcrack.mc_talking.duck.CitizenDataFrustrationExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
+import me.sshcrack.mc_talking.util.ColonyContext;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.network.chat.Component;
@@ -76,6 +80,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -140,6 +145,60 @@ public final class CitizenPromptViewFactory {
         ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, subState != null ? subState.state() : null);
         List<String> recentActions = extractRecentActions(data);
 
+        FrustrationData frustrationData = null;
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (config.enableFrustration) {
+            var tracker = ((CitizenDataFrustrationExtended) data).mc_talking$getFrustrationTracker();
+            long gameTime = data.getColony().getWorld() != null
+                ? data.getColony().getWorld().getGameTime() : 0;
+            long[] tierThresholds = {
+                config.mildlyAnnoyedThresholdTicks,
+                config.concernedThresholdTicks,
+                config.agitatedThresholdTicks,
+                config.furiousThresholdTicks
+            };
+            ColonyContext colonyCtx = config.constructionMitigationEnabled
+                ? ColonyContext.compute(data, config) : null;
+
+            frustrationData = tracker.compute(
+                modifiers,
+                gameTime,
+                config.frustrationNegativeThreshold,
+                tierThresholds,
+                colonyCtx
+            );
+
+            if (colonyCtx != null && frustrationData != null && !frustrationData.isInCooldown()) {
+                if (workBuilding != null) {
+                    ResourceLocation workTypeId = workBuilding.getBuildingType().getRegistryName();
+                    var modifiedViews = new ArrayList<>(frustrationData.modifiers());
+                    for (int i = 0; i < modifiedViews.size(); i++) {
+                        var mv = modifiedViews.get(i);
+                        if ((mv.type() == HappinessModifierType.IDLEATJOB
+                                || mv.type() == HappinessModifierType.UNEMPLOYMENT)
+                                && mv.contextNote() == null) {
+                            boolean found = colonyCtx.recentCompletions().stream()
+                                .anyMatch(e -> e.buildingTypeId().equals(workTypeId));
+                            if (found) {
+                                modifiedViews.set(i, new FrustrationModifierView(
+                                    mv.type(), mv.factor(), mv.rawDurationTicks(),
+                                    mv.adjustedDurationTicks(), mv.tier(),
+                                    "Your workplace was just upgraded!"
+                                ));
+                            }
+                        }
+                    }
+                    if (!modifiedViews.equals(frustrationData.modifiers())) {
+                        frustrationData = new FrustrationData(
+                            frustrationData.overallTier(),
+                            java.util.Collections.unmodifiableList(modifiedViews),
+                            false
+                        );
+                    }
+                }
+            }
+        }
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -191,7 +250,8 @@ public final class CitizenPromptViewFactory {
                 colonyAgeDays,
                 colonyFoodSituation,
                 recentActions,
-                subState
+                subState,
+                frustrationData
         );
     }
 

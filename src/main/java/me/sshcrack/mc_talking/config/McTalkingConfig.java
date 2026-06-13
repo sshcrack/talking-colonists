@@ -375,6 +375,87 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
     public List<String> customPersonalityArchetypes = new ArrayList<>();
 
+    // Frustration System
+    @AutoGen(category = "citizens", group = "frustration")
+    @TickBox
+    @SerialEntry(comment = "Master toggle for duration-based frustration")
+    public boolean enableFrustration = true;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 20, max = 6000)
+    @SerialEntry(comment = "How often frustration cooldowns tick (20 ticks = 1 second)")
+    public int frustrationCheckIntervalTicks = 100;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.1, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Happiness factor below which a modifier is tracked as negative")
+    public double frustrationNegativeThreshold = 0.8;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 1)
+    @SerialEntry(comment = "Duration before MILDLY_ANNOYED (~20 min)")
+    public int mildlyAnnoyedThresholdTicks = 24000;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 1)
+    @SerialEntry(comment = "Duration before CONCERNED (~2 h)")
+    public int concernedThresholdTicks = 144000;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 1)
+    @SerialEntry(comment = "Duration before AGITATED (~10 h)")
+    public int agitatedThresholdTicks = 720000;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 1)
+    @SerialEntry(comment = "Duration before FURIOUS (~14 h)")
+    public int furiousThresholdTicks = 1008000;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 0, max = 30)
+    @SerialEntry(comment = "In-game days before frustration tracking begins for new citizens")
+    public int frustrationCooldownDays = 3;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.0, max = 2.0, step = 0.05)
+    @SerialEntry(comment = "Urgency weight added per frustration tier level")
+    public double frustrationUrgencyMultiplier = 0.5;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @TickBox
+    @SerialEntry(comment = "Reduce frustration when buildings are under construction")
+    public boolean constructionMitigationEnabled = true;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Duration multiplier when a residence is being built (0 = no frustration)")
+    public double residenceMitigationFactor = 0.5;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Duration multiplier when a cook/tavern is being built")
+    public double foodMitigationFactor = 0.5;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Duration multiplier when the citizen's workplace is being upgraded")
+    public double jobMitigationFactor = 0.6;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Duration multiplier when housing exists but the citizen isn't assigned")
+    public double unassignedResidenceFactor = 0.7;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
+    @SerialEntry(comment = "Duration multiplier when a restaurant exists but has no cook")
+    public double noCookFactor = 0.8;
+
+    @AutoGen(category = "citizens", group = "frustration")
+    @IntField(min = 1)
+    @SerialEntry(comment = "How long a completion event persists in prompts (24000 = 1 in-game day)")
+    public int constructionEventRetentionTicks = 24000;
+
     // Colony Diplomacy
     @AutoGen(category = "citizens", group = "colony_diplomacy")
     @TickBox
