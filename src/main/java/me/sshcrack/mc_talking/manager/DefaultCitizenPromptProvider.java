@@ -452,6 +452,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     private static String formatFrustrationDuration(long ticks) {
+        if (ticks < 20 * 60) return "just started";
         long minutes = ticks / (20 * 60);
         if (minutes < 60) return minutes + "+ minutes";
         long hours = minutes / 60;

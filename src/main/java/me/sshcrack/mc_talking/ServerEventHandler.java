@@ -133,8 +133,9 @@ public class ServerEventHandler {
     }
 
     private void onServerTickCommon(MinecraftServer server) {
-        frustrationTickCounter++;
-        if (frustrationTickCounter % McTalkingConfig.INSTANCE.instance().frustrationCheckIntervalTicks == 0) {
+        int checkInterval = McTalkingConfig.INSTANCE.instance().frustrationCheckIntervalTicks;
+        if (++frustrationTickCounter >= checkInterval) {
+            frustrationTickCounter = 0;
             FrustrationHandler.tick(server);
         }
 

@@ -62,19 +62,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 
-import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
-import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
-import static com.minecolonies.api.util.constant.HappinessConstants.HEALTH;
-import static com.minecolonies.api.util.constant.HappinessConstants.HOMELESSNESS;
-import static com.minecolonies.api.util.constant.HappinessConstants.IDLEATJOB;
-import static com.minecolonies.api.util.constant.HappinessConstants.MYSTICAL_SITE;
-import static com.minecolonies.api.util.constant.HappinessConstants.RAIDWITHOUTDEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.SCHOOL;
-import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
-import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
-import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
-import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
+
 
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -845,47 +833,8 @@ public final class CitizenPromptViewFactory {
     }
 
     private static HappinessModifierType resolveHappinessModifierType(String modifierId) {
-        if (HOMELESSNESS.equals(modifierId)) {
-            return HappinessModifierType.HOMELESSNESS;
-        }
-        if (UNEMPLOYMENT.equals(modifierId)) {
-            return HappinessModifierType.UNEMPLOYMENT;
-        }
-        if (HEALTH.equals(modifierId)) {
-            return HappinessModifierType.HEALTH;
-        }
-        if (IDLEATJOB.equals(modifierId)) {
-            return HappinessModifierType.IDLEATJOB;
-        }
-        if (SCHOOL.equals(modifierId)) {
-            return HappinessModifierType.SCHOOL;
-        }
-        if (MYSTICAL_SITE.equals(modifierId)) {
-            return HappinessModifierType.MYSTICAL_SITE;
-        }
-        if (SECURITY.equals(modifierId)) {
-            return HappinessModifierType.SECURITY;
-        }
-        if (SOCIAL.equals(modifierId)) {
-            return HappinessModifierType.SOCIAL;
-        }
-        if (DAMAGE.equals(modifierId)) {
-            return HappinessModifierType.DAMAGE;
-        }
-        if (DEATH.equals(modifierId)) {
-            return HappinessModifierType.DEATH;
-        }
-        if (RAIDWITHOUTDEATH.equals(modifierId)) {
-            return HappinessModifierType.RAIDWITHOUTDEATH;
-        }
-        if (FOOD.equals(modifierId)) {
-            return HappinessModifierType.FOOD;
-        }
-        if (SLEPTTONIGHT.equals(modifierId)) {
-            return HappinessModifierType.SLEPTTONIGHT;
-        }
-
-        return HappinessModifierType.UNKNOWN;
+        var result = HappinessModifierType.fromId(modifierId);
+        return result != null ? result : HappinessModifierType.UNKNOWN;
     }
 
     private static String describeWeather(Level level) {

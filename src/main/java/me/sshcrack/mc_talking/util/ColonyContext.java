@@ -28,7 +28,10 @@ public record ColonyContext(
 
     public static ColonyContext compute(ICitizenData data, McTalkingConfig config) {
         IColony colony = data.getColony();
-        var buildings = colony.getServerBuildingManager().getBuildings().values();
+        var bm = colony.getServerBuildingManager();
+        if (bm == null) return defaultColonyContext(config);
+
+        var buildings = bm.getBuildings().values();
 
         boolean resUnderCon   = false;
         boolean cookUnderCon  = false;
@@ -73,6 +76,20 @@ public record ColonyContext(
             config.unassignedResidenceFactor,
             config.noCookFactor,
             retention
+        );
+    }
+
+    private static ColonyContext defaultColonyContext(McTalkingConfig config) {
+        return new ColonyContext(
+            false, false, false, false,
+            false, false,
+            List.of(),
+            config.residenceMitigationFactor,
+            config.foodMitigationFactor,
+            config.jobMitigationFactor,
+            config.unassignedResidenceFactor,
+            config.noCookFactor,
+            config.constructionEventRetentionTicks
         );
     }
 
