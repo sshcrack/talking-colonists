@@ -63,7 +63,9 @@ git commit -m "verify mixin smoke test"
 
 The `mixin-smoke-verification` CI job checks that `.mixin-smoke-verified` exists and matches `HEAD`. This is a fast (~10s) required check that blocks PR merge if the smoke test isn't current.
 
-A pre-commit hook (`check-mixin-smoke-required`) will remind you when mixin files are staged.
+A pre-commit hook (`check-mixin-smoke-required`) **blocks** the commit if mixin files are staged but `.mixin-smoke-verified` doesn't match `HEAD`. Run the smoke test, stage the generated `.mixin-smoke-verified` file, then commit.
+
+If you need to bypass (e.g., CI-only fix): `git commit --no-verify`.
 
 ## Local Gemini Live Library
 

@@ -29,6 +29,7 @@ public abstract class AbstractEntityAIGuardMixin {
             return;
 
 
+        
         AbstractEntityCitizen guard = ((AbstractAISkeletonAccessor) this).getWorker();
         PregenerationTaskService.playThreatNow(guard, attacker);
     }
