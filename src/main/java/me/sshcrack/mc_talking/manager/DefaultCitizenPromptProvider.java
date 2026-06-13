@@ -241,7 +241,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         if (view.homeless()) {
-            prompt.append("- Very concerned about not having a home\n");
+            if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge && view.colonyAgeDays() < 7) {
+                prompt.append("- Not having a proper home yet is tough, but the colony is still getting set up\n");
+            } else if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge && view.colonyAgeDays() < 30) {
+                prompt.append("- Getting worried about not having a proper home — the colony should be more established by now\n");
+            } else {
+                prompt.append("- Very concerned about not having a home\n");
+            }
         }
 
         if (!view.child() && view.jobName() == null) {
@@ -470,17 +476,45 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 case HOMELESSNESS:
                     if (factor < 0.8 && !view.guard()) {
                         if (factor < 0.3) {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "Sleeping without a proper roof over your head is wearing on you",
-                                "You desperately need a home — living like this is getting unbearable",
-                                "Not having a decent place to live is one of your biggest worries"
-                            )).append("\n");
+                            if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge && view.colonyAgeDays() < 7) {
+                                prompt.append("- ").append(MiscUtil.pick(
+                                    "Not having a proper home yet is tough, but the colony is still getting set up",
+                                    "You know the colony just started — you're willing to be patient about housing for now",
+                                    "Living without a proper roof is hard, but these things take time in a new colony"
+                                )).append("\n");
+                            } else if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge && view.colonyAgeDays() < 30) {
+                                prompt.append("- ").append(MiscUtil.pick(
+                                    "The lack of proper housing is starting to wear on you — the colony should be building homes by now",
+                                    "You've been without a real home for a while now and it's getting concerning",
+                                    "Not having proper shelter is becoming a real problem as the colony grows"
+                                )).append("\n");
+                            } else {
+                                prompt.append("- ").append(MiscUtil.pick(
+                                    "Sleeping without a proper roof over your head is wearing on you",
+                                    "You desperately need a home — living like this is getting unbearable",
+                                    "Not having a decent place to live is one of your biggest worries"
+                                )).append("\n");
+                            }
                         } else {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "Your current housing is cramped and basic — you wish for something better",
-                                "The shack you're living in barely counts as a proper home",
-                                "Your housing situation could be a lot better than this"
-                            )).append("\n");
+                            if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge && view.colonyAgeDays() < 7) {
+                                prompt.append("- ").append(MiscUtil.pick(
+                                    "Your housing is basic, but that's expected for a young colony",
+                                    "The cramped shelter is fine for now — the colony has only just started",
+                                    "Living in tight quarters is part of colony life in the early days"
+                                )).append("\n");
+                            } else if (McTalkingConfig.INSTANCE.instance().scaleHousingComplaintsByAge && view.colonyAgeDays() < 30) {
+                                prompt.append("- ").append(MiscUtil.pick(
+                                    "Your housing situation could use improvement as the colony matures",
+                                    "The basic shelter is getting old — you hope the colony expands housing soon",
+                                    "You're ready for better housing as the colony continues to develop"
+                                )).append("\n");
+                            } else {
+                                prompt.append("- ").append(MiscUtil.pick(
+                                    "Your current housing is cramped and basic — you wish for something better",
+                                    "The shack you're living in barely counts as a proper home",
+                                    "Your housing situation could be a lot better than this"
+                                )).append("\n");
+                            }
                         }
                     } else if (factor > 1.2) {
                         prompt.append("- ").append(MiscUtil.pick(
