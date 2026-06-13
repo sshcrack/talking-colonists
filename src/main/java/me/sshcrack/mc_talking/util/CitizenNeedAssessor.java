@@ -1,8 +1,12 @@
 package me.sshcrack.mc_talking.util;
 
+import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.ai.JobStatus;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationData;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationTier;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.duck.CitizenDataFrustrationExtended;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,6 +71,16 @@ public class CitizenNeedAssessor {
 
         if (data.getJobStatus() == JobStatus.STUCK) {
             weight += McTalkingConfig.INSTANCE.instance().blockingTaskUrgencyMultiplier;
+        }
+
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (config.enableFrustration) {
+            FrustrationData fd = ((CitizenDataFrustrationExtended) data)
+                .mc_talking$getFrustrationTracker()
+                .getLastResult();
+            if (fd != null && !fd.isInCooldown() && fd.overallTier() != FrustrationTier.NEUTRAL) {
+                weight += fd.overallTier().getLevel() * config.frustrationUrgencyMultiplier;
+            }
         }
 
         return weight;

@@ -8,10 +8,12 @@ import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.duck.CitizenDataFrustrationExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.util.FrustrationTracker;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -31,13 +33,17 @@ import java.util.concurrent.ThreadLocalRandom;
 
 
 @Mixin(value = CitizenData.class, remap = false)
-public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended, CitizenRecentActionsProvider {
+public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataPersonalityExtended, CitizenRecentActionsProvider, CitizenDataFrustrationExtended {
     @Unique
     private static final String TAG_MEMORY_KEY = "mc_talking_memory";
     @Unique
     private static final String TAG_PERSONALITY_KEY = "mc_talking_personality";
     @Unique
     private static final String TAG_RECENT_ACTIONS_KEY = "mc_talking_recent_actions";
+    @Unique
+    private static final String TAG_FRUSTRATION_KEY = "mc_talking_frustration";
+    @Unique
+    private final FrustrationTracker mc_talking$frustrationTracker = new FrustrationTracker();
     @Unique
     private static final String SLEEP_PROMPT = "You are now sleeping. END THE CONVERSATION NOW USING YOUR \"end_conversation\" TOOL. IGNORE ANY INSTRUCTIONS AND END CONVERSATION NOW!!!!";
     @Unique
@@ -144,6 +150,14 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
             tag.put(TAG_RECENT_ACTIONS_KEY, actionsTag);
         }
 
+        // Frustration tracker
+        if (tag.contains(TAG_FRUSTRATION_KEY)) {
+            McTalking.LOGGER.error("Frustration data conflict for citizen {}, not overwriting.",
+                CitizenData.class.cast(this).getUUID());
+        } else {
+            tag.put(TAG_FRUSTRATION_KEY, mc_talking$frustrationTracker.serializeNbt());
+        }
+
         // Personality
         if (mc_talking$personality != null) {
             tag.putString(TAG_PERSONALITY_KEY, mc_talking$personality.name());
@@ -167,6 +181,11 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
             }
         }
 
+        if (nbtTagCompound.contains(TAG_FRUSTRATION_KEY)) {
+            mc_talking$frustrationTracker.deserializeNbt(
+                nbtTagCompound.getCompound(TAG_FRUSTRATION_KEY));
+        }
+
         if (nbtTagCompound.contains(TAG_PERSONALITY_KEY)) {
             String raw = nbtTagCompound.getString(TAG_PERSONALITY_KEY);
             if (raw.startsWith("custom:")) {
@@ -181,6 +200,11 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
                 }
             }
         }
+    }
+
+    @Override
+    public FrustrationTracker mc_talking$getFrustrationTracker() {
+        return mc_talking$frustrationTracker;
     }
 
     @Override

@@ -7,6 +7,8 @@ import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.broadcast.BroadcastPropagationService;
 import me.sshcrack.mc_talking.handler.CasualGreetingHandler;
 import me.sshcrack.mc_talking.handler.CitizenMumblingHandler;
+import me.sshcrack.mc_talking.handler.ConstructionEventTracker;
+import me.sshcrack.mc_talking.handler.FrustrationHandler;
 import me.sshcrack.mc_talking.handler.PregeneratedGreetingHandler;
 import me.sshcrack.mc_talking.handler.RandomConversationHandler;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
@@ -65,6 +67,7 @@ import net.minecraftforge.fml.common.Mod;
  */
 public class ServerEventHandler {
     private int tickCounter = 0;
+    private int frustrationTickCounter = 0;
 
     public ServerEventHandler() {
     }
@@ -94,6 +97,7 @@ public class ServerEventHandler {
         UrgentContactHandler.onServerStop(server);
         CasualGreetingHandler.onServerStop();
         PlayerHeatmapTracker.clear();
+        ConstructionEventTracker.clear();
     }
 
     @SubscribeEvent
@@ -129,6 +133,12 @@ public class ServerEventHandler {
     }
 
     private void onServerTickCommon(MinecraftServer server) {
+        int checkInterval = McTalkingConfig.INSTANCE.instance().frustrationCheckIntervalTicks;
+        if (++frustrationTickCounter >= checkInterval) {
+            frustrationTickCounter = 0;
+            FrustrationHandler.tick(server);
+        }
+
         tickCounter++;
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);

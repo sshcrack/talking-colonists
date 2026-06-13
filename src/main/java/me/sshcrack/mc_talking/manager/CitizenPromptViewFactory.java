@@ -28,14 +28,18 @@ import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.util.ColonyStatsHelper;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationData;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
+import me.sshcrack.mc_talking.duck.CitizenDataFrustrationExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
+import me.sshcrack.mc_talking.util.ColonyContext;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.network.chat.Component;
@@ -58,24 +62,13 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 
-import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
-import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
-import static com.minecolonies.api.util.constant.HappinessConstants.HEALTH;
-import static com.minecolonies.api.util.constant.HappinessConstants.HOMELESSNESS;
-import static com.minecolonies.api.util.constant.HappinessConstants.IDLEATJOB;
-import static com.minecolonies.api.util.constant.HappinessConstants.MYSTICAL_SITE;
-import static com.minecolonies.api.util.constant.HappinessConstants.RAIDWITHOUTDEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.SCHOOL;
-import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
-import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
-import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
-import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
+
 
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Builds stable API prompt views from MineColonies runtime data.
@@ -140,6 +133,60 @@ public final class CitizenPromptViewFactory {
         ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, subState != null ? subState.state() : null);
         List<String> recentActions = extractRecentActions(data);
 
+        FrustrationData frustrationData = null;
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (config.enableFrustration) {
+            var tracker = ((CitizenDataFrustrationExtended) data).mc_talking$getFrustrationTracker();
+            long gameTime = data.getColony().getWorld() != null
+                ? data.getColony().getWorld().getGameTime() : 0;
+            long[] tierThresholds = {
+                config.mildlyAnnoyedThresholdTicks,
+                config.concernedThresholdTicks,
+                config.agitatedThresholdTicks,
+                config.furiousThresholdTicks
+            };
+            ColonyContext colonyCtx = config.constructionMitigationEnabled
+                ? ColonyContext.compute(data, config) : null;
+
+            frustrationData = tracker.compute(
+                modifiers,
+                gameTime,
+                config.frustrationNegativeThreshold,
+                tierThresholds,
+                colonyCtx
+            );
+
+            if (colonyCtx != null && frustrationData != null && !frustrationData.isInCooldown()) {
+                if (workBuilding != null) {
+                    ResourceLocation workTypeId = workBuilding.getBuildingType().getRegistryName();
+                    var modifiedViews = new ArrayList<>(frustrationData.modifiers());
+                    for (int i = 0; i < modifiedViews.size(); i++) {
+                        var mv = modifiedViews.get(i);
+                        if ((mv.type() == HappinessModifierType.IDLEATJOB
+                                || mv.type() == HappinessModifierType.UNEMPLOYMENT)
+                                && mv.contextNote() == null) {
+                            boolean found = colonyCtx.recentCompletions().stream()
+                                .anyMatch(e -> e.buildingTypeId().equals(workTypeId));
+                            if (found) {
+                                modifiedViews.set(i, new FrustrationModifierView(
+                                    mv.type(), mv.factor(), mv.rawDurationTicks(),
+                                    mv.adjustedDurationTicks(), mv.tier(),
+                                    "Your workplace was just upgraded!"
+                                ));
+                            }
+                        }
+                    }
+                    if (!modifiedViews.equals(frustrationData.modifiers())) {
+                        frustrationData = new FrustrationData(
+                            frustrationData.overallTier(),
+                            java.util.Collections.unmodifiableList(modifiedViews),
+                            false
+                        );
+                    }
+                }
+            }
+        }
+
         return new CitizenPromptView(
                 data.getName(),
                 data.isChild(),
@@ -191,7 +238,8 @@ public final class CitizenPromptViewFactory {
                 colonyAgeDays,
                 colonyFoodSituation,
                 recentActions,
-                subState
+                subState,
+                frustrationData
         );
     }
 
@@ -785,47 +833,8 @@ public final class CitizenPromptViewFactory {
     }
 
     private static HappinessModifierType resolveHappinessModifierType(String modifierId) {
-        if (HOMELESSNESS.equals(modifierId)) {
-            return HappinessModifierType.HOMELESSNESS;
-        }
-        if (UNEMPLOYMENT.equals(modifierId)) {
-            return HappinessModifierType.UNEMPLOYMENT;
-        }
-        if (HEALTH.equals(modifierId)) {
-            return HappinessModifierType.HEALTH;
-        }
-        if (IDLEATJOB.equals(modifierId)) {
-            return HappinessModifierType.IDLEATJOB;
-        }
-        if (SCHOOL.equals(modifierId)) {
-            return HappinessModifierType.SCHOOL;
-        }
-        if (MYSTICAL_SITE.equals(modifierId)) {
-            return HappinessModifierType.MYSTICAL_SITE;
-        }
-        if (SECURITY.equals(modifierId)) {
-            return HappinessModifierType.SECURITY;
-        }
-        if (SOCIAL.equals(modifierId)) {
-            return HappinessModifierType.SOCIAL;
-        }
-        if (DAMAGE.equals(modifierId)) {
-            return HappinessModifierType.DAMAGE;
-        }
-        if (DEATH.equals(modifierId)) {
-            return HappinessModifierType.DEATH;
-        }
-        if (RAIDWITHOUTDEATH.equals(modifierId)) {
-            return HappinessModifierType.RAIDWITHOUTDEATH;
-        }
-        if (FOOD.equals(modifierId)) {
-            return HappinessModifierType.FOOD;
-        }
-        if (SLEPTTONIGHT.equals(modifierId)) {
-            return HappinessModifierType.SLEPTTONIGHT;
-        }
-
-        return HappinessModifierType.UNKNOWN;
+        var result = HappinessModifierType.fromId(modifierId);
+        return result != null ? result : HappinessModifierType.UNKNOWN;
     }
 
     private static String describeWeather(Level level) {

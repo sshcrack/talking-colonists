@@ -13,6 +13,9 @@ import com.minecolonies.api.eventbus.events.colony.citizens.CitizenJobChangedMod
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingAddedModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingConstructionModEvent;
 import com.minecolonies.api.eventbus.events.colony.buildings.BuildingRemovedModEvent;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.duck.CitizenDataFrustrationExtended;
+import me.sshcrack.mc_talking.handler.ConstructionEventTracker;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
 import net.minecraft.network.chat.Component;
 
@@ -51,6 +54,14 @@ public final class ColonyEventSubscriber {
             ICitizenData citizen = (ICitizenData) event.getCitizen();
             IColony colony = citizen.getColony();
             String name = citizen.getName();
+
+            var config = McTalkingConfig.INSTANCE.instance();
+            if (config.enableFrustration) {
+                var tracker = ((CitizenDataFrustrationExtended) citizen)
+                    .mc_talking$getFrustrationTracker();
+                tracker.setCooldownTicks((long) config.frustrationCooldownDays * 24_000L);
+            }
+
             switch (event.getSource()) {
                 case BORN:
                     ColonyEventBuffer.recordEvent(colony, ColonyEventBuffer.EventType.CITIZEN_BORN,
@@ -99,9 +110,14 @@ public final class ColonyEventSubscriber {
             IColony colony = building.getColony();
             String buildingName = building.getBuildingDisplayName();
             int level = building.getBuildingLevel();
+
             if (level > 1) {
                 ColonyEventBuffer.recordEvent(colony, ColonyEventBuffer.EventType.BUILDING_UPGRADED,
                         buildingName + " was upgraded to level " + level);
+            }
+
+            if (McTalkingConfig.INSTANCE.instance().enableFrustration) {
+                ConstructionEventTracker.onConstructionComplete(building, event.getWorkOrder());
             }
         });
 

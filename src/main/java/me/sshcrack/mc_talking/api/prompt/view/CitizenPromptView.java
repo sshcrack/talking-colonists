@@ -86,6 +86,7 @@ public record CitizenPromptView(
         int colonyAgeDays,
         @Nullable ColonyFoodSituation colonyFoodSituation,
         @Nullable List<String> recentActions,
-        @Nullable CitizenSubState subState
+        @Nullable CitizenSubState subState,
+        @Nullable FrustrationData frustrationData
 ) {
 }

@@ -12,6 +12,10 @@ import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.util.InventoryUtils;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationData;
+import me.sshcrack.mc_talking.api.prompt.view.FrustrationTier;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.duck.CitizenDataFrustrationExtended;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
 
@@ -35,6 +39,16 @@ public final class MumblingTopicHelper {
         var data = citizen.getCitizenData();
         double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
 
+        int frustrationLevel = 0;
+        if (McTalkingConfig.INSTANCE.instance().enableFrustration) {
+            FrustrationData fd = ((CitizenDataFrustrationExtended) data)
+                .mc_talking$getFrustrationTracker()
+                .getLastResult();
+            if (fd != null && !fd.isInCooldown()) {
+                frustrationLevel = fd.overallTier().getLevel();
+            }
+        }
+
         String statusTopic = buildStatusTopic(citizen);
         boolean critical = isCriticalStatus(citizen);
 
@@ -43,7 +57,7 @@ public final class MumblingTopicHelper {
             return compose(statusTopic);
         }
 
-        String jobTopic = buildJobTopic(citizen, happiness);
+        String jobTopic = buildJobTopic(citizen, happiness, frustrationLevel);
 
         // Colony milestone — rolls independently so it can supplement any topic.
         String rawMilestone = null;
@@ -103,7 +117,7 @@ public final class MumblingTopicHelper {
 
     // ── Job-specific thoughts ─────────────────────────────────────────────────
 
-    private static String buildJobTopic(AbstractEntityCitizen citizen, double happiness) {
+    private static String buildJobTopic(AbstractEntityCitizen citizen, double happiness, int frustrationLevel) {
         var data = citizen.getCitizenData();
         if (data.getJob() == null) return null;
 
@@ -111,7 +125,7 @@ public final class MumblingTopicHelper {
         String base = buildJobThought(job);
         if (base == null) return null;
 
-        return applyMoodTint(base, happiness);
+        return applyMoodTint(base, happiness, frustrationLevel);
     }
 
     private static String buildJobThought(JobEntry job) {
@@ -420,7 +434,21 @@ public final class MumblingTopicHelper {
      * citizen's current happiness level. Neutral happiness (5–8) is left untouched
      * to avoid every mumble feeling melodramatic.
      */
-    private static String applyMoodTint(String base, double happiness) {
+    private static String applyMoodTint(String base, double happiness, int frustrationLevel) {
+        if (frustrationLevel >= 4) {
+            return base + " " + MiscUtil.pick(
+                    "You're furious about the way things have been going.",
+                    "Anger simmers just below the surface — you can't take much more.",
+                    "Every little thing is making you angrier and angrier."
+            );
+        }
+        if (frustrationLevel >= 3) {
+            return base + " " + MiscUtil.pick(
+                    "You're agitated and finding it hard to stay calm.",
+                    "Things have been going wrong for too long — you're on edge.",
+                    "You feel a constant sense of irritation you can't shake."
+            );
+        }
         if (happiness < 3.0) {
             return base + " " + MiscUtil.pick(
                     "A creeping frustration sits just beneath the surface.",
@@ -435,7 +463,7 @@ public final class MumblingTopicHelper {
                     "You're a little off — nothing feels quite right."
             );
         }
-        if (happiness > 8.0) {
+        if (happiness > 8.0 && frustrationLevel == 0) {
             return base + " " + MiscUtil.pick(
                     "Despite everything, you're in good spirits.",
                     "Things feel like they're going well lately.",
