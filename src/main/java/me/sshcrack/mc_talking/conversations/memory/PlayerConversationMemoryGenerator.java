@@ -9,11 +9,13 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.util.LlmFallback;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -109,16 +111,28 @@ public class PlayerConversationMemoryGenerator extends Thread {
                     citizenName, playerName,
                     playerName, playerName);
 
-            String responseJson;
-            try {
-                responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
-                return;
-            } catch (UnexpectedResponseException | IOException e) {
-                McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
-                return;
+            String responseJson = null;
+
+            // Try provider architecture first if configured
+            if (McTalkingConfig.useProviderArchitecture()) {
+                Optional<String> result = LlmFallback.callLlm(prompt, "Generate the memory JSON now.");
+                if (result.isPresent()) {
+                    responseJson = result.get();
+                }
+            }
+
+            // Fall back to Gemini Flash
+            if (responseJson == null) {
+                try {
+                    responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
+                    return;
+                } catch (UnexpectedResponseException | IOException e) {
+                    McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
+                    return;
+                }
             }
 
             GsonMemoryResponse response;

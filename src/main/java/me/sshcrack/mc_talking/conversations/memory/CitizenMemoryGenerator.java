@@ -9,12 +9,14 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
+import me.sshcrack.mc_talking.util.LlmFallback;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
@@ -72,17 +74,30 @@ public class CitizenMemoryGenerator extends Thread {
     public void run() {
         try {
             McTalking.LOGGER.debug("Starting memories generation for conversation: {}", conversation);
-            String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
-            String memoryString;
-            try {
-                memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                McTalking.LOGGER.debug("Memory generation thread was interrupted for conversation: {}", conversation);
-                return;
-            } catch (UnexpectedResponseException | IOException e) {
-                McTalking.LOGGER.error("Failed to generate memories for conversation: {}", conversation, e);
-                return;
+
+            String memoryString = null;
+
+            // Try provider architecture first if configured
+            if (McTalkingConfig.useProviderArchitecture()) {
+                Optional<String> result = LlmFallback.callLlm(PROMPT, conversation);
+                if (result.isPresent()) {
+                    memoryString = result.get();
+                }
+            }
+
+            // Fall back to Gemini Flash
+            if (memoryString == null) {
+                String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
+                try {
+                    memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    McTalking.LOGGER.debug("Memory generation thread was interrupted for conversation: {}", conversation);
+                    return;
+                } catch (UnexpectedResponseException | IOException e) {
+                    McTalking.LOGGER.error("Failed to generate memories for conversation: {}", conversation, e);
+                    return;
+                }
             }
 
             GsonMemoryResponse json;
