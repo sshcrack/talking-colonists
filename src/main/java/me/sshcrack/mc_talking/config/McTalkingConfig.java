@@ -17,6 +17,7 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.provider.ProviderSelection;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -401,6 +402,42 @@ public class McTalkingConfig {
     @IntField(min = 1, max = 500)
     @SerialEntry(comment = "Maximum number of individual events/facts before compaction is triggered for a citizen.")
     public int memoryCompactionThreshold = 15;
+
+    // Provider Selection
+    @AutoGen(category = "provider_selection")
+    @StringField
+    @SerialEntry(comment = "Provider ID for speech-to-text (STT). Leave empty to use the default/auto selection.")
+    public String sttProvider = "";
+
+    @AutoGen(category = "provider_selection")
+    @StringField
+    @SerialEntry(comment = "Provider ID for language model (LLM). Leave empty to use the default/auto selection.")
+    public String llmProvider = "";
+
+    @AutoGen(category = "provider_selection")
+    @StringField
+    @SerialEntry(comment = "Provider ID for text-to-speech (TTS). Leave empty to use the default/auto selection.")
+    public String ttsProvider = "";
+
+    @AutoGen(category = "provider_selection")
+    @StringField
+    @SerialEntry(comment = "Provider ID for live bundle (combined STT+LLM+TTS). When set, STT/LLM/TTS providers are ignored. Leave empty for auto selection.")
+    public String liveBundleProvider = "";
+
+    public static ProviderSelection buildProviderSelection() {
+        var inst = INSTANCE.instance();
+        return new ProviderSelection(
+            inst.sttProvider.isEmpty() ? ProviderSelection.DISABLED : inst.sttProvider,
+            inst.llmProvider.isEmpty() ? ProviderSelection.DISABLED : inst.llmProvider,
+            inst.ttsProvider.isEmpty() ? ProviderSelection.DISABLED : inst.ttsProvider,
+            inst.liveBundleProvider.isEmpty() ? ProviderSelection.DISABLED : inst.liveBundleProvider
+        );
+    }
+
+    public static boolean useProviderArchitecture() {
+        ProviderSelection sel = buildProviderSelection();
+        return sel.hasLiveBundle() || sel.hasComposable();
+    }
 
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
         @Override

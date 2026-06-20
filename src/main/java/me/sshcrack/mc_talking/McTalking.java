@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
+import me.sshcrack.mc_talking.api.provider.AiProviderRegistry;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.listener.ColonyEventSubscriber;
 import me.sshcrack.mc_talking.manager.tools.AITools;
@@ -77,6 +78,10 @@ public class McTalking {
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
+        AiProviderRegistry.setConfig(
+                AiProviderRegistry.CONFIG_GEMINI_API_KEY,
+                McTalkingConfig.INSTANCE.instance().geminiApiKey
+        );
         ColonyEventSubscriber.register();
     }
 

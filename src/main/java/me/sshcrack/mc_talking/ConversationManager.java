@@ -8,8 +8,11 @@ import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
+import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.session.CitizenGameSession;
+import me.sshcrack.mc_talking.session.SessionFactory;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
@@ -19,6 +22,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -59,6 +63,9 @@ public class ConversationManager {
 
     // Active AI clients keyed by citizen entity UUID
     private static final Map<UUID, GeminiWsClient> clients = new ConcurrentHashMap<>();
+
+    // Game sessions created via SessionFactory (provider-architecture path)
+    private static final Map<UUID, CitizenGameSession> gameSessions = new ConcurrentHashMap<>();
 
     // playerId → citizen entity the player is talking to
     private static final Map<UUID, AbstractEntityCitizen> activeEntity = new ConcurrentHashMap<>();
@@ -356,6 +363,8 @@ public class ConversationManager {
 
         GeminiWsClient client = clients.remove(entityId);
         if (client != null) client.close();
+        CitizenGameSession session = gameSessions.remove(entityId);
+        if (session != null) session.close();
         McTalking.LOGGER.info("[ConversationManager] Evicted slot for entity {} to make room", entityId);
     }
 
@@ -450,7 +459,7 @@ public class ConversationManager {
      */
     public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
         UUID id = citizen.getUUID();
-        return clients.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id) || backgroundSlots.contains(id);
+        return clients.containsKey(id) || gameSessions.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id) || backgroundSlots.contains(id);
     }
 
     /**
@@ -545,7 +554,7 @@ public class ConversationManager {
     public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
         if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
-        if (clients.containsKey(citizen.getUUID())) {
+        if (clients.containsKey(citizen.getUUID()) || gameSessions.containsKey(citizen.getUUID())) {
             urgentContactConversations.add(citizen.getUUID());
         }
     }
@@ -602,6 +611,11 @@ public class ConversationManager {
             return;
         }
 
+        if (McTalkingConfig.useProviderArchitecture()) {
+            startLowPrioritySessionViaFactory(citizen, userPrompt);
+            return;
+        }
+
         var client = new CitizenWsClient(citizen,
                 c -> {
                     c.close();
@@ -615,6 +629,20 @@ public class ConversationManager {
                 });
         client.addPromptTextAfterTalkingComplete(userPrompt);
         clients.put(citizenId, client);
+    }
+
+    private static void startLowPrioritySessionViaFactory(AbstractEntityCitizen citizen, String userPrompt) {
+        UUID citizenId = citizen.getUUID();
+        var factory = new SessionFactory(McTalkingConfig.buildProviderSelection());
+        var sessionOpt = factory.createSession(citizen, new CitizenEntityAudioProvider(citizen, null));
+        if (sessionOpt.isEmpty()) {
+            McTalking.LOGGER.warn("[ConversationManager] SessionFactory could not create session for citizen {}", citizenId);
+            releaseSlot(citizen);
+            return;
+        }
+        var session = sessionOpt.get();
+        session.addPromptTextAfterTalkingComplete(userPrompt);
+        gameSessions.put(citizenId, session);
     }
 
     /**
@@ -658,6 +686,13 @@ public class ConversationManager {
         activeEntity.put(playerId, citizen);
         citizenToPlayer.put(citizenId, playerId);
 
+        if (McTalkingConfig.useProviderArchitecture()) {
+            startPlayerConversationViaFactory(player, citizen);
+            playerConversationPartners.put(playerId, citizenId);
+            urgentContactConversations.remove(citizenId);
+            return;
+        }
+
         GeminiWsClient existingClient = clients.get(citizenId);
 
         if (existingClient instanceof CitizenWsClient cws && cws.isMumbling()) {
@@ -698,6 +733,28 @@ public class ConversationManager {
         urgentContactConversations.remove(citizenId);
     }
 
+    private static void startPlayerConversationViaFactory(ServerPlayer player, AbstractEntityCitizen citizen) {
+        UUID citizenId = citizen.getUUID();
+
+        // Abort any existing non-player session
+        Runnable abortHandler = abortHandlers.remove(citizenId);
+        if (abortHandler != null) abortHandler.run();
+
+        CitizenGameSession existing = gameSessions.remove(citizenId);
+        if (existing != null) existing.close();
+        releaseSlot(citizen);
+
+        claimSlot(citizen, true);
+        var factory = new SessionFactory(McTalkingConfig.buildProviderSelection());
+        var sessionOpt = factory.createPlayerSession(citizen, player);
+        if (sessionOpt.isEmpty()) {
+            McTalking.LOGGER.warn("[ConversationManager] SessionFactory could not create player session for citizen {}", citizenId);
+            releaseSlot(citizen);
+            return;
+        }
+        gameSessions.put(citizenId, sessionOpt.get());
+    }
+
     /**
      * Ends a conversation for a specific player.
      *
@@ -712,6 +769,8 @@ public class ConversationManager {
         citizenToPlayer.remove(citizenId);
         GeminiWsClient client = clients.remove(citizenId);
         if (client != null) client.close();
+        CitizenGameSession gameSession = gameSessions.remove(citizenId);
+        if (gameSession != null) gameSession.close();
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null) releaseSlot(entity);
@@ -755,6 +814,11 @@ public class ConversationManager {
         return clients.get(entityId);
     }
 
+    @Nullable
+    public static CitizenGameSession getGameSessionForEntity(UUID entityId) {
+        return gameSessions.get(entityId);
+    }
+
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {
         return activeEntity.get(playerId);
     }
@@ -782,10 +846,18 @@ public class ConversationManager {
                 McTalking.LOGGER.error("Error closing client during cleanup", e);
             }
         }
+        for (CitizenGameSession session : gameSessions.values()) {
+            try {
+                session.close();
+            } catch (Exception e) {
+                McTalking.LOGGER.error("Error closing game session during cleanup", e);
+            }
+        }
         for (GeminiLiveClient client : backgroundClients.values()) {
             try { client.close(); } catch (Exception ignored) {}
         }
         clients.clear();
+        gameSessions.clear();
         activeEntity.clear();
         playerConversationPartners.clear();
         citizenToPlayer.clear();

@@ -29,7 +29,7 @@ platform {
             curseforge = "minecolonies"
             forgeLikeVersionRange = "[${prop("deps.minecolonies_version")},)"
         }
-        required("gemini_live_lib") {
+        optional("gemini_live_lib") {
             curseforge = "gemini-live-lib"
             forgeLikeVersionRange = "[${prop("deps.gemini_live_lib_version")},)"
         }
@@ -180,6 +180,8 @@ publishing {
 }
 
 dependencies {
+    implementation(project(":api"))
+
     annotationProcessor("org.spongepowered:mixin:${libs.versions.mixin.get()}:processor")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4") as Any)
 
@@ -194,7 +196,9 @@ dependencies {
 
     modImplementation("de.maxhenkel.voicechat:voicechat-api:${prop("deps.voicechat_api_version")}")
     modRuntimeOnly("maven.modrinth:simple-voice-chat:forge-${voicechat_version}")
-    modImplementation("me.sshcrack:gemini_live_lib:${prop("deps.gemini_live_lib_version")}-${prop("deps.minecraft")}-forge")
+    compileOnly("me.sshcrack:gemini_live_lib:${prop("deps.gemini_live_lib_version")}-${prop("deps.minecraft")}-forge")
+
+    implementation("me.sshcrack:local_ai_lib:1.0.0")
 
     modImplementation("com.ldtteam:minecolonies:${prop("deps.minecolonies_version")}")
     modRuntimeOnly("com.ldtteam:domum_ornamentum:${prop("deps.domum_version")}:universal")
