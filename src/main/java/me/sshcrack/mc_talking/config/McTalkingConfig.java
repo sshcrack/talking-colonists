@@ -1,7 +1,12 @@
 package me.sshcrack.mc_talking.config;
 
+import dev.isxander.yacl3.api.Binding;
+import dev.isxander.yacl3.api.ConfigCategory;
 import dev.isxander.yacl3.api.Option;
+import dev.isxander.yacl3.api.OptionDescription;
+import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.ControllerBuilder;
+import dev.isxander.yacl3.api.controller.DropdownStringControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.isxander.yacl3.config.v2.api.ConfigClassHandler;
 import dev.isxander.yacl3.config.v2.api.ConfigField;
@@ -17,12 +22,19 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.provider.AiProviderRegistry;
+import me.sshcrack.mc_talking.api.provider.Capability;
 import me.sshcrack.mc_talking.api.provider.ProviderSelection;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Configuration class for the McTalking mod.
@@ -404,23 +416,15 @@ public class McTalkingConfig {
     public int memoryCompactionThreshold = 15;
 
     // Provider Selection
-    @AutoGen(category = "provider_selection")
-    @StringField
     @SerialEntry(comment = "Provider ID for speech-to-text (STT). Leave empty to use the default/auto selection.")
     public String sttProvider = "";
 
-    @AutoGen(category = "provider_selection")
-    @StringField
     @SerialEntry(comment = "Provider ID for language model (LLM). Leave empty to use the default/auto selection.")
     public String llmProvider = "";
 
-    @AutoGen(category = "provider_selection")
-    @StringField
     @SerialEntry(comment = "Provider ID for text-to-speech (TTS). Leave empty to use the default/auto selection.")
     public String ttsProvider = "";
 
-    @AutoGen(category = "provider_selection")
-    @StringField
     @SerialEntry(comment = "Provider ID for live bundle (combined STT+LLM+TTS). When set, STT/LLM/TTS providers are ignored. Leave empty for auto selection.")
     public String liveBundleProvider = "";
 
@@ -437,6 +441,72 @@ public class McTalkingConfig {
     public static boolean useProviderArchitecture() {
         ProviderSelection sel = buildProviderSelection();
         return sel.hasLiveBundle() || sel.hasComposable();
+    }
+
+    public static ConfigCategory buildProviderSelectionCategory() {
+        var builder = ConfigCategory.createBuilder()
+            .name(Component.translatable("yacl3.config.mc_talking:config.category.provider_selection"));
+
+        builder.option(buildProviderOption(
+            "yacl3.config.mc_talking:config.sttProvider",
+            "yacl3.config.mc_talking:config.sttProvider.desc",
+            () -> INSTANCE.instance().sttProvider,
+            v -> INSTANCE.instance().sttProvider = v,
+            Capability.STT
+        ));
+        builder.option(buildProviderOption(
+            "yacl3.config.mc_talking:config.llmProvider",
+            "yacl3.config.mc_talking:config.llmProvider.desc",
+            () -> INSTANCE.instance().llmProvider,
+            v -> INSTANCE.instance().llmProvider = v,
+            Capability.LLM
+        ));
+        builder.option(buildProviderOption(
+            "yacl3.config.mc_talking:config.ttsProvider",
+            "yacl3.config.mc_talking:config.ttsProvider.desc",
+            () -> INSTANCE.instance().ttsProvider,
+            v -> INSTANCE.instance().ttsProvider = v,
+            Capability.TTS
+        ));
+        builder.option(buildProviderOption(
+            "yacl3.config.mc_talking:config.liveBundleProvider",
+            "yacl3.config.mc_talking:config.liveBundleProvider.desc",
+            () -> INSTANCE.instance().liveBundleProvider,
+            v -> INSTANCE.instance().liveBundleProvider = v,
+            Capability.LIVE_BUNDLE
+        ));
+
+        return builder.build();
+    }
+
+    private static Option<String> buildProviderOption(String key, String descKey,
+        Supplier<String> getter, Consumer<String> setter, Capability capability) {
+        return Option.<String>createBuilder()
+            .name(Component.translatable(key))
+            .description(OptionDescription.of(Component.translatable(descKey)))
+            .binding(Binding.generic("", getter, setter))
+            .controller(opt -> DropdownStringControllerBuilder.create(opt)
+                .values(getProviderDropdownValues(capability))
+                .allowEmptyValue(true)
+                .allowAnyValue(false))
+            .build();
+    }
+
+    private static List<String> getProviderDropdownValues(Capability capability) {
+        List<String> ids = new ArrayList<>(AiProviderRegistry.getProviderIds(capability));
+        Collections.sort(ids);
+        return ids;
+    }
+
+    public static Screen createConfigScreen(Screen parent) {
+        YetAnotherConfigLib autoGen = INSTANCE.generateGui();
+        YetAnotherConfigLib combined = YetAnotherConfigLib.createBuilder()
+            .title(autoGen.title())
+            .categories(autoGen.categories())
+            .category(buildProviderSelectionCategory())
+            .save(INSTANCE::save)
+            .build();
+        return combined.generateScreen(parent);
     }
 
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
