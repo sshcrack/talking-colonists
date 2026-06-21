@@ -2,7 +2,9 @@ package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.McTalkingConfigScreen;
 import me.sshcrack.mc_talking.listener.ColonyEventSubscriber;
+import me.sshcrack.mc_talking.manager.ProviderUtil;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
@@ -44,7 +46,7 @@ public class McTalking {
 
         ModLoadingContext.get().registerExtensionPoint(
                 ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory((client, parent) -> McTalkingConfig.INSTANCE.generateGui().generateScreen(parent))
+                () -> new ConfigScreenHandler.ConfigScreenFactory((client, parent) -> McTalkingConfigScreen.createScreen(parent))
         );
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -60,7 +62,7 @@ public class McTalking {
 
         ModLoadingContext.get().registerExtensionPoint(
                 IConfigScreenFactory.class,
-                () -> (client, parent) -> McTalkingConfig.INSTANCE.generateGui().generateScreen(parent)
+                () -> (client, parent) -> McTalkingConfigScreen.createScreen(parent)
         );
 
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
@@ -74,6 +76,14 @@ public class McTalking {
         AITools.register();
         McTalkingConfig.loadConfig();
         AiStatusPayload.registerMessages();
+
+        // Expose API key to provider libraries (e.g. GeminiLiveLib) via system property.
+        // Provider libraries lazily read this at session-creation time, so it's safe
+        // to set here (well before any conversation starts).
+        var apiKey = ProviderUtil.resolveApiKey();
+        if (apiKey != null && !apiKey.isEmpty()) {
+            System.setProperty("gemini.apiKey", apiKey);
+        }
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {

@@ -180,6 +180,8 @@ publishing {
 }
 
 dependencies {
+    implementation(project(":api"))
+
     annotationProcessor("org.spongepowered:mixin:${libs.versions.mixin.get()}:processor")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4") as Any)
 
@@ -210,6 +212,10 @@ sourceSets {
             "${rootDir}/versions/datagen/${sc.current.version.split("-")[0]}/src/main/generated"
         )
     }
+}
+
+tasks.jar {
+    from(rootProject.project(":api").sourceSets.main.get().output)
 }
 
 tasks.named("createMinecraftArtifacts") {

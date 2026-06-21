@@ -8,7 +8,7 @@ import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.config.ConversationMode;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
-import me.sshcrack.mc_talking.manager.GeminiStream;
+import me.sshcrack.mc_talking.manager.AiAudioPlayer;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -48,7 +48,7 @@ public class CitizenConversation {
     /**
      * Only used in FLASH_TTS mode.
      */
-    private GeminiStream stream;
+    private AiAudioPlayer stream;
 
     /**
      * Only used in LIVE_WEBSOCKETS mode.
@@ -143,7 +143,7 @@ public class CitizenConversation {
                 setState(ConversationState.ENDED);
                 return;
             }
-            stream = new GeminiStream(channel);
+            stream = new AiAudioPlayer(channel);
         }
 
         // Mark participants as busy so they can't be double-booked

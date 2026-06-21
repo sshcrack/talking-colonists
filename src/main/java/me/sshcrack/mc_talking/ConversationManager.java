@@ -1,13 +1,22 @@
 package me.sshcrack.mc_talking;
 
+import com.google.gson.JsonElement;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
+import me.sshcrack.mc_talking.api.audio.AudioChunk;
+import me.sshcrack.mc_talking.api.audio.AudioFormat;
+import me.sshcrack.mc_talking.api.provider.AiRegistry;
+import me.sshcrack.mc_talking.api.provider.BundledAiProvider;
+import me.sshcrack.mc_talking.api.provider.PresetDefinition;
+import me.sshcrack.mc_talking.api.session.BundledSession;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+import me.sshcrack.mc_talking.manager.AiAudioPlayer;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
+import me.sshcrack.mc_talking.manager.ProviderUtil;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
@@ -57,8 +66,11 @@ import net.minecraft.core.component.DataComponents;
 public class ConversationManager {
     private ConversationManager() { /* utility class */ }
 
-    // Active AI clients keyed by citizen entity UUID
+    // Active AI clients keyed by citizen entity UUID (legacy Gemini path)
     private static final Map<UUID, GeminiWsClient> clients = new ConcurrentHashMap<>();
+
+    // Provider-based sessions keyed by citizen entity UUID (new AiRegistry path)
+    private static final Map<UUID, BundledSession> providerSessions = new ConcurrentHashMap<>();
 
     // playerId → citizen entity the player is talking to
     private static final Map<UUID, AbstractEntityCitizen> activeEntity = new ConcurrentHashMap<>();
@@ -124,6 +136,7 @@ public class ConversationManager {
     private static final Set<UUID> backgroundSlots = new LinkedHashSet<>();
     private static final Map<UUID, BackgroundSlotType> backgroundSlotTypes = new ConcurrentHashMap<>();
     private static final Map<UUID, GeminiLiveClient> backgroundClients = new ConcurrentHashMap<>();
+    private static final Map<UUID, BundledSession> backgroundSessions = new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
     // Slot management (priority-aware, synchronized)
@@ -298,10 +311,20 @@ public class ConversationManager {
                 McTalking.LOGGER.warn("[ConversationManager] Error closing released bg client {}", entityId, e);
             }
         }
+        BundledSession session = backgroundSessions.remove(entityId);
+        if (session != null) {
+            try { session.close(); } catch (Exception e) {
+                McTalking.LOGGER.warn("[ConversationManager] Error closing released bg session {}", entityId, e);
+            }
+        }
     }
 
     public static synchronized void registerBackgroundClient(UUID entityId, GeminiLiveClient client) {
         backgroundClients.put(entityId, client);
+    }
+
+    public static synchronized void registerBackgroundSession(UUID entityId, BundledSession session) {
+        backgroundSessions.put(entityId, session);
     }
 
     private static void purgeStaleBackgroundSlots() {
@@ -315,6 +338,16 @@ public class ConversationManager {
             backgroundSlotTypes.remove(id);
             backgroundClients.remove(id);
         }
+        var staleSessions = backgroundSessions.entrySet().stream()
+                .filter(e -> !e.getValue().isActive())
+                .map(Map.Entry::getKey)
+                .toList();
+        for (UUID id : staleSessions) {
+            McTalking.LOGGER.info("[ConversationManager] Purging stale background session for {}", id);
+            backgroundSlots.remove(id);
+            backgroundSlotTypes.remove(id);
+            backgroundSessions.remove(id);
+        }
     }
 
     private static void evictBackgroundSlot(UUID entityId) {
@@ -324,6 +357,12 @@ public class ConversationManager {
         if (client != null) {
             try { client.close(); } catch (Exception e) {
                 McTalking.LOGGER.warn("[ConversationManager] Error closing evicted bg client {}", entityId, e);
+            }
+        }
+        BundledSession session = backgroundSessions.remove(entityId);
+        if (session != null) {
+            try { session.close(); } catch (Exception e) {
+                McTalking.LOGGER.warn("[ConversationManager] Error closing evicted bg session {}", entityId, e);
             }
         }
         McTalking.LOGGER.info("[ConversationManager] Evicted background slot for {}", entityId);
@@ -355,8 +394,17 @@ public class ConversationManager {
         }
 
         GeminiWsClient client = clients.remove(entityId);
-        if (client != null) client.close();
-        McTalking.LOGGER.info("[ConversationManager] Evicted slot for entity {} to make room", entityId);
+        if (client != null) {
+            client.close();
+            McTalking.LOGGER.info("[ConversationManager] Evicted legacy slot for entity {}", entityId);
+            return;
+        }
+
+        BundledSession session = providerSessions.remove(entityId);
+        if (session != null) {
+            session.close();
+            McTalking.LOGGER.info("[ConversationManager] Evicted provider slot for entity {}", entityId);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -450,7 +498,8 @@ public class ConversationManager {
      */
     public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
         UUID id = citizen.getUUID();
-        return clients.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id) || backgroundSlots.contains(id);
+        return clients.containsKey(id) || providerSessions.containsKey(id)
+            || addedEntities.contains(id) || busyEntities.contains(id) || backgroundSlots.contains(id);
     }
 
     /**
@@ -529,7 +578,7 @@ public class ConversationManager {
      * slot is available (pool is full of player conversations).</p>
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (ProviderUtil.resolveApiKey() == null) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildPrompt(citizen));
     }
 
@@ -543,7 +592,7 @@ public class ConversationManager {
      * is already busy, on cooldown, or no low-priority slot is available.</p>
      */
     public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (ProviderUtil.resolveApiKey() == null) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
         if (clients.containsKey(citizen.getUUID())) {
             urgentContactConversations.add(citizen.getUUID());
@@ -592,7 +641,7 @@ public class ConversationManager {
      *                   model; see authoring contract above
      */
     public static void startLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (ProviderUtil.resolveApiKey() == null) return;
         if (!canCitizenSpeak(citizen)) return;
 
         UUID citizenId = citizen.getUUID();
@@ -602,6 +651,10 @@ public class ConversationManager {
             return;
         }
 
+        // Try provider path first
+        if (startProviderLowPrioritySession(citizen, userPrompt)) return;
+
+        // Fall back to legacy Gemini path
         var client = new CitizenWsClient(citizen,
                 c -> {
                     c.close();
@@ -615,6 +668,59 @@ public class ConversationManager {
                 });
         client.addPromptTextAfterTalkingComplete(userPrompt);
         clients.put(citizenId, client);
+    }
+
+    /**
+     * Attempts to start a low-priority session using the AI provider registry.
+     *
+     * @return {@code true} if the provider session was started successfully
+     */
+    private static boolean startProviderLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
+        UUID citizenId = citizen.getUUID();
+        PresetDefinition preset = ProviderUtil.resolvePreset("live");
+        if (preset == null) return false;
+
+        BundledAiProvider provider = ProviderUtil.resolveBundledProvider(preset);
+        if (provider == null) return false;
+
+        try {
+            var audioProvider = new CitizenEntityAudioProvider(citizen, null);
+            var channel = audioProvider.createChannel();
+            if (channel == null) return false;
+
+            var audioPlayer = new AiAudioPlayer(channel);
+            var citizenData = citizen.getCitizenData();
+            if (citizenData != null) {
+                var isFemale = citizenData.isFemale();
+                var isChild = citizenData.isChild();
+                if (isChild && !isFemale) audioPlayer.setPitch(1.2f);
+            }
+
+            var config = new BundledAiProvider.SessionConfig(
+                userPrompt, null, true, 8192, null, Map.of()
+            );
+
+            BundledSession session = provider.createSession(config);
+            session.onAudio(chunk -> {
+                    audioPlayer.addGeminiPcmWithPitch(chunk.data(), chunk.format().sampleRate());
+                })
+                .onTurnComplete(() -> {
+                    audioPlayer.flushAudio();
+                })
+                .onError(err -> {
+                    McTalking.LOGGER.error("[ProviderSession] Error for citizen {}", citizenId, err);
+                });
+
+            providerSessions.put(citizenId, session);
+            session.start();
+
+            McTalking.LOGGER.info("[ConversationManager] Started provider session for citizen {} using preset {}", citizenId, preset.fullId());
+            return true;
+        } catch (Exception e) {
+            McTalking.LOGGER.error("[ConversationManager] Failed to start provider session for citizen {}", citizenId, e);
+            releaseSlot(citizen);
+            return false;
+        }
     }
 
     /**
@@ -637,7 +743,7 @@ public class ConversationManager {
      * citizen) it is closed first so the player always wins.</p>
      */
     public static void startPlayerConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+        if (ProviderUtil.resolveApiKey() == null) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.no_key")
                             .withStyle(ChatFormatting.RED));
@@ -710,8 +816,14 @@ public class ConversationManager {
 
         urgentContactConversations.remove(citizenId);
         citizenToPlayer.remove(citizenId);
+
         GeminiWsClient client = clients.remove(citizenId);
-        if (client != null) client.close();
+        if (client != null) {
+            client.close();
+        } else {
+            BundledSession session = providerSessions.remove(citizenId);
+            if (session != null) session.close();
+        }
 
         AbstractEntityCitizen entity = activeEntity.remove(playerId);
         if (entity != null) releaseSlot(entity);
@@ -755,6 +867,18 @@ public class ConversationManager {
         return clients.get(entityId);
     }
 
+    public static BundledSession getSessionForEntity(UUID entityId) {
+        return providerSessions.get(entityId);
+    }
+
+    /**
+     * Returns the active provider session for the given entity, or {@code null}.
+     * For legacy Gemini sessions, use {@link #getClientForEntity(UUID)}.
+     */
+    public static BundledSession getActiveSession(UUID entityId) {
+        return providerSessions.get(entityId);
+    }
+
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {
         return activeEntity.get(playerId);
     }
@@ -782,10 +906,17 @@ public class ConversationManager {
                 McTalking.LOGGER.error("Error closing client during cleanup", e);
             }
         }
+        for (BundledSession session : providerSessions.values()) {
+            try { session.close(); } catch (Exception ignored) {}
+        }
         for (GeminiLiveClient client : backgroundClients.values()) {
             try { client.close(); } catch (Exception ignored) {}
         }
+        for (BundledSession session : backgroundSessions.values()) {
+            try { session.close(); } catch (Exception ignored) {}
+        }
         clients.clear();
+        providerSessions.clear();
         activeEntity.clear();
         playerConversationPartners.clear();
         citizenToPlayer.clear();
@@ -793,6 +924,7 @@ public class ConversationManager {
         backgroundSlots.clear();
         backgroundSlotTypes.clear();
         backgroundClients.clear();
+        backgroundSessions.clear();
         busyEntities.clear();
         abortHandlers.clear();
         lastSessionEndTime.clear();

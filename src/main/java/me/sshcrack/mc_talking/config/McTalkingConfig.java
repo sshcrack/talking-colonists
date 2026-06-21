@@ -17,6 +17,8 @@ import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.provider.AiRegistry;
+import me.sshcrack.mc_talking.api.provider.PresetDefinition;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,15 +46,36 @@ public class McTalkingConfig {
             .build();
 
     // API Configuration
-    @AutoGen(category = "api")
-    @StringField
-    @SerialEntry(comment = "This key is used to authenticate with the Gemini API. You can get one at https://aistudio.google.com/apikey")
+    @Deprecated
+    @SerialEntry(comment = "[Deprecated] API key moved to providerConfig JSON.")
     public String geminiApiKey = "";
 
-    @AutoGen(category = "api")
-    @EnumCycler
-    @SerialEntry(comment = "What kind of AI model to use. Right now, this is the only one Google offers")
+    @Deprecated
+    @SerialEntry(comment = "[Deprecated] Model selection moved to presets.")
     public AvailableAI currentAiModel = AvailableAI.Flash3;
+
+    // Preset selectors per conversation category, with optional fallback
+    @SerialEntry(comment = "Preset for live conversations (player interaction).")
+    public String livePreset = "gemini_live_lib.live_live";
+
+    @SerialEntry(comment = "Fallback preset for live conversations.")
+    public String liveFallback = "";
+
+    @SerialEntry(comment = "Preset for pregenerated conversations.")
+    public String pregeneratedPreset = "gemini_live_lib.flash_tts";
+
+    @SerialEntry(comment = "Fallback preset for pregenerated conversations.")
+    public String pregeneratedFallback = "gemini_live_lib.live_live";
+
+    @SerialEntry(comment = "Preset for background tasks.")
+    public String backgroundPreset = "gemini_live_lib.flash";
+
+    @SerialEntry(comment = "Fallback preset for background tasks.")
+    public String backgroundFallback = "";
+
+    // Provider-specific settings (JSON blob, managed internally)
+    @SerialEntry(comment = "Provider-specific configuration as JSON.")
+    public String providerConfig = "{}";
 
     // Language Configuration
     @AutoGen(category = "general")
@@ -94,9 +117,10 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, citizens will be able to start conversations with each other without player involvement.")
     public boolean enableCitizenToCitizenConversation = true;
 
+    @Deprecated
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @EnumCycler
-    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS: Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS: Flash generates a script, then Gemini TTS renders multi-speaker audio. Higher quality but limited to ~10/day.\nAUTO (default): Tries Flash+TTS first; automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted).")
+    @SerialEntry(comment = "[Deprecated] Conversation mode selection moved to presets.")
     public ConversationMode conversationMode = ConversationMode.AUTO;
 
     // Random citizen-to-citizen conversations
@@ -362,7 +386,7 @@ public class McTalkingConfig {
     public double broadcastYellingRange = 24.0;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
-    public int configVersion = 2;
+    public int configVersion = 4;
 
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
@@ -382,9 +406,10 @@ public class McTalkingConfig {
     public boolean enableColonyDiplomacy = true;
 
     // Memory Compaction
+    @Deprecated
     @AutoGen(category = "citizens", group = "memory")
     @EnumCycler
-    @SerialEntry(comment = "How memory compaction is performed. LIVE uses a text-only WebSocket session. FLASH uses the Gemini Flash API.")
+    @SerialEntry(comment = "[Deprecated] Memory compaction mode selection moved to presets.")
     public MemoryMode memoryMode = MemoryMode.LIVE;
 
     @AutoGen(category = "citizens", group = "memory")
@@ -417,9 +442,23 @@ public class McTalkingConfig {
 
 
     public static boolean hasGeminiApiKey() {
-        String key = INSTANCE.instance().geminiApiKey;
-        return key != null
-                && !key.trim().isEmpty();
+        var cfg = INSTANCE.instance();
+        String key = cfg.geminiApiKey;
+        if (key != null && !key.trim().isEmpty()) return true;
+        // Also check providerConfig JSON for Gemini key
+        if (cfg.providerConfig != null && !cfg.providerConfig.isBlank() && !"{}".equals(cfg.providerConfig)) {
+            try {
+                var json = new com.google.gson.Gson().fromJson(cfg.providerConfig, com.google.gson.JsonObject.class);
+                if (json != null && json.has("gemini_live")) {
+                    var geminiCfg = json.getAsJsonObject("gemini_live");
+                    if (geminiCfg != null && geminiCfg.has("apiKey")) {
+                        String apiKey = geminiCfg.get("apiKey").getAsString();
+                        return apiKey != null && !apiKey.trim().isEmpty();
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        return false;
     }
 
     public static void loadConfig() {
@@ -529,6 +568,106 @@ public class McTalkingConfig {
             }
             INSTANCE.instance().configVersion = 3;
             INSTANCE.save();
+        }
+
+        // One-time migration: v3 → v4 (ai-provider-architecture)
+        if (INSTANCE.instance().configVersion < 4) {
+            var cfg = INSTANCE.instance();
+            // Migrate geminiApiKey into providerConfig
+            if (!cfg.geminiApiKey.isEmpty()) {
+                try {
+                    var json = new com.google.gson.JsonObject();
+                    var geminiCfg = new com.google.gson.JsonObject();
+                    geminiCfg.addProperty("apiKey", cfg.geminiApiKey);
+                    json.add("gemini_live", geminiCfg);
+                    cfg.providerConfig = json.toString();
+                } catch (Exception e) {
+                    McTalking.LOGGER.warn("[Config] Failed to migrate geminiApiKey to providerConfig", e);
+                }
+            }
+
+            // Migrate conversationMode + currentAiModel → presets
+            switch (cfg.conversationMode) {
+                case LIVE_WEBSOCKETS:
+                    cfg.livePreset = "gemini_live_lib.live_live";
+                    cfg.pregeneratedPreset = "gemini_live_lib.live_live";
+                    break;
+                case FLASH_TTS:
+                    cfg.livePreset = "gemini_live_lib.live_live";
+                    cfg.pregeneratedPreset = "gemini_live_lib.flash_tts";
+                    cfg.pregeneratedFallback = "gemini_live_lib.live_live";
+                    break;
+                case AUTO:
+                default:
+                    cfg.livePreset = "gemini_live_lib.live_live";
+                    cfg.pregeneratedPreset = "gemini_live_lib.flash_tts";
+                    cfg.pregeneratedFallback = "gemini_live_lib.live_live";
+                    break;
+            }
+
+            // Migrate memoryMode → backgroundPreset
+            switch (cfg.memoryMode) {
+                case LIVE:
+                    cfg.backgroundPreset = "gemini_live_lib.live";
+                    break;
+                case FLASH:
+                    cfg.backgroundPreset = "gemini_live_lib.flash";
+                    break;
+            }
+
+            cfg.configVersion = 4;
+            INSTANCE.save();
+            McTalking.LOGGER.info("[Config] Migrated config from v3 to v4 (ai-provider-architecture)");
+        }
+
+        registerCustomPresets();
+    }
+
+    private static final com.google.gson.Gson PRESET_GSON = new com.google.gson.Gson();
+    private static Path customPresetsPath;
+
+    private static Path getCustomPresetsPath() {
+        if (customPresetsPath == null) {
+            customPresetsPath = YACLPlatform.getConfigDir().resolve("mc_talking_custom_presets.json");
+        }
+        return customPresetsPath;
+    }
+
+    public static void saveCustomPreset(PresetDefinition preset) {
+        var path = getCustomPresetsPath();
+        var gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
+        try {
+            com.google.gson.JsonArray arr = null;
+            if (Files.exists(path)) {
+                try (var reader = Files.newBufferedReader(path)) {
+                    arr = gson.fromJson(reader, com.google.gson.JsonArray.class);
+                }
+            }
+            if (arr == null) arr = new com.google.gson.JsonArray();
+            arr.add(gson.toJsonTree(preset));
+            try (var writer = Files.newBufferedWriter(path)) {
+                gson.toJson(arr, writer);
+            }
+        } catch (Exception e) {
+            McTalking.LOGGER.error("[Config] Failed to save custom preset", e);
+        }
+    }
+
+    private static void registerCustomPresets() {
+        var path = getCustomPresetsPath();
+        if (!Files.exists(path)) return;
+        try {
+            var reader = Files.newBufferedReader(path);
+            var arr = PRESET_GSON.fromJson(reader, com.google.gson.JsonArray.class);
+            reader.close();
+            if (arr == null) return;
+            for (var element : arr) {
+                var preset = PRESET_GSON.fromJson(element, PresetDefinition.class);
+                AiRegistry.registerPreset(preset);
+                McTalking.LOGGER.info("[Config] Loaded custom preset: {}", preset.fullId());
+            }
+        } catch (Exception e) {
+            McTalking.LOGGER.error("[Config] Failed to load custom presets", e);
         }
     }
 }

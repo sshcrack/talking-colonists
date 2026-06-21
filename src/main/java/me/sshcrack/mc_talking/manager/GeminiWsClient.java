@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.manager.ProviderUtil;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -100,7 +101,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected String currentTurnTranscript = "";
 
     private final String logPrefix;
-    protected final GeminiStream stream;
+    protected final AiAudioPlayer stream;
     private final AbstractEntityCitizen entity;
     private final OpusDecoder decoder;
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
@@ -123,12 +124,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     // AudioProvider creates channels/decoders so this client can be tested/mockable
     protected GeminiWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity) {
-        super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
+        super(ProviderUtil.resolveApiKey());
         this.entity = entity;
         this.logPrefix = "[GeminiWsClient, " + entity.getUUID() + "]";
         AudioChannel channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
-        stream = new GeminiStream(channel);
+        stream = new AiAudioPlayer(channel);
         stream.setOnPause(this::onStreamPause);
 
         var citizenData = entity.getCitizenData();

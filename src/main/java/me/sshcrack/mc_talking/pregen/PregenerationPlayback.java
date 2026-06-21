@@ -5,7 +5,7 @@ import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.manager.GeminiStream;
+import me.sshcrack.mc_talking.manager.AiAudioPlayer;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 
@@ -50,7 +50,7 @@ public class PregenerationPlayback {
                 return false;
             }
 
-            GeminiStream stream = new GeminiStream(channel);
+            AiAudioPlayer stream = new AiAudioPlayer(channel);
 
             var isFemale = citizen.getCitizenData().isFemale();
             var isChild = citizen.getCitizenData().isChild();

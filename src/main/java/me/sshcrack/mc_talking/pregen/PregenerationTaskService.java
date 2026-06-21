@@ -14,8 +14,17 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+import me.sshcrack.mc_talking.api.provider.BundledAiProvider;
+import me.sshcrack.mc_talking.api.provider.PresetDefinition;
+import me.sshcrack.mc_talking.api.session.BundledSession;
+import me.sshcrack.mc_talking.manager.ProviderUtil;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -173,6 +182,12 @@ public class PregenerationTaskService {
         McTalking.LOGGER.info("[Pregeneration] Starting {} for citizen {} (threat={}, model={})",
                 isThreat ? "threat" : "pregen", citizen.getUUID(), isThreat, model.getName());
 
+        // Try provider registry path first
+        if (startPregenerationWithProvider(citizen, prompt, onComplete, isThreat, isPlayerGreeting)) {
+            return true;
+        }
+
+        // Fall back to legacy PregenerationGeminiClient path
         PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, model,
                 audio -> {
                     if (isThreat) ConversationManager.releaseSlot(citizen);
@@ -198,6 +213,90 @@ public class PregenerationTaskService {
             McTalking.LOGGER.error("[Pregeneration] Failed to connect for citizen {}", citizen.getUUID(), e);
             if (isThreat) ConversationManager.releaseSlot(citizen);
             else ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+            generatingCount.decrementAndGet();
+            if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+            return false;
+        }
+    }
+
+    /**
+     * Attempts to start pregeneration using the AI provider registry.
+     * Only supports BUNDLED-mode presets (e.g. {@code live_live}).
+     *
+     * @return {@code true} if the provider session was created successfully
+     */
+    private static boolean startPregenerationWithProvider(AbstractEntityCitizen citizen, String prompt,
+                                                           java.util.function.Consumer<AudioChunk> onComplete,
+                                                           boolean isThreat, boolean isPlayerGreeting) {
+        PresetDefinition preset = ProviderUtil.resolvePreset("pregenerated");
+        if (preset == null) return false;
+        if (preset.mode() != PresetDefinition.PresetMode.BUNDLED) return false;
+
+        BundledAiProvider provider = ProviderUtil.resolveBundledProvider(preset);
+        if (provider == null) return false;
+
+        UUID citizenId = citizen.getUUID();
+
+        try {
+            var view = CitizenPromptViewFactory.create(citizen.getCitizenData(), new HashMap<>(), null);
+            String systemPrompt = CitizenPromptService.generateSystemControlledRoleplayPrompt(view);
+
+            var config = new BundledAiProvider.SessionConfig(
+                systemPrompt, null, true, 8192, null, Map.of()
+            );
+
+            BundledSession session = provider.createSession(config);
+
+            ByteArrayOutputStream audioBuf = new ByteArrayOutputStream();
+            int[] sampleRateHolder = new int[]{48000};
+
+            session.onAudio(chunk -> {
+                    if (sampleRateHolder[0] == 48000) {
+                        sampleRateHolder[0] = chunk.format().sampleRate();
+                    }
+                    try {
+                        audioBuf.write(chunk.data());
+                    } catch (IOException e) {
+                        McTalking.LOGGER.error("[Pregeneration] Failed to buffer audio", e);
+                    }
+                })
+                .onTurnComplete(() -> {
+                    try {
+                        byte[] audioData = audioBuf.toByteArray();
+                        if (audioData.length > 0) {
+                            onComplete.accept(new AudioChunk(audioData, sampleRateHolder[0]));
+                        } else {
+                            McTalking.LOGGER.warn("[Pregeneration] Provider produced no audio for citizen {}", citizenId);
+                        }
+                    } finally {
+                        if (isThreat) ConversationManager.releaseSlot(citizen);
+                        else ConversationManager.releaseBackgroundSlot(citizenId);
+                        generatingCount.decrementAndGet();
+                        if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+                        try { session.close(); } catch (Exception ignored) {}
+                    }
+                })
+                .onError(err -> {
+                    McTalking.LOGGER.error("[Pregeneration] Provider error for citizen {}", citizenId, err);
+                    if (isThreat) ConversationManager.releaseSlot(citizen);
+                    else ConversationManager.releaseBackgroundSlot(citizenId);
+                    generatingCount.decrementAndGet();
+                    if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+                    try { session.close(); } catch (Exception ignored) {}
+                });
+
+            if (!isThreat) {
+                ConversationManager.registerBackgroundSession(citizenId, session);
+            }
+
+            session.start();
+            McTalking.LOGGER.info("[Pregeneration] Started provider session for citizen {} (threat={}, preset={})",
+                    citizenId, isThreat, preset.fullId());
+            return true;
+        } catch (Exception e) {
+            McTalking.LOGGER.error("[Pregeneration] Failed to start provider session for citizen {}", citizenId, e);
+            if (isThreat) ConversationManager.releaseSlot(citizen);
+            else ConversationManager.releaseBackgroundSlot(citizenId);
             generatingCount.decrementAndGet();
             if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
             return false;

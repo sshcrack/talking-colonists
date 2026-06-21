@@ -178,6 +178,8 @@ publishing {
 }
 
 dependencies {
+    implementation(project(":api"))
+
     implementation(libs.moulberry.mixinconstraints)
     jarJar(libs.moulberry.mixinconstraints)
 
@@ -191,6 +193,10 @@ dependencies {
     runtimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
 
     implementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+1.21.1-neoforge")
+}
+
+tasks.jar {
+    from(project(":api").sourceSets.main.get().output)
 }
 
 tasks.named("createMinecraftArtifacts") {

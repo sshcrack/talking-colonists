@@ -12,6 +12,8 @@ import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
+import me.sshcrack.mc_talking.api.session.BundledSession;
+import me.sshcrack.mc_talking.manager.AiAudioPlayer;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
@@ -140,11 +142,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             return;
         }
 
-        var manager = ConversationManager.getClientForEntity(entity.getUUID());
-        if (manager == null) {
-            return;
-        }
-
         UUID entityId = entity.getUUID();
 
         // Process the voice packet
@@ -152,13 +149,25 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         boolean hasVoiceActivity = hasVoiceActivity(opusData);
         long currentTime = System.currentTimeMillis();
 
-        // Announce the speaker so the AI knows whose voice this is
-        if (manager instanceof CitizenWsClient cws) {
-            cws.announcePlayerIfChanged(player);
-        }
+        // Try provider session first, then fall back to legacy Gemini client
+        var session = ConversationManager.getSessionForEntity(entityId);
+        if (session != null) {
+            // Announce the speaker to the AI via text (audio forwarding requires Opus decoder)
+            session.sendText("[" + player.getName().getString() + " is now speaking]");
+        } else {
+            var manager = ConversationManager.getClientForEntity(entityId);
+            if (manager == null) {
+                return;
+            }
 
-        // Forward the voice data to the AI regardless of silence detection
-        manager.promptAudioOpus(opusData);
+            // Announce the speaker so the AI knows whose voice this is
+            if (manager instanceof CitizenWsClient cws) {
+                cws.announcePlayerIfChanged(player);
+            }
+
+            // Forward the voice data to the AI regardless of silence detection
+            manager.promptAudioOpus(opusData);
+        }
 
         // Update voice activity tracking
         if (hasVoiceActivity) {

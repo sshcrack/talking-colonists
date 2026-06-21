@@ -5,10 +5,13 @@ import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.provider.LlmProvider;
+import me.sshcrack.mc_talking.api.provider.PresetDefinition;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.MemoryMode;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.manager.ProviderUtil;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
@@ -19,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -92,11 +96,60 @@ public class MemoryCompactionService {
         McTalking.LOGGER.info("[MemoryCompaction] Citizen {} has {} events and {} facts",
                 citizen.getCitizenData().getName(), mem.getEvents().size(), mem.getFacts().size());
 
+        // Try provider registry path first
+        if (tryProviderCompaction(citizen)) return;
+
+        // Fall back to legacy paths
         if (McTalkingConfig.INSTANCE.instance().memoryMode == MemoryMode.FLASH) {
             startFlashCompaction(citizen);
         } else {
             startLiveCompaction(citizen);
         }
+    }
+
+    /**
+     * Attempts compaction using the AI provider registry (LlmProvider).
+     *
+     * @return {@code true} if a provider was found and compaction was started
+     */
+    private static boolean tryProviderCompaction(AbstractEntityCitizen citizen) {
+        PresetDefinition preset = ProviderUtil.resolvePreset("background");
+        if (preset == null) return false;
+
+        LlmProvider provider = ProviderUtil.resolveLlmProvider(preset);
+        if (provider == null) return false;
+
+        UUID citizenId = citizen.getUUID();
+        McTalking.LOGGER.info("[MemoryCompaction] Starting provider compaction for citizen {}",
+                citizen.getCitizenData().getName());
+
+        var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
+        var mem = data.mc_talking$getOrInitializeMemory();
+        activeCompactionCitizens.add(citizenId);
+
+        var config = new LlmProvider.LlmConfig(SYSTEM_PROMPT, null, null, null, Map.of());
+
+        provider.generate(buildPrompt(citizen, mem), config)
+                .thenAccept(responseText -> {
+                    String summary = extractSummaryFromResponse(responseText);
+                    if (summary == null || summary.isBlank()) {
+                        McTalking.LOGGER.warn("[MemoryCompaction] Empty summary from provider for citizen {}",
+                                citizen.getCitizenData().getName());
+                        return;
+                    }
+                    var server = citizen.level().getServer();
+                    if (server != null) {
+                        server.execute(() -> applyCompaction(citizen, summary));
+                    }
+                })
+                .exceptionally(err -> {
+                    McTalking.LOGGER.error("[MemoryCompaction] Provider compaction failed for citizen {}",
+                            citizen.getCitizenData().getName(), err);
+                    return null;
+                })
+                .whenComplete((v, err) -> activeCompactionCitizens.remove(citizenId));
+
+        return true;
     }
 
     private static void startFlashCompaction(AbstractEntityCitizen citizen) {
