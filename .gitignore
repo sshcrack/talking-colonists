@@ -45,6 +45,13 @@ bin/
 ### VS Code ###
 .vscode/
 
+### MkDocs ###
+site/
+
+### Python ###
+.venv/
+.direnv/
+
 ### Mac OS ###
 .DS_Store
 

@@ -1,0 +1,87 @@
+site_name: "MineColonies Talking Citizens"
+site_url: "https://sshcrack.github.io/talking-colonists"
+site_description: "Interactive voice chat with MineColonies citizens via Google Gemini AI"
+site_author: "sshcrack"
+repo_url: "https://github.com/sshcrack/talking-colonists"
+repo_name: "sshcrack/talking-colonists"
+edit_uri: edit/main/docs/
+copyright: "MineColonies Talking Citizens"
+
+theme:
+  name: shadcn
+  icon: null
+  topbar_sections: false
+  pygments_style:
+    light: shadcn-light
+    dark: github-dark
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      enable_git_follow: false
+
+markdown_extensions:
+  admonition:
+  codehilite:
+  fenced_code:
+  footnotes:
+  extra:
+  pymdownx.blocks.details:
+  pymdownx.tabbed:
+  pymdownx.blocks.tab:
+    combine_header_slug: true
+    separator: ___
+  pymdownx.progressbar:
+  pymdownx.snippets:
+  pymdownx.superfences:
+  pymdownx.highlight:
+  pymdownx.inlinehilite:
+  pymdownx.keys:
+  pymdownx.emoji:
+  pymdownx.tasklist:
+  pymdownx.caret:
+  pymdownx.mark:
+  pymdownx.tilde:
+  pymdownx.smartsymbols:
+  pymdownx.blocks.caption:
+  pymdownx.magiclink:
+  pymdownx.betterem:
+  pymdownx.escapeall:
+  pymdownx.pathconverter:
+  pymdownx.striphtml:
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: getting-started/index.md
+    - Setup: getting-started/setup.md
+    - Usage: getting-started/usage.md
+  - Configuration:
+    - Overview: configuration/index.md
+    - API Settings: configuration/api.md
+    - General: configuration/general.md
+    - Citizens: configuration/citizens.md
+  - Features:
+    - Overview: features/index.md
+    - Conversations: features/conversations.md
+    - Personalities: features/personalities.md
+    - Rumor Mill: features/rumor-mill.md
+    - Broadcast System: features/broadcast.md
+    - Memory System: features/memory.md
+    - Audio Pregeneration: features/pregeneration.md
+    - Urgent Contact: features/urgent-contact.md
+    - Mumbling: features/mumbling.md
+  - Architecture:
+    - Overview: architecture/index.md
+    - Prompt System: architecture/prompt-system.md
+    - AI Tools: architecture/ai-tools.md
+    - Voice Chat Integration: architecture/voice-chat.md
+    - Platform Abstraction: architecture/platform-abstraction.md
+  - Development:
+    - Overview: development/index.md
+    - Building: development/building.md
+    - Contributing: development/contributing.md
+    - API Reference: development/api.md
+  - Commands: commands.md
+  - Changelog: changelog.md
