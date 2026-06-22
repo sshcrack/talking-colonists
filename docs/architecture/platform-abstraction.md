@@ -7,26 +7,21 @@ The mod supports **NeoForge (1.21.1)** and **Forge (1.20.1)** using a platform a
 ```mermaid
 flowchart TD
  subgraph Common["Shared Source (src/main/java)"]
- PI["Platform Interface"]
- CC["Conditional Compilation<br/>/*? if neoforge {*/"]
+  CC["Conditional Compilation<br/>/*? if neoforge {*/"]
  end
 
  subgraph NeoForgeImpl["NeoForge 1.21.1"]
- NFI["NeoforgePlatformImpl"]
- NFAW["Access Widener<br/>(aw/1.21.1-neoforge.accesswidener)"]
- NFBuild["build.neoforge.gradle.kts"]
+  NFBuild["build.neoforge.gradle.kts"]
+   NFAW["Access Transformer<br/>(aw/1.21.1.cfg)"]
  end
 
  subgraph ForgeImpl["Forge 1.20.1"]
- FI["ForgePlatformImpl"]
- FAC["Access Transformer<br/>(aw/1.20.1-forge.cfg)"]
- FBuild["build.forge.gradle.kts"]
+  FBuild["build.forge.gradle.kts"]
+  FAC["Access Transformer<br/>(aw/1.20.1.cfg)"]
  end
 
- PI --> NFI
- PI --> FI
- CC --> NFI
- CC --> FI
+ CC --> NeoForgeImpl
+ CC --> ForgeImpl
 ```
 
 ## Key Differences
@@ -39,13 +34,6 @@ flowchart TD
 | Item NBT | `DataComponents.CUSTOM_DATA` | `CompoundTag` directly |
 | Client init | Separate `@Mod` instance | `@Mod.EventBusSubscriber` (static) |
 | Registry | `BuiltInRegistries` | `ForgeRegistries` |
-
-## Platform Interface
-
-The `Platform` interface defines loader-agnostic methods that each loader implements:
-
-- `NeoforgePlatformImpl` — NeoForge implementation
-- `ForgePlatformImpl` — Forge implementation
 
 ## Stonecutter Conditional Compilation
 

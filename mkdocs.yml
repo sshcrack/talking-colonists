@@ -9,7 +9,7 @@ copyright: "MineColonies Talking Citizens"
 
 theme:
   name: shadcn
-  icon: null
+  icon: assets/logo.png
   logo: assets/logo.png
   favicon: assets/logo.png
   custom_dir: overrides

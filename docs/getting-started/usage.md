@@ -62,7 +62,7 @@ Starts autonomous conversations between citizens.
 | **Ending** | The conversation ends when you walk away (beyond the max conversation distance) or when the citizen naturally concludes. |
 
 !!! tip "Player tools vs general tools"
- **Drop item** and **Leave colony** are only available in player-initiated conversations — the AI won't use them autonomously during citizen-to-citizen chats.
+ **Drop item** and **Leave colony** are only available in player-initiated conversations - the AI won't use them autonomously during citizen-to-citizen chats.
 
 ---
 
@@ -71,7 +71,7 @@ Starts autonomous conversations between citizens.
 When enabled, citizens autonomously start conversations with each other when nearby. They share rumors, discuss colony events, and gossip. This creates a living, breathing colony where information spreads organically.
 
 !!! example "See it in action"
- Watch two citizens with status `(In conversation)` standing close together — they're having an autonomous conversation about colony life.
+ Watch two citizens with status `(In conversation)` standing close together - they're having an autonomous conversation about colony life.
 
 ---
 

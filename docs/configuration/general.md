@@ -47,4 +47,4 @@ Core configuration options for the mod's behavior.
 | `TEXT_AND_AUDIO` | + AI responds with both text and audio | Subtitles + voice |
 
 !!! tip "Text + Audio mode"
- Enabling `TEXT_AND_AUDIO` is great for accessibility — you can read what the citizen said if the audio is unclear.
+ Enabling `TEXT_AND_AUDIO` is great for accessibility - you can read what the citizen said if the audio is unclear.

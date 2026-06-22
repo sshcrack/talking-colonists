@@ -1,6 +1,6 @@
 # Rumor Mill
 
-The Rumor Mill system creates a living information economy in your colony. Citizens organically share information — memories, events, and gossip — with each other.
+The Rumor Mill system creates a living information economy in your colony. Citizens organically share information - memories, events, and gossip - with each other.
 
 ---
 
@@ -12,7 +12,7 @@ graph TD
  B -->|Yes| C{Rumor chance met?}
  C -->|Yes - 40% default| D[Rumor copied to Citizen B]
  D --> E[Citizen B remembers rumor]
- E -->|Next check| F{Citizen B near player?}
+ E --> F{Citizen B near player?}
  F -->|Yes| G{Rumor Talking chance met?}
  G -->|Yes - 50% default| H[Citizen B voices rumor aloud]
 ```
@@ -34,7 +34,7 @@ Each `Rumor` stores:
 
 - The rumor text content
 - The source citizen
-- A timestamp
+- An internal ID (UUID) used for deduplication
 
 Recent rumors are included in the citizen's AI prompt, so they can discuss them during conversations.
 
@@ -57,6 +57,9 @@ Up to `maxRumorsInPrompt` recent rumors are injected into each citizen's prompt,
 | `rumorMillChancePerPair` | `0.4` | Chance rumors are shared per pair per check |
 | `rumorMillRange` | `12.0` | Max distance (blocks) for rumor propagation |
 | `rumorMillCheckIntervalTicks` | `600` | How often to check for propagation |
+| `rumorMillMaxPropagationsPerTick` | `3` | Max rumor propagations per tick |
 | `enableRumorTalking` | `true` | Citizens voice rumors aloud near players |
+| `rumorTalkingChance` | `0.5` | Per-propagation chance a rumor is spoken aloud |
+| `rumorTalkingRange` | `12.0` | Max distance (blocks) for a player to overhear |
 | `maxRumorsStored` | `10` | Max rumors stored per citizen |
 | `maxRumorsInPrompt` | `3` | Rumors included in AI prompt |

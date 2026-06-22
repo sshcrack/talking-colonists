@@ -29,8 +29,8 @@ public class MyCustomProvider implements CitizenPromptProvider {
 
 AI function-calling tools are registered in `AITools.register()`. Each tool extends `FunctionAction` (abstract base) which has two categories:
 
-- `GeneralFunctionAction` — Available in all conversation contexts.
-- `PlayerFunctionAction` — Only available during player conversations.
+- `GeneralFunctionAction` - Available in all conversation contexts.
+- `PlayerFunctionAction` - Only available during player conversations.
 
 ### Adding a Custom Tool
 
@@ -38,21 +38,11 @@ AI function-calling tools are registered in `AITools.register()`. Each tool exte
 2. Implement the `execute(AbstractEntityCitizen, IColony, JsonObject)` method.
 3. Register in `AITools.register()` by adding to the appropriate map.
 
-## Platform Abstraction
-
-The `me.sshcrack.mc_talking.platform` package provides loader-agnostic interfaces:
-
-- `Platform` — Common interface implemented by each loader.
-- `NeoforgePlatformImpl` — NeoForge 1.21.1 implementation.
-- `ForgePlatformImpl` — Forge 1.20.1 implementation.
-
-Implement `Platform` to add support for additional mod loaders.
-
 ## MineColonies Integration
 
 The `me.sshcrack.mc_talking.duck` package contains duck-type interfaces for MineColonies extension points. Key interfaces:
 
-- `PersonalityExtendedCitizen` — Added via the `CitizenDataPersonalityExtended` mixin for personality storage.
+- `CitizenDataPersonalityExtended` - Added via mixin for personality storage.
 
 ## Events
 
@@ -66,6 +56,5 @@ The `me.sshcrack.mc_talking.duck` package contains duck-type interfaces for Mine
 |---------|---------|
 | `me.sshcrack.mc_talking.api.prompt` | PromptProvider SPI |
 | `me.sshcrack.mc_talking.manager.tools` | AI tool registration |
-| `me.sshcrack.mc_talking.platform` | Loader abstraction |
 | `me.sshcrack.mc_talking.duck` | MineColonies duck-type interfaces |
 | `me.sshcrack.mc_talking.listener` | Event subscribers |

@@ -3,7 +3,7 @@
 AI tools are function declarations the Gemini AI can invoke during a conversation to interact with the game world or gather information.
 
 !!! info "How AI tools work"
- When a citizen is talking to you, the AI decides when to call these tools. For example, if you ask "what's around here?", the AI calls `describe_surroundings`. You don't need to do anything — the AI handles it automatically.
+ When a citizen is talking to you, the AI decides when to call these tools. For example, if you ask "what's around here?", the AI calls `describe_surroundings`. You don't need to do anything - the AI handles it automatically.
 
 ---
 
@@ -12,14 +12,14 @@ AI tools are function declarations the Gemini AI can invoke during a conversatio
 | Category | Scope | Tools |
 |----------|-------|-------|
 | **General** | Available in all conversation contexts (player, mumbling, citizen-to-citizen) | 11 tools |
-| **Player-Only** | Only callable when a player is directly speaking | 4 tools |
+| **Player-Only** | Only callable when a player is directly speaking | 3 tools |
 
 ---
 
 ## General Tools
 
 <details markdown="1">
-<summary> <code>get_citizen_info</code> — Get citizen details</summary>
+<summary> <code>get_citizen_info</code> - Get citizen details</summary>
 
 **Class:** `GetCitizenInfoAction`
 
@@ -31,7 +31,7 @@ Gets detailed info about a specific citizen (skills, job, family, saturation, qu
 </details>
 
 <details markdown="1">
-<summary> <code>list_citizens</code> — List all citizens</summary>
+<summary> <code>list_citizens</code> - List all citizens</summary>
 
 **Class:** `ListCitizenAction`
 
@@ -41,7 +41,7 @@ Lists all citizens in the colony by name. No parameters.
 </details>
 
 <details markdown="1">
-<summary> <code>get_inventory</code> — Citizen inventory</summary>
+<summary> <code>get_inventory</code> - Citizen inventory</summary>
 
 **Class:** `GetInventoryAction`
 
@@ -51,7 +51,7 @@ Lists current items in the citizen's inventory. No parameters.
 </details>
 
 <details markdown="1">
-<summary> <code>get_colony</code> — Colony info</summary>
+<summary> <code>get_colony</code> - Colony info</summary>
 
 **Class:** `GetColonyAction`
 
@@ -63,7 +63,7 @@ Gets colony info (name, buildings, happiness, research, statistics, events).
 </details>
 
 <details markdown="1">
-<summary> <code>describe_surroundings</code> — Immediate surroundings</summary>
+<summary> <code>describe_surroundings</code> - Immediate surroundings</summary>
 
 **Class:** `DescribeSurroundingsAction`
 
@@ -73,7 +73,7 @@ Describes immediate surroundings (~20 blocks): time, weather, nearby entities, c
 </details>
 
 <details markdown="1">
-<summary> <code>describe_building</code> — Colony building</summary>
+<summary> <code>describe_building</code> - Colony building</summary>
 
 **Class:** `DescribeBuildingAction`
 
@@ -85,7 +85,7 @@ Describes a colony building (type, level, workers, type-specific info).
 </details>
 
 <details markdown="1">
-<summary> <code>end_conversation</code> — End conversation</summary>
+<summary> <code>end_conversation</code> - End conversation</summary>
 
 **Class:** `EndConversationAction`
 
@@ -93,7 +93,7 @@ Terminates the current autonomous conversation. Cannot be used during player con
 </details>
 
 <details markdown="1">
-<summary> <code>record_relationship_change</code> — Update relationship</summary>
+<summary> <code>record_relationship_change</code> - Update relationship</summary>
 
 **Class:** `RecordRelationshipChange`
 
@@ -105,7 +105,7 @@ Updates relationship memory toward another citizen or the player.
 </details>
 
 <details markdown="1">
-<summary> <code>add_event_to_memory</code> — Add memory event</summary>
+<summary> <code>add_event_to_memory</code> - Add memory event</summary>
 
 **Class:** `AddEventToMemory`
 
@@ -119,7 +119,7 @@ Disabled when compaction mode is on.
 </details>
 
 <details markdown="1">
-<summary> <code>recommend_job</code> — Job recommendations</summary>
+<summary> <code>recommend_job</code> - Job recommendations</summary>
 
 **Class:** `RecommendJobAction`
 
@@ -129,7 +129,7 @@ Analyzes citizen's skills and returns top 5 job recommendations with scores. No 
 </details>
 
 <details markdown="1">
-<summary> <code>get_current_situation</code> — Current activity</summary>
+<summary> <code>get_current_situation</code> - Current activity</summary>
 
 **Class:** `GetCurrentSituationAction`
 
@@ -143,7 +143,7 @@ Refreshes knowledge of the citizen's current activity, work status, blocked item
 ## Player-Only Tools
 
 <details markdown="1">
-<summary> <code>drop_item</code> — Drop item</summary>
+<summary> <code>drop_item</code> - Drop item</summary>
 
 **Class:** `DropItemAction`
 
@@ -153,18 +153,18 @@ Drops an item from the citizen's inventory.
 </details>
 
 <details markdown="1">
-<summary> <code>leave_colony</code> — Leave colony (permanent)</summary>
+<summary> <code>leave_colony</code> - Leave colony (permanent)</summary>
 
 **Class:** `LeaveColonyAction`
 
 Citizen permanently leaves the colony and becomes a recruitable visitor. Requires a tavern building. **Final decision.**
 
 !!! warning "Irreversible"
- This action is permanently irreversibly — once a citizen leaves, they're gone from your colony.
+ This action is permanently irreversibly - once a citizen leaves, they're gone from your colony.
 </details>
 
 <details markdown="1">
-<summary> <code>initiate_broadcast</code> — Broadcast message</summary>
+<summary> <code>initiate_broadcast</code> - Broadcast message</summary>
 
 **Class:** `InitiateBroadcastAction`
 

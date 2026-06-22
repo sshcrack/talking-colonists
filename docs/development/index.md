@@ -10,7 +10,6 @@ Information for developers working on MineColonies Talking Citizens.
 |--------|--------|
 | **Multi-loader** | Stonecutter manages versions for NeoForge (1.21.1) and Forge (1.20.1) |
 | **Conditional compilation** | `/*? if neoforge {*/` / `/*? if forge {*/` directives |
-| **Platform abstraction** | `Platform` interface with loader-specific implementations |
 | **Key packages** | `me.sshcrack.mc_talking` (entrypoints), `.manager` (Gemini clients), `.conversations` (lifecycle), `.config` (YACL), `.api.prompt` (SPI) |
 
 ---
@@ -34,4 +33,4 @@ cd talking-colonists
 |------|----------------|
 | [**Building**](building.md) | Build commands, Stonecutter workflow, publishing |
 | [**Contributing**](contributing.md) | PR workflow, mixin guidelines, code style |
-| [**API Reference**](api.md) | PromptProvider SPI, tool registration, platform abstraction |
+| [**API Reference**](api.md) | PromptProvider SPI, tool registration, MineColonies integration |

@@ -3,7 +3,7 @@
 Citizens remember past events, conversations, and relationships, creating a persistent history that shapes their future behavior.
 
 !!! info "It's not just chat history"
- Citizens don't just remember what you said — they remember events like raids, job changes, new buildings, and their relationships with other citizens.
+ Citizens don't just remember what you said - they remember events like raids, job changes, new buildings, and their relationships with other citizens.
 
 ---
 
@@ -43,9 +43,9 @@ Over time, citizen memories accumulate. To prevent the prompt from growing too l
 
 ## Data Models
 
-- **`CitizenMemories`** — Stores memories per citizen (events, facts, summaries).
-- **`CitizenRelationshipMemory`** — Tracks inter-citizen relationship data.
-- **`CitizenRelationshipChangeType`** — Defines how relationships can evolve.
+- **`CitizenMemories`** - Stores memories per citizen (events, facts, summaries).
+- **`CitizenRelationshipMemory`** - Tracks inter-citizen relationship data.
+- **`CitizenRelationshipChangeType`** - Defines how relationships can evolve.
 
 ---
 

@@ -12,7 +12,7 @@
 
 ![Hero](assets/hero-conversation.png)
 
-Talk to your MineColonies citizens using natural voice conversations powered by Google Gemini AI. Each citizen has a unique personality, remembers past interactions, and reacts to colony events — creating a living, breathing colony.
+Talk to your MineColonies citizens using natural voice conversations powered by Google Gemini AI. Each citizen has a unique personality, remembers past interactions, and reacts to colony events - creating a living, breathing colony.
 
 ---
 

@@ -3,14 +3,14 @@
 The Broadcast System allows players to ask citizens to spread messages colony-wide through word-of-mouth propagation.
 
 !!! warning "Player-only feature"
- Broadcasts can only be initiated during **player-initiated conversations** — citizens won't spontaneously broadcast during autonomous conversations.
+ Broadcasts can only be initiated during **player-initiated conversations** - citizens won't spontaneously broadcast during autonomous conversations.
 
 ---
 
 ## How It Works
 
 ``` mermaid
-graph LR
+graph TD
  A[Player requests broadcast] -->|AI invokes initiate_broadcast tool| B[ColonyBroadcast created]
  B --> C[BroadcastPropagationService]
  C -->|Periodic check| D{Another citizen in range?}
@@ -19,11 +19,11 @@ graph LR
  E -->|Player nearby?| F[Citizen yells aloud]
 ```
 
-1. **Initiation** — During a conversation, the player asks a citizen to spread a message.
-2. **AI Tool** — The AI invokes the `initiate_broadcast` tool (player-only function).
-3. **Propagation** — The `BroadcastPropagationService` periodically checks for active broadcasts and propagates them to nearby citizens within range.
-4. **Chain effect** — Each citizen that receives a broadcast can pass it on to others, creating a wave across the colony.
-5. **Yelling** — Citizens can announce broadcasts aloud when a player is nearby (`enableBroadcastYelling`).
+1. **Initiation** - During a conversation, the player asks a citizen to spread a message.
+2. **AI Tool** - The AI invokes the `initiate_broadcast` tool (player-only function).
+3. **Propagation** - The `BroadcastPropagationService` periodically checks for active broadcasts and propagates them to nearby citizens within range.
+4. **Chain effect** - Each citizen that receives a broadcast can pass it on to others, creating a wave across the colony.
+5. **Yelling** - Citizens can announce broadcasts aloud when a player is nearby (`enableBroadcastYelling`).
 
 !!! tip "Use cases"
  - "Tell everyone to meet at the town hall!"

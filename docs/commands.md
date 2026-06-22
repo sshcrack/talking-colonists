@@ -7,19 +7,19 @@
 
 ## Root Command
 
-**`/talking_colonists`** — Shows an overview of mod status including API key status, active sessions, config toggles, and cooldowns.
+**`/talking_colonists`** - Shows an overview of mod status including API key status, active sessions, config toggles, and cooldowns.
 
 ![Command status](assets/command-status.png)
 
 !!! tip "Quick health check"
- This is the first command to run if something isn't working — it tells you if the API key is set and how many sessions are active.
+ This is the first command to run if something isn't working - it tells you if the API key is set and how many sessions are active.
 
 ---
 
 ## Subcommands
 
 <details markdown="1">
-<summary> <code>/talking_colonists status</code> — Detailed system status</summary>
+<summary> <code>/talking_colonists status</code> - Detailed system status</summary>
 
 Displays:
 
@@ -35,7 +35,7 @@ Displays:
 </details>
 
 <details markdown="1">
-<summary> <code>/talking_colonists connections</code> — Active connections</summary>
+<summary> <code>/talking_colonists connections</code> - Active connections</summary>
 
 ![Command connections](assets/command-connections.png)
 
@@ -49,7 +49,7 @@ Lists all active WebSocket connections with:
 </details>
 
 <details markdown="1">
-<summary> <code>/talking_colonists citizen &lt;target&gt;</code> — Citizen info</summary>
+<summary> <code>/talking_colonists citizen &lt;target&gt;</code> - Citizen info</summary>
 
 Shows detailed information about a specific citizen:
 
@@ -64,7 +64,7 @@ Shows detailed information about a specific citizen:
 </details>
 
 <details markdown="1">
-<summary> <code>/talking_colonists memory &lt;target&gt;</code> — Citizen memory</summary>
+<summary> <code>/talking_colonists memory &lt;target&gt;</code> - Citizen memory</summary>
 
 Shows memory contents of a citizen:
 
@@ -76,7 +76,7 @@ Shows memory contents of a citizen:
 </details>
 
 <details markdown="1">
-<summary> <code>/talking_colonists events [colony_id]</code> — Colony events</summary>
+<summary> <code>/talking_colonists events [colony_id]</code> - Colony events</summary>
 
 Shows recent colony events:
 
@@ -86,23 +86,23 @@ Shows recent colony events:
 </details>
 
 <details markdown="1">
-<summary> <code>/talking_colonists urgent_contact &lt;citizen&gt;</code> — Urgent contact</summary>
+<summary> <code>/talking_colonists urgent_contact &lt;citizen&gt;</code> - Urgent contact</summary>
 
 Triggers the citizen to walk to the player using `UrgentContactHandler`. Must be executed by a player entity.
 </details>
 
 <details markdown="1">
-<summary> <code>/talking_colonists prompt &lt;citizen&gt; &lt;prompt&gt;</code> — Force prompt</summary>
+<summary> <code>/talking_colonists prompt &lt;citizen&gt; &lt;prompt&gt;</code> - Force prompt</summary>
 
 Forces a low-priority AI conversation session with a citizen by injecting a custom prompt string. Force-removes their cooldown first.
 </details>
 
 <details markdown="1">
-<summary> <code>/list_tools</code> — List AI tools</summary>
+<summary> <code>/list_tools</code> - List AI tools</summary>
 
 Lists all registered AI tool function names with their category (Player/General).
 
-**`/list_tools <tool_name>`** — Shows detailed description and parameter schema for a specific tool.
+**`/list_tools <tool_name>`** - Shows detailed description and parameter schema for a specific tool.
 </details>
 
 ---

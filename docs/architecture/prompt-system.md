@@ -5,7 +5,7 @@ The prompt system constructs the context that shapes each citizen's AI responses
 ## Prompt Construction Flow
 
 ```mermaid
-flowchart LR
+flowchart TD
  Start["Conversation Start"] --> VF["CitizenPromptViewFactory"]
  VF --> View["CitizenPromptView"]
  View --> Prov["DefaultCitizenPromptProvider"]
@@ -28,12 +28,12 @@ flowchart LR
 
 The final prompt includes:
 
-- **Citizen Identity** — Name, job title, personality archetype description.
-- **Colony Status** — Overall colony happiness, resource levels, building status.
-- **Recent Memories** — Past conversations, significant events, learned facts.
-- **Active Rumors and Broadcasts** — Information from the rumor mill and broadcast system.
-- **Current Tasks and Needs** — What the citizen is doing and what they need.
-- **Relationship Data** — Feelings toward the player and other citizens.
+- **Citizen Identity** - Name, job title, personality archetype description.
+- **Colony Status** - Overall colony happiness, resource levels, building status.
+- **Recent Memories** - Past conversations, significant events, learned facts.
+- **Active Rumors and Broadcasts** - Information from the rumor mill and broadcast system.
+- **Current Tasks and Needs** - What the citizen is doing and what they need.
+- **Relationship Data** - Feelings toward the player and other citizens.
 
 ## SPI for Customization
 

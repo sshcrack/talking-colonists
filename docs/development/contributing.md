@@ -18,7 +18,7 @@
 
 - **Indentation**: 4 spaces for Java, 2 spaces for JSON/YAML/Markdown (`.editorconfig`).
 - **Imports**: Single class imports; import-on-demand threshold = 999.
-- **No automated formatter** — match the existing style of the codebase.
+- **No automated formatter** - match the existing style of the codebase.
 
 ## Config Changes
 
@@ -29,7 +29,7 @@ When adding or removing configuration values in `McTalkingConfig`:
 
 ## Stonecutter Notes
 
-- Never commit changes to `.sc_active_version` — the pre-commit hook blocks it.
+- Never commit changes to `.sc_active_version` - the pre-commit hook blocks it.
 - Use `git commit --no-verify` only if the change is intentional.
 
 ## Pre-commit Hooks

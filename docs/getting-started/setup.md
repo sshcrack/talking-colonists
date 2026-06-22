@@ -1,6 +1,6 @@
 # Setup
 
-Before you start, make sure you have a valid **Google Gemini API key** — the mod won't work without one.
+Before you start, make sure you have a valid **Google Gemini API key** - the mod won't work without one.
 
 ## Installing Dependencies
 
@@ -31,8 +31,8 @@ Place all `.jar` files in your `mods/` folder. On a server, install them on both
 3. Copy the generated key.
 
 !!! tip "About Free Tier Limits"
- - **Gemini Flash 3** — Up to **3 concurrent citizens** on the free tier.
- - **Gemini Flash 2.5** — Only **1 concurrent connection** (cheaper but more limited).
+ - **Gemini Flash 3** - Up to **3 concurrent citizens** on the free tier.
+ - **Gemini Flash 2.5** - Only **1 concurrent connection** (cheaper but more limited).
 
 ---
 
@@ -49,13 +49,13 @@ You can configure the mod in two ways:
 3. The YACL-based GUI organizes settings into three categories: **API**, **General**, and **Citizens**.
 
 !!! tip "No need to restart"
- Changes made via the in-game GUI take effect immediately — no game restart required.
+ Changes made via the in-game GUI take effect immediately - no game restart required.
 
 ### Direct File Edit
 
 The config file is located at `config/yacl-mc_talking.json5` (JSON5 format).
 
-The file contains many more fields beyond what's shown below — this is only the minimal snippet to get started:
+The file contains many more fields beyond what's shown below - this is only the minimal snippet to get started:
 
 ```json5
 {

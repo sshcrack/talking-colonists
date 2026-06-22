@@ -9,11 +9,11 @@ The audio pregeneration system reduces response latency by pre-generating common
 
 ## How It Works
 
-1. **Background generation** — The `PregenerationTaskService` runs scheduled tasks to generate audio for nearby citizens.
-2. **Gemini client** — `PregenerationGeminiClient` handles the lightweight API calls for pregeneration.
-3. **Caching** — Generated audio is cached per citizen, keyed by context.
-4. **Playback** — When a player walks near a citizen, the `DeliveryInteractionManager` plays the appropriate pregenerated greeting instantly.
-5. **Heatmap tracking** — The `PlayerHeatmapTracker` monitors where players spend time, prioritizing pregeneration for frequently visited areas.
+1. **Background generation** - The `PregenerationTaskService` runs scheduled tasks to generate audio for nearby citizens.
+2. **Gemini client** - `PregenerationGeminiClient` handles the lightweight API calls for pregeneration.
+3. **Caching** - Generated audio is cached per citizen, keyed by context.
+4. **Playback** - When a player walks near a citizen, the `DeliveryInteractionManager` plays the appropriate pregenerated greeting instantly.
+5. **Heatmap tracking** - The `PlayerHeatmapTracker` monitors where players spend time, prioritizing pregeneration for frequently visited areas.
 
 ---
 
