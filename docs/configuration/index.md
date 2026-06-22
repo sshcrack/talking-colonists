@@ -1,24 +1,49 @@
----
-title: Configuration Overview
-ai_instructions:
-  goal: |
-    Overview of the configuration system. Explain the YACL-based config,
-    where the file lives, and the two methods (GUI vs direct edit).
-
-  content_sections:
-    - "**Config file location**: `config/yacl-mc_talking.json5` (JSON5 format)."
-    - "**In-game GUI**: Mod menu → Talking Citizens → Config, or use a mod menu mod."
-    - "**Config categories**: API, General, Citizens (with many sub-groups)."
-    - "**Reload behavior**: Some options require a restart, some are live. Note which."
-    - "**Links to sub-pages**: [API Settings](api.md), [General](general.md), [Citizens](citizens.md)."
-
-  source_references:
-    - "src/main/java/me/sshcrack/mc_talking/config/McTalkingConfig.java"
-    - "src/main/resources/assets/mc_talking/lang/en_us.json — for config translations."
----
-
 # Configuration
 
-This section documents all configurable options for MineColonies Talking Citizens.
+The mod uses **YetAnotherConfigLib (YACL)** for its configuration system. Settings are stored in `config/yacl-mc_talking.json5` (JSON5 format).
 
-> **Note**: This is a stub page. Content should be populated per the `ai_instructions` above.
+!!! tip "No restart needed"
+ Most config changes take effect immediately through the in-game GUI. No game restart required.
+
+---
+
+## Configuration Methods
+
+### In-Game GUI
+
+Open the config screen through any mod menu mod, or by navigating to **Mod Menu** → **Talking Citizens** → **Config**. The GUI is organized into three main categories with collapsible sub-groups.
+
+### Direct File Edit
+
+Edit `config/yacl-mc_talking.json5` directly while the game is closed.
+
+```json5
+{
+ "api": {
+ "geminiApiKey": "YOUR_API_KEY"
+ },
+ "general": {
+ "language": "en-US"
+ },
+ "citizens": { /* ... */ }
+}
+```
+
+---
+
+## Categories
+
+| Category | Description | Key settings |
+|----------|-------------|--------------|
+| [**API**](api.md) | Gemini API key and AI model selection | `geminiApiKey`, `currentAiModel` |
+| [**General**](general.md) | Language, interaction behavior, resource limits | `language`, `modality`, `maxConcurrentAgents` |
+| [**Citizens**](citizens.md) | All citizen behavior settings (conversations, mumbling, memory, rumors, etc.) | 55+ settings across 11 sub-groups |
+
+---
+
+## Config File Location
+
+`config/yacl-mc_talking.json5`
+
+!!! info "JSON5 format"
+ Unlike regular JSON, JSON5 supports comments, trailing commas, and unquoted keys. This makes manual editing much friendlier.

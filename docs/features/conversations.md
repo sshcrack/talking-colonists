@@ -1,38 +1,53 @@
----
-title: Conversations
-ai_instructions:
-  goal: |
-    Document both player-to-citizen and citizen-to-citizen conversation systems.
-
-  content_sections:
-    - "**Player ↔ Citizen**:"
-      "  - Initiated by left-clicking a citizen with the Citizen Communication Device."
-      "  - Uses Gemini Live API for real-time voice chat."
-      "  - Citizens respond based on their personality, memories, colony status."
-      "  - Conversation lifecycle handle by ConversationManager."
-      "  - Slot-based priority system (player conversations always win)."
-    - "**Citizen ↔ Citizen**:"
-      "  - Auto-triggered by the mod when citizens are near each other."
-      "  - Two modes (controlled by conversationMode config):"
-      "    - LIVE_WEBSOCKETS: Two Gemini Live sessions cross-fed."
-      "    - FLASH_TTS: Flash generates script, TTS renders audio."
-      "    - AUTO: Tries FLASH_TTS first, falls back as needed."
-      "  - Citizens share rumors, discuss colony events, gossip."
-    - "**Random Conversations**: Citizens may randomly start talking."
-    - "**Config keys**: conversationMode, enableCitizenToCitizenConversation,"
-      "  enableRandomConversations, randomConversationChance, respondInGroups."
-
-  source_references:
-    - "src/main/java/me/sshcrack/mc_talking/conversations/CitizenConversation.java"
-    - "src/main/java/me/sshcrack/mc_talking/conversations/CitizenConversationGenerator.java"
-    - "src/main/java/me/sshcrack/mc_talking/conversations/LiveConversationWsClient.java"
-    - "src/main/java/me/sshcrack/mc_talking/config/ConversationMode.java"
-    - "src/main/java/me/sshcrack/mc_talking/handler/CasualGreetingHandler.java"
-    - "src/main/java/me/sshcrack/mc_talking/handler/RandomConversationHandler.java"
----
-
 # Conversations
 
-How citizens talk to players and each other.
+The mod supports two types of conversations: **player** ↔ **citizen** and **citizen** ↔ **citizen**.
 
-> **Note**: This is a stub page. Content should be populated per the `ai_instructions` above.
+---
+
+## Player ↔ Citizen
+
+| Step | Detail |
+|------|--------|
+| **Initiation** | Left-click a citizen while holding the **Citizen Communication Device** |
+| **Technology** | Uses the Gemini Live API for real-time, bidirectional voice streaming |
+| **Response context** | Citizens respond based on their personality, memories, colony status, recent events, rumors, and broadcasts |
+| **Lifecycle** | Managed by `ConversationManager`, which tracks active sessions, cooldowns, and slot allocation |
+| **Priority system** | Player conversations are high-priority and can evict lower-priority sessions (mumbling, citizen-to-citizen) when the connection limit is reached |
+
+!!! tip "Hint"
+ You can have up to 3 simultaneous conversations on the Gemini free tier with Flash 3.
+
+---
+
+## Citizen ↔ Citizen
+
+Citizens can autonomously start conversations with each other when nearby. This creates a living colony where citizens discuss colony events, share rumors, gossip, and build relationships.
+
+!!! example "Screenshot needed"
+ Two colonists standing close together with `(In conversation)` status indicators visible in their name tags.
+
+### Modes
+
+Controlled by `conversationMode`:
+
+| Mode | How it works | Quality |
+|------|-------------|---------|
+| `LIVE_WEBSOCKETS` | Two Gemini Live WebSocket sessions cross-feed audio to each other in real time | Cheaper/faster |
+| `FLASH_TTS` | Flash generates a script, then Gemini TTS renders multi-speaker audio | Higher quality, ~10/day limit |
+| `AUTO` | (Default) Tries Flash + TTS first; falls back to Live WebSockets if the pipeline fails | Best of both |
+
+---
+
+## Random Conversations
+
+Citizens may randomly start conversations with nearby citizens based on a configurable chance and interval.
+
+### Key Config Options
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enableCitizenToCitizenConversation` | `true` | Enable autonomous citizen conversations |
+| `conversationMode` | `AUTO` | Mode for citizen-to-citizen conversations |
+| `enableRandomConversations` | `true` | Citizens randomly start conversations |
+| `randomConversationChance` | `0.05` | :100: Chance per check interval |
+| `respondInGroups` | `false` | Citizens respond in group chat |

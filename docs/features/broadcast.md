@@ -1,32 +1,61 @@
----
-title: Broadcast System
-ai_instructions:
-  goal: |
-    Document the colony-wide broadcast propagation system.
-
-  content_sections:
-    - "**What it is**: Players can ask citizens to spread a message across the colony."
-      "  Citizens propagate the message to nearby citizens, creating a chain."
-    - "**How it works**:"
-      "  - Player tells a citizen a message they want broadcast."
-      "  - The AI uses the InitiateBroadcastAction tool to start a broadcast."
-      "  - Citizens periodically propagate broadcasts to nearby citizens."
-      "  - BroadcastPropagationService manages the propagation logic."
-      "  - Citizens can yell broadcasts (enableBroadcastYelling)."
-    - "**Data model**: ColonyBroadcast stores message, source citizen, timestamp."
-    - "**Config keys**: enableBroadcastPropagation, broadcastPropagationIntervalTicks,"
-      "  broadcastMaxPropagationsPerTick, broadcastPropagationRange,"
-      "  maxBroadcastsInPrompt, maxBroadcastsStored,"
-      "  enableBroadcastYelling, broadcastYellingRange."
-
-  source_references:
-    - "src/main/java/me/sshcrack/mc_talking/broadcast/ColonyBroadcast.java"
-    - "src/main/java/me/sshcrack/mc_talking/broadcast/BroadcastPropagationService.java"
-    - "src/main/java/me/sshcrack/mc_talking/manager/tools/InitiateBroadcastAction.java"
----
-
 # Broadcast System
 
-Colony-wide message propagation.
+The Broadcast System allows players to ask citizens to spread messages colony-wide through word-of-mouth propagation.
 
-> **Note**: This is a stub page. Content should be populated per the `ai_instructions` above.
+!!! warning "Player-only feature"
+ Broadcasts can only be initiated during **player-initiated conversations** — citizens won't spontaneously broadcast during autonomous conversations.
+
+---
+
+## How It Works
+
+``` mermaid
+graph LR
+ A[Player requests broadcast] -->|AI invokes initiate_broadcast tool| B[ColonyBroadcast created]
+ B --> C[BroadcastPropagationService]
+ C -->|Periodic check| D{Another citizen in range?}
+ D -->|Yes| E[Citizen receives broadcast]
+ E -->|Can propagate further| C
+ E -->|Player nearby?| F[Citizen yells aloud]
+```
+
+1. **Initiation** — During a conversation, the player asks a citizen to spread a message.
+2. **AI Tool** — The AI invokes the `initiate_broadcast` tool (player-only function).
+3. **Propagation** — The `BroadcastPropagationService` periodically checks for active broadcasts and propagates them to nearby citizens within range.
+4. **Chain effect** — Each citizen that receives a broadcast can pass it on to others, creating a wave across the colony.
+5. **Yelling** — Citizens can announce broadcasts aloud when a player is nearby (`enableBroadcastYelling`).
+
+!!! tip "Use cases"
+ - "Tell everyone to meet at the town hall!"
+ - "Spread the word: we need more wood for the expansion."
+ - "Announce that a raid is coming!"
+
+---
+
+## Data Model
+
+Each `ColonyBroadcast` stores:
+
+- The message text
+- The source citizen who started it
+- A timestamp
+
+---
+
+## Prompt Integration
+
+Recent broadcasts are included in citizen prompts so they can discuss them during conversations.
+
+---
+
+## Key Config Options
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enableBroadcastPropagation` | `true` | Enable broadcast propagation |
+| `broadcastPropagationIntervalTicks` | `300` | How often to check for propagation |
+| `broadcastMaxPropagationsPerTick` | `5` | Max propagations per tick |
+| `broadcastPropagationRange` | `24.0` | Max distance between citizens |
+| `maxBroadcastsInPrompt` | `3` | Broadcasts included in AI prompt |
+| `enableBroadcastYelling` | `true` | Citizens announce broadcasts aloud |
+| `broadcastYellingRange` | `24.0` | Max distance to hear broadcast |

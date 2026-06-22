@@ -1,35 +1,84 @@
----
-title: Architecture Overview
-ai_instructions:
-  goal: |
-    Provide a high-level overview of the mod's architecture. Describe the major
-    subsystems and how they interact.
-
-  content_sections:
-    - "**Mod structure at a glance**:"
-      "  - Entrypoints: McTalking (common), McTalkingClient (client), McTalkingVoicechatPlugin."
-      "  - ConversationManager: Central orchestrator for all conversations."
-      "  - Config: YACL-based, categories for API/General/Citizens."
-      "  - Gemini client layer: GeminiWsClient, CitizenWsClient."
-      "  - Prompt system: Prompt providers, views, and the SPI for customization."
-      "  - AI Tools: 18+ function-calling tools the AI can invoke."
-      "  - Memory: Conversation memory, compaction, relationship tracking."
-      "  - Services: Rumor mill, broadcast, pregeneration, urgent contact."
-    - "**Multi-loader architecture**:"
-      "  - Stonecutter manages two version sets (1.20.1-forge, 1.21.1-neoforge)."
-      "  - Platform abstraction via Platform interface and Impl classes."
-    - "**Data flow diagram** (describe what a diagram would show):"
-      "  Player voice → Voice Chat Plugin → ConversationManager → GeminiWsClient"
-      "  → Gemini API → Response → Audio playback."
-    - "**Links to sub-pages**."
-
-  source_references:
-    - "All files under src/main/java/me/sshcrack/mc_talking/"
-    - "AGENTS.md"
----
-
 # Architecture
 
-High-level architecture of MineColonies Talking Citizens.
+## Data Flow
 
-> **Note**: This is a stub page. Content should be populated per the `ai_instructions` above.
+```mermaid
+flowchart LR
+ Player["Player (Microphone)"] --> VC["Simple Voice Chat Plugin"]
+ VC --> CM["ConversationManager"]
+ CM --> GWC["GeminiWsClient / CitizenWsClient"]
+ GWC --> Gemini["Gemini Live API"]
+ Gemini --> GWC
+ GWC --> CM
+ CM --> VC
+ VC --> PlayerSpeakers["Player (Speakers)"]
+
+ CM --> CIT["Citizen Entity"]
+ CIT --> MC["MineColonies API"]
+ MC --> CIT
+
+ subgraph AI["AI Tools"]
+ AIT["AITools.register()"]
+ AIT --> GF["General Tools"]
+ AIT --> PF["Player-Only Tools"]
+ end
+
+ GWC --> AIT
+ AIT --> MC
+```
+
+## Major Subsystems
+
+| Subsystem | Package | Purpose |
+|-----------|---------|---------|
+| **Entrypoints** | `me.sshcrack.mc_talking` | `McTalking` (common init), `McTalkingClient` (client), `McTalkingVoicechatPlugin` (voice chat) |
+| **Conversation Manager** | `.conversations` | Central orchestrator for all conversations, slot management, cooldowns |
+| **Config** | `.config` | YACL-based configuration with API/General/Citizens categories |
+| **Gemini Client** | `.manager` | `GeminiWsClient`, `CitizenWsClient` — WebSocket clients for the Gemini Live API |
+| **Prompt System** | `.api.prompt`, `.manager` | Prompt view/provider SPI for constructing AI prompts |
+| **AI Tools** | `.manager.tools` | 15+ function-calling tools the AI can invoke during conversations |
+| **Memory** | `.conversations.memory` | Conversation memory, compaction, relationship tracking |
+| **Services** | `.handler`, `.rumor`, `.broadcast`, `.pregen` | Rumor mill, broadcast, pregeneration, urgent contact |
+
+## Multi-Loader Architecture
+
+```mermaid
+flowchart TD
+ subgraph Shared["Shared Code (src/main/java)"]
+ Platform["Platform Interface"]
+ Mixins["23 Mixin Classes"]
+ Items["3 Items"]
+ Config["McTalkingConfig (YACL)"]
+ end
+
+ subgraph NeoForge["1.21.1 NeoForge"]
+ NFImpl["NeoforgePlatformImpl"]
+ NFBuild["build.neoforge.gradle.kts"]
+ NFAW["accesswidener"]
+ end
+
+ subgraph Forge["1.20.1 Forge"]
+ FImpl["ForgePlatformImpl"]
+ FBuild["build.forge.gradle.kts"]
+ FCFG["access transformer .cfg"]
+ end
+
+ Platform --> NFImpl
+ Platform --> FImpl
+```
+
+## Mod Initialization
+
+1. **`McTalking` constructor** — Called by mod loader
+2. `AITools.register()` — Registers all AI function-calling tools
+3. `McTalkingConfig.loadConfig()` — Loads YACL config
+4. `ModItems.register()` — Registers 3 items via DeferredRegister
+5. Event bus registration — Server event handlers, network payloads
+6. `onCommonSetup` — `ColonyEventSubscriber.register()` for MineColonies hooks
+
+## Sub-Pages
+
+- [**Prompt System**](prompt-system.md) — How AI prompts are constructed
+- [**AI Tools**](ai-tools.md) — Function-calling tools reference
+- [**Voice Chat Integration**](voice-chat.md) — Simple Voice Chat integration
+- [**Platform Abstraction**](platform-abstraction.md) — Multi-loader architecture

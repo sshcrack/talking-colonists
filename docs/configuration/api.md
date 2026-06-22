@@ -1,23 +1,34 @@
----
-title: API Settings
-ai_instructions:
-  goal: |
-    Document the `api` config category. Include the config key, type, default value,
-    and description for each option. Use a table format if possible.
-
-  config_fields:
-    - "**geminiApiKey** (String): The Google Gemini API key. Required. Get from https://aistudio.google.com/apikey."
-    - "**currentAiModel** (enum AvailableAI — Flash3 or Flash2_5): The AI model to use for conversations."
-      "  Flash3 = `gemini-3.1-flash-live-preview`, Flash2_5 = `gemini-2.5-flash-native-audio-preview-12-2025`."
-      "  Flash2_5 is cheaper but supports only 1 concurrent connection on free tier."
-
-  source_references:
-    - "src/main/java/me/sshcrack/mc_talking/config/McTalkingConfig.java (api category)."
-    - "src/main/java/me/sshcrack/mc_talking/config/AvailableAI.java"
----
-
 # API Settings
 
 Configuration options for the Gemini API connection.
 
-> **Note**: This is a stub page. Content should be populated per the `ai_instructions` above.
+!!! warning "API Key Required"
+ The mod will not function without a valid Gemini API key. Get one at [Google AI Studio](https://aistudio.google.com/apikey) — it's free.
+
+---
+
+## Configuration Options
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `geminiApiKey` | String | `""` | Google Gemini API key |
+| `currentAiModel` | Enum | `Flash3` | AI model to use for conversations |
+
+---
+
+## Available Models
+
+| Value | API Model | Free Tier Limit |
+|-------|-----------|-----------------|
+| `Flash3` | `gemini-3.1-flash-live-preview` | Up to **3 concurrent** connections |
+| `Flash2_5` | `gemini-2.5-flash-native-audio-preview-12-2025` | Only **1 concurrent** connection |
+
+!!! tip "Which model should I use?"
+ - **Flash 3** for most users — faster and supports up to 3 simultaneous conversations.
+ - **Flash 2.5** if you want to save API credits and only need 1 conversation at a time.
+
+---
+
+## Voice Options
+
+Each model supports both male and female voices. The selected voice is randomized per conversation, giving each interaction a unique feel.

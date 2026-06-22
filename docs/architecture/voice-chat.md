@@ -1,32 +1,56 @@
----
-title: Voice Chat Integration
-ai_instructions:
-  goal: |
-    Document the Simple Voice Chat integration.
-
-  content_sections:
-    - "**Integration point**: McTalkingVoicechatPlugin implements the Simple Voice Chat API."
-    - "**How voice flows**:"
-      "  - Player microphone audio → Voice Chat plugin → ConversationManager →"
-      "    GeminiWsClient (sent to Gemini API)."
-      "  - Gemini API response audio → GeminiWsClient → Voice Chat plugin →"
-      "    Player speakers."
-    - "**Volume categories**:"
-      "  - Direct player-to-citizen audio."
-      "  - Citizen-to-citizen audio."
-    - "**Whisper system**: Citizens can whisper (citizenVoiceWhisper config)."
-    - "**Audio distance**: citizenVoiceDistance controls how far citizen audio carries."
-    - "**Silence detection**: Voice activity/silence detection in the plugin."
-    - "**Config keys**: citizenVoiceWhisper, citizenVoiceDistance."
-
-  source_references:
-    - "src/main/java/me/sshcrack/mc_talking/McTalkingVoicechatPlugin.java"
-    - "src/main/java/me/sshcrack/mc_talking/manager/audio/AudioProvider.java"
-    - "src/main/java/me/sshcrack/mc_talking/manager/audio/CitizenEntityAudioProvider.java"
----
-
 # Voice Chat Integration
 
-How Simple Voice Chat integrates with the mod.
+The mod integrates with **Simple Voice Chat** to handle all audio input and output.
 
-> **Note**: This is a stub page. Content should be populated per the `ai_instructions` above.
+## Voice Flow
+
+```mermaid
+flowchart LR
+ Mic["Player Microphone"] --> VCP["Simple Voice Chat Plugin"]
+ VCP --> MicEvent["MicrophonePacketEvent"]
+ MicEvent --> VAD["Voice Activity Detection"]
+ VAD --> WS["Gemini WebSocket Client"]
+ WS --> Gemini["Gemini Live API"]
+ Gemini --> WS
+ WS --> VCP
+ VCP --> Speakers["Player Speakers"]
+```
+
+## Integration Points
+
+| Component | File | Role |
+|-----------|------|------|
+| Voice Chat Plugin | `McTalkingVoicechatPlugin.java` | Registers with Simple Voice Chat, handles events |
+| Audio Provider | `AudioProvider.java` | Processes audio streaming |
+| Entity Audio | `CitizenEntityAudioProvider.java` | Routes citizen audio to voice chat |
+
+## Events
+
+| Event | Handler | Purpose |
+|-------|---------|---------|
+| `MicrophonePacketEvent` | `handleMicPacket` | Captures player microphone input, forwards to active Gemini WebSocket client |
+| `VoicechatServerStartedEvent` | `onServerStarted` | Stores Voicechat API reference, registers volume categories, starts silence detection |
+| `VoicechatServerStoppedEvent` | `onStop` | Shuts down memory generators and executor |
+
+## Volume Categories
+
+Two volume categories control audio levels:
+
+| Category | Purpose |
+|----------|---------|
+| `ptc_dialog` | Player-to-citizen conversation audio |
+| `ctc_dialog` | Citizen-to-citizen conversation audio |
+
+## Audio Processing
+
+- **Voice Activity Detection**: Uses opus packet size heuristics.
+- **Silence Detection**: Periodic executor generates randomized ambient noise (Gaussian, amplitude ~5.0) during silence.
+- **Whisper Support**: Citizens can use whisper volume (`citizenVoiceWhisper` config).
+- **Audio Distance**: Controlled by `citizenVoiceDistance` config (0 = use default).
+
+## Key Config Options
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `citizenVoiceWhisper` | `true` | Citizens whisper when talking |
+| `citizenVoiceDistance` | `0` | Max audio distance (0 = default) |

@@ -1,0 +1,52 @@
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  function initMermaidFullscreen() {
+    var containers = document.querySelectorAll('.mermaid');
+    if (!containers.length) return;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'mermaid-fullscreen-overlay';
+    overlay.innerHTML =
+      '<button class="mermaid-fullscreen-close" aria-label="Close fullscreen">&times;</button>';
+    document.body.appendChild(overlay);
+
+    containers.forEach(function (container) {
+      var wrapper = document.createElement('div');
+      wrapper.className = 'mermaid-container';
+      container.parentNode.insertBefore(wrapper, container);
+      wrapper.appendChild(container);
+
+      var checkExisting = setInterval(function () {
+        var svg = container.querySelector('svg');
+        if (!svg) return;
+        clearInterval(checkExisting);
+        svg.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var clone = svg.cloneNode(true);
+          clone.style.cursor = 'default';
+          var existing = overlay.querySelector('svg');
+          if (existing) existing.remove();
+          overlay.appendChild(clone);
+          overlay.classList.add('open');
+        });
+      }, 200);
+    });
+
+    function closeFullscreen() {
+      overlay.classList.remove('open');
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || e.target.closest('.mermaid-fullscreen-close')) {
+        closeFullscreen();
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeFullscreen();
+    });
+  }
+
+  initMermaidFullscreen();
+});
+</script>

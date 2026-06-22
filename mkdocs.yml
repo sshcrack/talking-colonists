@@ -10,6 +10,9 @@ copyright: "MineColonies Talking Citizens"
 theme:
   name: shadcn
   icon: null
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  custom_dir: overrides
   topbar_sections: false
   pygments_style:
     light: shadcn-light
@@ -20,6 +23,20 @@ plugins:
   - git-revision-date-localized:
       enable_creation_date: true
       enable_git_follow: false
+  - mermaid2:
+      javascript: https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs
+      arguments:
+        theme: dark
+        maxTextSize: 90000
+        themeVariables:
+          primaryColor: "#1e293b"
+          primaryTextColor: "#f8fafc"
+          primaryBorderColor: "#334155"
+          lineColor: "#6366f1"
+          secondaryColor: "#0f172a"
+          tertiaryColor: "#1e293b"
+          clusterBkg: "#0f172a"
+          clusterBorder: "#334155"
 
 markdown_extensions:
   admonition:
@@ -50,6 +67,9 @@ markdown_extensions:
   pymdownx.escapeall:
   pymdownx.pathconverter:
   pymdownx.striphtml:
+
+extra_css:
+  - assets/css/mermaid.css
 
 nav:
   - Home: index.md
@@ -83,5 +103,5 @@ nav:
     - Building: development/building.md
     - Contributing: development/contributing.md
     - API Reference: development/api.md
-  - Commands: commands.md
   - Changelog: changelog.md
+  - Commands: commands.md
