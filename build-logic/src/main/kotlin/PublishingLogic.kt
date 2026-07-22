@@ -115,6 +115,11 @@ private fun ModPublishExtension.curseforge(
 
 	this.accessToken = accessToken
 	minecraftVersions.addAll(listOf(ctx.currentMcVersion) + additionalVersions)
+	// CurseForge requires at least one selection from its Environment group.
+	// This mod must be installed on both sides: clients provide voice chat and
+	// servers host the MineColonies/Gemini conversation integration.
+	clientRequired = true
+	serverRequired = true
 
 	deps.required.forEach { dep -> whenNotNull(dep.curseforge) { requires(it) } }
 	deps.optional.forEach { dep -> whenNotNull(dep.curseforge) { optional(it) } }
