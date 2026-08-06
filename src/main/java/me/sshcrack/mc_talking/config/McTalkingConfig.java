@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.config;
 
 import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.controller.ControllerBuilder;
+import dev.isxander.yacl3.api.controller.DropdownStringControllerBuilder;
 import dev.isxander.yacl3.api.controller.StringControllerBuilder;
 import dev.isxander.yacl3.config.v2.api.ConfigClassHandler;
 import dev.isxander.yacl3.config.v2.api.ConfigField;
@@ -371,8 +372,8 @@ public class McTalkingConfig {
     public boolean enablePersonalityArchetypes = true;
 
     @AutoGen(category = "citizens")
-    @ListGroup(valueFactory = ToolListFactory.class, controllerFactory = ToolListFactory.class)
-    @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
+    @ListGroup(valueFactory = PersonalityArchetypeListFactory.class, controllerFactory = PersonalityArchetypeListFactory.class)
+    @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Pick from presets or type your own.")
     public List<String> customPersonalityArchetypes = new ArrayList<>();
 
     // Colony Diplomacy
@@ -414,7 +415,43 @@ public class McTalkingConfig {
         }
     }
 
+    public static class PersonalityArchetypeListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
+        private static final List<String> PRESETS = List.of(
+            "Optimist — upbeat and cheerful",
+            "Grump — cranky and blunt",
+            "Stoic — reserved and factual",
+            "Gossip — sociable and conspiratorial",
+            "Anxious — worrying and hesitant",
+            "Boastful — proud and competitive",
+            "Timid — soft-spoken and apologetic",
+            "Philosophical — reflective and thoughtful",
+            "Sarcastic — dry and witty",
+            "Dramatic — theatrical and exaggerated",
+            "Nurturing — caring and gentle",
+            "Competitive — achievement-driven",
+            "Curious — inquisitive and questioning",
+            "Nostalgic — sentimental and wistful",
+            "Superstitious — mystical and superstitious",
+            "Always speaks in rhyming couplets",
+            "Has a thick regional accent",
+            "Frequently quotes proverbs",
+            "Uses overly formal language",
+            "Speaks in metaphors and similes"
+        );
 
+        @Override
+        public String provideNewValue() {
+            return "";
+        }
+
+        @Override
+        public ControllerBuilder<String> createController(ListGroup annotation, ConfigField<List<String>> field, dev.isxander.yacl3.config.v2.api.autogen.OptionAccess storage, Option<String> option) {
+            return DropdownStringControllerBuilder.create(option)
+                .values(PRESETS)
+                .allowAnyValue(true)
+                .allowEmptyValue(false);
+        }
+    }
 
     public static boolean hasGeminiApiKey() {
         String key = INSTANCE.instance().geminiApiKey;
