@@ -14,6 +14,7 @@ import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
+import me.sshcrack.mc_talking.session.CitizenGameSession;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -140,26 +141,43 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
             return;
         }
 
-        var manager = ConversationManager.getClientForEntity(entity.getUUID());
-        if (manager == null) {
-            return;
-        }
-
         UUID entityId = entity.getUUID();
-
-        // Process the voice packet
         byte[] opusData = packet.getOpusEncodedData();
         boolean hasVoiceActivity = hasVoiceActivity(opusData);
         long currentTime = System.currentTimeMillis();
 
-        // Announce the speaker so the AI knows whose voice this is
-        if (manager instanceof CitizenWsClient cws) {
-            cws.announcePlayerIfChanged(player);
+        // Try the old GeminiWsClient path first
+        var manager = ConversationManager.getClientForEntity(entityId);
+        if (manager != null) {
+            // Announce the speaker so the AI knows whose voice this is
+            if (manager instanceof CitizenWsClient cws) {
+                cws.announcePlayerIfChanged(player);
+            }
+
+            // Forward the voice data to the AI regardless of silence detection
+            manager.promptAudioOpus(opusData);
+
+            trackVoiceActivity(entityId, hasVoiceActivity, currentTime);
+            return;
         }
 
-        // Forward the voice data to the AI regardless of silence detection
-        manager.promptAudioOpus(opusData);
+        // Fallback to the provider-architecture game session path
+        var gameSession = ConversationManager.getGameSessionForEntity(entityId);
+        if (gameSession != null) {
+            if (opusData != null && opusData.length > 1) {
+                var decoder = vcApi.createDecoder();
+                if (decoder != null) {
+                    short[] pcmAudio = decoder.decode(opusData);
+                    gameSession.sendAudio(pcmAudio);
+                }
+            }
 
+            trackVoiceActivity(entityId, hasVoiceActivity, currentTime);
+            return;
+        }
+    }
+
+    private void trackVoiceActivity(UUID entityId, boolean hasVoiceActivity, long currentTime) {
         // Update voice activity tracking
         if (hasVoiceActivity) {
             // Reset consecutive silent packet counter
@@ -294,11 +312,15 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                 // Clean up the speech end detection entry
                 speechEndDetections.remove(entityId);
 
-                // Get the talking manager for this entity
+                // Get the talking manager or game session for this entity
                 var manager = ConversationManager.getClientForEntity(entityId);
                 if (manager != null) {
                     // Schedule silence packets
                     scheduleSilenceTask(entityId, manager);
+                } else if (ConversationManager.getGameSessionForEntity(entityId) != null) {
+                    // Game sessions don't need silence packets (composable sessions process text directly)
+                    speechEndDetections.remove(entityId);
+                    isSpeaking.put(entityId, false);
                 }
             }
         }
@@ -318,11 +340,15 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
                     // Mark the entity as no longer speaking
                     isSpeaking.put(entityId, false);
 
-                    // Get the talking manager for this entity
+                    // Get the talking manager or game session for this entity
                     var manager = ConversationManager.getClientForEntity(entityId);
                     if (manager != null) {
                         // Schedule silence packets
                         scheduleSilenceTask(entityId, manager);
+                    } else if (ConversationManager.getGameSessionForEntity(entityId) != null) {
+                        // Game sessions don't need silence packets
+                        speechEndDetections.remove(entityId);
+                        isSpeaking.put(entityId, false);
                     }
                 }
             }

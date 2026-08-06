@@ -11,6 +11,7 @@ import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.util.LlmFallback;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -92,11 +94,50 @@ public class MemoryCompactionService {
         McTalking.LOGGER.info("[MemoryCompaction] Citizen {} has {} events and {} facts",
                 citizen.getCitizenData().getName(), mem.getEvents().size(), mem.getFacts().size());
 
+        if (McTalkingConfig.useProviderArchitecture()) {
+            startProviderLlmCompaction(citizen);
+            return;
+        }
+
         if (McTalkingConfig.INSTANCE.instance().memoryMode == MemoryMode.FLASH) {
             startFlashCompaction(citizen);
         } else {
             startLiveCompaction(citizen);
         }
+    }
+
+    private static void startProviderLlmCompaction(AbstractEntityCitizen citizen) {
+        UUID citizenId = citizen.getUUID();
+        activeCompactionCitizens.add(citizenId);
+        var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
+        var mem = data.mc_talking$getOrInitializeMemory();
+        String prompt = buildPrompt(citizen, mem);
+
+        Thread thread = new Thread(() -> {
+            try {
+                Optional<String> result = LlmFallback.callLlm(SYSTEM_PROMPT, prompt);
+                if (result.isEmpty()) {
+                    McTalking.LOGGER.warn("[MemoryCompaction] LLM fallback returned no result for citizen {}", citizen.getCitizenData().getName());
+                    return;
+                }
+
+                String summary = extractSummaryFromResponse(result.get());
+                if (summary == null || summary.isBlank()) {
+                    McTalking.LOGGER.warn("[MemoryCompaction] Empty summary from provider LLM for citizen {}", citizen.getCitizenData().getName());
+                    return;
+                }
+
+                var server = citizen.level().getServer();
+                if (server != null) {
+                    server.execute(() -> applyCompaction(citizen, summary));
+                }
+            } finally {
+                activeCompactionCitizens.remove(citizenId);
+            }
+        }, "mc-talking-memory-provider-compaction");
+
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private static void startFlashCompaction(AbstractEntityCitizen citizen) {

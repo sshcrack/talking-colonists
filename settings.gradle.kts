@@ -33,6 +33,8 @@ private fun getBuildscript(loader: String, version: String): String {
     return "build.$loader.gradle.kts"
 }
 
+include("api")
+
 val libraryDir = file("../gemini-live-library")
 if (libraryDir.exists()) {
     println("Including Gemini Live Library from $libraryDir")
@@ -47,3 +49,16 @@ if (libraryDir.exists()) {
 } else {
     println("Warning: Gemini Live Library not found, skipping includeBuild")
 }
+
+val localAiLibraryDir = file("../local-ai-library")
+if (localAiLibraryDir.exists()) {
+    println("Including Local AI Library from $localAiLibraryDir")
+    includeBuild(localAiLibraryDir) {
+        dependencySubstitution {
+            substitute(module("me.sshcrack:local_ai_lib:1.0.0"))
+                .using(project(":"))
+        }
+    }
+}
+
+rootProject.name = "talking-colonists"

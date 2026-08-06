@@ -274,5 +274,15 @@
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks": "Memory Compaction Interval (ticks)",
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks.desc": "How often the server checks for memory compaction candidates. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.memoryCompactionThreshold": "Memory Compaction Threshold",
-  "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen."
+  "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen.",
+
+  "yacl3.config.mc_talking:config.category.provider_selection": "Provider Selection",
+  "yacl3.config.mc_talking:config.sttProvider": "STT Provider",
+  "yacl3.config.mc_talking:config.sttProvider.desc": "Provider ID for speech-to-text. Leave empty to auto-select. Available IDs depend on installed mods.",
+  "yacl3.config.mc_talking:config.llmProvider": "LLM Provider",
+  "yacl3.config.mc_talking:config.llmProvider.desc": "Provider ID for language model. Leave empty to auto-select. Available IDs depend on installed mods.",
+  "yacl3.config.mc_talking:config.ttsProvider": "TTS Provider",
+  "yacl3.config.mc_talking:config.ttsProvider.desc": "Provider ID for text-to-speech. Leave empty to auto-select. Available IDs depend on installed mods.",
+  "yacl3.config.mc_talking:config.liveBundleProvider": "Live Bundle Provider",
+  "yacl3.config.mc_talking:config.liveBundleProvider.desc": "Provider ID for a combined live bundle (STT+LLM+TTS in one connection). When set, individual STT/LLM/TTS providers are ignored. Leave empty for auto selection."
 }
