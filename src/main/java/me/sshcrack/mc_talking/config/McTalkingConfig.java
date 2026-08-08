@@ -28,9 +28,9 @@ import java.util.List;
  * Handles loading and managing configuration options.
  */
 public class McTalkingConfig {
-    public static final String FLASH_MODEL = "gemini-flash-lite-latest";
+    public static final String FLASH_MODEL = "gemini-3.5-flash-lite";
     public static final String TTS_MODEL = "gemini-3.1-flash-tts-preview";
-    public static final AvailableAI CHEAP_LIVE_MODEL = AvailableAI.Flash2_5;
+    public static final AvailableAI CHEAP_LIVE_MODEL = AvailableAI.Flash3;
 
     /** Movement speed multiplier when a citizen walks to the player on urgent contact. */
     public static final double CITIZEN_URGENT_WALK_SPEED = 1.2;
@@ -51,7 +51,7 @@ public class McTalkingConfig {
 
     @AutoGen(category = "api")
     @EnumCycler
-    @SerialEntry(comment = "What kind of AI model to use. Right now, this is the only one Google offers")
+    @SerialEntry(comment = "Gemini Live model used for interactive citizen conversations.")
     public AvailableAI currentAiModel = AvailableAI.Flash3;
 
     // Language Configuration
@@ -96,7 +96,7 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "citizen_to_citizen")
     @EnumCycler
-    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS: Two Gemini Live sessions feed audio to each other in real time - no Flash or TTS call needed.\nFLASH_TTS: Flash generates a script, then Gemini TTS renders multi-speaker audio. Higher quality but limited to ~10/day.\nAUTO (default): Tries Flash+TTS first; automatically falls back to Live WebSockets if the pipeline fails (e.g. quota exhausted).")
+    @SerialEntry(comment = "How citizen-to-citizen conversations are generated.\nLIVE_WEBSOCKETS: Two Gemini Live sessions feed audio to each other in real time.\nFLASH_TTS: Flash generates a script, then Gemini TTS renders multi-speaker audio. Higher quality but subject to stricter preview-model free-tier limits.\nAUTO (default): Tries Flash+TTS first; automatically falls back to Live WebSockets if that pipeline is rate-limited or unavailable.")
     public ConversationMode conversationMode = ConversationMode.AUTO;
 
     // Random citizen-to-citizen conversations
@@ -144,13 +144,13 @@ public class McTalkingConfig {
     // Resource Management
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 100)
-    @SerialEntry(comment = "Maximum number of AI agents that can be activated at once (for free tier Flash2.0 this is limited to 3, for Flash2.5 to 1)")
-    public int maxConcurrentAgents = 3;
+    @SerialEntry(comment = "Maximum simultaneous foreground Gemini Live sessions. Defaults conservatively for Gemini AI Studio free-tier usage; actual limits vary by project and model.")
+    public int maxConcurrentAgents = 2;
 
     @AutoGen(category = "general", group = "resource_management")
     @IntField(min = 1, max = 10)
-    @SerialEntry(comment = "Maximum concurrent background connections for the flash2.5 cheap live model (memory compaction, greeting pregeneration). The API allows 3 concurrent connections.")
-    public int maxConcurrentBackground = 3;
+    @SerialEntry(comment = "Maximum concurrent background Gemini Live sessions used by memory compaction and greeting pregeneration. Kept low by default to preserve free-tier capacity for player conversations.")
+    public int maxConcurrentBackground = 1;
 
     @AutoGen(category = "general", group = "interaction")
     @DoubleField(min = 1.0, max = 100.0)
@@ -362,7 +362,7 @@ public class McTalkingConfig {
     public double broadcastYellingRange = 24.0;
 
     @SerialEntry(comment = "Internal: config schema version for one-time migrations.")
-    public int configVersion = 2;
+    public int configVersion = 4;
 
     // Personality Archetypes
     @AutoGen(category = "citizens", group = "personality")
@@ -528,6 +528,25 @@ public class McTalkingConfig {
                 McTalking.LOGGER.info("[Config] Migrated citizenContactCheckIntervalTicks from 400 to 80");
             }
             INSTANCE.instance().configVersion = 3;
+            INSTANCE.save();
+        }
+
+        // One-time migration: move old defaults onto the current free-tier-friendly
+        // Live model and conservative concurrency. Exact non-default values are kept.
+        if (INSTANCE.instance().configVersion < 4) {
+            if (INSTANCE.instance().currentAiModel == AvailableAI.Flash2_5) {
+                INSTANCE.instance().currentAiModel = AvailableAI.Flash3;
+                McTalking.LOGGER.info("[Config] Migrated Gemini Live model from Flash2_5 to Flash3");
+            }
+            if (INSTANCE.instance().maxConcurrentAgents == 3) {
+                INSTANCE.instance().maxConcurrentAgents = 2;
+                McTalking.LOGGER.info("[Config] Migrated default maxConcurrentAgents from 3 to 2");
+            }
+            if (INSTANCE.instance().maxConcurrentBackground == 3) {
+                INSTANCE.instance().maxConcurrentBackground = 1;
+                McTalking.LOGGER.info("[Config] Migrated default maxConcurrentBackground from 3 to 1");
+            }
+            INSTANCE.instance().configVersion = 4;
             INSTANCE.save();
         }
     }

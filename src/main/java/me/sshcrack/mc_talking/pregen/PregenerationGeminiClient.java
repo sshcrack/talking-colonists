@@ -84,6 +84,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
+        QuotaTracker.reportSuccess(modelName);
         var input = new RealtimeInput();
         input.text = promptText;
         send(ClientMessages.input(input));

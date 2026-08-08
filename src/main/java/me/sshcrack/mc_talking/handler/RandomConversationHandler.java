@@ -22,7 +22,7 @@ public class RandomConversationHandler {
     }
 
     public static void checkForRandomConversations(MinecraftServer server) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty())
+        if (!McTalkingConfig.hasGeminiApiKey())
             return;
 
         double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange * 2;
@@ -30,11 +30,6 @@ public class RandomConversationHandler {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             var nearbyBox = player.getBoundingBox().inflate(range);
             var citizens = player.serverLevel().getEntitiesOfClass(AbstractEntityCitizen.class, nearbyBox);
-
-            boolean anyBusy = citizens.stream()
-                    .anyMatch(ConversationManager::isCitizenBusy);
-            if (anyBusy)
-                continue;
 
             for (AbstractEntityCitizen citizen : citizens) {
                 if (!ConversationManager.canCitizenSpeak(citizen))
@@ -70,8 +65,17 @@ public class RandomConversationHandler {
                         case PLAYING_AUDIO -> AiStatus.IN_CONVERSATION;
                         case ENDED -> AiStatus.NONE;
                     };
-                    AiStatusHelper.setAiStatusSynced(citizen, status);
-                    AiStatusHelper.setAiStatusSynced(partner, status);
+                    // A player may have taken over one participant while the old
+                    // paired session is finishing. Do not overwrite the new session's
+                    // status with NONE from delayed cleanup.
+                    if (newState != CitizenConversation.ConversationState.ENDED
+                            || !ConversationManager.isCitizenBusy(citizen)) {
+                        AiStatusHelper.setAiStatusSynced(citizen, status);
+                    }
+                    if (newState != CitizenConversation.ConversationState.ENDED
+                            || !ConversationManager.isCitizenBusy(partner)) {
+                        AiStatusHelper.setAiStatusSynced(partner, status);
+                    }
                 });
                 conversation.performConversation();
 

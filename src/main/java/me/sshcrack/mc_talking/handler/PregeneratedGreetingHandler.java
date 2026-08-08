@@ -70,7 +70,7 @@ public class PregeneratedGreetingHandler {
     }
 
     public static void playPregeneratedPlayerGreetings(ServerPlayer player, List<AbstractEntityCitizen> citizens) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty())
+        if (!McTalkingConfig.hasGeminiApiKey())
             return;
 
         UUID playerId = player.getUUID();

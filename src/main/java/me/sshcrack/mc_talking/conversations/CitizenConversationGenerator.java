@@ -9,11 +9,9 @@ import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
-import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -106,7 +104,14 @@ public class CitizenConversationGenerator {
         GeminiTTS.RequestPayload.Content content = new GeminiTTS.RequestPayload.Content();
 
         GeminiTTS.RequestPayload.Part part = new GeminiTTS.RequestPayload.Part();
-        part.text = conversation;
+        part.text = """
+                Synthesize the multi-speaker dialogue below as natural speech. Follow the configured
+                speaker voices and bracketed vocal cues. Do not read section headings, scene notes,
+                director notes, or formatting instructions aloud; only speak the lines under the
+                transcript section.
+
+                %s
+                """.formatted(conversation);
 
         content.parts = List.of(part);
         content.role = "user";
@@ -151,7 +156,7 @@ public class CitizenConversationGenerator {
         return request;
     }
 
-    public static void generateConversation(List<AbstractEntityCitizen> conversationEntities, MinecraftServer server, Consumer<GeminiTTS.AudioChunk> chunkConsumer) throws ConversationGenerationException {
+    public static String generateConversation(List<AbstractEntityCitizen> conversationEntities, MinecraftServer server, Consumer<GeminiTTS.AudioChunk> chunkConsumer) throws ConversationGenerationException {
         StringBuilder citizenInfo = new StringBuilder();
         citizenInfo.append("-----\n");
 
@@ -176,12 +181,12 @@ public class CitizenConversationGenerator {
             speakerVoiceConfigs.add(config);
         }
 
-        RawConversation conversation = generateConversationAndMemory(conversationEntities, citizenInfo, server);
+        String conversation = generateConversationScript(conversationEntities, citizenInfo);
 
         String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         try {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for conversation with {} citizens", conversationEntities.size());
-            GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation.conversation(), speakerVoiceConfigs), chunkConsumer);
+            GeminiTTS.streamGenerateAudioConversation(McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation, speakerVoiceConfigs), chunkConsumer);
             TtsQuotaManager.reportSuccess();
         } catch (IOException | UnexpectedResponseException e) {
             McTalking.LOGGER.error("Failed to generate conversation audio using Gemini TTS", e);
@@ -194,18 +199,11 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
         }
 
-        //REVIEW: Maybe only save if the conversation has been finished fully
-        var generator = conversation.generator();
-        if(generator != null)
-            generator.scheduleOrSaveMemory();
-    }
-
-    public record RawConversation(String conversation, @Nullable CitizenMemoryGenerator generator) {
-
+        return conversation;
     }
 
     @NotNull
-    private static RawConversation generateConversationAndMemory(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo, MinecraftServer server) throws ConversationGenerationException {
+    private static String generateConversationScript(List<AbstractEntityCitizen> conversationEntities, StringBuilder citizenInfo) throws ConversationGenerationException {
         String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         String rawConversationOutput;
         try {
@@ -222,10 +220,6 @@ public class CitizenConversationGenerator {
             throw new ConversationGenerationException("Conversation generation was interrupted", e);
         }
 
-        CitizenMemoryGenerator generator = null;
-        if (McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
-            generator = CitizenMemoryGenerator.addAndGenerateMemory(rawConversationOutput, conversationEntities, server);
-        }
-        return new RawConversation(rawConversationOutput, generator);
+        return rawConversationOutput;
     }
 }

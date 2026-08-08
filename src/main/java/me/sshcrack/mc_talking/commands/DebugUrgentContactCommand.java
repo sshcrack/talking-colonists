@@ -39,11 +39,17 @@ public class DebugUrgentContactCommand {
             throw NOT_A_PLAYER.create();
         }
 
-        UrgentContactHandler.triggerWalkToPlayer(citizen, player);
+        boolean started = UrgentContactHandler.triggerWalkToPlayer(citizen, player);
 
         String citizenName = citizen.getCitizenData() != null
                 ? citizen.getCitizenData().getName()
                 : citizen.getUUID().toString().substring(0, 8);
+
+        if (!started) {
+            source.sendFailure(Component.translatable("mc_talking.capacity_reached")
+                    .withStyle(ChatFormatting.YELLOW));
+            return 0;
+        }
 
         source.sendSuccess(() -> Component.translatable("mc_talking.debug.urgent_contact_triggered", citizenName)
                 .withStyle(ChatFormatting.GREEN), false);

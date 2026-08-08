@@ -159,7 +159,7 @@ public class CitizenTalkingDevice extends Item {
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
         UUID playerId = serverPlayer.getUUID();        // Check if API key is set
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+        if (!McTalkingConfig.hasGeminiApiKey()) {
             serverPlayer.sendSystemMessage(
                     Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
                             .withStyle(ChatFormatting.RED)
@@ -202,8 +202,11 @@ public class CitizenTalkingDevice extends Item {
             return true;
         }
 
-        // Use the centralized startConversation method
-        ConversationManager.startPlayerConversation(serverPlayer, citizen);
+        // Use the centralized startConversation method. Do not update the item or
+        // show a success message if the configured AI capacity is currently full.
+        if (!ConversationManager.startPlayerConversation(serverPlayer, citizen)) {
+            return true;
+        }
 
         /*? if forge {*/
         /*CompoundTag tag = stack.getOrCreateTag();

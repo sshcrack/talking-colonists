@@ -157,15 +157,19 @@ public class PregenerationTaskService {
                                                          boolean isThreat, boolean isPlayerGreeting) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
 
-        AvailableAI model;
+        AvailableAI model = isThreat
+                ? McTalkingConfig.INSTANCE.instance().currentAiModel
+                : McTalkingConfig.CHEAP_LIVE_MODEL;
+
+        if (QuotaTracker.isQuotaExceeded(model.getName())) return false;
+
+        // Generation itself is silent background work, even for a threat line.
+        // Keeping it out of the foreground pool means a player can always preempt
+        // it cleanly without a late completion callback releasing the player's slot.
         if (isThreat) {
-            model = McTalkingConfig.INSTANCE.instance().currentAiModel;
-            if (!ConversationManager.claimSlot(citizen, false)) return false;
-        } else {
-            model = McTalkingConfig.CHEAP_LIVE_MODEL;
-            if (QuotaTracker.isQuotaExceeded(model.getName())) return false;
-            if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return false;
+            ConversationManager.releaseBackgroundSlot(citizen.getUUID());
         }
+        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return false;
 
         generatingCount.incrementAndGet();
         if (isPlayerGreeting) playerGreetingActiveCount.incrementAndGet();
@@ -175,29 +179,24 @@ public class PregenerationTaskService {
 
         PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, model,
                 audio -> {
-                    if (isThreat) ConversationManager.releaseSlot(citizen);
-                    else ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
                     generatingCount.decrementAndGet();
                     if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
                     onComplete.accept(audio);
                 },
                 () -> {
-                    if (isThreat) ConversationManager.releaseSlot(citizen);
-                    else ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
                     generatingCount.decrementAndGet();
                     if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
                 });
 
         try {
             client.connect();
-            if (!isThreat) {
-                ConversationManager.registerBackgroundClient(citizen.getUUID(), client);
-            }
+            ConversationManager.registerBackgroundClient(citizen.getUUID(), client);
             return true;
         } catch (Exception e) {
             McTalking.LOGGER.error("[Pregeneration] Failed to connect for citizen {}", citizen.getUUID(), e);
-            if (isThreat) ConversationManager.releaseSlot(citizen);
-            else ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+            ConversationManager.releaseBackgroundSlot(citizen.getUUID());
             generatingCount.decrementAndGet();
             if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
             return false;
@@ -377,8 +376,8 @@ public class PregenerationTaskService {
         lastPlayerGreetingPlayTime.put(citizenId + ":" + playerId, System.currentTimeMillis());
     }
 
-    public static void generatePlayerGreetingNow(AbstractEntityCitizen citizen, String playerName, java.util.function.Consumer<AudioChunk> onComplete) {
-        startPregenerationIfPossible(citizen, PLAYER_GREETING_PROMPT.formatted(playerName), onComplete, false, true);
+    public static boolean generatePlayerGreetingNow(AbstractEntityCitizen citizen, String playerName, java.util.function.Consumer<AudioChunk> onComplete) {
+        return startPregenerationIfPossible(citizen, PLAYER_GREETING_PROMPT.formatted(playerName), onComplete, false, true);
     }
 
     /**

@@ -19,10 +19,10 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class GeminiStream implements Supplier<short[]> {
     public static final int FRAME_SIZE_SAMPLES = 960;
-    // Minimum buffer size for effective pitch shifting (about 100ms of audio)
-    private static final int MIN_BUFFER_SIZE_FOR_PITCH = TARGET_SAMPLE_RATE * 2;
-    // Minimum number of frames to buffer before starting playback (about 500ms)
-    private static final int MIN_FRAMES_BEFORE_PLAYBACK = 100;
+    // Minimum buffer size for effective pitch shifting (about 100ms of audio).
+    private static final int MIN_BUFFER_SIZE_FOR_PITCH = TARGET_SAMPLE_RATE / 10;
+    // 960 samples at 48 kHz is 20ms, so 25 frames is about 500ms.
+    private static final int MIN_FRAMES_BEFORE_PLAYBACK = 25;
 
     private final Queue<short[]> audioFrames = new ConcurrentLinkedQueue<>();
     private final AudioChannel channel;
@@ -145,10 +145,18 @@ public class GeminiStream implements Supplier<short[]> {
             audioFrames.add(frame);
         }
 
-        // Store any remaining samples for next time
+        // Store any remaining samples for next time. On a final flush, pad the
+        // last partial frame with silence so the tail of the sentence is not lost.
         if (remainingCount > 0) {
-            remainingSamples = new short[remainingCount];
-            System.arraycopy(samples, frameCount * FRAME_SIZE_SAMPLES, remainingSamples, 0, remainingCount);
+            if (flushed) {
+                short[] frame = new short[FRAME_SIZE_SAMPLES];
+                System.arraycopy(samples, frameCount * FRAME_SIZE_SAMPLES, frame, 0, remainingCount);
+                audioFrames.add(frame);
+                remainingSamples = new short[0];
+            } else {
+                remainingSamples = new short[remainingCount];
+                System.arraycopy(samples, frameCount * FRAME_SIZE_SAMPLES, remainingSamples, 0, remainingCount);
+            }
         }
 
         // Initialize or restart the player when needed
@@ -210,6 +218,21 @@ public class GeminiStream implements Supplier<short[]> {
             onPause.run();
         }
         return null;
+    }
+
+
+    /**
+     * Returns whether generated audio is still buffered or actively playing.
+     * Callers use this after the producer has finished and {@link #flushAudio()}
+     * has been called, so no new frames are expected to arrive.
+     */
+    public boolean hasPendingPlayback() {
+        if (!audioFrames.isEmpty() || remainingSamples.length > 0) return true;
+        synchronized (incomingData) {
+            if (!incomingData.isEmpty() || totalBufferedBytes > 0) return true;
+        }
+        AudioPlayer currentPlayer = player;
+        return currentPlayer != null && !currentPlayer.isStopped();
     }
 
     public void setPitch(float pitch) {

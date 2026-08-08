@@ -34,7 +34,7 @@ public class UrgentContactHandler {
     public static void checkForCitizenInitiatedContact(ServerPlayer player,
                                                         List<AbstractEntityCitizen> citizens,
                                                         Set<UUID> contactedThisInterval) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty())
+        if (!McTalkingConfig.hasGeminiApiKey())
             return;
 
         int playerCooldownSecs = McTalkingConfig.INSTANCE.instance().playerUrgentContactCooldownSeconds;
@@ -75,26 +75,27 @@ public class UrgentContactHandler {
                         walkToPlayer ? "walk-to-player" : "contact",
                         player.getName().getString());
 
-                lastPlayerUrgentContactTimes.put(player.getUUID(), System.currentTimeMillis());
-
-                if (walkToPlayer) {
-                    startWalkingUrgentContact(citizen, player);
-                } else {
-                    ConversationManager.startUrgentContact(citizen, player);
+                boolean started = walkToPlayer
+                        ? startWalkingUrgentContact(citizen, player)
+                        : ConversationManager.startUrgentContact(citizen, player);
+                if (started) {
+                    // Only consume the per-player cooldown if an interaction actually
+                    // started. A full free-tier slot pool should not suppress retries.
+                    lastPlayerUrgentContactTimes.put(player.getUUID(), System.currentTimeMillis());
+                    break;
                 }
-                break;
             }
         }
     }
 
-    public static void triggerWalkToPlayer(AbstractEntityCitizen citizen, ServerPlayer player) {
-        startWalkingUrgentContact(citizen, player);
+    public static boolean triggerWalkToPlayer(AbstractEntityCitizen citizen, ServerPlayer player) {
+        return startWalkingUrgentContact(citizen, player);
     }
 
-    static void startWalkingUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
+    static boolean startWalkingUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
         if (!ConversationManager.claimSlot(citizen, false)) {
             McTalking.LOGGER.debug("[CitizenContact] No slot available for walking citizen {}", citizen.getUUID());
-            return;
+            return false;
         }
 
         // Use 0 as initial repath tick — the tick counter is now internal to this
@@ -105,6 +106,7 @@ public class UrgentContactHandler {
 
         McTalking.LOGGER.info("[CitizenContact] Citizen {} walking to player {}",
                 citizen.getCitizenData().getName(), player.getName().getString());
+        return true;
     }
 
     public static void updateWalkingCitizens(MinecraftServer server) {
@@ -132,7 +134,8 @@ public class UrgentContactHandler {
                 McTalking.LOGGER.info("[CitizenContact] Citizen {} picked up for player conversation, aborting walk",
                         citizen.getCitizenData().getName());
                 citizen.getNavigation().stop();
-                AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
+                // The new player session owns the AI status now; do not overwrite
+                // LISTENING/IN_CONVERSATION with NONE from the old walk state.
                 it.remove();
                 continue;
             }

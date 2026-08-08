@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.GeminiStream;
@@ -17,6 +18,8 @@ import net.minecraft.world.phys.Vec3;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -154,20 +157,54 @@ public class CitizenConversation {
 
         new Thread(() -> {
             setState(ConversationState.GENERATING);
+            boolean fallbackTriggered = false;
 
             try {
-                CitizenConversationGenerator.generateConversation(
+                AtomicBoolean playbackStarted = new AtomicBoolean(false);
+                String completedTranscript = CitizenConversationGenerator.generateConversation(
                         participants, server,
-                        chunk -> stream.addGeminiPcmWithPitch(chunk.audioBytes(), chunk.sampleRate()));
+                        chunk -> {
+                            if (playbackStarted.compareAndSet(false, true)) {
+                                setState(ConversationState.PLAYING_AUDIO);
+                            }
+                            stream.addGeminiPcmWithPitch(chunk.audioBytes(), chunk.sampleRate());
+                        });
 
-                if (!aborted) {
-                    setState(ConversationState.ENDED);
+                // The websocket client flushes its stream when generation completes,
+                // but the Flash/TTS path is synchronous and has to do it explicitly.
+                // Without this, a short final chunk can remain buffered forever.
+                stream.flushAudio();
+
+                long playbackDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
+                while (!aborted && stream.hasPendingPlayback() && System.nanoTime() < playbackDeadline) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new ConversationGenerationException("Conversation playback was interrupted", interrupted);
+                    }
+                }
+
+                boolean playbackCompleted = !stream.hasPendingPlayback();
+                if (!aborted && !playbackCompleted) {
+                    McTalking.LOGGER.warn("[Flash/TTS] Playback did not drain before timeout; stopping stream");
+                    stream.stop();
+                }
+
+                // Only spend the optional extra Flash request on memories after the
+                // generated conversation was actually heard to completion. Aborted or
+                // timed-out playback must not create memories for unheard dialogue.
+                if (!aborted && playbackCompleted && playbackStarted.get()
+                        && McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
+                    CitizenMemoryGenerator.addAndGenerateMemory(completedTranscript, participants, server)
+                            .scheduleOrSaveMemory();
                 }
 
             } catch (ConversationGenerationException e) {
                 McTalking.LOGGER.error("Failed to generate Flash/TTS conversation: {}, cause: {}",
                         e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
                 if (fallback != null) {
+                    fallbackTriggered = true;
                     McTalking.LOGGER.info("[Auto] Flash/TTS failed, falling back to Live WebSockets");
                     if (stream != null) {
                         stream.stop();
@@ -179,13 +216,13 @@ public class CitizenConversation {
                 for (AbstractEntityCitizen p : participants) {
                     ConversationManager.unregisterAbortHandler(p);
                     ConversationManager.markNotBusy(p);
-                    if (fallback == null && !aborted) {
+                    if (!fallbackTriggered && !aborted) {
                         ConversationManager.recordCooldown(p);
                         AiStatusHelper.setAiStatusSynced(p, AiStatus.NONE);
                     }
                 }
 
-                if (fallback == null && !aborted) {
+                if (!fallbackTriggered && !aborted) {
                     setState(ConversationState.ENDED);
                 }
             }
@@ -233,24 +270,39 @@ public class CitizenConversation {
         setState(ConversationState.GENERATING);
 
         AtomicInteger sharedTurnCounter = new AtomicInteger(0);
-        AtomicInteger endedCount = new AtomicInteger(0);
+        AtomicBoolean cleanupStarted = new AtomicBoolean(false);
+        AtomicReference<LiveConversationWsClient> clientARef = new AtomicReference<>();
+        AtomicReference<LiveConversationWsClient> clientBRef = new AtomicReference<>();
 
         Consumer<LiveConversationWsClient> onClientEnded = client -> {
-            int ended = endedCount.incrementAndGet();
-            if (ended >= 2) {
-                // Close any still-open peer, unregister both slots
-                if (liveClients != null) {
-                    liveClients.forEach(c -> {
-                        if (!c.isClosed()) c.close();
-                    });
-                }
-                ConversationManager.unregisterExternalClient(citizenA);
-                ConversationManager.unregisterExternalClient(citizenB);
-                // Record per-citizen cooldowns so they aren't immediately re-selected
-                ConversationManager.recordCooldown(citizenA);
-                ConversationManager.recordCooldown(citizenB);
-                setState(ConversationState.ENDED);
+            if (!cleanupStarted.compareAndSet(false, true)) {
+                return;
             }
+
+            // WebSocket callbacks do not necessarily run on the Minecraft server
+            // thread. End the pair together and only unregister the exact clients
+            // created by this conversation; a player takeover may already have
+            // replaced one of them in ConversationManager.
+            server.execute(() -> {
+                LiveConversationWsClient expectedA = clientARef.get();
+                LiveConversationWsClient expectedB = clientBRef.get();
+
+                boolean removedA = expectedA != null
+                        && ConversationManager.unregisterExternalClient(citizenA, expectedA);
+                boolean removedB = expectedB != null
+                        && ConversationManager.unregisterExternalClient(citizenB, expectedB);
+
+                if (removedA) {
+                    if (!expectedA.isClosed()) expectedA.close();
+                    ConversationManager.recordCooldown(citizenA);
+                }
+                if (removedB) {
+                    if (!expectedB.isClosed()) expectedB.close();
+                    ConversationManager.recordCooldown(citizenB);
+                }
+
+                setState(ConversationState.ENDED);
+            });
         };
 
         var citizenDataA = citizenA.getCitizenData();
@@ -262,13 +314,34 @@ public class CitizenConversation {
                 %s
                 """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
 
-        LiveConversationWsClient clientA = new LiveConversationWsClient(
-                new CitizenEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                citizenA, sharedTurnCounter, onClientEnded);
+        LiveConversationWsClient clientA;
+        LiveConversationWsClient clientB;
+        try {
+            clientA = new LiveConversationWsClient(
+                    new CitizenEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
+                    citizenA, sharedTurnCounter, onClientEnded);
+            clientARef.set(clientA);
 
-        LiveConversationWsClient clientB = new LiveConversationWsClient(
-                new CitizenEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
+            clientB = new LiveConversationWsClient(
+                    new CitizenEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
+                    citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
+            clientBRef.set(clientB);
+        } catch (RuntimeException e) {
+            // Client construction happens after both foreground slots are claimed.
+            // Release them explicitly so a failed audio/client constructor cannot
+            // permanently consume free-tier capacity. Suppress close callbacks here
+            // because the clients have not been registered in ConversationManager.
+            cleanupStarted.set(true);
+            LiveConversationWsClient partialA = clientARef.get();
+            if (partialA != null) {
+                try { partialA.close(); } catch (Exception ignored) { }
+            }
+            ConversationManager.releaseSlot(citizenA);
+            ConversationManager.releaseSlot(citizenB);
+            McTalking.LOGGER.error("[LiveConv] Failed to construct paired Gemini clients", e);
+            setState(ConversationState.ENDED);
+            return;
+        }
 
         clientA.setPeer(clientB);
         clientB.setPeer(clientA);
@@ -279,8 +352,14 @@ public class CitizenConversation {
         ConversationManager.registerExternalClient(citizenA, clientA);
         ConversationManager.registerExternalClient(citizenB, clientB);
 
-        clientA.connect();
-        clientB.connect();
+        try {
+            clientA.connect();
+            clientB.connect();
+        } catch (RuntimeException e) {
+            McTalking.LOGGER.error("[LiveConv] Failed to connect paired Gemini sessions", e);
+            onClientEnded.accept(clientA);
+            return;
+        }
 
         // Kick off the dialogue from A's side
 

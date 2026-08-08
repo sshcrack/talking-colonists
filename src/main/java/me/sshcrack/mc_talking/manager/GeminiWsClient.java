@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
@@ -107,6 +108,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
     private final List<Runnable> onCloseActions = Collections.synchronizedList(new ArrayList<>());
+    private final AtomicBoolean closeActionsFired = new AtomicBoolean(false);
 
     private final long sessionStartTimeMs = System.currentTimeMillis();
 
@@ -159,6 +161,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private void fireOnCloseActions() {
+        if (!closeActionsFired.compareAndSet(false, true)) {
+            return;
+        }
+
         synchronized (onCloseActions) {
             for (Runnable action : onCloseActions) {
                 try {
@@ -167,6 +173,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                     McTalking.LOGGER.error("{} Error executing onClose action", logPrefix, e);
                 }
             }
+            onCloseActions.clear();
         }
     }
 
@@ -538,6 +545,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
+        QuotaTracker.reportSuccess(getModelName());
         reconnectAttempts = 0;
         unrecognizedCloseRetryCount = 0;
         synchronized (this) {

@@ -34,7 +34,7 @@ public class McTalkingDebugCommand {
     private static int overview(CommandContext<CommandSourceStack> ctx) {
         var source = ctx.getSource();
         var config = McTalkingConfig.INSTANCE.instance();
-        boolean hasKey = !config.geminiApiKey.isEmpty();
+        boolean hasKey = McTalkingConfig.hasGeminiApiKey();
         int activeSessions = ConversationManager.getClients().size();
         int playerSessions = ConversationManager.getCitizenToPlayer().size();
         int maxAgents = config.maxConcurrentAgents;

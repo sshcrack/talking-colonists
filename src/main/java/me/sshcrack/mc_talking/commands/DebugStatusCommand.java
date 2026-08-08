@@ -33,7 +33,7 @@ public class DebugStatusCommand {
         int compactionActive = MemoryCompactionService.getActiveCount();
         int totalActive = activeSessions + pregenActive + compactionActive;
         int maxAgents = config.maxConcurrentAgents;
-        boolean hasKey = !config.geminiApiKey.isEmpty();
+        boolean hasKey = McTalkingConfig.hasGeminiApiKey();
 
         source.sendSuccess(() -> {
             var msg = Component.literal("")

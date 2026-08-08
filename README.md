@@ -12,7 +12,7 @@ You can interactively talk to citizens in your minecolonies just as if they were
  #This key is used to authenticate with the Gemini API. You can get one at https://aistudio.google.com/apikey
 gemini_key = "Put your API key here"
  ```
-(The free tier allows up to 3 citizens to be spoken at the same time)
+McTalking is designed to work with a Gemini API key from Google AI Studio without requiring billing. The default models have Gemini Developer API free-tier access, and the default foreground/background concurrency is intentionally conservative. Google can change model-specific rate limits over time, so check your project's current limits in AI Studio if you encounter `429`/quota messages; paying is optional and only increases available capacity.
 
 ## Usage
 Craft a Citizen Communication Device using a Book and Quill and a Redstone Torch (I would really appreciate it if someone could create a better texture for it):

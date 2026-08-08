@@ -27,7 +27,7 @@ public class CasualGreetingHandler {
 
     public static void checkForCasualGreeting(ServerPlayer player, List<AbstractEntityCitizen> citizens,
                                                Set<UUID> greetedThisInterval) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty())
+        if (!McTalkingConfig.hasGeminiApiKey())
             return;
 
         double casualWeight = McTalkingConfig.INSTANCE.instance().citizenCasualGreetingWeight;
@@ -60,26 +60,34 @@ public class CasualGreetingHandler {
                         citizen.getCitizenData().getName(),
                         player.getName().getString());
 
-                lastPlayerCasualGreetingTimes.put(player.getUUID(), System.currentTimeMillis());
-
                 UUID citizenId = citizen.getUUID();
                 UUID playerId = player.getUUID();
+                boolean started = false;
 
                 if (PregenerationTaskService.hasPlayerGreeting(citizenId, playerId)
                         && !PregenerationTaskService.isPlayerGreetingOnCooldown(citizenId, playerId)) {
                     var audio = PregenerationTaskService.popPlayerGreeting(citizenId, playerId);
                     if (audio != null && PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
                         PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
+                        started = true;
                     } else if (audio != null) {
                         PregenerationTaskService.putPlayerGreeting(citizenId, playerId, audio);
                     }
                 } else {
                     String playerName = player.getName().getString();
-                    PregenerationTaskService.generatePlayerGreetingNow(citizen, playerName, audio -> {
-                        PregenerationPlayback.playAudioIfPossible(citizen, audio);
+                    started = PregenerationTaskService.generatePlayerGreetingNow(citizen, playerName, audio -> {
+                        if (PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
+                            PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
+                        }
                     });
                 }
-                break;
+
+                if (started) {
+                    // Do not consume the cooldown when free-tier background capacity or
+                    // quota prevented the greeting from even starting.
+                    lastPlayerCasualGreetingTimes.put(playerId, System.currentTimeMillis());
+                    break;
+                }
             }
         }
     }

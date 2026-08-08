@@ -63,6 +63,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
+        QuotaTracker.reportSuccess(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
         var input = new RealtimeInput();
         input.text = MemoryCompactionService.buildPrompt(citizen, memories);
         send(ClientMessages.input(input));

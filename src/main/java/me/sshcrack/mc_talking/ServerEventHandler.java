@@ -71,7 +71,7 @@ public class ServerEventHandler {
 
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+        if (!McTalkingConfig.hasGeminiApiKey()) {
             McTalking.LOGGER.error("======================");
             McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
             McTalking.LOGGER.error("======================");
@@ -176,10 +176,6 @@ public class ServerEventHandler {
                     UrgentContactHandler.checkUrgentContactAbort(player);
                 }
             }
-
-            var anyBusy = citizens.stream().anyMatch(ConversationManager::isCitizenBusy);
-            if (anyBusy)
-                continue;
 
             AbstractEntityCitizen talkingCitizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
             if (talkingCitizen != null

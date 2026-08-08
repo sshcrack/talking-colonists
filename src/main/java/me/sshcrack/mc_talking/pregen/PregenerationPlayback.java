@@ -12,6 +12,7 @@ import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PregenerationPlayback {
     private static final Map<UUID, Boolean> ACTIVE_PREGENERATED_PLAYBACK = new ConcurrentHashMap<>();
@@ -51,6 +52,13 @@ public class PregenerationPlayback {
             }
 
             GeminiStream stream = new GeminiStream(channel);
+            AtomicBoolean cleanedUp = new AtomicBoolean(false);
+            Runnable cleanup = () -> {
+                if (!cleanedUp.compareAndSet(false, true)) return;
+                ConversationManager.unregisterAbortHandler(citizen);
+                releasePlaybackSlot(citizenId);
+                ConversationManager.markNotBusy(citizen);
+            };
 
             var isFemale = citizen.getCitizenData().isFemale();
             var isChild = citizen.getCitizenData().isChild();
@@ -62,8 +70,15 @@ public class PregenerationPlayback {
                 try {
                     stream.close();
                 } finally {
-                    releasePlaybackSlot(citizenId);
-                    ConversationManager.markNotBusy(citizen);
+                    cleanup.run();
+                }
+            });
+            ConversationManager.registerAbortHandler(citizen, () -> {
+                try {
+                    stream.stop();
+                    stream.close();
+                } finally {
+                    cleanup.run();
                 }
             });
 
@@ -71,6 +86,7 @@ public class PregenerationPlayback {
             stream.flushAudio();
             return true;
         } catch (RuntimeException e) {
+            ConversationManager.unregisterAbortHandler(citizen);
             releasePlaybackSlot(citizenId);
             ConversationManager.markNotBusy(citizen);
             throw e;

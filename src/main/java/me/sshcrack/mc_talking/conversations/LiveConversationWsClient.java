@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -56,6 +57,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
      * Callback invoked when this client's session ends (either naturally or on error).
      */
     private final Consumer<LiveConversationWsClient> onEnded;
+    private final AtomicBoolean endedNotified = new AtomicBoolean(false);
 
     /**
      * The citizen entity this client represents.
@@ -161,15 +163,15 @@ public class LiveConversationWsClient extends GeminiWsClient {
     @Override
     protected void onQuotaExceededEvent(String message) {
         McTalking.LOGGER.warn("[LiveConvWs] Quota exceeded for {}: {}", citizen.getCitizenData().getName(), message);
-        AiStatusHelper.setAiStatusOnServerThread(citizen, AiStatus.QUOTA_EXCEEDED);
-        onEnded.accept(this);
+        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.QUOTA_EXCEEDED);
+        notifyEnded();
     }
 
     @Override
     protected void onErrorEvent(Exception ex) {
         McTalking.LOGGER.error("[LiveConvWs] Error for {}", citizen.getCitizenData().getName(), ex);
-        AiStatusHelper.setAiStatusOnServerThread(citizen, AiStatus.ERROR);
-        onEnded.accept(this);
+        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.ERROR);
+        notifyEnded();
     }
 
     /**
@@ -203,7 +205,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
         if (shouldEndConversation) {
             McTalking.LOGGER.info("[LiveConvWs] Ending conversation as requested by {}", citizen.getCitizenData().getName());
-            onEnded.accept(this);
+            notifyEnded();
         }
     }
 
@@ -225,7 +227,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
         if (turn >= MAX_TOTAL_TURNS) {
             McTalking.LOGGER.info("[LiveConvWs] Max turns reached – ending conversation");
-            onEnded.accept(this);
+            notifyEnded();
             return;
         }
 
@@ -237,6 +239,19 @@ public class LiveConversationWsClient extends GeminiWsClient {
                     peer.getEntity().getCitizenData().getName());
             peer.releaseHeldAudio();
         }
+    }
+
+
+    private void notifyEnded() {
+        if (endedNotified.compareAndSet(false, true)) {
+            onEnded.accept(this);
+        }
+    }
+
+    @Override
+    public void close() {
+        super.close();
+        notifyEnded();
     }
 
     @Override

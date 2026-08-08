@@ -41,9 +41,9 @@ import net.minecraft.core.component.DataComponents;
  *
  * <h2>Slot priority</h2>
  * <ul>
- *   <li><b>High-priority (player conversations)</b>: always succeed. When all
- *       {@code maxConcurrentAgents} slots are full they evict the oldest
- *       <em>non-player</em> session to make room.</li>
+ *   <li><b>High-priority (player conversations)</b>: evict the oldest
+ *       <em>non-player</em> session when needed, but never kick another player
+ *       conversation. If every slot belongs to a player the request is rejected.</li>
  *   <li><b>Low-priority (mumbles, citizen-to-citizen)</b>: rejected when no
  *       free or evictable non-player slot is available, so they can never
  *       displace a player.</li>
@@ -120,7 +120,7 @@ public class ConversationManager {
      */
     private static final Map<UUID, Runnable> abortHandlers = new ConcurrentHashMap<>();
 
-    // ---- Background pool (flash2.5 model) ----
+    // ---- Background pool (configured cheap/current Live model) ----
     private static final Set<UUID> backgroundSlots = new LinkedHashSet<>();
     private static final Map<UUID, BackgroundSlotType> backgroundSlotTypes = new ConcurrentHashMap<>();
     private static final Map<UUID, GeminiLiveClient> backgroundClients = new ConcurrentHashMap<>();
@@ -133,8 +133,8 @@ public class ConversationManager {
      * Tries to claim one agent slot for {@code entityId}.
      *
      * <ul>
-     *   <li><b>High-priority</b> ({@code isPlayerConversation=true}): always
-     *       succeeds; evicts the oldest non-player session when at capacity.</li>
+     *   <li><b>High-priority</b> ({@code isPlayerConversation=true}): evicts the
+     *       oldest non-player session when at capacity, but never another player.</li>
      *   <li><b>Low-priority</b> ({@code isPlayerConversation=false}): succeeds
      *       only when a slot is free or a non-player slot can be evicted without
      *       displacing any player. Returns {@code false} otherwise.</li>
@@ -144,6 +144,14 @@ public class ConversationManager {
      */
     public static synchronized boolean claimSlot(AbstractEntityCitizen citizen, boolean isPlayerConversation) {
         UUID entityId = citizen.getUUID();
+
+        // Foreground interactions always take precedence over invisible background
+        // work such as greeting pregeneration or memory compaction. Keeping both
+        // alive wastes free-tier quota and can make the citizen appear unavailable.
+        if (backgroundSlots.contains(entityId)) {
+            releaseBackgroundSlot(entityId);
+        }
+
         if (addedEntities.contains(entityId)) return true; // already registered
 
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
@@ -158,18 +166,12 @@ public class ConversationManager {
         UUID victim = findEvictableNonPlayerSlot();
 
         if (victim == null) {
-            // Every slot belongs to a player conversation
-            if (!isPlayerConversation) {
-                // Low priority – refuse so no player is displaced
-                return false;
-            }
-            // High priority last-resort: evict the oldest slot even if it is a player
-            var it = addedEntities.iterator();
-            victim = it.hasNext() ? it.next() : null;
-            if (victim != null) it.remove();
-        } else {
-            addedEntities.remove(victim);
+            // Every slot belongs to a player conversation. Never terminate somebody
+            // else's live conversation merely to admit a newer request.
+            return false;
         }
+
+        addedEntities.remove(victim);
 
         evict(victim);
         addedEntities.add(entityId);
@@ -209,6 +211,22 @@ public class ConversationManager {
     public static synchronized void unregisterExternalClient(AbstractEntityCitizen citizen) {
         clients.remove(citizen.getUUID());
         releaseSlot(citizen);
+    }
+
+    /**
+     * Removes an externally-created client only if it is still the currently
+     * registered client for that citizen. This prevents delayed cleanup from an
+     * old citizen-to-citizen session from releasing a newer player conversation.
+     *
+     * @return true when the expected client was removed and its slot released
+     */
+    public static synchronized boolean unregisterExternalClient(
+            AbstractEntityCitizen citizen, GeminiWsClient expectedClient) {
+        if (!clients.remove(citizen.getUUID(), expectedClient)) {
+            return false;
+        }
+        releaseSlot(citizen);
+        return true;
     }
 
     /**
@@ -258,7 +276,10 @@ public class ConversationManager {
         purgeStaleBackgroundSlots();
 
         UUID id = citizen.getUUID();
-        if (backgroundSlots.contains(id)) return true;
+        // A citizen may only own one background request at a time. Returning
+        // true here used to let a second task overwrite backgroundClients and
+        // orphan the first connection.
+        if (backgroundSlots.contains(id)) return false;
 
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
 
@@ -450,7 +471,9 @@ public class ConversationManager {
      */
     public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
         UUID id = citizen.getUUID();
-        return clients.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id) || backgroundSlots.contains(id);
+        // Background work is intentionally omitted. It does not consume the
+        // citizen's attention and claimSlot() cancels it if foreground speech starts.
+        return clients.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id);
     }
 
     /**
@@ -529,7 +552,7 @@ public class ConversationManager {
      * slot is available (pool is full of player conversations).</p>
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
+        if (!McTalkingConfig.hasGeminiApiKey()) return;
         startLowPrioritySession(citizen, MumblingTopicHelper.buildPrompt(citizen));
     }
 
@@ -542,12 +565,14 @@ public class ConversationManager {
      * to themselves, distinguishing this from ordinary mumbling. Silently returns if the citizen
      * is already busy, on cooldown, or no low-priority slot is available.</p>
      */
-    public static void startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-        startLowPrioritySession(citizen, MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
-        if (clients.containsKey(citizen.getUUID())) {
+    public static boolean startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
+        if (!McTalkingConfig.hasGeminiApiKey()) return false;
+        boolean started = startLowPrioritySession(citizen,
+                MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
+        if (started) {
             urgentContactConversations.add(citizen.getUUID());
         }
+        return started;
     }
 
     /**
@@ -591,30 +616,37 @@ public class ConversationManager {
      * @param userPrompt a system-prompt addition written as a directive to the AI
      *                   model; see authoring contract above
      */
-    public static void startLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) return;
-        if (!canCitizenSpeak(citizen)) return;
+    public static boolean startLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
+        if (!McTalkingConfig.hasGeminiApiKey()) return false;
+        if (!canCitizenSpeak(citizen)) return false;
 
         UUID citizenId = citizen.getUUID();
 
         if (!claimSlot(citizen, false)) {
             McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for session for citizen {}", citizenId);
-            return;
+            return false;
         }
 
-        var client = new CitizenWsClient(citizen,
-                c -> {
-                    c.close();
-                    synchronized (ConversationManager.class) {
-                        if (clients.get(citizenId) == c) {
-                            clients.remove(citizenId);
-                            releaseSlot(citizen);
+        try {
+            var client = new CitizenWsClient(citizen,
+                    c -> {
+                        c.close();
+                        synchronized (ConversationManager.class) {
+                            if (clients.get(citizenId) == c) {
+                                clients.remove(citizenId);
+                                releaseSlot(citizen);
+                            }
                         }
-                    }
-                    recordCooldown(citizen);
-                });
-        client.addPromptTextAfterTalkingComplete(userPrompt);
-        clients.put(citizenId, client);
+                        recordCooldown(citizen);
+                    });
+            client.addPromptTextAfterTalkingComplete(userPrompt);
+            clients.put(citizenId, client);
+            return true;
+        } catch (RuntimeException e) {
+            releaseSlot(citizen);
+            McTalking.LOGGER.error("[ConversationManager] Failed to start low-priority session for {}", citizenId, e);
+            return false;
+        }
     }
 
     /**
@@ -636,23 +668,34 @@ public class ConversationManager {
      * (no reconnect). If the citizen is in a different active session (citizen-to-
      * citizen) it is closed first so the player always wins.</p>
      */
-    public static void startPlayerConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
-        if (McTalkingConfig.INSTANCE.instance().geminiApiKey.isEmpty()) {
+    public static boolean startPlayerConversation(ServerPlayer player, AbstractEntityCitizen citizen) {
+        if (!McTalkingConfig.hasGeminiApiKey()) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.no_key")
                             .withStyle(ChatFormatting.RED));
-            return;
+            return false;
         }
 
         if (!canCitizenSpeak(citizen, true))
-            return;
+            return false;
 
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
         UUID existingPlayerId = citizenToPlayer.get(citizenId);
         if (existingPlayerId != null && !existingPlayerId.equals(playerId)) {
-            endConversation(existingPlayerId, false);
+            // Check the requested citizen before tearing down the caller's current
+            // conversation. A failed switch must leave the old conversation intact.
+            player.sendSystemMessage(Component.translatable("mc_talking.citizen_in_use")
+                    .withStyle(ChatFormatting.YELLOW));
+            return false;
+        }
+
+        UUID currentCitizenId = playerConversationPartners.get(playerId);
+        if (currentCitizenId != null && !currentCitizenId.equals(citizenId)) {
+            // A player can only own one direct conversation. Tear the old one down
+            // now that the requested target has passed its ownership check.
+            endConversation(playerId, false);
         }
 
         activeEntity.put(playerId, citizen);
@@ -678,11 +721,27 @@ public class ConversationManager {
                 // slot stays in addedEntities; claimSlot will see it already present
             }
 
-            // High-priority claim (may evict an older non-player slot if at capacity)
-            claimSlot(citizen, true);
-            var ws = new CitizenWsClient(
-                    new CitizenEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
-                    citizen, player);
+            // High-priority claim may evict ambient work, but never another player.
+            if (!claimSlot(citizen, true)) {
+                activeEntity.remove(playerId);
+                citizenToPlayer.remove(citizenId, playerId);
+                player.sendSystemMessage(Component.translatable("mc_talking.capacity_reached")
+                        .withStyle(ChatFormatting.YELLOW));
+                return false;
+            }
+
+            final CitizenWsClient ws;
+            try {
+                ws = new CitizenWsClient(
+                        new CitizenEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
+                        citizen, player);
+            } catch (RuntimeException e) {
+                releaseSlot(citizen);
+                activeEntity.remove(playerId);
+                citizenToPlayer.remove(citizenId, playerId);
+                McTalking.LOGGER.error("Failed to construct Gemini client for player conversation with {}", citizenId, e);
+                return false;
+            }
 
             clients.put(citizenId, ws);
 
@@ -691,11 +750,22 @@ public class ConversationManager {
             // handles the initial-connection path (via hasMadeInitialConnection), so a
             // lazy approach would also work — but eager connect reduces first-input latency.
             McTalking.LOGGER.info("Starting initial websocket connection from outer...");
-            ws.connect();
+            try {
+                ws.connect();
+            } catch (RuntimeException e) {
+                clients.remove(citizenId, ws);
+                releaseSlot(citizen);
+                activeEntity.remove(playerId);
+                citizenToPlayer.remove(citizenId, playerId);
+                try { ws.close(); } catch (Exception ignored) { }
+                McTalking.LOGGER.error("Failed to connect Gemini client for player conversation with {}", citizenId, e);
+                return false;
+            }
         }
 
         playerConversationPartners.put(playerId, citizenId);
         urgentContactConversations.remove(citizenId);
+        return true;
     }
 
     /**
