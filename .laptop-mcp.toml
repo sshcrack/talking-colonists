@@ -1,0 +1,13 @@
+version = 1
+
+[sandbox]
+memory = "8g"
+pids_limit = 4096
+tmp_size = "8g"
+network = true
+max_sessions = 4
+
+[image]
+apt_packages = [
+  "openjdk-21-jdk-headless",
+]
