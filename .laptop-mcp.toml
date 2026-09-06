@@ -11,3 +11,6 @@ max_sessions = 4
 apt_packages = [
   "openjdk-21-jdk-headless",
 ]
+
+[env]
+GRADLE_USER_HOME = "/cache/gradle"
