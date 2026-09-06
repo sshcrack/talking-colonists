@@ -1,5 +1,8 @@
 @file:OptIn(dev.kikugie.stonecutter.StonecutterExperimentalAPI::class)
 
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
+
 plugins {
 	alias(libs.plugins.stonecutter)
 	alias(libs.plugins.dotenv)
@@ -12,6 +15,27 @@ plugins {
 	alias(libs.plugins.devtools.ksp).apply(false)
 	alias(libs.plugins.fletching.table).apply(false)
 	alias(libs.plugins.legacyforge.moddev).apply(false)
+}
+
+abstract class LaptopMcpMinecraftArtifactsLock : BuildService<BuildServiceParameters.None>
+
+// NeoFormRuntime's Minecraft artifact generation is safe to run in parallel with the
+// rest of the build, but the Forge and NeoForge variants can contend with each other.
+// Laptop MCP sandboxes deliberately keep Gradle parallelism enabled, so serialize only
+// these heavyweight tasks there instead of forcing the entire build to --no-parallel.
+val laptopMcpMinecraftArtifactsLock = System.getenv("LAPTOP_MCP_TMPDIR")?.let {
+	gradle.sharedServices.registerIfAbsent(
+		"laptopMcpMinecraftArtifactsLock",
+		LaptopMcpMinecraftArtifactsLock::class
+	) {
+		maxParallelUsages.set(1)
+	}
+}
+
+subprojects {
+	laptopMcpMinecraftArtifactsLock?.let { lock ->
+		tasks.matching { it.name == "createMinecraftArtifacts" }.configureEach { usesService(lock) }
+	}
 }
 
 stonecutter active file(".sc_active_version")
