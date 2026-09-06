@@ -399,4 +399,4 @@ The following are intentionally not extension points:
 
 If addon functionality requires one of those details, the supported API should gain a semantic
 operation or event while the raw object remains internal. Addon compatibility is tied to gameplay
-contracts rather than Talking Colonists implementation choices.
+contracts and does not depend on Talking Colonists implementation choices.
