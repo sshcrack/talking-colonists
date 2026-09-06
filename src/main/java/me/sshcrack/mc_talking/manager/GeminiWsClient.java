@@ -13,7 +13,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.api.tool.AiToolContext;
-import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
+import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.config.ModalityModes;
@@ -668,7 +668,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var colony = this.entity.getCitizenColonyHandler().getColony();
 
         var action = AITools.getAction(name);
-        var addonAction = AiToolRegistry.findByProviderName(name);
+        var addonAction = AiToolRuntime.findByProviderName(name);
         if (action == null && addonAction == null) {
             McTalking.LOGGER.warn("{} Unknown function call: {}", logPrefix, name);
             var error = new JsonObject();

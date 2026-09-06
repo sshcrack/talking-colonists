@@ -2,75 +2,182 @@ package me.sshcrack.mc_talking.api;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationHandle;
+import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
+import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
+import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
+import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
+import me.sshcrack.mc_talking.api.pregen.PregenerationPromptModifier;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptContributor;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.registration.AddonRegistration;
+import me.sshcrack.mc_talking.api.tool.AiTool;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Entry point shared by the standalone addon API artifact and the full Talking Colonists mod.
+ * Root entry point for the Talking Colonists addon API.
  *
- * <p>Addons consume the public services under {@code me.sshcrack.mc_talking.api}. The full mod
- * installs the backend implementation during startup; the backend itself lives only in the normal
- * mod source set and is intentionally absent from the addon API jar.</p>
+ * <p>The normal Talking Colonists mod contains the runtime implementation. The separate
+ * {@code mc_talking-api} artifact is only a compile/source surface for addon developers and must
+ * not be installed as an additional mod.</p>
  */
 public final class TalkingColonistsApi {
-    private static volatile Backend backend;
+    /** Breaking API generation for addon compatibility declarations. */
+    public static final int API_MAJOR_VERSION = 2;
+
+    private static final String IMPLEMENTATION_CLASS =
+            "me.sshcrack.mc_talking.internal.api.TalkingColonistsApiBackend";
+    private static volatile Services services;
 
     private TalkingColonistsApi() {
     }
 
-    /** Returns whether the full Talking Colonists runtime has installed its API backend. */
+    /** Returns whether the normal Talking Colonists runtime is present and exposes this API. */
     public static boolean isAvailable() {
-        return backend != null;
+        try {
+            return resolveServices() != null;
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
+    }
+
+    /** Returns the major API generation implemented by the installed normal mod. */
+    public static int runtimeApiMajorVersion() {
+        return services().apiMajorVersion();
     }
 
     /**
-     * Core-only bootstrap hook. Addons must not install or replace the backend.
+     * Returns the runtime service surface supplied by the installed Talking Colonists mod.
+     *
+     * <p>Most addons can use the focused static facade classes instead. This unified service view
+     * is useful for frameworks/integration layers that prefer dependency injection.</p>
      */
-    @ApiStatus.Internal
-    public static synchronized void installBackend(@NotNull Backend implementation) {
-        if (backend != null && backend != implementation) {
-            throw new IllegalStateException("Talking Colonists API backend is already installed");
-        }
-        backend = java.util.Objects.requireNonNull(implementation, "implementation");
-    }
-
-    /** Core-only backend accessor used by public facade classes. */
-    @ApiStatus.Internal
-    public static @NotNull Backend backend() {
-        Backend current = backend;
+    public static @NotNull Services services() {
+        Services current = resolveServices();
         if (current == null) {
-            throw new IllegalStateException("Talking Colonists core is not initialized");
+            throw new IllegalStateException("Talking Colonists runtime is not available");
         }
         return current;
     }
 
+    private static Services resolveServices() {
+        Services current = services;
+        if (current != null) return current;
+        synchronized (TalkingColonistsApi.class) {
+            current = services;
+            if (current != null) return current;
+            try {
+                Class<?> implementation = Class.forName(
+                        IMPLEMENTATION_CLASS,
+                        true,
+                        TalkingColonistsApi.class.getClassLoader()
+                );
+                Object instance = implementation.getField("INSTANCE").get(null);
+                if (!(instance instanceof Services resolved)) {
+                    throw new IllegalStateException(
+                            "Installed Talking Colonists runtime does not implement the expected addon API services"
+                    );
+                }
+                services = resolved;
+                return resolved;
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(
+                        "Talking Colonists runtime is not available; install the normal Talking Colonists mod",
+                        e
+                );
+            }
+        }
+    }
+
     /**
-     * SPI implemented by the full mod. It deliberately exposes only public API/external types so
-     * the standalone API artifact never needs implementation classes on an addon's compile classpath.
+     * Unified supported runtime surface. Addons consume this interface; only Talking Colonists
+     * supplies its implementation.
      */
-    @ApiStatus.Internal
-    public interface Backend {
-        @NotNull CitizenPromptProvider defaultPromptProvider();
+    public interface Services {
+        int apiMajorVersion();
+
+        @NotNull AddonRegistration registerPromptProvider(
+                @NotNull String id,
+                int priority,
+                @NotNull CitizenPromptProvider provider
+        );
+
+        @NotNull AddonRegistration registerPromptContributor(
+                @NotNull String id,
+                int order,
+                @NotNull CitizenPromptContributor contributor
+        );
+
+        @NotNull AddonRegistration registerSpeechPolicy(
+                @NotNull String id,
+                int order,
+                @NotNull CitizenSpeechPolicy policy
+        );
+
+        @NotNull AddonRegistration registerUrgencyModifier(
+                @NotNull String id,
+                int order,
+                @NotNull CitizenUrgencyModifier modifier
+        );
+
+        @NotNull AddonRegistration registerPregenerationPromptModifier(
+                @NotNull String id,
+                int order,
+                @NotNull PregenerationPromptModifier modifier
+        );
+
+        @NotNull AddonRegistration registerAiTool(
+                @NotNull String namespace,
+                @NotNull String name,
+                @NotNull AiTool tool
+        );
+
+        @NotNull CitizenPromptView snapshotCitizenContext(
+                @NotNull AbstractEntityCitizen citizen,
+                @Nullable ServerPlayer speakingPlayer
+        );
 
         boolean isBusy(@NotNull AbstractEntityCitizen citizen);
 
-        boolean canSpeak(@NotNull AbstractEntityCitizen citizen, @NotNull ConversationKind kind);
+        @NotNull ConversationEligibility conversationEligibility(
+                @NotNull AbstractEntityCitizen citizen,
+                @NotNull ConversationKind kind
+        );
 
-        boolean startPlayerConversation(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen);
+        @NotNull ConversationStartResult startPlayerConversation(
+                @NotNull ServerPlayer player,
+                @NotNull AbstractEntityCitizen citizen
+        );
 
-        boolean startAmbientLine(@NotNull AbstractEntityCitizen citizen, @NotNull String promptDirective);
+        @NotNull CompletableFuture<AmbientLineResult> requestAmbientLine(
+                @NotNull AbstractEntityCitizen citizen,
+                @NotNull String promptDirective
+        );
+
+        @NotNull AddonRegistration registerConversationLifecycleListener(
+                @NotNull String id,
+                int order,
+                @NotNull ConversationLifecycleListener listener
+        );
+
+        @NotNull Optional<ConversationKind> activeConversationKind(@NotNull AbstractEntityCitizen citizen);
 
         @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen);
 
@@ -84,7 +191,8 @@ public final class TalkingColonistsApi {
 
         @NotNull Optional<CitizenActivityReservation> reserveActivity(
                 @NotNull AbstractEntityCitizen citizen,
-                @NotNull String ownerId
+                @NotNull String ownerId,
+                @NotNull Duration timeout
         );
 
         void resetAutomaticCooldown(@NotNull AbstractEntityCitizen citizen);
@@ -103,7 +211,18 @@ public final class TalkingColonistsApi {
 
         boolean addMemoryEvent(@NotNull ICitizenData citizen, @NotNull String event);
 
+        boolean removeMemoryEvent(@NotNull ICitizenData citizen, @NotNull String event);
+
         boolean addMemoryFact(@NotNull ICitizenData citizen, @NotNull String fact);
+
+        boolean removeMemoryFact(@NotNull ICitizenData citizen, @NotNull String fact);
+
+        boolean addMemoryRelationshipChange(
+                @NotNull ICitizenData citizen,
+                @NotNull UUID targetId,
+                @NotNull CitizenRelationshipDimension dimension,
+                float delta
+        );
 
         @NotNull Optional<CitizenMemorySnapshot> memorySnapshot(@NotNull ICitizenData citizen);
     }

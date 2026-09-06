@@ -5,7 +5,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
@@ -166,14 +166,14 @@ public class CitizenConversationGenerator {
 
         for (AbstractEntityCitizen entity : conversationEntities) {
             CitizenPromptView view = CitizenPromptViewFactory.create(entity.getCitizenData(), interestedParties, null);
-            citizenInfo.append(CitizenPromptService.generateConversationalInfoPrompt(view)).append("\n-----\n");
+            citizenInfo.append(PromptRuntime.generateConversationalInfoPrompt(view)).append("\n-----\n");
 
-            var isFemale = view.female();
+            var isFemale = view.identity().female();
             var voiceName = McTalkingConfig.INSTANCE.instance().currentAiModel.getRandomVoice(entity.getUUID(), isFemale);
 
             var config = new GeminiTTS.RequestPayload.SpeakerVoiceConfig();
 
-            config.speaker = view.name();
+            config.speaker = view.identity().name();
             config.voice_config = new GeminiTTS.RequestPayload.VoiceConfig();
             config.voice_config.prebuilt_voice_config = new GeminiTTS.RequestPayload.PrebuiltVoiceConfig();
             config.voice_config.prebuilt_voice_config.voice_name = voiceName;

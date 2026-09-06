@@ -1,10 +1,7 @@
 package me.sshcrack.mc_talking.api.prompt.view;
 
-/**
- * Stable happiness modifier data for prompt generation.
- */
-public record HappinessModifierView(
-        HappinessModifierType type,
-        double factor
-) {
+import org.jetbrains.annotations.NotNull;
+
+/** Stable semantic happiness modifier and its current factor. */
+public record HappinessModifierView(@NotNull HappinessModifierType type, double factor) {
 }

@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking.conversations;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
@@ -125,7 +125,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
             others.put(peer.citizen.getUUID(), peer.citizen.getCitizenData().getName());
         }
         var view = CitizenPromptViewFactory.create(citizen.getCitizenData(), others, null);
-        var prompt = CitizenPromptService.generateSystemControlledRoleplayPrompt(view);
+        var prompt = PromptRuntime.generateSystemControlledRoleplayPrompt(view);
         if (systemPromptAddition != null) {
             prompt += "\n\n" + systemPromptAddition;
         }

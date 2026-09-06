@@ -1,7 +1,10 @@
-package me.sshcrack.mc_talking.conversations.memory.data;
+package me.sshcrack.mc_talking.api.memory;
 
-public enum CitizenRelationshipChangeType {
-    // Personality
+/**
+ * Semantic dimensions Talking Colonists tracks for long-term citizen relationships/personality
+ * changes. These are Talking Colonists-owned values, not mirrored MineColonies state.
+ */
+public enum CitizenRelationshipDimension {
     FRIENDLINESS,
     AGGRESSION,
     HONESTY,
@@ -12,26 +15,18 @@ public enum CitizenRelationshipChangeType {
     EMPATHY,
     PRIDE,
     PATIENCE,
-
-    // Emotional
     ANGER,
     ANXIETY,
     OPTIMISM,
     PESSIMISM,
     RESILIENCE,
-
-    // Social (use per-relationship)
     TRUST,
     RESPECT,
     AFFECTION,
     JEALOUSY,
-
-    // Work / survival
     WORK_ETHIC,
     RESOURCEFULNESS,
     RISK_TAKING,
-
-    // Communication
     DIRECTNESS,
     POLITENESS,
     SARCASM,

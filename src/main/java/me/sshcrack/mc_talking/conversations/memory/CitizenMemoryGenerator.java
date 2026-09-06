@@ -5,7 +5,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
@@ -48,7 +48,7 @@ public class CitizenMemoryGenerator extends Thread {
                 }
               ]
             }
-            """).formatted(Arrays.stream(CitizenRelationshipChangeType.values())
+            """).formatted(Arrays.stream(CitizenRelationshipDimension.values())
             .map(Enum::toString).collect(Collectors.joining(", ")));
 
     private final String conversation;

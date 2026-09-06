@@ -7,18 +7,36 @@ import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationHandle;
+import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
+import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
+import me.sshcrack.mc_talking.api.conversation.ConversationTranscriptEntry;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
+import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
+import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
+import me.sshcrack.mc_talking.api.pregen.PregenerationPromptModifier;
+import me.sshcrack.mc_talking.api.prompt.CitizenPromptContributor;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.registration.AddonRegistration;
+import me.sshcrack.mc_talking.api.tool.AiTool;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
+import me.sshcrack.mc_talking.conversations.memory.MemorySnapshotFactory;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.DefaultCitizenPromptProvider;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +49,11 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /** Full-mod implementation of the standalone addon API bridge. */
-public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Backend {
+public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Services {
     public static final TalkingColonistsApiBackend INSTANCE = new TalkingColonistsApiBackend();
 
     private static final int MAX_CONTROLLED_TRANSCRIPT_CHARS = 8_000;
+    private static final Duration MAX_ADDON_ACTIVITY_LEASE = Duration.ofHours(1);
     private static final Pattern OWNER_ID = Pattern.compile("[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}");
     private static final CitizenPromptProvider DEFAULT_PROMPT_PROVIDER = new DefaultCitizenPromptProvider();
 
@@ -42,8 +61,76 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
     }
 
     @Override
+    public int apiMajorVersion() {
+        return TalkingColonistsApi.API_MAJOR_VERSION;
+    }
+
     public @NotNull CitizenPromptProvider defaultPromptProvider() {
         return DEFAULT_PROMPT_PROVIDER;
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerPromptProvider(
+            @NotNull String id,
+            int priority,
+            @NotNull CitizenPromptProvider provider
+    ) {
+        return PromptRuntime.registerProvider(id, priority, provider);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerPromptContributor(
+            @NotNull String id,
+            int order,
+            @NotNull CitizenPromptContributor contributor
+    ) {
+        return PromptRuntime.registerContributor(id, order, contributor);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerSpeechPolicy(
+            @NotNull String id,
+            int order,
+            @NotNull CitizenSpeechPolicy policy
+    ) {
+        return ConversationRuleRuntime.registerSpeechPolicy(id, order, policy);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerUrgencyModifier(
+            @NotNull String id,
+            int order,
+            @NotNull CitizenUrgencyModifier modifier
+    ) {
+        return ConversationRuleRuntime.registerUrgencyModifier(id, order, modifier);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerPregenerationPromptModifier(
+            @NotNull String id,
+            int order,
+            @NotNull PregenerationPromptModifier modifier
+    ) {
+        return PregenerationPromptRuntime.register(id, order, modifier);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerAiTool(
+            @NotNull String namespace,
+            @NotNull String name,
+            @NotNull AiTool tool
+    ) {
+        return AiToolRuntime.register(namespace, name, tool);
+    }
+
+    @Override
+    public @NotNull CitizenPromptView snapshotCitizenContext(
+            @NotNull AbstractEntityCitizen citizen,
+            @Nullable ServerPlayer speakingPlayer
+    ) {
+        var data = citizen.getCitizenData();
+        if (data == null) throw new IllegalStateException("Citizen data is not available");
+        return CitizenPromptViewFactory.create(data, Map.of(), speakingPlayer);
     }
 
     @Override
@@ -52,18 +139,72 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
     }
 
     @Override
-    public boolean canSpeak(@NotNull AbstractEntityCitizen citizen, @NotNull ConversationKind kind) {
-        return ConversationManager.canCitizenSpeak(citizen, kind);
+    public @NotNull ConversationEligibility conversationEligibility(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull ConversationKind kind
+    ) {
+        return ConversationManager.conversationEligibility(citizen, kind);
     }
 
     @Override
-    public boolean startPlayerConversation(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen) {
-        return ConversationManager.startPlayerConversation(player, citizen);
+    public @NotNull ConversationStartResult startPlayerConversation(
+            @NotNull ServerPlayer player,
+            @NotNull AbstractEntityCitizen citizen
+    ) {
+        return ConversationManager.startPlayerConversationDetailed(player, citizen);
     }
 
     @Override
-    public boolean startAmbientLine(@NotNull AbstractEntityCitizen citizen, @NotNull String promptDirective) {
-        return ConversationManager.startAddonAmbientSession(citizen, promptDirective);
+    public @NotNull CompletableFuture<AmbientLineResult> requestAmbientLine(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull String promptDirective
+    ) {
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            return CompletableFuture.completedFuture(AmbientLineResult.rejected(
+                    AmbientLineResult.RejectionReason.PROVIDER_UNAVAILABLE,
+                    "Gemini API key/provider is unavailable"
+            ));
+        }
+
+        ConversationEligibility eligibility = ConversationManager.conversationEligibility(
+                citizen, ConversationKind.ADDON_AMBIENT
+        );
+        if (!eligibility.eligible()) {
+            return CompletableFuture.completedFuture(AmbientLineResult.rejected(
+                    mapAmbientRejection(eligibility.status()),
+                    eligibility.detail()
+            ));
+        }
+        if (!ConversationManager.hasLowPriorityCapacity(1)) {
+            return CompletableFuture.completedFuture(AmbientLineResult.rejected(
+                    AmbientLineResult.RejectionReason.CAPACITY_EXHAUSTED,
+                    "no low-priority foreground capacity is available"
+            ));
+        }
+
+        CompletableFuture<AmbientLineResult> future = new CompletableFuture<>();
+        boolean started = ConversationManager.startAddonAmbientSession(citizen, promptDirective, future::complete);
+        if (!started) {
+            future.complete(AmbientLineResult.rejected(
+                    AmbientLineResult.RejectionReason.CAPACITY_EXHAUSTED,
+                    "conversation became unavailable before the ambient line could start"
+            ));
+        }
+        return future;
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerConversationLifecycleListener(
+            @NotNull String id,
+            int order,
+            @NotNull ConversationLifecycleListener listener
+    ) {
+        return ConversationEventRuntime.register(id, order, listener);
+    }
+
+    @Override
+    public @NotNull Optional<ConversationKind> activeConversationKind(@NotNull AbstractEntityCitizen citizen) {
+        return Optional.ofNullable(ConversationManager.getActiveConversationKind(citizen.getUUID()));
     }
 
     @Override
@@ -99,15 +240,17 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
     @Override
     public @NotNull Optional<CitizenActivityReservation> reserveActivity(
             @NotNull AbstractEntityCitizen citizen,
-            @NotNull String ownerId
+            @NotNull String ownerId,
+            @NotNull Duration timeout
     ) {
         java.util.Objects.requireNonNull(citizen, "citizen");
         java.util.Objects.requireNonNull(ownerId, "ownerId");
         if (!OWNER_ID.matcher(ownerId).matches()) {
             throw new IllegalArgumentException("ownerId must be namespaced and match " + OWNER_ID.pattern());
         }
+        long timeoutNanos = validateActivityTimeout(timeout);
         UUID token = UUID.randomUUID();
-        if (!ConversationManager.claimAddonActivity(citizen, token)) return Optional.empty();
+        if (!ConversationManager.claimAddonActivity(citizen, token, timeoutNanos)) return Optional.empty();
         return Optional.of(new ActivityReservation(citizen.getUUID(), ownerId, token));
     }
 
@@ -147,6 +290,13 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
     }
 
     @Override
+    public boolean removeMemoryEvent(@NotNull ICitizenData citizen, @NotNull String event) {
+        if (event.isBlank()) throw new IllegalArgumentException("event must not be blank");
+        CitizenMemories memories = getExisting(citizen);
+        return memories != null && memories.removeEvent(event);
+    }
+
+    @Override
     public boolean addMemoryFact(@NotNull ICitizenData citizen, @NotNull String fact) {
         if (fact.isBlank()) throw new IllegalArgumentException("fact must not be blank");
         CitizenMemories memories = getOrCreate(citizen);
@@ -156,14 +306,57 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
     }
 
     @Override
+    public boolean removeMemoryFact(@NotNull ICitizenData citizen, @NotNull String fact) {
+        if (fact.isBlank()) throw new IllegalArgumentException("fact must not be blank");
+        CitizenMemories memories = getExisting(citizen);
+        return memories != null && memories.removeFact(fact);
+    }
+
+    @Override
+    public boolean addMemoryRelationshipChange(
+            @NotNull ICitizenData citizen,
+            @NotNull UUID targetId,
+            @NotNull CitizenRelationshipDimension dimension,
+            float delta
+    ) {
+        java.util.Objects.requireNonNull(targetId, "targetId");
+        java.util.Objects.requireNonNull(dimension, "dimension");
+        if (!Float.isFinite(delta) || delta < -1.0f || delta > 1.0f) {
+            throw new IllegalArgumentException("relationship delta must be finite and within [-1, 1]");
+        }
+        CitizenMemories memories = getOrCreate(citizen);
+        if (memories == null) return false;
+        memories.addRelationshipChange(targetId, dimension, delta);
+        return true;
+    }
+
+    @Override
     public @NotNull Optional<CitizenMemorySnapshot> memorySnapshot(@NotNull ICitizenData citizen) {
         CitizenMemories memories = getExisting(citizen);
         if (memories == null) return Optional.empty();
-        return Optional.of(new CitizenMemorySnapshot(
-                memories.getFacts(),
-                memories.getEvents(),
-                memories.getSummarizedMemory()
-        ));
+        return Optional.of(MemorySnapshotFactory.create(memories));
+    }
+
+    private static long validateActivityTimeout(Duration timeout) {
+        java.util.Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("activity lease timeout must be positive");
+        }
+        if (timeout.compareTo(MAX_ADDON_ACTIVITY_LEASE) > 0) {
+            throw new IllegalArgumentException("activity lease timeout must not exceed " + MAX_ADDON_ACTIVITY_LEASE);
+        }
+        return timeout.toNanos();
+    }
+
+    private static AmbientLineResult.RejectionReason mapAmbientRejection(ConversationEligibility.Status status) {
+        return switch (status) {
+            case SLEEPING -> AmbientLineResult.RejectionReason.SLEEPING;
+            case VISITOR -> AmbientLineResult.RejectionReason.VISITOR;
+            case COOLDOWN -> AmbientLineResult.RejectionReason.COOLDOWN;
+            case BUSY -> AmbientLineResult.RejectionReason.BUSY;
+            case ADDON_POLICY_VETO -> AmbientLineResult.RejectionReason.ADDON_POLICY_VETO;
+            case ELIGIBLE -> throw new IllegalArgumentException("ELIGIBLE is not a rejection");
+        };
     }
 
     private static CitizenMemories getExisting(ICitizenData citizen) {
@@ -200,7 +393,20 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
 
         @Override
         public boolean isClosed() {
-            return closed.get();
+            if (closed.get()) return true;
+            if (ConversationManager.isAddonActivityActive(citizenId, token)) return false;
+            closed.set(true);
+            return true;
+        }
+
+        @Override
+        public boolean renew(@NotNull Duration timeout) {
+            if (closed.get()) return false;
+            boolean renewed = ConversationManager.renewAddonActivity(
+                    citizenId, token, validateActivityTimeout(timeout)
+            );
+            if (!renewed) closed.set(true);
+            return renewed;
         }
 
         @Override
@@ -217,7 +423,8 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
         private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
         private final AtomicReference<AbstractEntityCitizen> activeSpeaker = new AtomicReference<>();
         private final AtomicReference<CompletableFuture<AmbientLineResult>> activeFuture = new AtomicReference<>();
-        private final StringBuilder sharedTranscript = new StringBuilder();
+        private final ArrayDeque<ConversationTranscriptEntry> transcript = new ArrayDeque<>();
+        private int transcriptChars;
         private volatile String agenda;
 
         private ControlledSession(MinecraftServer server, List<AbstractEntityCitizen> participants, String agenda) {
@@ -255,7 +462,13 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
         public void addPlayerStatement(@NotNull ServerPlayer player, @NotNull String statement) {
             java.util.Objects.requireNonNull(player, "player");
             if (statement.isBlank()) return;
-            appendTranscript(player.getName().getString() + ": " + statement.trim());
+            appendTranscript(new ConversationTranscriptEntry(
+                    ConversationTranscriptEntry.SpeakerKind.PLAYER,
+                    player.getUUID(),
+                    player.getName().getString(),
+                    statement.trim(),
+                    player.level().getGameTime()
+            ));
         }
 
         @Override
@@ -285,7 +498,13 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
                 }
                 boolean started = ConversationManager.startAddonAmbientSession(speaker, prompt, result -> {
                     if (result.status() == AmbientLineResult.Status.COMPLETED && !result.transcript().isBlank()) {
-                        appendTranscript(speaker.getName().getString() + ": " + result.transcript().trim());
+                        appendTranscript(new ConversationTranscriptEntry(
+                                ConversationTranscriptEntry.SpeakerKind.CITIZEN,
+                                speaker.getUUID(),
+                                speaker.getName().getString(),
+                                result.transcript().trim(),
+                                speaker.level().getGameTime()
+                        ));
                     }
                     activeSpeaker.compareAndSet(speaker, null);
                     activeFuture.compareAndSet(future, null);
@@ -324,9 +543,18 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
         }
 
         @Override
+        public @NotNull List<ConversationTranscriptEntry> transcript() {
+            synchronized (transcript) {
+                return List.copyOf(transcript);
+            }
+        }
+
+        @Override
         public @NotNull String sharedTranscript() {
-            synchronized (sharedTranscript) {
-                return sharedTranscript.toString();
+            synchronized (transcript) {
+                return transcript.stream()
+                        .map(entry -> entry.speakerName() + ": " + entry.text())
+                        .collect(java.util.stream.Collectors.joining("\n"));
             }
         }
 
@@ -346,16 +574,28 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Bac
                     """.formatted(agenda, boundedTopic, history.isBlank() ? "(none yet)" : history);
         }
 
-        private void appendTranscript(String line) {
-            if (line == null || line.isBlank()) return;
-            synchronized (sharedTranscript) {
-                if (!sharedTranscript.isEmpty()) sharedTranscript.append('\n');
-                sharedTranscript.append(line);
-                if (sharedTranscript.length() > MAX_CONTROLLED_TRANSCRIPT_CHARS) {
-                    int remove = sharedTranscript.length() - MAX_CONTROLLED_TRANSCRIPT_CHARS;
-                    int newline = sharedTranscript.indexOf("\n", remove);
-                    sharedTranscript.delete(0, newline >= 0 ? newline + 1 : remove);
+        private void appendTranscript(ConversationTranscriptEntry entry) {
+            synchronized (transcript) {
+                int overhead = entry.speakerName().length() + 2;
+                int maxTextChars = Math.max(1, MAX_CONTROLLED_TRANSCRIPT_CHARS - overhead);
+                ConversationTranscriptEntry bounded = entry.text().length() <= maxTextChars
+                        ? entry
+                        : new ConversationTranscriptEntry(
+                                entry.speakerKind(),
+                                entry.speakerId(),
+                                entry.speakerName(),
+                                entry.text().substring(0, maxTextChars),
+                                entry.gameTimeTicks()
+                        );
+                int entryChars = overhead + bounded.text().length() + (transcript.isEmpty() ? 0 : 1);
+                while (!transcript.isEmpty() && transcriptChars + entryChars > MAX_CONTROLLED_TRANSCRIPT_CHARS) {
+                    ConversationTranscriptEntry removed = transcript.removeFirst();
+                    transcriptChars -= removed.speakerName().length() + 2 + removed.text().length();
+                    if (!transcript.isEmpty()) transcriptChars -= 1;
                 }
+                if (!transcript.isEmpty()) transcriptChars += 1;
+                transcript.addLast(bounded);
+                transcriptChars += overhead + bounded.text().length();
             }
         }
     }

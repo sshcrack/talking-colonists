@@ -4,7 +4,7 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.core.colony.CitizenData;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
@@ -96,7 +96,7 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
         }
 
         var statusView = CitizenPromptViewFactory.createStatusView(status, data);
-        var newStatusPrompt = String.format("You are now %s", CitizenPromptService.formatStatus(statusView));
+        var newStatusPrompt = String.format("You are now %s", PromptRuntime.formatStatus(statusView));
         client.setLastStatus(status);
         client.addPromptTextAfterTalkingComplete(newStatusPrompt);
     }

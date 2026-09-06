@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.function.Consumer;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.VoiceSelectionService;
 import me.sshcrack.mc_talking.util.AudioHelper;
@@ -72,7 +72,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         var view = CitizenPromptViewFactory.create(entity.getCitizenData(), new HashMap<>(), null);
-        var prompt = CitizenPromptService.generateSystemControlledRoleplayPrompt(view);
+        var prompt = PromptRuntime.generateSystemControlledRoleplayPrompt(view);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
         sys.parts.add(p);
         setup.systemInstruction = sys;

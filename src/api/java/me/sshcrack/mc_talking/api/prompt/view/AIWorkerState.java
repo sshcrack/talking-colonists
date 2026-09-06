@@ -1,8 +1,8 @@
 package me.sshcrack.mc_talking.api.prompt.view;
 
 /**
- * Mirror of {@code com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState}
- * from MineColonies. Interface {@code IAIState} stripped — used here purely as a value type.
+ * Stable Talking Colonists compatibility view of {@code com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState}
+ * MineColonies worker AI states. Addons depend on this enum rather than the upstream enum so MineColonies patch-level API changes are absorbed by Talking Colonists.
  */
 public enum AIWorkerState {
     IDLE(true),
@@ -128,7 +128,9 @@ public enum AIWorkerState {
     HARVEST_MISTLETOE(true),
     HARVEST_NETHERWART(true),
     CONCRETE_MIXER_PLACING(true),
-    CONCRETE_MIXER_HARVESTING(true);
+    CONCRETE_MIXER_HARVESTING(true),
+    /** MineColonies exposed a work state this API generation does not know yet. */
+    UNKNOWN(false);
 
     private boolean isOkayToEat;
 

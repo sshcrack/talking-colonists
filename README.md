@@ -26,10 +26,13 @@ Now the citizen will complain if they are unhappy or missing some resources, jus
 Yup
 
 ## Addon API
-Addon authors can extend AI tools, prompt context, conversation eligibility/urgency, citizen memories,
-pregenerated prompt constraints, addon activity reservations, ordinary citizen conversations, and
-controlled meeting/council turns through supported interfaces under `me.sshcrack.mc_talking.api`.
-The supported sources are compiled separately from implementation code and published as
-`me.sshcrack:mc_talking-api`; addons should use that artifact as their compile/IDE dependency while
-requiring the normal Talking Colonists mod at runtime. See [docs/addon-api.md](docs/addon-api.md). The pinned Colonist Errands hook audit and migration map is
+Addon API generation 2 is a breaking, first-class integration baseline. Addons can register AI
+tools and prompt context/providers, consume normalized citizen snapshots, inspect typed conversation
+eligibility/start results, observe conversation lifecycle, work with citizen memories, modify
+pregenerated prompt constraints, hold renewable activity leases, and run ordinary or controlled
+meeting/council conversations through `me.sshcrack.mc_talking.api`.
+The supported sources are compiled separately from implementation code and published as the
+developer-only `me.sshcrack:mc_talking-api` artifact. Addons should use it as a compile/IDE
+dependency while requiring the normal Talking Colonists mod at runtime. **Players install only the
+normal Talking Colonists mod; the API artifact is not a second mod.** See [docs/addon-api.md](docs/addon-api.md). The pinned Colonist Errands hook audit and migration map is
 in [docs/colonist-errands-migration.md](docs/colonist-errands-migration.md).

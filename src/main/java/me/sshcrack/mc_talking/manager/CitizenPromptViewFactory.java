@@ -18,19 +18,28 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.EntityCitizen;
-import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.BuildingView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenActivityCategory;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenActivityView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
+import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenSubState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenFamilyView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenIdentityView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenWellbeingView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenWorkView;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPersonalityView;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
+import me.sshcrack.mc_talking.conversations.memory.MemorySnapshotFactory;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenSubState;
-import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
 import me.sshcrack.mc_talking.util.ColonyEventBuffer;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.util.ColonyStatsHelper;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
-import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
@@ -60,19 +69,6 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 
-import static com.minecolonies.api.util.constant.HappinessConstants.DAMAGE;
-import static com.minecolonies.api.util.constant.HappinessConstants.DEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.FOOD;
-import static com.minecolonies.api.util.constant.HappinessConstants.HEALTH;
-import static com.minecolonies.api.util.constant.HappinessConstants.HOMELESSNESS;
-import static com.minecolonies.api.util.constant.HappinessConstants.IDLEATJOB;
-import static com.minecolonies.api.util.constant.HappinessConstants.MYSTICAL_SITE;
-import static com.minecolonies.api.util.constant.HappinessConstants.RAIDWITHOUTDEATH;
-import static com.minecolonies.api.util.constant.HappinessConstants.SCHOOL;
-import static com.minecolonies.api.util.constant.HappinessConstants.SECURITY;
-import static com.minecolonies.api.util.constant.HappinessConstants.SLEPTTONIGHT;
-import static com.minecolonies.api.util.constant.HappinessConstants.SOCIAL;
-import static com.minecolonies.api.util.constant.HappinessConstants.UNEMPLOYMENT;
 
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -124,8 +120,9 @@ public final class CitizenPromptViewFactory {
                 personality.name().toLowerCase(Locale.ROOT), personality.getPromptLines(), false);
         String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
         var memory = ((CitizenDataMemoryExtended) data).mc_talking$getMemory();
-        CitizenMemorySnapshot memorySnapshot = memory == null ? null : new CitizenMemorySnapshot(
-                memory.getFacts(), memory.getEvents(), memory.getSummarizedMemory(), memory.toPrompt(interestedParties));
+        CitizenMemorySnapshot memorySnapshot = memory == null
+                ? null
+                : MemorySnapshotFactory.create(memory);
         String playerState = extractPlayerState(speakingTo);
         var envInfo = extractEnvironmentInfo(data);
         String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
@@ -139,66 +136,80 @@ public final class CitizenPromptViewFactory {
         int lastRaidLostCitizens = ColonyEventBuffer.getLostCitizens(colony);
         long currentGameTimeTicks = colony.getWorld() != null ? colony.getWorld().getGameTime() : 0;
         List<String> recentEvents = extractRecentEvents(data);
-        CitizenSubState subState = extractCitizenSubState(data);
-        AIWorkerState workAiState = extractWorkAiState(data);
+        ActivityParts activityParts = extractActivityParts(data);
+        AIWorkerState workState = extractWorkState(data);
         String nameTagDescription = extractNameTagDescription(data);
         String colonyFoundingPlayer = data.getColony().getPermissions().getOwnerName();
         int colonyAgeDays = data.getColony().getDay();
-        ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, subState != null ? subState.state() : null);
+        ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, activityParts.category());
         List<String> recentActions = extractRecentActions(data);
 
-        return new CitizenPromptView(
-                data.getName(),
-                data.isChild(),
-                data.isFemale(),
-                jobName,
-                isGuard,
-                data.getCitizenDiseaseHandler().isSick(),
-                data.getHomeBuilding() == null && !isGuard,
-                parents,
-                data.getPartner() != null,
-                childrenNames,
-                siblingNames,
-                data.getSaturation(),
-                healthPercent,
-                createStatusView(data.getStatus(), data),
-                happiness,
-                modifiers,
-                hasSchool,
-                skills,
-                blockingMessages,
-                relation,
-                getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
-                memorySnapshot,
-                interestedParties,
-                colonyName,
-                homeBuildingDisplayName,
-                homeBuildingLevel,
-                workBuildingDisplayName,
-                workBuildingLevel,
-                data.getColony().getID(),
-                envInfo.peaceful(),
-                lastRaidEndTimeTicks,
-                lastRaidLostCitizens,
-                currentGameTimeTicks,
-                personalityView,
-                customPersonalityText,
-                playerState,
-                envInfo.description(),
-                categorizedRequests.fulfillable(),
-                categorizedRequests.blocked(),
-                activeQuests,
-                recentEvents,
-                colonyConnections,
-                colonyMilestone,
-                subState != null ? subState.state() : null,
-                workAiState,
+        CitizenStatusView statusView = createStatusView(data.getStatus(), data);
+        CitizenActivityView activity = new CitizenActivityView(
+                activityParts.category(),
+                statusView,
+                activityParts.citizenState(),
+                workState,
+                activityParts.subState(),
+                AIStateDescriber.describe(
+                        activityParts.category(),
+                        workState,
+                        activityParts.subState(),
+                        nameTagDescription,
+                        workBuildingDisplayName
+                ),
                 nameTagDescription,
-                colonyFoundingPlayer,
-                colonyAgeDays,
-                colonyFoodSituation,
-                recentActions,
-                subState
+                recentActions == null ? List.of() : recentActions
+        );
+
+        return new CitizenPromptSnapshot(
+                new CitizenIdentityView(
+                        data.getName(), data.isChild(), data.isFemale(), isGuard,
+                        personalityView, customPersonalityText
+                ),
+                new CitizenFamilyView(parents, data.getPartner() != null, childrenNames, siblingNames),
+                new CitizenWellbeingView(
+                        data.getCitizenDiseaseHandler().isSick(),
+                        data.getHomeBuilding() == null && !isGuard,
+                        data.getSaturation(),
+                        healthPercent,
+                        happiness,
+                        modifiers,
+                        hasSchool,
+                        blockingMessages,
+                        colonyFoodSituation
+                ),
+                new CitizenWorkView(
+                        jobName,
+                        homeBuildingDisplayName == null ? null : new BuildingView(homeBuildingDisplayName, homeBuildingLevel),
+                        workBuildingDisplayName == null ? null : new BuildingView(workBuildingDisplayName, workBuildingLevel),
+                        skills,
+                        categorizedRequests.fulfillable() == null ? List.of() : categorizedRequests.fulfillable(),
+                        categorizedRequests.blocked() == null ? List.of() : categorizedRequests.blocked(),
+                        activeQuests == null ? List.of() : activeQuests
+                ),
+                new ColonyPromptView(
+                        data.getColony().getID(),
+                        colonyName,
+                        envInfo.peaceful(),
+                        colonyFoundingPlayer,
+                        colonyAgeDays,
+                        lastRaidEndTimeTicks,
+                        lastRaidLostCitizens,
+                        currentGameTimeTicks,
+                        recentEvents,
+                        colonyConnections == null ? List.of() : colonyConnections,
+                        colonyMilestone,
+                        envInfo.description()
+                ),
+                new ConversationPromptView(
+                        getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
+                        relation,
+                        playerState,
+                        interestedParties
+                ),
+                activity,
+                memorySnapshot
         );
     }
 
@@ -212,119 +223,84 @@ public final class CitizenPromptViewFactory {
         return Component.translatable(data.getJob().getJobRegistryEntry().getTranslationKey()).getString();
     }
 
-    @Nullable
-    private static CitizenSubState extractCitizenSubState(ICitizenData data) {
+    private record ActivityParts(
+            CitizenActivityCategory category,
+            @Nullable CitizenAIState citizenState,
+            @Nullable CitizenSubState subState
+    ) {
+        static ActivityParts other() {
+            return new ActivityParts(CitizenActivityCategory.OTHER, CitizenAIState.UNKNOWN, null);
+        }
+    }
+
+    private static ActivityParts extractActivityParts(ICitizenData data) {
         var entityOpt = data.getEntity();
-        if (entityOpt.isEmpty()) return null;
-        if (!(entityOpt.get() instanceof EntityCitizen citizen)) return null;
+        if (entityOpt.isEmpty() || !(entityOpt.get() instanceof EntityCitizen citizen)) {
+            return new ActivityParts(CitizenActivityCategory.OTHER, null, null);
+        }
         var ai = citizen.getCitizenAI();
-        if (ai == null) return null;
+        if (ai == null || ai.getState() == null) return new ActivityParts(CitizenActivityCategory.OTHER, null, null);
         var state = ai.getState();
-        if (state == null) return null;
 
         if (state instanceof com.minecolonies.api.entity.ai.statemachine.states.CitizenAIState cs) {
-            var ours = switch (cs) {
-                case IDLE -> CitizenAIState.IDLE;
-                case FLEE -> CitizenAIState.FLEE;
-                case EATING -> CitizenAIState.EATING;
-                case SICK -> CitizenAIState.SICK;
-                case SLEEP -> CitizenAIState.SLEEP;
-                case MOURN -> CitizenAIState.MOURN;
-                case WORK -> CitizenAIState.WORK;
-                case WORKING -> CitizenAIState.WORKING;
-                case INACTIVE -> CitizenAIState.INACTIVE;
+            CitizenAIState stable = MineColoniesCompatibilityMapper.citizenState(cs);
+            CitizenActivityCategory category = switch (stable) {
+                case IDLE -> CitizenActivityCategory.IDLE;
+                case FLEE -> CitizenActivityCategory.DANGER;
+                case EATING -> CitizenActivityCategory.EATING;
+                case SICK -> CitizenActivityCategory.SICK;
+                case SLEEP -> CitizenActivityCategory.SLEEPING;
+                case MOURN -> CitizenActivityCategory.MOURNING;
+                case WORK, WORKING -> CitizenActivityCategory.WORKING;
+                case INACTIVE -> CitizenActivityCategory.INACTIVE;
+                case UNKNOWN -> CitizenActivityCategory.OTHER;
             };
-            return new CitizenSubState(ours, null, null);
+            return new ActivityParts(category, stable, null);
         }
 
         if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAIEatTask.EatingState es) {
-            var sub = switch (es) {
-                case CHECK_FOR_FOOD -> MinimalAISubState.EAT_CHECKING_FOOD;
-                case GO_TO_HUT -> MinimalAISubState.EAT_GOING_TO_HUT;
-                case SEARCH_RESTAURANT -> MinimalAISubState.EAT_SEARCH_RESTAURANT;
-                case GO_TO_RESTAURANT -> MinimalAISubState.EAT_GOING_TO_RESTAURANT;
-                case WAIT_FOR_FOOD -> MinimalAISubState.EAT_WAITING_FOOD;
-                case GET_FOOD_YOURSELF -> MinimalAISubState.EAT_GETTING_FOOD_SELF;
-                case GO_TO_EAT_POS -> MinimalAISubState.EAT_GOING_TO_EAT_POS;
-                case EAT -> MinimalAISubState.EAT_EATING;
-                case DONE -> null;
-            };
-            return sub != null
-                    ? new CitizenSubState(CitizenAIState.EATING, sub, deriveRestaurantContext(data))
-                    : null;
+            return new ActivityParts(CitizenActivityCategory.EATING, CitizenAIState.EATING,
+                    new CitizenSubState(CitizenAIState.EATING, MineColoniesCompatibilityMapper.eatingState(es), deriveRestaurantContext(data)));
         }
-
         if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAISleep.SleepState ss) {
-            var sub = switch (ss) {
-                case WALKING_HOME -> MinimalAISubState.SLEEP_WALKING_TO_BED;
-                case FIND_BED -> MinimalAISubState.SLEEP_FINDING_BED;
-                case SLEEPING -> MinimalAISubState.SLEEP_IN_BED;
-            };
-            return new CitizenSubState(CitizenAIState.SLEEP, sub, deriveHomeName(data));
+            return new ActivityParts(CitizenActivityCategory.SLEEPING, CitizenAIState.SLEEP,
+                    new CitizenSubState(CitizenAIState.SLEEP, MineColoniesCompatibilityMapper.sleepState(ss), deriveHomeName(data)));
         }
-
         if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAISickTask.DiseaseState ds) {
-            var sub = switch (ds) {
-                case CHECK_FOR_CURE -> MinimalAISubState.SICK_CHECKING_FOR_CURE;
-                case GO_TO_HUT, GO_TO_HOSPITAL -> MinimalAISubState.SICK_WALKING_TO_HOSPITAL;
-                case SEARCH_HOSPITAL, FIND_EMPTY_BED, WAIT_FOR_CURE -> MinimalAISubState.SICK_AT_HOSPITAL;
-                case APPLY_CURE -> MinimalAISubState.SICK_RECEIVING_CURE;
-                case WANDER -> MinimalAISubState.SICK_WANDERING;
-            };
-            return new CitizenSubState(CitizenAIState.SICK, sub, deriveDiseaseName(data));
+            return new ActivityParts(CitizenActivityCategory.SICK, CitizenAIState.SICK,
+                    new CitizenSubState(CitizenAIState.SICK, MineColoniesCompatibilityMapper.diseaseState(ds), deriveDiseaseName(data)));
         }
-
         if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAIMournCitizen.MourningState ms) {
-            var sub = switch (ms) {
-                case DECIDE, WANDERING -> MinimalAISubState.MOURN_WALKING;
-                case WALKING_TO_TOWNHALL -> MinimalAISubState.MOURN_AT_TOWNHALL;
-                case WALKING_TO_GRAVEYARD -> MinimalAISubState.MOURN_WALKING_TO_GRAVEYARD;
-                case WANDER_AT_GRAVEYARD, WALK_TO_GRAVE -> MinimalAISubState.MOURN_AT_GRAVE;
-                case STARING -> MinimalAISubState.MOURN_STARING;
-            };
-            return new CitizenSubState(CitizenAIState.MOURN, sub, deriveDeceasedName(data));
+            return new ActivityParts(CitizenActivityCategory.MOURNING, CitizenAIState.MOURN,
+                    new CitizenSubState(CitizenAIState.MOURN, MineColoniesCompatibilityMapper.mourningState(ms), deriveDeceasedName(data)));
         }
-
         if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAICitizenAvoidEntity.FleeStates fs) {
-            var sub = switch (fs) {
-                case CHECK_ENTITIES -> MinimalAISubState.FLEE_CHECKING;
-                case RUNNING -> MinimalAISubState.FLEE_RUNNING;
-            };
-            return new CitizenSubState(CitizenAIState.FLEE, sub, null);
+            return new ActivityParts(CitizenActivityCategory.DANGER, CitizenAIState.FLEE,
+                    new CitizenSubState(CitizenAIState.FLEE, MineColoniesCompatibilityMapper.fleeState(fs), null));
+        }
+        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAICitizenWander.WanderState ws) {
+            return new ActivityParts(CitizenActivityCategory.IDLE, CitizenAIState.IDLE,
+                    new CitizenSubState(CitizenAIState.IDLE, MineColoniesCompatibilityMapper.wanderState(ws), null));
         }
 
-        if (state instanceof com.minecolonies.core.entity.ai.minimal.EntityAICitizenWander.WanderState) {
-            return new CitizenSubState(CitizenAIState.IDLE, null, null);
-        }
-
-        McTalking.LOGGER.warn("Unknown citizen AI state: {} (raw: {})", state, state);
-        return null;
+        McTalking.LOGGER.debug("Unmapped citizen AI state: {} ({})", state, state.getClass().getName());
+        return ActivityParts.other();
     }
 
-    @Nullable
-    private static AIWorkerState extractWorkAiState(ICitizenData data) {
+    private static @Nullable AIWorkerState extractWorkState(ICitizenData data) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) return null;
-        var entity = entityOpt.get();
-        var jobHandler = entity.getCitizenJobHandler();
-        if (jobHandler == null) return null;
-        var workAi = jobHandler.getWorkAI();
-        if (workAi == null) return null;
-        var stateAi = workAi.getStateAI();
-        if (stateAi == null) return null;
-        var state = stateAi.getState();
+        var jobHandler = entityOpt.get().getCitizenJobHandler();
+        if (jobHandler == null || jobHandler.getWorkAI() == null || jobHandler.getWorkAI().getStateAI() == null) {
+            return null;
+        }
+        var state = jobHandler.getWorkAI().getStateAI().getState();
         if (state == null) return null;
-
-        if (!(state instanceof com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState)) {
-            McTalking.LOGGER.warn("Unexpected IAIState type in work AI: {}", state);
-            return null;
+        if (state instanceof com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState workerState) {
+            return MineColoniesCompatibilityMapper.workerState(workerState);
         }
-        try {
-            return AIWorkerState.valueOf(state.toString());
-        } catch (IllegalArgumentException e) {
-            McTalking.LOGGER.warn("Unknown AI worker state: {}", state);
-            return null;
-        }
+        McTalking.LOGGER.debug("Unmapped work AI state: {} ({})", state, state.getClass().getName());
+        return AIWorkerState.UNKNOWN;
     }
 
     @Nullable
@@ -334,9 +310,9 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static ColonyFoodSituation extractFoodSituation(ICitizenData data, CitizenAIState citizenAiState) {
+    private static ColonyFoodSituation extractFoodSituation(ICitizenData data, CitizenActivityCategory activityCategory) {
         if (data.getSaturation() > 5.0) return null;
-        if (citizenAiState == CitizenAIState.EATING) return ColonyFoodSituation.ALREADY_EATING;
+        if (activityCategory == CitizenActivityCategory.EATING) return ColonyFoodSituation.ALREADY_EATING;
 
         var colony = data.getColony();
         var bm = colony.getServerBuildingManager();
@@ -463,7 +439,7 @@ public final class CitizenPromptViewFactory {
                     if (modifier == null) {
                         return null;
                     }
-                    return new HappinessModifierView(resolveHappinessModifierType(modifierId), modifier.getFactor(data));
+                    return new HappinessModifierView(MineColoniesCompatibilityMapper.happinessModifier(modifierId), modifier.getFactor(data));
                 })
                 .filter(Objects::nonNull)
                 .toList();
@@ -474,7 +450,7 @@ public final class CitizenPromptViewFactory {
             return List.of();
         }
         return data.getCitizenSkillHandler().getSkills().entrySet().stream()
-                .map(e -> new SkillLevelView(e.getKey().name(), e.getValue().getLevel()))
+                .map(e -> new SkillLevelView(MineColoniesCompatibilityMapper.skill(e.getKey()), e.getValue().getLevel()))
                 .toList();
     }
 
@@ -739,45 +715,32 @@ public final class CitizenPromptViewFactory {
     }
 
     public static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {
-        if (status == null) {
-            return null;
-        }
+        if (status == null) return null;
 
-        List<String> contextValues = List.of();
-        if (status == VisibleCitizenStatus.MOURNING) {
-            contextValues = new ArrayList<>(data.getCitizenMournHandler().getDeceasedCitizens());
-        }
-
-        return new CitizenStatusView(resolveStatusId(status), status.getTranslationKey(), contextValues);
+        CitizenStatusType type = MineColoniesCompatibilityMapper.status(status);
+        List<String> contextValues = type == CitizenStatusType.MOURNING
+                ? new ArrayList<>(data.getCitizenMournHandler().getDeceasedCitizens())
+                : List.of();
+        String description = switch (type) {
+            case WORKING -> "working";
+            case SLEEP -> "sleeping";
+            case HOUSE -> "at home";
+            case RAIDED -> "on alert (raid)";
+            case MOURNING -> contextValues.isEmpty()
+                    ? "mourning"
+                    : "mourning " + String.join(", ", contextValues);
+            case BAD_WEATHER -> "sheltering from bad weather";
+            case SICK -> "ill and needing care";
+            case EAT -> "eating at the restaurant";
+            case UNKNOWN -> humanizeTranslationKey(status.getTranslationKey());
+        };
+        return new CitizenStatusView(type, status.getTranslationKey(), description, contextValues);
     }
 
-    private static CitizenStatusType resolveStatusId(VisibleCitizenStatus status) {
-        if (status == VisibleCitizenStatus.WORKING) {
-            return CitizenStatusType.WORKING;
-        }
-        if (status == VisibleCitizenStatus.SLEEP) {
-            return CitizenStatusType.SLEEP;
-        }
-        if (status == VisibleCitizenStatus.HOUSE) {
-            return CitizenStatusType.HOUSE;
-        }
-        if (status == VisibleCitizenStatus.RAIDED) {
-            return CitizenStatusType.RAIDED;
-        }
-        if (status == VisibleCitizenStatus.MOURNING) {
-            return CitizenStatusType.MOURNING;
-        }
-        if (status == VisibleCitizenStatus.BAD_WEATHER) {
-            return CitizenStatusType.BAD_WEATHER;
-        }
-        if (status == VisibleCitizenStatus.SICK) {
-            return CitizenStatusType.SICK;
-        }
-        if (status == VisibleCitizenStatus.EAT) {
-            return CitizenStatusType.EAT;
-        }
-
-        return CitizenStatusType.UNKNOWN;
+    private static String humanizeTranslationKey(String translationKey) {
+        int separator = translationKey.lastIndexOf('.');
+        String raw = separator >= 0 ? translationKey.substring(separator + 1) : translationKey;
+        return raw.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 
     private static String getLanguageNameFromCode(String localeCode) {
@@ -789,50 +752,6 @@ public final class CitizenPromptViewFactory {
         } catch (Exception e) {
             return localeCode;
         }
-    }
-
-    private static HappinessModifierType resolveHappinessModifierType(String modifierId) {
-        if (HOMELESSNESS.equals(modifierId)) {
-            return HappinessModifierType.HOMELESSNESS;
-        }
-        if (UNEMPLOYMENT.equals(modifierId)) {
-            return HappinessModifierType.UNEMPLOYMENT;
-        }
-        if (HEALTH.equals(modifierId)) {
-            return HappinessModifierType.HEALTH;
-        }
-        if (IDLEATJOB.equals(modifierId)) {
-            return HappinessModifierType.IDLEATJOB;
-        }
-        if (SCHOOL.equals(modifierId)) {
-            return HappinessModifierType.SCHOOL;
-        }
-        if (MYSTICAL_SITE.equals(modifierId)) {
-            return HappinessModifierType.MYSTICAL_SITE;
-        }
-        if (SECURITY.equals(modifierId)) {
-            return HappinessModifierType.SECURITY;
-        }
-        if (SOCIAL.equals(modifierId)) {
-            return HappinessModifierType.SOCIAL;
-        }
-        if (DAMAGE.equals(modifierId)) {
-            return HappinessModifierType.DAMAGE;
-        }
-        if (DEATH.equals(modifierId)) {
-            return HappinessModifierType.DEATH;
-        }
-        if (RAIDWITHOUTDEATH.equals(modifierId)) {
-            return HappinessModifierType.RAIDWITHOUTDEATH;
-        }
-        if (FOOD.equals(modifierId)) {
-            return HappinessModifierType.FOOD;
-        }
-        if (SLEPTTONIGHT.equals(modifierId)) {
-            return HappinessModifierType.SLEPTTONIGHT;
-        }
-
-        return HappinessModifierType.UNKNOWN;
     }
 
     private static String describeWeather(Level level) {

@@ -5,63 +5,25 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Pluggable provider for citizen AI prompt generation.
- * Other mods can implement this interface and register their provider
- * through {@link CitizenPromptService#setProvider(CitizenPromptProvider)}.
+ * Complete prompt-generation strategy.
+ *
+ * <p>Most addons should contribute context with {@link CitizenPromptService#registerContributor}
+ * instead. Provider replacement exists for integrations that intentionally own the full prompt.
+ * The supplied {@link CitizenPromptView} is read-only and implemented by Talking Colonists.</p>
  */
 public interface CitizenPromptProvider {
-    String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson);
+    @NotNull String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson);
 
-    /**
-     * Builds the initial roleplay/system prompt for a citizen conversation.
-     *
-     * @param view stable prompt data view
-     * @return system prompt text
-     */
-    String generateCitizenRoleplayPrompt(@NotNull CitizenPromptView view);
+    @NotNull String generateCitizenRoleplayPrompt(@NotNull CitizenPromptView view);
 
-    String getDetailedCitizenInfoPrompt(@NotNull CitizenPromptView view);
+    @NotNull String getDetailedCitizenInfoPrompt(@NotNull CitizenPromptView view);
 
-    String generateConversationalInfoPrompt(@NotNull CitizenPromptView view);
+    @NotNull String generateConversationalInfoPrompt(@NotNull CitizenPromptView view);
 
-    /**
-     * Formats a citizen status value into text used in prompt updates.
-     *
-     * @param status stable status data view
-     * @return status text
-     */
-    default String formatStatus(CitizenStatusView status) {
-        switch (status.type()) {
-            case WORKING:
-                return "working";
-            case SLEEP:
-                return "sleeping";
-            case HOUSE:
-                return "at home";
-            case RAIDED:
-                return "on alert (raid)";
-            case MOURNING:
-                var deceased = String.join(",", status.contextValues());
-                return "mourning " + deceased;
-            case BAD_WEATHER:
-                return "sheltering from bad weather";
-            case SICK:
-                return "ill and needing care";
-            case EAT:
-                return "eating at the restaurant";
-            case UNKNOWN:
-            default:
-                break;
-        }
-
-        String translationKey = status.translationKey();
-        if (translationKey.contains(".")) {
-            String[] parts = translationKey.split("\\.");
-            return parts[parts.length - 1].toLowerCase().replace('_', ' ');
-        }
-
-        return translationKey;
+    /** Uses Talking Colonists' already-normalized human-readable status description by default. */
+    default @NotNull String formatStatus(@NotNull CitizenStatusView status) {
+        return status.description();
     }
 
-    String generateSystemControlledRoleplayPrompt(CitizenPromptView view);
+    @NotNull String generateSystemControlledRoleplayPrompt(@NotNull CitizenPromptView view);
 }

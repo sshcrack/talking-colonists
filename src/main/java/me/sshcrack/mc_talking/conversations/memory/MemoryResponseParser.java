@@ -5,7 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 
 import java.util.ArrayList;
@@ -156,9 +156,9 @@ public final class MemoryResponseParser {
             String target = requireNonBlankString(relationshipObject, "target", relationshipPath);
             if (!context.relationshipTargets().contains(target)) throw new ValidationException("unknown relationship target '" + target + "'");
             String rawType = requireNonBlankString(relationshipObject, "type", relationshipPath);
-            CitizenRelationshipChangeType type;
+            CitizenRelationshipDimension type;
             try {
-                type = CitizenRelationshipChangeType.valueOf(rawType.toUpperCase(Locale.ROOT));
+                type = CitizenRelationshipDimension.valueOf(rawType.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException exception) {
                 throw new ValidationException("unknown relationship type '" + rawType + "'");
             }

@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import org.jetbrains.annotations.NotNull;
 
@@ -48,7 +48,7 @@ public class GetCitizenInfoAction extends GeneralFunctionAction {
 
         var found = foundOpt.get();
         var view = CitizenPromptViewFactory.create(found, new HashMap<>(), null);
-        var generalPrompt = CitizenPromptService.getDetailedCitizenInfoPrompt(view);
+        var generalPrompt = PromptRuntime.getDetailedCitizenInfoPrompt(view);
 
         var obj = new JsonObject();
         obj.addProperty("info", generalPrompt);

@@ -4,7 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -147,14 +147,14 @@ public class CitizenWsClient extends GeminiWsClient {
     protected String getSystemPrompt() {
         if (startedInSystemMode) {
             var view = CitizenPromptViewFactory.create(getEntity().getCitizenData(), new HashMap<>(), null);
-            return CitizenPromptService.generateSystemControlledRoleplayPrompt(view);
+            return PromptRuntime.generateSystemControlledRoleplayPrompt(view);
         } else {
             Map<UUID, String> interestedParties = new HashMap<>();
             if (player != null)
                 interestedParties.put(player.getUUID(), player.getName().getString());
 
             var promptView = CitizenPromptViewFactory.create(getEntity().getCitizenData(), interestedParties, player);
-            return CitizenPromptService.generateCitizenRoleplayPrompt(promptView);
+            return PromptRuntime.generateCitizenRoleplayPrompt(promptView);
         }
     }
 

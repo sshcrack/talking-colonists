@@ -1,7 +1,6 @@
 package me.sshcrack.mc_talking.api.tool;
 
 import com.google.gson.JsonObject;
-import me.sshcrack.gemini_live_lib.gson.properties.Property;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -16,8 +15,8 @@ public interface AiTool {
     /** Human-readable description shown to the model. */
     @NotNull String description();
 
-    /** Optional Gemini parameter schema. */
-    default @Nullable Property parameters() {
+    /** Optional provider-neutral parameter schema. */
+    default @Nullable AiToolParameter parameters() {
         return null;
     }
 

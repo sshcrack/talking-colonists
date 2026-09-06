@@ -4,7 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.api.pregen.PregenerationKind;
 import me.sshcrack.mc_talking.api.pregen.PregenerationPromptContext;
-import me.sshcrack.mc_talking.api.pregen.PregenerationPromptService;
+import me.sshcrack.mc_talking.internal.api.PregenerationPromptRuntime;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -169,7 +169,7 @@ public class PregenerationTaskService {
                     + "Do not mention the current time of day, light level, weather, or a meal you are about to have; "
                     + "use wording that remains true whenever the cached line is played.";
         }
-        prompt = PregenerationPromptService.apply(new PregenerationPromptContext(citizen, kind), prompt);
+        prompt = PregenerationPromptRuntime.apply(new PregenerationPromptContext(citizen, kind), prompt);
 
         AvailableAI model = isThreat
                 ? McTalkingConfig.INSTANCE.instance().currentAiModel

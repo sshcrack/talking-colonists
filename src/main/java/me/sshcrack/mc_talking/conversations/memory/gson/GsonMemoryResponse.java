@@ -1,7 +1,7 @@
 package me.sshcrack.mc_talking.conversations.memory.gson;
 
 import com.google.gson.*;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
@@ -10,7 +10,7 @@ import java.util.List;
 
 public class GsonMemoryResponse {
     public static final Gson GSON = new GsonBuilder()
-            .registerTypeAdapter(CitizenRelationshipChangeType.class, new SafeEnumDeserializer())
+            .registerTypeAdapter(CitizenRelationshipDimension.class, new SafeEnumDeserializer())
             .create();
 
     public List<GsonCitizenMemory> citizens = new ArrayList<>();
@@ -29,17 +29,17 @@ public class GsonMemoryResponse {
     public static class GsonRelationshipMemory {
         public String target;
         @Nullable
-        public CitizenRelationshipChangeType type;
+        public CitizenRelationshipDimension type;
         public float change;
     }
 
     // Optional: Safe enum deserializer (prevents crashes on bad LLM output)
-    public static class SafeEnumDeserializer implements JsonDeserializer<CitizenRelationshipChangeType> {
+    public static class SafeEnumDeserializer implements JsonDeserializer<CitizenRelationshipDimension> {
         @Override
-        public CitizenRelationshipChangeType deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
+        public CitizenRelationshipDimension deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
                 throws JsonParseException {
             try {
-                return CitizenRelationshipChangeType.valueOf(json.getAsString());
+                return CitizenRelationshipDimension.valueOf(json.getAsString());
             } catch (Exception e) {
                 return null; // or default like TRUST
             }

@@ -1,53 +1,142 @@
-# Addon integration API
+# Addon API
 
-Talking Colonists exposes supported addon seams under `me.sshcrack.mc_talking.api`.
-Addons should not depend on `manager`, `duck`, `pregen`, `handler`, or raw
-`ConversationManager` collections. Those packages remain implementation details even where an
-older public method still exists for compatibility.
+Talking Colonists treats addons as a first-class integration surface. Supported addon code lives
+under `me.sshcrack.mc_talking.api`; `ConversationManager`, websocket clients, audio queues, handlers,
+`duck` interfaces, pregeneration caches and other implementation packages are not API.
 
-The compile-only examples in
-`src/test/java/me/sshcrack/mc_talking/api/examples/AddonApiCompileExample.java` are kept in the
-normal test source set so API examples fail the build if signatures drift.
+This document describes **API generation 2**, the breaking baseline introduced to remove the legacy
+flat prompt snapshot, mirrored MineColonies enums and provider-specific declaration types.
+`TalkingColonistsApi.API_MAJOR_VERSION` is `2`.
 
-## Compile-time dependency and source boundary
+## Runtime vs developer artifact
 
-The supported Java surface lives in `src/api/java` and is compiled as its own `addonApi` Gradle
-source set. The implementation lives in `src/main/java`. `addonApi` receives the loader's mapped
-external dependencies but **not** `main` output, so importing a Talking Colonists implementation
-class from API source is a compile-time error instead of merely a packaging convention.
+**Players and servers install only the normal Talking Colonists mod.** There is no second API mod to
+install.
 
-Each loader publishes a separate Maven artifact:
+Addon developers should use the matching developer artifact as a compile/IDE dependency:
 
 ```text
-me.sshcrack:mc_talking-api:<matching Talking Colonists version/Minecraft/loader>
+me.sshcrack:mc_talking-api:<matching Talking Colonists / Minecraft / loader version>
 ```
-
-Addon projects should use that artifact for their compiler/IDE, for example:
 
 ```kotlin
 dependencies {
     compileOnly("me.sshcrack:mc_talking-api:<matching-version>")
+
+    // Your dev runtime should contain the normal Talking Colonists mod.
+    // Do not package mc_talking-api into your addon jar.
 }
 ```
 
-Install and declare the normal Talking Colonists mod as the required runtime mod dependency. Avoid
-using the full `mc_talking` mod jar as the addon compile surface when the API artifact is available;
-the full runtime jar intentionally contains both API and implementation classes, while the API jar
-contains only `me.sshcrack.mc_talking.api/**`.
+The supported sources live in `src/api/java` and are compiled as a separate `addonApi` source set
+that cannot see Talking Colonists `main` output. The developer JAR contains no Forge/NeoForge mod
+metadata, mixin metadata, provider implementation classes or Talking Colonists internals. The normal
+Talking Colonists mod embeds the same public API classes plus the runtime implementation.
 
-Some supported signatures intentionally expose public types from Minecraft, MineColonies, Gson and
-Gemini Live Lib. Addons still need the matching normal dependencies for those types. The isolation
-rule is specifically that Talking Colonists' own implementation packages never become addon API.
+Compile examples in
+`src/apiTest/java/me/sshcrack/mc_talking/api/examples/AddonApiCompileExample.java` are compiled
+against the actual stripped developer JAR. This catches accidental implementation dependencies that
+would otherwise be hidden by the full mod classpath.
+
+Minecraft, MineColonies and Gson types are intentionally used where addons operate on those same
+objects. Provider/transport implementation types such as Gemini Live Lib are not part of the addon
+contract.
+
+## Registration lifetime
+
+Composable extension points return `AddonRegistration`:
+
+```java
+AddonRegistration registration = ...;
+registration.close();
+```
+
+A handle closes exactly the registration that created it. A stale handle cannot unregister a newer
+registration with the same conceptual purpose. Registries validate namespaced IDs and use stable
+ordering (`order`, then ID) so multiple addons can coexist deterministically.
+
+Keep process/mod-lifetime registrations open for as long as the addon is loaded. Do not close them
+on a server stop unless the addon will register them again for the next server.
+
+## Normalized citizen context
+
+The old giant constructible `CitizenPromptView` record was replaced by a read-only grouped interface.
+The Talking Colonists-owned compatibility enums remain intentionally part of the API: they form a stable
+firewall between addon code and MineColonies patch-level API churn.
+
+```java
+CitizenPromptView snapshot = CitizenContextService.snapshot(citizen, player);
+
+String name = snapshot.identity().name();
+String job = snapshot.work().jobName();
+CitizenActivityCategory category = snapshot.activity().category();
+AIWorkerState exactWorkState = snapshot.activity().workState();
+String activityText = snapshot.activity().description();
+```
+
+The groups are:
+
+- `identity()` — name, age/sex flags, guard flag and personality.
+- `family()` — parents, partner, children and siblings.
+- `wellbeing()` — health, sickness, hunger, happiness, blockers and food situation.
+- `work()` — job, home/workplace, skills, requests and quests.
+- `colony()` — colony identity, world/raid context, history, diplomacy and recent events.
+- `conversation()` — response language and optional authenticated speaking-player context.
+- `activity()` — stable semantic category, typed compatibility states/sub-state, normalized description and recent actions.
+- `memories()` — immutable Talking Colonists memory snapshot when present.
+
+Talking Colonists owns semantic categories such as `WORKING`, `EATING` and `MOURNING`. Exact state
+concepts needed by addons are exposed through Talking Colonists-owned compatibility enums
+(`CitizenAIState`, `AIWorkerState`, `MinimalAISubState`). Addons therefore get autocomplete, exhaustive
+switches and typo safety without linking their API contract to MineColonies enum classes. Unknown/new
+MineColonies values map to `UNKNOWN` at runtime; Talking Colonists' compatibility tests deliberately fail
+when a newly selected MineColonies version contains an unmapped known value, so only Talking Colonists
+needs updating. `CitizenStatusType`, `HappinessModifierType`, and `CitizenSkill` follow the same pattern.
+
+## Prompt extensions
+
+Most addons should contribute bounded context instead of replacing the full prompt:
+
+```java
+var registration = CitizenPromptService.registerContributor(
+        "my_addon:expedition",
+        100,
+        (view, target) -> List.of(PromptContribution.observation(
+                "Expedition state",
+                view.identity().name() + " returned with two chorus flowers.")));
+```
+
+Contributors run in ascending `order`, then namespaced ID. A failing contributor is isolated from
+core and other addons. Per-contribution and total addon text budgets are bounded.
+
+Use:
+
+- `observation` for current server-verified facts.
+- `recollection` for remembered/inferred facts.
+- `instruction` for addon-owned conversational guidance, never to bypass core permissions.
+
+An integration that deliberately owns the complete prompt can register a provider override:
+
+```java
+var registration = CitizenPromptService.registerProvider(
+        "my_addon:provider",
+        100,
+        myProvider);
+```
+
+The highest provider priority wins; ties are deterministic by namespaced ID. Closing that handle
+falls back to the next provider or the Talking Colonists default. There is no mutable global
+`setProvider/resetProvider` singleton API anymore.
 
 ## AI tools
 
-Register tools with `AiToolRegistry` instead of reflecting into `AITools` maps:
+Register addon tools rather than reflecting into built-in tool maps:
 
 ```java
-var toolRegistration = AiToolRegistry.register("my_addon", "come_here", new AiTool() {
+var registration = AiToolRegistry.register("my_addon", "come_here", new AiTool() {
     @Override
     public String description() {
-        return "Ask this citizen to come to the player.";
+        return "Ask this citizen to come to the authenticated player.";
     }
 
     @Override
@@ -56,58 +145,46 @@ var toolRegistration = AiToolRegistry.register("my_addon", "come_here", new AiTo
     }
 
     @Override
+    public AiToolParameter parameters() {
+        return AiToolParameter.object(Map.of(
+                "urgency", AiToolParameter.enumeration(List.of("normal", "urgent"), false)
+        ));
+    }
+
+    @Override
     public boolean canExecute(AiToolContext context) {
-        var player = context.player();
+        ServerPlayer player = context.player();
         return player != null
                 && player.getUUID().equals(context.colony().getPermissions().getOwner());
     }
 
     @Override
     public JsonObject execute(AiToolContext context, JsonObject parameters) {
-        var player = context.requirePlayer();
-        // Schedule world mutation on player.getServer() when necessary.
-        var result = new JsonObject();
+        context.runOnServerThread(() -> {
+            // World mutation here.
+        });
+
+        JsonObject result = new JsonObject();
         result.addProperty("accepted", true);
         return result;
     }
 });
 ```
 
-The addon ID is namespaced (`my_addon:come_here`). Talking Colonists derives a provider-safe
-function name internally. Do not persist or hard-code the derived Gemini name.
+`AiToolParameter` is Talking Colonists-owned and provider-neutral. Core translates it into the
+current provider's function declaration internally.
 
-`AiToolContext.player()` is resolved from the actual owning conversation. Model JSON cannot choose
-its actor, player UUID, colony rank, or authority. `canExecute` is checked again when the call is
-executed. Gemini callbacks are not guaranteed to run on the Minecraft server thread; schedule world
-mutations onto the server thread.
+`AiToolContext.player()` is authoritative: it is resolved from the owning conversation, not model
+JSON. Use `PLAYER_CONVERSATION` plus `requirePlayer()` for player-authorized actions. Tool callbacks
+are not guaranteed to originate on the Minecraft server thread, so `runOnServerThread` and
+`supplyOnServerThread` are provided for world work.
 
-## Prompt contributions and verified addon state
+The provider-facing function name derived from an addon ID is private implementation detail. Persist
+only your namespaced addon/tool ID.
 
-Use `CitizenPromptService.registerContributor` instead of replacing or injecting into the assembled
-prompt:
+## Conversation eligibility and policy
 
-```java
-var registration = CitizenPromptService.registerContributor(
-        "my_addon:expedition",
-        100,
-        (view, target) -> List.of(PromptContribution.observation(
-                "Voyager expedition",
-                "The last expedition returned with two chorus flowers.")));
-```
-
-Contributors coexist with the legacy `CitizenPromptProvider` override. They run deterministically by
-`order`, then namespaced ID. One contributor throwing does not disable core or other addons. Each
-block is bounded, and the total addon contribution budget is bounded.
-
-Use `observation` for current server-verified state and `recollection` for remembered/inferred state.
-Current observations are explicitly labelled as higher-confidence context. `instruction` is
-available for addon-owned conversational rules; do not use it to replace core safety or tool
-permission checks.
-
-## Conversation eligibility and urgent contact
-
-Addon gameplay state can veto automatic speech without mixing into the random-conversation or need
-assessor code:
+Addon state can veto speech without mixing into random-conversation handlers or need assessment:
 
 ```java
 var speech = CitizenConversationRules.registerSpeechPolicy(
@@ -116,111 +193,181 @@ var speech = CitizenConversationRules.registerSpeechPolicy(
         (citizen, kind) -> kind == ConversationKind.PLAYER || !isOnMilitaryDuty(citizen));
 
 var urgency = CitizenConversationRules.registerUrgencyModifier(
-        "my_addon:promises",
+        "my_addon:handled_need",
         100,
-        (citizen, currentWeight) -> hasPatientOpenPromise(citizen) ? 0.0 : currentWeight);
+        (citizen, currentWeight) -> isAlreadyHandled(citizen) ? 0.0 : currentWeight);
 ```
 
-Speech policies are veto-only: an addon cannot bypass sleeping, busy, cooldown, or other core
-invariants. Urgency modifiers receive the already-calculated core weight, so addons do not need to
-reflect configuration values such as `blockingTaskUrgencyMultiplier` or duplicate core need logic.
+Speech policies are veto-only. They cannot bypass core sleeping, visitor, cooldown or busy rules.
+Urgency modifiers receive the already-calculated core weight and therefore do not need to mirror
+Talking Colonists formulas/configuration.
 
-For ambient/group chatter that should only run when somebody can hear it, use
-`CitizenConversationService.hasPlayerNearby(citizen, range)` instead of importing
-`ConversationManager`.
+Use detailed eligibility when an addon needs a reason:
 
-## Reserving a citizen for addon gameplay
+```java
+ConversationEligibility eligibility =
+        CitizenConversationService.eligibility(citizen, ConversationKind.ADDON_AMBIENT);
 
-Use an ownership-safe reservation instead of balancing `ConversationManager.markBusy` and
-`markNotBusy` calls:
+if (!eligibility.eligible()) {
+    // eligibility.status() / eligibility.detail()
+}
+```
+
+## Starting speech and conversations
+
+Player conversation starts return a typed immediate result instead of an ambiguous boolean:
+
+```java
+ConversationStartResult result =
+        CitizenConversationService.startPlayerConversation(player, citizen);
+
+if (!result.started()) {
+    // PROVIDER_UNAVAILABLE, IN_USE_BY_OTHER_PLAYER, CAPACITY_EXHAUSTED, ...
+}
+```
+
+Addon-directed ambient speech returns a future that reaches terminal state after audible playback:
+
+```java
+CitizenConversationService
+        .requestAmbientLine(citizen, "Thank the courier for the delivery in one sentence.")
+        .thenAccept(result -> {
+            if (result.completed()) {
+                // Safe to continue gameplay after the spoken line actually finished.
+            } else if (result.status() == AmbientLineResult.Status.REJECTED) {
+                // result.rejectionReason() explains why it could not start.
+            }
+        });
+```
+
+`hasAmbientCapacity(slots)`, `hasPlayerNearby(citizen, range)`, `activePlayerId(citizen)`,
+`activeKind(citizen)` and `requestGracefulEnd(citizen)` cover common queries/actions without
+exposing provider clients or manager collections.
+
+## Conversation lifecycle observation
+
+Observe core-managed audible conversations without a mixin:
+
+```java
+var registration = CitizenConversationService.registerLifecycleListener(
+        "my_addon:conversation_ui",
+        100,
+        event -> {
+            if (event.phase() == ConversationLifecycleEvent.Phase.STARTED) {
+                // event.kind(), event.citizen(), event.playerId(), event.gameTimeTicks()
+            }
+        });
+```
+
+Listener failures are isolated. Core dispatches lifecycle events outside manager critical sections
+and on the Minecraft server executor when one is available.
+
+## Reserving citizens for addon gameplay
+
+Use an activity lease when an addon task occupies a citizen without opening a Talking Colonists
+conversation:
 
 ```java
 Optional<CitizenActivityReservation> reservation =
-        CitizenConversationService.reserveActivity(citizen, "my_addon:delivery");
-
-// Keep the returned handle with the errand/task.
-reservation.ifPresent(CitizenActivityReservation::close);
+        CitizenConversationService.reserveActivity(
+                citizen,
+                "my_addon:delivery",
+                Duration.ofMinutes(15));
 ```
 
-A stale handle cannot clear a newer activity because each reservation has an opaque ownership token.
-A direct player conversation is still allowed to take priority while an addon gameplay reservation
-exists; after the player leaves, the reservation continues to represent the addon task until closed.
+The convenience overload uses a 10-minute lease. Explicit leases must be positive and at most one
+hour. Long-running tasks renew the exact lease:
+
+```java
+reservation.ifPresent(r -> r.renew(Duration.ofMinutes(15)));
+```
+
+Close the handle immediately when the task ends. Leases also expire automatically, so a crashed or
+forgotten addon task cannot leave a citizen permanently busy. Ownership tokens ensure an expired or
+stale handle cannot renew/release a replacement reservation.
+
+A direct player conversation retains core takeover priority; addons never own provider slot maps.
 
 ## Memories
 
-Use `CitizenMemoryService` instead of casting MineColonies citizen data to
-`CitizenDataMemoryExtended`:
+Use `CitizenMemoryService` instead of casts to Talking Colonists data-extension interfaces:
 
 ```java
 CitizenMemoryService.addEvent(citizen, "I returned from the End expedition safely.");
 CitizenMemoryService.addFact(citizen, "My expedition partner is Marta.");
-var snapshot = CitizenMemoryService.snapshot(citizen.getCitizenData());
+CitizenMemoryService.addRelationshipChange(
+        citizen,
+        player.getUUID(),
+        CitizenRelationshipDimension.TRUST,
+        0.2f);
+
+var snapshot = CitizenMemoryService.snapshot(citizen);
+for (CitizenRelationshipView relationship : snapshot.orElseThrow().relationships()) {
+    // targetId(), dimension(), factor()
+}
+
+CitizenMemoryService.removeFact(citizen, "My expedition partner is Marta.");
 ```
 
-These methods preserve the current simple fact/event save format. They are suitable for an addon
-recording a confirmed gameplay outcome. More detailed provenance fields may be added compatibly in a
-later format revision.
+Relationship dimensions are Talking Colonists-owned semantic values shared by core and addons; the
+internal memory implementation no longer carries a duplicate enum. Relationship deltas use the same
+finite `[-1, 1]` validation as model-generated changes. Exact fact/event removal lets addon-owned
+state be corrected without direct collection access. Memory storage, compaction, session tokens,
+broadcast/rumor propagation and save coordination remain core responsibilities.
 
-## Ending a conversation
+## Autonomous citizen conversations
 
-Do not fetch a `GeminiWsClient` just to close it:
-
-```java
-CitizenConversationService.requestGracefulEnd(citizen);
-```
-
-A graceful end finishes the current generated turn, flushes pending audio, waits for audible
-playback, then closes. It has a bounded timeout. Late generated audio after the requested final turn
-is discarded so a tool-driven goodbye is not repeated.
-
-## Ordinary citizen-to-citizen conversation
-
-For an autonomous pair:
+For a regular two-citizen conversation:
 
 ```java
 var conversation = CitizenConversationService.createPairConversation(server, alice, bob);
-conversation.setStateListener(state -> { /* server-thread callback */ });
+conversation.setStateListener(state -> {
+    // GENERATING / PLAYING_AUDIO / ENDED
+});
 conversation.start();
 ```
 
-The handle hides Gemini clients, audio streams, slot reservations, and busy bookkeeping.
+The handle hides provider clients, streams, audio queues, slot ownership and teardown.
 
-## Controlled meetings / councils
+## Controlled meetings and councils
 
-For a meeting, the caller owns attendance, navigation, seating, hand raising and the podium. Talking
-Colonists owns speech generation/playback and only reserves provider capacity for the current
-speaker:
+The addon owns attendance, navigation, seats, podiums, hand raising and floor policy. Talking
+Colonists owns provider capacity, one current speaker, prompt grounding, audible completion and
+cancellation:
 
 ```java
 var meeting = CitizenConversationService.createControlledSession(
-        server, attendees, "Food supply and town defenses");
+        server,
+        attendees,
+        "Food supply and town defenses");
 
-// Colony Meetings moves Alice to the podium first.
-meeting.requestTurn(alice, "Give your view on the food-supply item")
+// Move Alice to the podium first, then request the turn.
+meeting.requestTurn(alice, "Give your view on food supply")
         .thenAccept(result -> {
-            // COMPLETED means the audible turn finished, not only generation.
-            // Now it is safe to grant the floor to the next citizen.
+            if (result.completed()) {
+                // Grant the next speaker the floor.
+            }
         });
 
 meeting.addPlayerStatement(player, "What should we build first?");
 meeting.setAgenda("Food supply, then guard staffing");
-meeting.interruptTurn(); // barge-in / chair revokes the floor
+meeting.interruptTurn();
+
+for (ConversationTranscriptEntry entry : meeting.transcript()) {
+    // Structured speaker kind/id/name, text and game tick for UI/minutes/persistence.
+}
+
 meeting.end();
 ```
 
-Only registered participants may be given the floor and only one controlled turn may be active.
-The session maintains a bounded, speaker-attributed shared transcript so later turns know what was
-actually said. Opening a meeting does not open one Live connection per attendee.
-
-Current limitation: controlled turns are separate bounded provider turns tied together by Talking
-Colonists' shared transcript, rather than one permanently-open multi-speaker Gemini session. This is
-intentional to keep silent attendees from consuming provider capacity.
+Only registered participants may receive a turn and only one controlled turn is active at once.
+The transcript is bounded and speaker-attributed. Opening a meeting does not create one provider
+connection for every silent attendee.
 
 ## Pregenerated speech
 
-Talking Colonists now owns cached-playback interruption and makes reusable greeting prompts
-independent of the current time/weather. Addons that need an additional constraint can register a
-prompt modifier:
+Core owns pregeneration caches, playback interruption, barge-in, queue draining and takeover. Addons
+may modify the prompt contract without accessing those internals:
 
 ```java
 var registration = PregenerationPromptService.registerModifier(
@@ -229,12 +376,19 @@ var registration = PregenerationPromptService.registerModifier(
         (context, prompt) -> prompt + " Keep the line appropriate for a formal ceremony.");
 ```
 
-Do not inspect `PregenerationPlayback` maps or `GeminiStream` queues. Player barge-in and higher
-priority conversation takeover are handled by core.
+Do not inspect `PregenerationPlayback`, background-slot maps or `GeminiStream` queues.
 
-## Registration lifetime
+## What remains internal by design
 
-Tool, prompt, speech-policy, urgency and pregeneration registrations return `AutoCloseable` handles.
-They remain registered until the handle is closed. This is process/mod lifetime by default; do not
-close them merely because one integrated server stops unless your addon re-registers on the next
-server start.
+The following are intentionally not extension points:
+
+- Gemini/provider websocket clients and reconnect state.
+- Audio queues, Opus decoders, voice-chat channels and playback drain logic.
+- Foreground/background slot maps and eviction bookkeeping.
+- Pregeneration cache entries and playback objects.
+- Internal memory objects/session tokens/compaction tasks.
+- Urgent-contact walking state and watchdog maps.
+
+If addon functionality requires one of those details, add a semantic API operation/event instead of
+making the internal object public. This keeps addon compatibility tied to gameplay contracts rather
+than Talking Colonists implementation choices.

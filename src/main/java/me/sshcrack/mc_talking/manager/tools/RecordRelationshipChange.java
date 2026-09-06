@@ -9,7 +9,7 @@ import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenRelationshipChangeType;
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,7 +27,7 @@ public class RecordRelationshipChange extends GeneralFunctionAction {
                 new ObjectProperty(new HashMap<>() {{
                     put("citizen_name", new PrimitiveProperty(PrimitiveProperty.Type.STRING, false));
                     put("change", new PrimitiveProperty(PrimitiveProperty.Type.NUMBER, true));
-                    put("type", new EnumProperty(Arrays.stream(CitizenRelationshipChangeType.values())
+                    put("type", new EnumProperty(Arrays.stream(CitizenRelationshipDimension.values())
                             .map(Enum::name)
                             .toList(),
                             true
@@ -50,7 +50,7 @@ public class RecordRelationshipChange extends GeneralFunctionAction {
         var change = parameters.get("change").getAsFloat();
         var typeStr = parameters.get("type").getAsString();
 
-        var typeOpt = Arrays.stream(CitizenRelationshipChangeType.values())
+        var typeOpt = Arrays.stream(CitizenRelationshipDimension.values())
                 .filter(t -> t.name().equalsIgnoreCase(typeStr))
                 .findFirst();
 

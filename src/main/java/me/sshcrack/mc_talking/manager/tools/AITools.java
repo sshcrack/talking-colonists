@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking.manager.tools;
 
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.properties.Property;
-import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
+import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
 import me.sshcrack.mc_talking.api.tool.AiToolScope;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import org.jetbrains.annotations.Nullable;
@@ -35,34 +35,34 @@ public class AITools {
     }
 
     public static boolean hasAction(String name) {
-        return getAction(name) != null || AiToolRegistry.findByProviderName(name) != null;
+        return getAction(name) != null || AiToolRuntime.findByProviderName(name) != null;
     }
 
     public static boolean isPlayerOnlyAction(String name) {
         var action = getAction(name);
         if (action != null) return action.isPlayerOnly();
-        var addon = AiToolRegistry.findByProviderName(name);
+        var addon = AiToolRuntime.findByProviderName(name);
         return addon != null && addon.tool().scope() == AiToolScope.PLAYER_CONVERSATION;
     }
 
     public static @Nullable String getToolDescription(String name) {
         var action = getAction(name);
         if (action != null) return action.getDescription();
-        var addon = AiToolRegistry.findByProviderName(name);
+        var addon = AiToolRuntime.findByProviderName(name);
         return addon == null ? null : addon.tool().description();
     }
 
     public static @Nullable Property getToolProperty(String name) {
         var action = getAction(name);
         if (action != null) return action.getProperty();
-        var addon = AiToolRegistry.findByProviderName(name);
-        return addon == null ? null : addon.tool().parameters();
+        var addon = AiToolRuntime.findByProviderName(name);
+        return addon == null ? null : AiToolSchemaAdapter.toGemini(addon.tool().parameters());
     }
 
     public static List<String> getRegisteredFunctionNames() {
         var names = new ArrayList<>(registeredFunctions.keySet());
         names.addAll(playerConversationOnlyTools.keySet());
-        AiToolRegistry.registeredTools().stream().map(AiToolRegistry.RegisteredAiTool::providerName).forEach(names::add);
+        AiToolRuntime.registeredTools().stream().map(AiToolRuntime.RegisteredTool::providerName).forEach(names::add);
         return names;
     }
 
@@ -88,12 +88,12 @@ public class AITools {
                         .toList()
         );
 
-        for (var addon : AiToolRegistry.registeredTools()) {
+        for (var addon : AiToolRuntime.registeredTools()) {
             var addonTool = addon.tool();
             if (!addonTool.isEnabled() || rawToolsDisabled.contains(addon.providerName())) continue;
             var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(
                     addon.providerName(), addonTool.description());
-            if (addonTool.parameters() != null) declaration.parameters = addonTool.parameters();
+            if (addonTool.parameters() != null) declaration.parameters = AiToolSchemaAdapter.toGemini(addonTool.parameters());
             tool.functionDeclarations.add(declaration);
         }
 

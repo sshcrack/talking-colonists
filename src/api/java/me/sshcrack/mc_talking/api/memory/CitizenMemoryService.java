@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Supported addon access to citizen memory without casting MineColonies data to Talking Colonists
@@ -20,7 +21,16 @@ public final class CitizenMemoryService {
     }
 
     public static boolean addEvent(@NotNull ICitizenData citizen, @NotNull String event) {
-        return TalkingColonistsApi.backend().addMemoryEvent(citizen, event);
+        return TalkingColonistsApi.services().addMemoryEvent(citizen, event);
+    }
+
+    /** Removes one exact event string if present. */
+    public static boolean removeEvent(@NotNull AbstractEntityCitizen citizen, @NotNull String event) {
+        return citizen.getCitizenData() != null && removeEvent(citizen.getCitizenData(), event);
+    }
+
+    public static boolean removeEvent(@NotNull ICitizenData citizen, @NotNull String event) {
+        return TalkingColonistsApi.services().removeMemoryEvent(citizen, event);
     }
 
     public static boolean addFact(@NotNull AbstractEntityCitizen citizen, @NotNull String fact) {
@@ -28,10 +38,49 @@ public final class CitizenMemoryService {
     }
 
     public static boolean addFact(@NotNull ICitizenData citizen, @NotNull String fact) {
-        return TalkingColonistsApi.backend().addMemoryFact(citizen, fact);
+        return TalkingColonistsApi.services().addMemoryFact(citizen, fact);
+    }
+
+    /** Removes one exact fact string if present. */
+    public static boolean removeFact(@NotNull AbstractEntityCitizen citizen, @NotNull String fact) {
+        return citizen.getCitizenData() != null && removeFact(citizen.getCitizenData(), fact);
+    }
+
+    public static boolean removeFact(@NotNull ICitizenData citizen, @NotNull String fact) {
+        return TalkingColonistsApi.services().removeMemoryFact(citizen, fact);
+    }
+
+    /**
+     * Applies a bounded relationship/personality delta. {@code delta} must be finite and within
+     * [-1, 1], matching core-generated relationship changes.
+     */
+    public static boolean addRelationshipChange(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull UUID targetId,
+            @NotNull CitizenRelationshipDimension dimension,
+            float delta
+    ) {
+        return citizen.getCitizenData() != null
+                && addRelationshipChange(citizen.getCitizenData(), targetId, dimension, delta);
+    }
+
+    public static boolean addRelationshipChange(
+            @NotNull ICitizenData citizen,
+            @NotNull UUID targetId,
+            @NotNull CitizenRelationshipDimension dimension,
+            float delta
+    ) {
+        return TalkingColonistsApi.services().addMemoryRelationshipChange(
+                citizen, targetId, dimension, delta);
+    }
+
+    public static @NotNull Optional<CitizenMemorySnapshot> snapshot(@NotNull AbstractEntityCitizen citizen) {
+        return citizen.getCitizenData() == null
+                ? Optional.empty()
+                : snapshot(citizen.getCitizenData());
     }
 
     public static @NotNull Optional<CitizenMemorySnapshot> snapshot(@NotNull ICitizenData citizen) {
-        return TalkingColonistsApi.backend().memorySnapshot(citizen);
+        return TalkingColonistsApi.services().memorySnapshot(citizen);
     }
 }

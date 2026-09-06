@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory.data;
 
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.rumor.Rumor;
@@ -14,7 +15,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,8 +57,16 @@ public class CitizenMemories {
         facts.add(fact);
     }
 
+    public boolean removeFact(String fact) {
+        return facts.remove(fact);
+    }
+
     public void addEvent(String event) {
         events.add(event);
+    }
+
+    public boolean removeEvent(String event) {
+        return events.remove(event);
     }
 
     public void removeEventsIf(java.util.function.Predicate<String> predicate) {
@@ -73,7 +81,7 @@ public class CitizenMemories {
         return summarizedMemory;
     }
 
-    public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipChangeType type, float change) {
+    public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipDimension type, float change) {
         for (CitizenRelationshipMemory relationship : relationships) {
             if (relationship.getTargetUUID().equals(targetUUID) && relationship.getType() == type) {
                 relationship.addChange(change);
@@ -222,72 +230,4 @@ public class CitizenMemories {
         this.sessionToken = token == null ? "" : token;
     }
 
-    public String toPrompt(Map<UUID, String> interestedParties) {
-        StringBuilder prompt = new StringBuilder();
-
-        if (!summarizedMemory.isBlank()) {
-            prompt.append(" Summarized Memory:\n");
-            prompt.append(" ").append(summarizedMemory).append("\n\n");
-        }
-
-        if (!events.isEmpty()) {
-            prompt.append(" Recent Events:\n");
-            for (String event : events) {
-                prompt.append("- ").append(event).append("\n");
-            }
-        }
-
-        if (!facts.isEmpty()) {
-            prompt.append(" Recent Facts:\n");
-            for (String fact : facts) {
-                prompt.append("- ").append(fact).append("\n");
-            }
-        }
-
-        List<CitizenRelationshipMemory> relevantRelationships = relationships
-                .stream()
-                .filter(r -> interestedParties.containsKey(r.getTargetUUID()))
-                .toList();
-
-        if (!relevantRelationships.isEmpty()) {
-            prompt.append(" Relationships:\n");
-            prompt.append(" These are the relationship changes that are relevant to the current conversation based on the parties involved. The factor is neutral at 0:\n");
-            for (CitizenRelationshipMemory relationship : relevantRelationships) {
-                String name = interestedParties.get(relationship.getTargetUUID());
-
-                prompt.append("- Your ").append(relationship.getType()).append(" towards ")
-                        .append(name).append(" is at factor ").append(relationship.getFactor()).append("\n");
-            }
-        }
-
-        int broadcastCap = McTalkingConfig.INSTANCE.instance().maxBroadcastsInPrompt;
-        if (!receivedBroadcasts.isEmpty() && broadcastCap > 0) {
-            prompt.append(" Colony Broadcasts (most recent first):\n");
-            int count = 0;
-            for (ColonyBroadcast b : receivedBroadcasts) {
-                if (count >= broadcastCap) break;
-                prompt.append("- ").append(b.getSenderPlayerName())
-                    .append(" sent word via ").append(b.getOriginatorName())
-                    .append(": ").append(b.getMessage()).append("\n");
-                count++;
-            }
-        }
-
-        int rumorCap = McTalkingConfig.INSTANCE.instance().maxRumorsInPrompt;
-        if (!receivedRumors.isEmpty() && rumorCap > 0) {
-            prompt.append(" Rumors (heard via the grapevine, most recent first):\n");
-            int count = 0;
-            for (Rumor r : receivedRumors) {
-                if (count >= rumorCap) break;
-                prompt.append("- You heard (originally from ")
-                    .append(r.getOriginatorName())
-                    .append("): ")
-                    .append(r.getContent())
-                    .append("\n");
-                count++;
-            }
-        }
-
-        return prompt.toString();
-    }
 }

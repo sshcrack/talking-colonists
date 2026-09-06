@@ -1,5 +1,12 @@
 package me.sshcrack.mc_talking.api.prompt.view;
 
+/**
+ * Stable Talking Colonists view of fine-grained minimal citizen AI phases.
+ *
+ * <p>This intentionally normalizes several MineColonies core-internal state enums into one typed
+ * addon-facing enum, so addon authors get autocomplete/exhaustive switches without depending on
+ * MineColonies implementation packages.</p>
+ */
 public enum MinimalAISubState {
     EAT_CHECKING_FOOD,
     EAT_GOING_TO_HUT,
@@ -28,4 +35,11 @@ public enum MinimalAISubState {
 
     FLEE_CHECKING,
     FLEE_RUNNING,
+
+    LEISURE_GOING_TO_SITE,
+    LEISURE_WANDERING_AT_SITE,
+    LEISURE_READING,
+
+    /** MineColonies exposed a fine-grained state this API generation does not know yet. */
+    UNKNOWN
 }

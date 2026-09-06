@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory.data;
 
+import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import net.minecraft.nbt.CompoundTag;
 
 import java.util.UUID;
@@ -9,10 +10,10 @@ public class CitizenRelationshipMemory {
     private static final String TAG_TYPE = "type";
     private static final String TAG_TARGET_UUID = "targetUUID";
     private final UUID targetUUID;
-    private final CitizenRelationshipChangeType type;
+    private final CitizenRelationshipDimension type;
     private float change;
 
-    public CitizenRelationshipMemory(UUID targetUUID, CitizenRelationshipChangeType type, float change) {
+    public CitizenRelationshipMemory(UUID targetUUID, CitizenRelationshipDimension type, float change) {
         this.targetUUID = targetUUID;
         this.type = type;
         this.change = change;
@@ -20,7 +21,7 @@ public class CitizenRelationshipMemory {
 
     public CitizenRelationshipMemory(CompoundTag tag) {
         this.targetUUID = UUID.fromString(tag.getString(TAG_TARGET_UUID));
-        this.type = CitizenRelationshipChangeType.valueOf(tag.getString(TAG_TYPE));
+        this.type = CitizenRelationshipDimension.valueOf(tag.getString(TAG_TYPE));
         this.change = tag.getFloat(TAG_CHANGE);
     }
 
@@ -28,7 +29,7 @@ public class CitizenRelationshipMemory {
         return targetUUID;
     }
 
-    public CitizenRelationshipChangeType getType() {
+    public CitizenRelationshipDimension getType() {
         return type;
     }
 

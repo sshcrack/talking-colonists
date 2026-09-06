@@ -2,72 +2,118 @@ package me.sshcrack.mc_talking.api.conversation;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
+import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
-/** Supported addon-facing conversation entry points. */
+/** Supported addon-facing conversation entry points and lifecycle observation. */
 public final class CitizenConversationService {
     private CitizenConversationService() {
     }
 
     public static boolean isBusy(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.backend().isBusy(citizen);
+        return TalkingColonistsApi.services().isBusy(citizen);
     }
 
+    /** Detailed speech eligibility without starting a provider session. */
+    public static @NotNull ConversationEligibility eligibility(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull ConversationKind kind
+    ) {
+        return TalkingColonistsApi.services().conversationEligibility(citizen, kind);
+    }
+
+    /** Convenience equivalent to {@code eligibility(citizen, kind).eligible()}. */
     public static boolean canSpeak(@NotNull AbstractEntityCitizen citizen, @NotNull ConversationKind kind) {
-        return TalkingColonistsApi.backend().canSpeak(citizen, kind);
+        return eligibility(citizen, kind).eligible();
     }
 
-    public static boolean startPlayerConversation(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.backend().startPlayerConversation(player, citizen);
+    /** Starts or switches to a player-owned conversation and explains any rejection. */
+    public static @NotNull ConversationStartResult startPlayerConversation(
+            @NotNull ServerPlayer player,
+            @NotNull AbstractEntityCitizen citizen
+    ) {
+        return TalkingColonistsApi.services().startPlayerConversation(player, citizen);
     }
 
-    /** Starts a one-sided addon-directed ambient line. */
-    public static boolean startAmbientLine(@NotNull AbstractEntityCitizen citizen, @NotNull String promptDirective) {
-        return TalkingColonistsApi.backend().startAmbientLine(citizen, promptDirective);
+    /**
+     * Starts one addon-directed ambient line and completes after audible playback reaches a
+     * terminal state. Rejected starts are represented as {@link AmbientLineResult.Status#REJECTED}
+     * with a typed rejection reason instead of an ambiguous {@code false}.
+     */
+    public static @NotNull CompletableFuture<AmbientLineResult> requestAmbientLine(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull String promptDirective
+    ) {
+        return TalkingColonistsApi.services().requestAmbientLine(citizen, promptDirective);
+    }
+
+    /** Observes core-managed audible conversation starts/ends without mixins or manager access. */
+    public static @NotNull AddonRegistration registerLifecycleListener(
+            @NotNull String id,
+            int order,
+            @NotNull ConversationLifecycleListener listener
+    ) {
+        return TalkingColonistsApi.services().registerConversationLifecycleListener(id, order, listener);
+    }
+
+    /** Returns the active Talking Colonists conversation kind for this citizen, if any. */
+    public static @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen) {
+        return TalkingColonistsApi.services().activeConversationKind(citizen);
     }
 
     /** Returns the player currently speaking directly to this citizen, if any. */
     public static @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.backend().activePlayerId(citizen);
+        return TalkingColonistsApi.services().activePlayerId(citizen);
     }
 
     /** Returns whether the player currently owns a direct Talking Colonists conversation. */
     public static boolean isPlayerInConversation(@NotNull ServerPlayer player) {
-        return TalkingColonistsApi.backend().isPlayerInConversation(player);
+        return TalkingColonistsApi.services().isPlayerInConversation(player);
     }
 
     /** Returns true only for genuinely free low-priority provider capacity. */
     public static boolean hasAmbientCapacity(int slotsNeeded) {
-        return TalkingColonistsApi.backend().hasAmbientCapacity(slotsNeeded);
+        return TalkingColonistsApi.services().hasAmbientCapacity(slotsNeeded);
     }
 
     /** Returns whether any online player in the same dimension is within {@code range} blocks. */
     public static boolean hasPlayerNearby(@NotNull AbstractEntityCitizen citizen, double range) {
-        return TalkingColonistsApi.backend().hasPlayerNearby(citizen, range);
+        return TalkingColonistsApi.services().hasPlayerNearby(citizen, range);
     }
 
     /** Requests the active citizen session to finish audible playback and close. */
     public static boolean requestGracefulEnd(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.backend().requestGracefulEnd(citizen);
+        return TalkingColonistsApi.services().requestGracefulEnd(citizen);
     }
 
-    /** Reserves a citizen for addon gameplay with ownership-safe release semantics. */
+    /** Reserves a citizen for addon gameplay with a ten-minute renewable safety lease. */
     public static @NotNull Optional<CitizenActivityReservation> reserveActivity(
             @NotNull AbstractEntityCitizen citizen,
             @NotNull String ownerId
     ) {
-        return TalkingColonistsApi.backend().reserveActivity(citizen, ownerId);
+        return reserveActivity(citizen, ownerId, Duration.ofMinutes(10));
+    }
+
+    /** Reserves a citizen for addon gameplay with an explicit renewable safety lease. */
+    public static @NotNull Optional<CitizenActivityReservation> reserveActivity(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull String ownerId,
+            @NotNull Duration timeout
+    ) {
+        return TalkingColonistsApi.services().reserveActivity(citizen, ownerId, timeout);
     }
 
     /** Clears only the automatic-conversation cooldown. */
     public static void resetAutomaticCooldown(@NotNull AbstractEntityCitizen citizen) {
-        TalkingColonistsApi.backend().resetAutomaticCooldown(citizen);
+        TalkingColonistsApi.services().resetAutomaticCooldown(citizen);
     }
 
     /** Opens caller-controlled floor management for meetings/councils. */
@@ -76,7 +122,7 @@ public final class CitizenConversationService {
             @NotNull List<AbstractEntityCitizen> participants,
             @NotNull String agenda
     ) {
-        return TalkingColonistsApi.backend().createControlledSession(server, participants, agenda);
+        return TalkingColonistsApi.services().createControlledSession(server, participants, agenda);
     }
 
     /** Creates an ordinary two-citizen autonomous conversation handle. */
@@ -85,6 +131,6 @@ public final class CitizenConversationService {
             @NotNull AbstractEntityCitizen first,
             @NotNull AbstractEntityCitizen second
     ) {
-        return TalkingColonistsApi.backend().createPairConversation(server, first, second);
+        return TalkingColonistsApi.services().createPairConversation(server, first, second);
     }
 }

@@ -6,7 +6,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
-import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
+import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
@@ -347,7 +347,7 @@ public class CitizenConversation {
                 You are about to start a conversation with a fellow citizen %s.
                 This is some basic information about them. Talk naturally and according to your feelings.
                 %s
-                """.formatted(citizenDataA.getName(), CitizenPromptService.getBasicCitizenInfoPrompt(viewA));
+                """.formatted(citizenDataA.getName(), PromptRuntime.getBasicCitizenInfoPrompt(viewA));
 
         LiveConversationWsClient clientA;
         LiveConversationWsClient clientB;
@@ -401,7 +401,7 @@ public class CitizenConversation {
         var citizenDataB = citizenB.getCitizenData();
         var view = CitizenPromptViewFactory.create(citizenDataB, new HashMap<>(), null);
         clientA.addPromptTextAfterTalkingComplete(
-                "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + CitizenPromptService.getBasicCitizenInfoPrompt(view));
+                "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + PromptRuntime.getBasicCitizenInfoPrompt(view));
 
         setState(ConversationState.PLAYING_AUDIO);
     }

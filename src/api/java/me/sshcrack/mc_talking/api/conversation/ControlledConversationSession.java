@@ -43,6 +43,9 @@ public interface ControlledConversationSession extends AutoCloseable {
     /** Ends the session and cancels a current turn if present. Idempotent. */
     void end();
 
+    /** Structured bounded transcript snapshot for addon UI, persistence, or meeting minutes. */
+    @NotNull List<ConversationTranscriptEntry> transcript();
+
     /** Human-readable bounded shared transcript snapshot used to ground later turns. */
     @NotNull String sharedTranscript();
 

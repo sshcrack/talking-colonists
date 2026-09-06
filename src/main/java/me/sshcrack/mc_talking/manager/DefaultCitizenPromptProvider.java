@@ -1,14 +1,11 @@
 package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
-import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
-import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
-import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenSkill;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.MiscUtil;
@@ -26,8 +23,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     @Override
     public String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
         StringBuilder prompt = new StringBuilder();
-        String name = view.name();
-        String citizenType = (view.child() ? "Child" : "Adult") + " " + (view.female() ? "woman" : "man");
+        String name = view.identity().name();
+        String citizenType = (view.identity().child() ? "Child" : "Adult") + " " + (view.identity().female() ? "woman" : "man");
 
         if (firstPerson) {
             prompt.append("# ROLEPLAY AS ").append(name).append("\n\n");
@@ -37,33 +34,33 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("Type: ").append(citizenType);
         }
 
-        if (view.jobName() != null) {
-            prompt.append(", **").append(view.jobName()).append("**");
-            if (view.workBuildingDisplayName() != null) {
-                prompt.append(" at ").append(view.workBuildingDisplayName())
-                        .append(" (level ").append(view.workBuildingLevel()).append(")");
+        if (view.work().jobName() != null) {
+            prompt.append(", **").append(view.work().jobName()).append("**");
+            if (view.work().workplace() != null) {
+                prompt.append(" at ").append(view.work().workplace().displayName())
+                        .append(" (level ").append(view.work().workplace().level()).append(")");
             }
         } else {
             prompt.append(", **unemployed**");
         }
 
-        var sick = view.sick();
+        var sick = view.wellbeing().sick();
         if (sick) {
             prompt.append(", sick");
         }
 
-        if (view.homeless()) {
+        if (view.wellbeing().homeless()) {
             prompt.append(", homeless");
         }
 
         prompt.append(".\n");
-        prompt.append("Colony: **").append(view.colonyName()).append("**");
-        if (view.homeBuildingDisplayName() != null && !view.homeless()) {
-            prompt.append(" | Home: ").append(view.homeBuildingDisplayName())
-                    .append(" (level ").append(view.homeBuildingLevel()).append(")");
-        } else if (view.guard() && view.workBuildingDisplayName() != null) {
-            prompt.append(" | Home: ").append(view.workBuildingDisplayName())
-                    .append(" (level ").append(view.workBuildingLevel())
+        prompt.append("Colony: **").append(view.colony().name()).append("**");
+        if (view.work().home() != null && !view.wellbeing().homeless()) {
+            prompt.append(" | Home: ").append(view.work().home().displayName())
+                    .append(" (level ").append(view.work().home().level()).append(")");
+        } else if (view.identity().guard() && view.work().workplace() != null) {
+            prompt.append(" | Home: ").append(view.work().workplace().displayName())
+                    .append(" (level ").append(view.work().workplace().level())
                     .append(") — your guard post serves as your living quarters");
         }
         prompt.append("\n\n");
@@ -74,20 +71,20 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         StringBuilder prompt = new StringBuilder();
         prompt.append(getBasicCitizenInfoPrompt(view, firstPerson));
 
-        if (view.skills() != null && !view.skills().isEmpty()) {
-            appendCondensedSkills(view.skills(), prompt);
+        if (!view.work().skills().isEmpty()) {
+            appendCondensedSkills(view.work().skills(), prompt);
         }
 
         addRelationships(view, prompt);
         addColonyDiplomacy(view, prompt);
-        addCurrentState(view, prompt, view.sick());
+        addCurrentState(view, prompt, view.wellbeing().sick());
         addRecentActions(view, prompt);
         addObservations(view, prompt);
         addMemory(view, prompt);
 
         prompt.append("\n## EMOTIONAL PROFILE\n");
 
-        double happiness = view.happiness();
+        double happiness = view.wellbeing().happiness();
 
         if (happiness > 8.0) {
             prompt.append("- Generally cheerful and friendly\n");
@@ -107,24 +104,24 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- May refuse requests or be uncooperative\n");
         }
 
-        if (view.sick()) {
+        if (view.wellbeing().sick()) {
             prompt.append("- Occasionally mentions symptoms or discomfort\n");
         }
 
-        if (!view.blockingInteractionMessages().isEmpty()) {
+        if (!view.wellbeing().blockingInteractionMessages().isEmpty()) {
             prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
-            for (var message : view.blockingInteractionMessages()) {
+            for (var message : view.wellbeing().blockingInteractionMessages()) {
                 prompt.append("- ").append(message);
             }
         }
 
         // Personality archetype
-        if (view.personality() != null) {
+        if (view.identity().personality() != null) {
             prompt.append("\n## PERSONALITY\n");
-            prompt.append(view.personality().promptText()).append("\n");
-        } else if (view.customPersonalityText() != null) {
+            prompt.append(view.identity().personality().promptText()).append("\n");
+        } else if (view.identity().customPersonalityText() != null) {
             prompt.append("\n## PERSONALITY\n");
-            prompt.append(view.customPersonalityText()).append("\n");
+            prompt.append(view.identity().customPersonalityText()).append("\n");
         }
 
         return prompt.toString();
@@ -132,14 +129,57 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     private void addMemory(CitizenPromptView view, StringBuilder prompt) {
         var memories = view.memories();
-        if (memories != null) {
-            prompt.append("\n## MEMORIES\n");
-            prompt.append(memories.promptText());
+        if (memories == null) return;
+
+        prompt.append("\n## MEMORIES\n");
+        if (!memories.summarizedMemory().isBlank()) {
+            prompt.append(" Summarized Memory:\n ")
+                    .append(memories.summarizedMemory()).append("\n\n");
+        }
+        if (!memories.events().isEmpty()) {
+            prompt.append(" Recent Events:\n");
+            memories.events().forEach(event -> prompt.append("- ").append(event).append("\n"));
+        }
+        if (!memories.facts().isEmpty()) {
+            prompt.append(" Recent Facts:\n");
+            memories.facts().forEach(fact -> prompt.append("- ").append(fact).append("\n"));
+        }
+
+        var parties = view.conversation().interestedParties();
+        var relevantRelationships = memories.relationships().stream()
+                .filter(r -> parties.containsKey(r.targetId()))
+                .toList();
+        if (!relevantRelationships.isEmpty()) {
+            prompt.append(" Relationships:\n");
+            prompt.append(" These are relationship changes relevant to the current conversation; neutral is 0:\n");
+            for (var relationship : relevantRelationships) {
+                prompt.append("- Your ").append(relationship.dimension())
+                        .append(" towards ").append(parties.get(relationship.targetId()))
+                        .append(" is at factor ").append(relationship.factor()).append("\n");
+            }
+        }
+
+        int broadcastCap = McTalkingConfig.INSTANCE.instance().maxBroadcastsInPrompt;
+        if (broadcastCap > 0 && !memories.broadcasts().isEmpty()) {
+            prompt.append(" Colony Broadcasts (most recent first):\n");
+            memories.broadcasts().stream().limit(broadcastCap).forEach(broadcast ->
+                    prompt.append("- ").append(broadcast.senderPlayerName())
+                            .append(" sent word via ").append(broadcast.originatorName())
+                            .append(": ").append(broadcast.message()).append("\n"));
+        }
+
+        int rumorCap = McTalkingConfig.INSTANCE.instance().maxRumorsInPrompt;
+        if (rumorCap > 0 && !memories.rumors().isEmpty()) {
+            prompt.append(" Rumors (heard via the grapevine, most recent first):\n");
+            memories.rumors().stream().limit(rumorCap).forEach(rumor ->
+                    prompt.append("- You heard (originally from ")
+                            .append(rumor.originatorName()).append("): ")
+                            .append(rumor.content()).append("\n"));
         }
     }
 
     private static void addRecentActions(CitizenPromptView view, StringBuilder prompt) {
-        var actions = view.recentActions();
+        var actions = view.activity().recentActions();
         if (actions == null || actions.isEmpty()) return;
         prompt.append("\n## RECENT ACTIVITY\n");
         for (String action : actions) {
@@ -150,39 +190,39 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private void addObservations(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder obs = new StringBuilder();
 
-        if (view.playerState() != null) {
-            obs.append("- The player you are speaking to appears ").append(view.playerState()).append("\n");
+        if (view.conversation().playerState() != null) {
+            obs.append("- The player you are speaking to appears ").append(view.conversation().playerState()).append("\n");
         }
 
-        if (view.colonyFoundingPlayer() != null) {
+        if (view.colony().foundingPlayer() != null) {
             obs.append("## COLONY HISTORY\n");
-            obs.append("- This colony was founded by ").append(view.colonyFoundingPlayer()).append(".\n");
-            obs.append("- The colony is now ").append(view.colonyAgeDays()).append(" days old.\n");
+            obs.append("- This colony was founded by ").append(view.colony().foundingPlayer()).append(".\n");
+            obs.append("- The colony is now ").append(view.colony().ageDays()).append(" days old.\n");
         }
 
-        if (view.colonyMilestone() != null) {
-            obs.append("- Recently noted: ").append(view.colonyMilestone()).append(" This may come up in conversation.\n");
+        if (view.colony().milestone() != null) {
+            obs.append("- Recently noted: ").append(view.colony().milestone()).append(" This may come up in conversation.\n");
         }
 
-        if (view.blockedItemRequests() != null && !view.blockedItemRequests().isEmpty()) {
+        if (!view.work().blockedItemRequests().isEmpty()) {
             obs.append("- IMPORTANT: You are currently blocked and cannot work because these items are missing from the colony — no warehouse stock and no deliverer has been assigned:\n");
-            for (String req : view.blockedItemRequests()) {
+            for (String req : view.work().blockedItemRequests()) {
                 obs.append("  - ").append(req).append("\n");
             }
             obs.append("- Urgently mention this if the player asks how you are doing or why you are not working.\n");
         }
 
-        if (view.fulfillableItemRequests() != null && !view.fulfillableItemRequests().isEmpty()) {
+        if (!view.work().fulfillableItemRequests().isEmpty()) {
             obs.append("- Some items are in the warehouse or already being delivered to you:\n");
-            for (String req : view.fulfillableItemRequests()) {
+            for (String req : view.work().fulfillableItemRequests()) {
                 obs.append("  - ").append(req).append("\n");
             }
             obs.append("- The supply system is handling these; no need to raise an alarm, but you can mention it casually if asked.\n");
         }
 
-        if (view.activeQuests() != null && !view.activeQuests().isEmpty()) {
+        if (!view.work().activeQuests().isEmpty()) {
             obs.append("- You are currently involved in the following quests:\n");
-            for (String q : view.activeQuests()) {
+            for (String q : view.work().activeQuests()) {
                 obs.append("  - ").append(q).append("\n");
             }
             obs.append("- Since you have ongoing quests, you can naturally mention them if the topic comes up.\n");
@@ -198,8 +238,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         appendDetailedHappinessState(view, prompt);
 
-        double saturation = view.saturation();
-        ColonyFoodSituation foodSit = view.colonyFoodSituation();
+        double saturation = view.wellbeing().saturation();
+        ColonyFoodSituation foodSit = view.wellbeing().foodSituation();
         if (saturation <= 5) {
             String hungerLine = saturation <= 1 ? "Very hungry and weak from lack of food"
                     : saturation <= 3 ? "Hungry and thinking about food"
@@ -223,8 +263,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
-        if (view.healthPercent() != null) {
-            double healthPercent = view.healthPercent();
+        if (view.wellbeing().healthPercent() != null) {
+            double healthPercent = view.wellbeing().healthPercent();
             if (healthPercent < 20) {
                 prompt.append("- Severely injured, in intense pain\n");
             } else if (healthPercent < 50) {
@@ -240,45 +280,42 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Sick and feeling terrible. Needs medical attention\n");
         }
 
-        if (view.homeless()) {
+        if (view.wellbeing().homeless()) {
             prompt.append("- Very concerned about not having a home\n");
         }
 
-        if (!view.child() && view.jobName() == null) {
+        if (!view.identity().child() && view.work().jobName() == null) {
             prompt.append("- Frustrated about not having a job\n");
         }
 
-        final CitizenStatusView status = view.status();
+        final CitizenStatusView status = view.activity().status();
         if (status != null) {
-            if (view.peaceful() && status.type() == CitizenStatusType.RAIDED) {
+            if (view.colony().peaceful() && status.type() == CitizenStatusType.RAIDED) {
                 prompt.append("- Currently: going about the day\n");
             } else {
                 prompt.append("- Currently: ").append(formatStatus(status)).append("\n");
             }
         }
 
-        CitizenAIState citizenAiState = view.citizenAiState();
-        AIWorkerState workAiState = view.workAiState();
-        String nameTagDescription = view.nameTagDescription();
-        String aiDesc = describeAiState(citizenAiState, workAiState, nameTagDescription, view);
+        String aiDesc = view.activity().description();
         if (aiDesc != null && !aiDesc.isEmpty()) {
             prompt.append("- Currently: ").append(aiDesc).append("\n");
         }
 
-        if (view.environment() != null) {
-            prompt.append("- ").append(view.environment()).append("\n");
+        if (view.colony().environment() != null) {
+            prompt.append("- ").append(view.colony().environment()).append("\n");
         }
 
         // Post-raid trauma
-        Long lastRaidEndTimeTicks = view.lastRaidEndTimeTicks();
-        if (!view.peaceful() && lastRaidEndTimeTicks != null) {
+        Long lastRaidEndTimeTicks = view.colony().lastRaidEndTimeTicks();
+        if (!view.colony().peaceful() && lastRaidEndTimeTicks != null) {
             int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
-            long sinceTicks = view.currentGameTimeTicks() - lastRaidEndTimeTicks;
+            long sinceTicks = view.colony().currentGameTimeTicks() - lastRaidEndTimeTicks;
             if (traumaDuration > 0 && sinceTicks < traumaDuration * 20L) {
-                int lost = view.lastRaidLostCitizens();
+                int lost = view.colony().lastRaidLostCitizens();
                 prompt.append("\n## POST-RAID TRAUMA\n");
 
-                if (view.guard()) {
+                if (view.identity().guard()) {
                     if (sinceTicks < 5 * 60 * 20L) {
                         prompt.append("- Adrenaline is still pumping after the fight. You're angry the raid happened, not scared.\n");
                     } else if (sinceTicks < 15 * 60 * 20L) {
@@ -308,42 +345,33 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
 
         // Recent colony events
-        if (!view.recentColonyEvents().isEmpty()) {
+        if (!view.colony().recentEvents().isEmpty()) {
             prompt.append("\n## RECENT COLONY EVENTS\n");
-            for (String event : view.recentColonyEvents()) {
+            for (String event : view.colony().recentEvents()) {
                 prompt.append("- ").append(event).append("\n");
             }
         }
     }
 
-    private static String describeAiState(
-            CitizenAIState citizenAiState, AIWorkerState workAiState,
-            String nameTagDescription, CitizenPromptView view) {
-        return AIStateDescriber.describeAiState(citizenAiState, workAiState, nameTagDescription, view);
-    }
-
-    private static boolean isSubStateConsistentWithAiState(MinimalAISubState sub, @Nullable CitizenAIState aiState) {
-        return AIStateDescriber.isSubStateConsistentWithAiState(sub, aiState);
-    }
 
     private static void addRelationships(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder relationshipPrompt = new StringBuilder();
 
-        if (view.parentNames() != null && !view.parentNames().isEmpty()) {
-            relationshipPrompt.append("- Parents: ").append(String.join(", ", view.parentNames())).append("\n");
+        if (!view.family().parentNames().isEmpty()) {
+            relationshipPrompt.append("- Parents: ").append(String.join(", ", view.family().parentNames())).append("\n");
         }
 
-        if (view.hasPartner()) {
+        if (view.family().hasPartner()) {
             relationshipPrompt.append("- In a relationship\n");
         }
 
-        List<String> childNames = view.childNames();
+        List<String> childNames = view.family().childNames();
         if (!childNames.isEmpty()) {
             relationshipPrompt.append("- Has ").append(childNames.size()).append(" ").append(childNames.size() == 1 ? "child" : "children")
                     .append(": ").append(String.join(", ", childNames)).append("\n");
         }
 
-        List<String> siblingNames = view.siblingNames();
+        List<String> siblingNames = view.family().siblingNames();
         if (!siblingNames.isEmpty()) {
             relationshipPrompt.append("- Has ").append(siblingNames.size()).append(" ").append(siblingNames.size() == 1 ? "sibling" : "siblings")
                     .append(": ").append(String.join(", ", siblingNames)).append("\n");
@@ -372,7 +400,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         StringBuilder prompt = new StringBuilder();
         prompt.append("You are a citizen in a colony. The user is actually a system prompt, which you should follow and talk accordingly to it.\n");
         prompt.append(getGeneralCitizenPrompt(view, true));
-        appendGuardDuty(prompt, view.guard());
+        appendGuardDuty(prompt, view.identity().guard());
 
         prompt.append("""
                         ## GUIDELINES
@@ -384,7 +412,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         - Do not use markdown, speak in plain text.
                         REMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.
                         Start by speaking in the language %s and ONLY switch if the user is speaking in another language
-                        """.formatted(view.responseLanguageName()));
+                        """.formatted(view.conversation().responseLanguageName()));
 
         return prompt.toString();
     }
@@ -393,7 +421,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     public String generateCitizenRoleplayPrompt(@NotNull final CitizenPromptView view) {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));
-        appendGuardDuty(prompt, view.guard());
+        appendGuardDuty(prompt, view.identity().guard());
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");
@@ -403,7 +431,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
         prompt.append("- Do not use markdown, speak in plain text.");
 
-        var relation = view.playerRelation();
+        var relation = view.conversation().playerRelation();
         if (relation != null) {
             prompt.append("- The colony has multiple players. When someone speaks to you, a context message like [PlayerName is now speaking to you] will appear. Always address that person by their announced name.\n");
             prompt.append("- Default speaking player: ").append(relation.playerName()).append(" (role: ").append(relation.rankName()).append(")\n");
@@ -419,7 +447,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 "\nStay in character. Express emotions matching your circumstances. If very unhappy or in pain, make that clear in your tone and content.");
         prompt.append(
                 "\nREMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.");
-        prompt.append("\nStart by speaking in the language ").append(view.responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
+        prompt.append("\nStart by speaking in the language ").append(view.conversation().responseLanguageName()).append(" and ONLY switch if the user is speaking in another language");
 
         return prompt.toString();
     }
@@ -439,7 +467,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     private static void addColonyDiplomacy(@NotNull CitizenPromptView view, StringBuilder prompt) {
-        List<String> connections = view.colonyConnections();
+        List<String> connections = view.colony().connections();
         if (connections != null && !connections.isEmpty()) {
             prompt.append("\n## COLONY DIPLOMACY\n");
             prompt.append("Your colony has relations with neighboring colonies:\n");
@@ -450,7 +478,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     }
 
     private static void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {
-        double happiness = view.happiness();
+        double happiness = view.wellbeing().happiness();
 
         if (happiness > 8.0) {
             prompt.append("- Very happy (").append(String.format("%.1f", happiness)).append("/10)\n");
@@ -462,13 +490,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Miserable (").append(String.format("%.1f", happiness)).append("/10)\n");
         }
 
-        for (var modifier : view.happinessModifiers()) {
-            HappinessModifierType modifierType = modifier.type();
+        for (var modifier : view.wellbeing().happinessModifiers()) {
+            var modifierType = modifier.type();
             double factor = modifier.factor();
 
             switch (modifierType) {
                 case HOMELESSNESS:
-                    if (factor < 0.8 && !view.guard()) {
+                    if (factor < 0.8 && !view.identity().guard()) {
                         if (factor < 0.3) {
                             prompt.append("- ").append(MiscUtil.pick(
                                 "Sleeping without a proper roof over your head is wearing on you",
@@ -533,7 +561,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     }
                     break;
 
-                case IDLEATJOB:
+                case IDLE_AT_JOB:
                     if (factor < 0.8) {
                         if (factor < 0.3) {
                             prompt.append("- ").append(MiscUtil.pick(
@@ -553,7 +581,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
                 case SCHOOL:
                     if (factor < 0.8) {
-                        if (view.hasSchool()) {
+                        if (view.wellbeing().hasSchool()) {
                             prompt.append("- ").append(MiscUtil.pick(
                                 "You wish you could attend the school like the other kids instead of wandering around",
                                 "Seeing other children go to school while you're left out makes you sad",
@@ -587,7 +615,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
                 case SECURITY:
                     if (factor < 0.8) {
-                        if (!view.peaceful()) {
+                        if (!view.colony().peaceful()) {
                             if (factor < 0.3) {
                                 prompt.append("- ").append(MiscUtil.pick(
                                     "You feel terrified — there are hardly any guards to protect the colony",
@@ -657,8 +685,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     }
                     break;
 
-                case RAIDWITHOUTDEATH:
-                    if (!view.peaceful() && factor > 1.2) {
+                case RAID_WITHOUT_DEATH:
+                    if (!view.colony().peaceful() && factor > 1.2) {
                         prompt.append("- ").append(MiscUtil.pick(
                             "Surviving the raid without any casualties filled you with relief and pride",
                             "The colony stood strong against the raid — no one died and you're feeling confident",
@@ -699,7 +727,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     }
                     break;
 
-                case SLEPTTONIGHT:
+                case SLEPT_TONIGHT:
                     if (factor < 0.85) {
                         if (factor < 0.6) {
                             prompt.append("- ").append(MiscUtil.pick(
@@ -717,23 +745,22 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     }
                     break;
 
-                case UNKNOWN:
-                default:
+                case QUEST, GREAT_FOOD, UNKNOWN:
                     break;
             }
         }
     }
 
     private static void appendCondensedSkills(List<SkillLevelView> skillLevels, StringBuilder prompt) {
-        Map<String, Integer> skills = skillLevels.stream()
-                .collect(Collectors.toMap(SkillLevelView::name, SkillLevelView::level, Math::max));
+        Map<CitizenSkill, Integer> skills = skillLevels.stream()
+                .collect(Collectors.toMap(SkillLevelView::skill, SkillLevelView::level, Math::max));
 
-        String highestSkill = null;
+        CitizenSkill highestSkill = null;
         int highestLevel = -1;
-        String secondSkill = null;
+        CitizenSkill secondSkill = null;
         int secondLevel = -1;
 
-        for (Map.Entry<String, Integer> entry : skills.entrySet()) {
+        for (Map.Entry<CitizenSkill, Integer> entry : skills.entrySet()) {
             int level = entry.getValue();
             if (level > highestLevel) {
                 secondSkill = highestSkill;
@@ -752,17 +779,18 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
             if (highestLevel >= 3) {
                 switch (highestSkill) {
-                    case "Intelligence" -> prompt.append("- Intellectual and thoughtful\n");
-                    case "Strength" -> prompt.append("- Values physical prowess\n");
-                    case "Creativity" -> prompt.append("- Has artistic mindset\n");
-                    case "Knowledge" -> prompt.append("- Well-read and informative\n");
-                    case "Dexterity" -> prompt.append("- Has nimble hands\n");
-                    case "Adaptability" -> prompt.append("- Flexible and quick to adapt\n");
-                    case "Focus" -> prompt.append("- Detail-oriented and methodical\n");
-                    case "Mana" -> prompt.append("- Spiritually sensitive\n");
-                    case "Athletics" -> prompt.append("- Physically active and energetic\n");
-                    case "Agility" -> prompt.append("- Quick and graceful\n");
-                    case "Stamina" -> prompt.append("- Has great endurance\n");
+                    case INTELLIGENCE -> prompt.append("- Intellectual and thoughtful\n");
+                    case STRENGTH -> prompt.append("- Values physical prowess\n");
+                    case CREATIVITY -> prompt.append("- Has artistic mindset\n");
+                    case KNOWLEDGE -> prompt.append("- Well-read and informative\n");
+                    case DEXTERITY -> prompt.append("- Has nimble hands\n");
+                    case ADAPTABILITY -> prompt.append("- Flexible and quick to adapt\n");
+                    case FOCUS -> prompt.append("- Detail-oriented and methodical\n");
+                    case MANA -> prompt.append("- Spiritually sensitive\n");
+                    case ATHLETICS -> prompt.append("- Physically active and energetic\n");
+                    case AGILITY -> prompt.append("- Quick and graceful\n");
+                    case STAMINA -> prompt.append("- Has great endurance\n");
+                    case UNKNOWN -> { }
                 }
             }
 
@@ -770,10 +798,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 prompt.append("- Also good at **").append(formatSkillName(secondSkill)).append("**\n");
             }
 
-            String lowestSkill = null;
+            CitizenSkill lowestSkill = null;
             int lowestLevel = Integer.MAX_VALUE;
 
-            for (Map.Entry<String, Integer> entry : skills.entrySet()) {
+            for (Map.Entry<CitizenSkill, Integer> entry : skills.entrySet()) {
                 int level = entry.getValue();
                 if (level < lowestLevel) {
                     lowestSkill = entry.getKey();
@@ -787,7 +815,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
-    private static String formatSkillName(String skill) {
-        return skill.toLowerCase().replace('_', ' ');
+    private static String formatSkillName(CitizenSkill skill) {
+        return skill.name().toLowerCase().replace('_', ' ');
     }
 }
