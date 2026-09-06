@@ -1,7 +1,10 @@
 package me.sshcrack.mc_talking.internal.api;
 
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
+import me.sshcrack.mc_talking.api.tool.AiCommandTool;
+import me.sshcrack.mc_talking.api.tool.AiQueryTool;
 import me.sshcrack.mc_talking.api.tool.AiTool;
+import me.sshcrack.mc_talking.api.tool.AiToolParameter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -13,7 +16,7 @@ import java.util.regex.Pattern;
 public final class AiToolRuntime {
     private static final System.Logger LOGGER = System.getLogger("mc_talking-api");
     private static final Pattern ID_PART = Pattern.compile("[a-z][a-z0-9_]{0,31}");
-    private static final int MAX_PROVIDER_NAME_LENGTH = 64;
+    private static final int MAX_PROVIDER_NAME_LENGTH = 128;
     private static final RegistrationRegistry<RegisteredTool> TOOLS = new RegistrationRegistry<>("AI tool");
 
     private AiToolRuntime() {
@@ -27,6 +30,16 @@ public final class AiToolRuntime {
         validatePart("namespace", namespace);
         validatePart("name", name);
         Objects.requireNonNull(tool, "tool");
+        boolean query = tool instanceof AiQueryTool;
+        boolean command = tool instanceof AiCommandTool;
+        if (query == command) {
+            throw new IllegalArgumentException("AI tool must implement exactly one of AiQueryTool or AiCommandTool");
+        }
+        if (tool.parameters() != null && !(tool.parameters() instanceof AiToolParameter.ObjectValue)) {
+            throw new IllegalArgumentException("AI tool parameter schema root must be an object");
+        }
+        Objects.requireNonNull(tool.scope(), "tool.scope()");
+        Objects.requireNonNull(tool.permission(), "tool.permission()");
 
         String id = namespace + ":" + name;
         if (TOOLS.find(id) != null) {

@@ -1,15 +1,14 @@
 package me.sshcrack.mc_talking.api.tool;
 
-import com.google.gson.JsonObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Supported addon-facing Gemini tool contract.
+ * Common metadata and authorization contract for addon-facing AI tools.
  *
- * <p>Implementations should be fast and thread-safe. Gemini callbacks are not guaranteed to run
- * on the Minecraft server thread; world mutations must be scheduled onto the server thread by the
- * addon. A future command API may provide managed asynchronous execution for longer operations.</p>
+ * <p>Implement exactly one of {@link AiQueryTool} or {@link AiCommandTool}. Queries are synchronous
+ * and commands are asynchronous. Talking Colonists owns dispatch, schema validation, permission
+ * checks, idempotency, server-thread command start, and operation result routing.</p>
  */
 public interface AiTool {
     /** Human-readable description shown to the model. */
@@ -25,18 +24,27 @@ public interface AiTool {
         return AiToolScope.ANY_SESSION;
     }
 
+    /**
+     * Core-enforced MineColonies permission required from the authenticated initiating player.
+     *
+     * <p>{@link AiToolPermission#NONE} is appropriate for read-only/public tools. Any other value
+     * implicitly requires an authenticated player and is resolved from current server-side colony
+     * permissions at execution time.</p>
+     */
+    default @NotNull AiToolPermission permission() {
+        return AiToolPermission.NONE;
+    }
+
     /** Whether this tool should currently be advertised at all. */
     default boolean isEnabled() {
         return true;
     }
 
     /**
-     * Runtime permission hook. This is evaluated again for every call using authoritative context.
+     * Runtime authorization hook. This is evaluated again for every call using authoritative
+     * context after the core permission check. It must be side-effect free and return promptly.
      */
     default boolean canExecute(@NotNull AiToolContext context) {
         return true;
     }
-
-    /** Executes the tool and returns the structured result sent back to Gemini. */
-    @NotNull JsonObject execute(@NotNull AiToolContext context, @Nullable JsonObject parameters);
 }

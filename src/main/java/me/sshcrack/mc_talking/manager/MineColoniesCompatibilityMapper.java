@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
@@ -8,7 +9,9 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenSkill;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
+import me.sshcrack.mc_talking.api.tool.AiToolPermission;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
@@ -19,8 +22,41 @@ import java.util.Locale;
  * services. Patch-level MineColonies changes should require updating this class and its tests, not
  * addon code.</p>
  */
-final class MineColoniesCompatibilityMapper {
+public final class MineColoniesCompatibilityMapper {
     private MineColoniesCompatibilityMapper() {
+    }
+
+    public static @Nullable Action toolPermission(@NotNull AiToolPermission permission) {
+        return switch (permission) {
+            case NONE -> null;
+            case ACCESS_HUTS -> Action.ACCESS_HUTS;
+            case PLACE_HUTS -> Action.PLACE_HUTS;
+            case BREAK_HUTS -> Action.BREAK_HUTS;
+            case EDIT_PERMISSIONS -> Action.EDIT_PERMISSIONS;
+            case MANAGE_HUTS -> Action.MANAGE_HUTS;
+            case RECEIVE_MESSAGES -> Action.RECEIVE_MESSAGES;
+            case USE_SCAN_TOOL -> Action.USE_SCAN_TOOL;
+            case PLACE_BLOCKS -> Action.PLACE_BLOCKS;
+            case BREAK_BLOCKS -> Action.BREAK_BLOCKS;
+            case TOSS_ITEM -> Action.TOSS_ITEM;
+            case PICKUP_ITEM -> Action.PICKUP_ITEM;
+            case FILL_BUCKET -> Action.FILL_BUCKET;
+            case OPEN_CONTAINER -> Action.OPEN_CONTAINER;
+            case RIGHTCLICK_BLOCK -> Action.RIGHTCLICK_BLOCK;
+            case RIGHTCLICK_ENTITY -> Action.RIGHTCLICK_ENTITY;
+            case THROW_POTION -> Action.THROW_POTION;
+            case SHOOT_ARROW -> Action.SHOOT_ARROW;
+            case ATTACK_CITIZEN -> Action.ATTACK_CITIZEN;
+            case ATTACK_ENTITY -> Action.ATTACK_ENTITY;
+            case TELEPORT_TO_COLONY -> Action.TELEPORT_TO_COLONY;
+            case EXPLODE -> Action.EXPLODE;
+            case RALLY_GUARDS -> Action.RALLY_GUARDS;
+            case HURT_CITIZEN -> Action.HURT_CITIZEN;
+            case HURT_VISITOR -> Action.HURT_VISITOR;
+            case MAP_BORDER -> Action.MAP_BORDER;
+            case MAP_DEATHS -> Action.MAP_DEATHS;
+            case ACCESS_TOGGLEABLES -> Action.ACCESS_TOGGLEABLES;
+        };
     }
 
     static @NotNull CitizenAIState citizenState(

@@ -11,15 +11,15 @@ import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
 import org.junit.jupiter.api.Test;
 
 class AiToolRegistryTest {
-    private static AiTool dummy() {
-        return new AiTool() {
+    private static AiQueryTool dummy() {
+        return new AiQueryTool() {
             @Override
             public String description() {
                 return "test tool";
             }
 
             @Override
-            public JsonObject execute(AiToolContext context, JsonObject parameters) {
+            public JsonObject executeQuery(AiToolContext context, JsonObject parameters) {
                 return new JsonObject();
             }
         };
@@ -52,5 +52,31 @@ class AiToolRegistryTest {
         }
         assertThrows(IllegalArgumentException.class,
                 () -> AiToolRegistry.register("Bad Namespace", "hello", dummy()));
+    }
+
+    @Test
+    void toolMustChooseOneExecutionContractAndObjectSchemaRoot() {
+        AiTool metadataOnly = () -> "metadata only";
+        assertThrows(IllegalArgumentException.class,
+                () -> AiToolRegistry.register("addon", "metadata_only", metadataOnly));
+
+        AiQueryTool invalidSchema = new AiQueryTool() {
+            @Override
+            public String description() {
+                return "bad schema";
+            }
+
+            @Override
+            public AiToolParameter parameters() {
+                return AiToolParameter.string(true);
+            }
+
+            @Override
+            public JsonObject executeQuery(AiToolContext context, JsonObject parameters) {
+                return new JsonObject();
+            }
+        };
+        assertThrows(IllegalArgumentException.class,
+                () -> AiToolRegistry.register("addon", "bad_schema", invalidSchema));
     }
 }

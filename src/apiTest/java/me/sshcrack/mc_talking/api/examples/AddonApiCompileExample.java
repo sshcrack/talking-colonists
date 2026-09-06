@@ -17,9 +17,11 @@ import me.sshcrack.mc_talking.api.pregen.PregenerationPromptService;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.api.prompt.PromptContribution;
 import me.sshcrack.mc_talking.api.prompt.PromptTarget;
-import me.sshcrack.mc_talking.api.tool.AiTool;
+import me.sshcrack.mc_talking.api.tool.AiCommandTool;
+import me.sshcrack.mc_talking.api.tool.AiQueryTool;
 import me.sshcrack.mc_talking.api.tool.AiToolContext;
 import me.sshcrack.mc_talking.api.tool.AiToolParameter;
+import me.sshcrack.mc_talking.api.tool.AiToolPermission;
 import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
 import me.sshcrack.mc_talking.api.tool.AiToolScope;
 import net.minecraft.server.MinecraftServer;
@@ -30,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
 
 /** Compile-only examples kept in tests so public addon snippets cannot silently rot. */
@@ -42,7 +46,27 @@ final class AddonApiCompileExample {
     ) {
         List<AutoCloseable> registrations = new ArrayList<>();
 
-        registrations.add(AiToolRegistry.register("example_addon", "come_here", new AiTool() {
+        registrations.add(AiToolRegistry.register("example_addon", "current_destination", new AiQueryTool() {
+            @Override
+            public String description() {
+                return "Read the destination currently requested by the addon.";
+            }
+
+            @Override
+            public AiToolParameter parameters() {
+                return AiToolParameter.object(Map.of());
+            }
+
+            @Override
+            public JsonObject executeQuery(AiToolContext context, JsonObject parameters) {
+                JsonObject result = new JsonObject();
+                result.addProperty("citizen", context.citizen().getName().getString());
+                result.addProperty("sessionId", context.sessionId().toString());
+                return result;
+            }
+        }));
+
+        registrations.add(AiToolRegistry.register("example_addon", "come_here", new AiCommandTool() {
             @Override
             public String description() {
                 return "Ask this citizen to come to the player.";
@@ -54,6 +78,11 @@ final class AddonApiCompileExample {
             }
 
             @Override
+            public AiToolPermission permission() {
+                return AiToolPermission.RIGHTCLICK_ENTITY;
+            }
+
+            @Override
             public AiToolParameter parameters() {
                 return AiToolParameter.object(Map.of(
                         "destination", AiToolParameter.string(true)
@@ -61,19 +90,18 @@ final class AddonApiCompileExample {
             }
 
             @Override
-            public boolean canExecute(AiToolContext context) {
-                ServerPlayer player = context.player();
-                return player != null
-                        && player.getUUID().equals(context.colony().getPermissions().getOwner());
-            }
-
-            @Override
-            public JsonObject execute(AiToolContext context, JsonObject parameters) {
-                ServerPlayer player = context.requirePlayer();
-                JsonObject result = new JsonObject();
-                result.addProperty("accepted", true);
-                result.addProperty("player", player.getName().getString());
-                return result;
+            public CompletionStage<JsonObject> executeCommand(AiToolContext context, JsonObject parameters) {
+                // Long work may finish later. Only the world-changing continuation is marshalled
+                // back to the Minecraft server thread. Core immediately returns an operation ID.
+                return CompletableFuture.supplyAsync(() -> parameters.get("destination").getAsString())
+                        .thenCompose(destination -> context.supplyOnServerThread(() -> {
+                            ServerPlayer player = context.requirePlayer();
+                            // Addon-owned navigation/world mutation would begin here.
+                            JsonObject result = new JsonObject();
+                            result.addProperty("destination", destination);
+                            result.addProperty("requestedBy", player.getUUID().toString());
+                            return result;
+                        }));
             }
         }));
 

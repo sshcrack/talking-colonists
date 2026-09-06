@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenSkill;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
+import me.sshcrack.mc_talking.api.tool.AiToolPermission;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,4 +106,16 @@ class MineColoniesCompatibilityMapperTest {
         assertEquals(HappinessModifierType.UNKNOWN,
                 MineColoniesCompatibilityMapper.happinessModifier("future_patch_modifier"));
     }
+    @Test
+    void allStableToolPermissionsMapToCurrentMineColoniesActions() {
+        for (AiToolPermission permission : AiToolPermission.values()) {
+            if (permission == AiToolPermission.NONE) {
+                assertEquals(null, MineColoniesCompatibilityMapper.toolPermission(permission));
+            } else {
+                assertEquals(permission.name(), MineColoniesCompatibilityMapper.toolPermission(permission).name(),
+                        () -> "Permission drift for " + permission.name());
+            }
+        }
+    }
+
 }

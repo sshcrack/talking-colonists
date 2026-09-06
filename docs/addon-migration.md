@@ -110,10 +110,14 @@ modifier type, and citizen skill.
 
 ## AI tool migration
 
-An internal/player-aware tool should become an `AiTool` registration:
+Internal `FunctionAction` subclasses should become either `AiQueryTool` or `AiCommandTool`
+registrations. Do not copy `AITools` maps, reflect into `GeminiWsClient`, or preserve a parallel
+legacy registration path in the addon.
+
+A world-changing/player-authorized action is a command:
 
 ```java
-AddonRegistration registration = AiToolRegistry.register("my_addon", "accept_job", new AiTool() {
+AddonRegistration registration = AiToolRegistry.register("my_addon", "accept_job", new AiCommandTool() {
     @Override
     public String description() {
         return "Accept the offered addon job.";
@@ -125,6 +129,11 @@ AddonRegistration registration = AiToolRegistry.register("my_addon", "accept_job
     }
 
     @Override
+    public AiToolPermission permission() {
+        return AiToolPermission.MANAGE_HUTS;
+    }
+
+    @Override
     public AiToolParameter parameters() {
         return AiToolParameter.object(Map.of(
                 "job", AiToolParameter.string(true)
@@ -132,16 +141,27 @@ AddonRegistration registration = AiToolRegistry.register("my_addon", "accept_job
     }
 
     @Override
-    public JsonObject execute(AiToolContext context, JsonObject parameters) {
+    public CompletionStage<JsonObject> executeCommand(AiToolContext context, JsonObject parameters) {
+        // Core invokes this method on the server thread and rechecks current colony permission.
         ServerPlayer player = context.requirePlayer();
-        context.runOnServerThread(() -> acceptJob(context.citizen(), player));
-        return new JsonObject();
+        acceptJob(context.citizen(), player, parameters.get("job").getAsString());
+        JsonObject result = new JsonObject();
+        result.addProperty("accepted", true);
+        return CompletableFuture.completedFuture(result);
     }
 });
 ```
 
-Do not trust a player UUID/name supplied by model JSON. `AiToolContext.player()` is tied to the actual
-conversation and is the authorization source for player-scoped tools.
+Use `AiQueryTool` instead when the operation is a short read-only lookup. Both contracts receive the
+same authoritative `AiToolContext`. Do not trust player UUID/name, colony rank, or session identity
+from model JSON; those values are not authority. Core validates the parameter schema and resolves
+the actual actor from the owning conversation.
+
+Do not emulate command retry handling in the addon. Core reserves the provider function-call ID,
+returns an operation ID, suppresses duplicate side effects, bounds retained results, routes delayed
+completion only to the still-active owning session, and invokes `AiCommandTool.onCompletion` even
+when delivery is no longer possible. Later asynchronous world mutations must be marshalled with
+`runOnServerThread`/`supplyOnServerThread`.
 
 ## Conversation migration
 

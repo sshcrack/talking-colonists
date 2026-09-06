@@ -181,10 +181,38 @@ breaking baseline; legacy global-provider mutation methods are not retained as c
 
 ## AI tools
 
-Addon tools are registered with `AiToolRegistry`:
+Register addon tools with `AiToolRegistry`. A tool must choose exactly one execution contract:
+`AiQueryTool` for a short synchronous query or `AiCommandTool` for world-changing/delayed work.
+
+A query is executed by core on the Minecraft server thread and returns a `completed` result:
 
 ```java
-var registration = AiToolRegistry.register("my_addon", "come_here", new AiTool() {
+var query = AiToolRegistry.register("my_addon", "current_destination", new AiQueryTool() {
+    @Override
+    public String description() {
+        return "Read the citizen's current addon destination.";
+    }
+
+    @Override
+    public AiToolParameter parameters() {
+        return AiToolParameter.object(Map.of());
+    }
+
+    @Override
+    public JsonObject executeQuery(AiToolContext context, JsonObject parameters) {
+        JsonObject result = new JsonObject();
+        result.addProperty("citizen", context.citizen().getName().getString());
+        result.addProperty("sessionId", context.sessionId().toString());
+        return result;
+    }
+});
+```
+
+Commands are started on the Minecraft server thread, but return a completion stage immediately.
+This lets core acknowledge the model with an operation ID while the addon finishes later:
+
+```java
+var command = AiToolRegistry.register("my_addon", "come_here", new AiCommandTool() {
     @Override
     public String description() {
         return "Ask this citizen to come to the authenticated player.";
@@ -196,6 +224,11 @@ var registration = AiToolRegistry.register("my_addon", "come_here", new AiTool()
     }
 
     @Override
+    public AiToolPermission permission() {
+        return AiToolPermission.RIGHTCLICK_ENTITY;
+    }
+
+    @Override
     public AiToolParameter parameters() {
         return AiToolParameter.object(Map.of(
                 "urgency", AiToolParameter.enumeration(List.of("normal", "urgent"), false)
@@ -203,32 +236,78 @@ var registration = AiToolRegistry.register("my_addon", "come_here", new AiTool()
     }
 
     @Override
-    public boolean canExecute(AiToolContext context) {
-        ServerPlayer player = context.player();
-        return player != null
-                && player.getUUID().equals(context.colony().getPermissions().getOwner());
+    public CompletionStage<JsonObject> executeCommand(AiToolContext context, JsonObject parameters) {
+        return beginAddonPlanningAsync().thenCompose(plan ->
+                context.supplyOnServerThread(() -> {
+                    ServerPlayer player = context.requirePlayer();
+                    startNavigation(context.citizen(), player, plan);
+                    JsonObject result = new JsonObject();
+                    result.addProperty("started", true);
+                    return result;
+                }));
     }
 
     @Override
-    public JsonObject execute(AiToolContext context, JsonObject parameters) {
-        context.runOnServerThread(() -> {
-            // World mutation here.
-        });
-
-        JsonObject result = new JsonObject();
-        result.addProperty("accepted", true);
-        return result;
+    public void onCompletion(AiToolOperationOutcome outcome) {
+        // Runs even if the conversation ended before the command finished.
+        // outcome.deliveredToSession() says whether core could still route it to the model.
     }
 });
 ```
 
-`AiToolParameter` is Talking Colonists-owned and provider-neutral. Core translates it into the
-current provider's function declaration internally.
+### Validation and authority
 
-`AiToolContext.player()` is authoritative: it is resolved from the owning conversation, not model
-JSON. Use `PLAYER_CONVERSATION` plus `requirePlayer()` for player-authorized actions. Tool callbacks
-are not guaranteed to originate on the Minecraft server thread, so `runOnServerThread` and
-`supplyOnServerThread` are provided for world work.
+`AiToolParameter` is Talking Colonists-owned and provider-neutral. The root schema must be an
+object. Core validates every call before execution: required fields must exist, values must match
+the declared primitive/enum/array/object type, `null` is rejected, and undeclared fields are
+rejected. Provider JSON is therefore data only; it cannot add an undeclared player, rank, session,
+or other authority field.
+
+`AiToolContext` is authoritative and contains a core-generated `sessionId()`, the acting citizen,
+the citizen's server-side colony, and the authenticated initiating player when one exists. Never
+use a player UUID, rank, or session ID from model JSON as authorization. `authenticatedPlayerId()`
+and `requirePlayer()` derive from the conversation instead. NPC/system sessions have no implicit
+player authority.
+
+For common colony mutations, declare an `AiToolPermission`. Core maps that stable API value to the
+current MineColonies permission and calls `colony.getPermissions().hasPermission(...)` at execution
+time. A rank/permission change after the tool was advertised is therefore effective immediately.
+`AiToolPermission.NONE` skips the colony-permission check; custom domain authorization can be added
+with side-effect-free `canExecute(context)`. `PLAYER_CONVERSATION` still independently requires an
+authenticated player.
+
+### Threading and asynchronous outcomes
+
+Authorization, queries, and the initial `executeCommand` call run on the Minecraft server thread.
+Queries must return promptly. `executeCommand` must also return its `CompletionStage` promptly; do
+not block it waiting for long work. Any later asynchronous continuation that mutates Minecraft must
+use `context.runOnServerThread(...)` or `context.supplyOnServerThread(...)`. `onCompletion` may run
+off the server thread.
+
+Provider responses use a stable envelope:
+
+```json
+{ "status": "accepted",  "operationId": "...", "toolId": "my_addon:come_here" }
+{ "status": "completed", "operationId": "...", "toolId": "my_addon:come_here", "result": {} }
+{ "status": "failed",    "operationId": "...", "toolId": "my_addon:come_here",
+  "error": { "code": "unauthorized", "message": "..." } }
+{ "status": "cancelled", "operationId": "...", "toolId": "my_addon:come_here",
+  "error": { "code": "cancelled", "message": "..." } }
+```
+
+A command uses the provider's function-call ID as its idempotency key within the owning session. A
+retry with the same call ID and identical tool/arguments returns the existing operation and never
+starts the side effect again. Reusing that call ID with different arguments fails with
+`call_id_conflict`. Commands without a provider call ID fail rather than executing without
+idempotency. Core bounds active commands and terminal-result retention; terminal records are also
+dropped when their conversation intentionally closes. Provider call IDs are unique call tokens,
+not addon persistence IDs.
+
+When a delayed command finishes, core routes the terminal result back into the same conversation
+only if that provider session is still active. It never queues the result through reconnect logic.
+If the session is closed or temporarily unavailable, no connection is reopened; `onCompletion`
+still fires with `deliveredToSession() == false`. Cancelling the returned future produces a
+`cancelled` outcome.
 
 The provider-facing function name derived from an addon ID is private implementation detail. Persist
 only your namespaced addon/tool ID.

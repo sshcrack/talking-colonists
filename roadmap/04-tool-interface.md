@@ -46,3 +46,34 @@ world-changing operation. Use bounded result retention, not an unbounded global 
   managed server-thread world mutation, asynchronous operation IDs/results,
   cancellation, duplicate-call idempotency, bounded result retention, and the full
   authorization/spoofing test matrix remain.
+
+## Implementation record — 2026-09-07 (completion)
+
+- Split addon tools into the explicit `AiQueryTool` and `AiCommandTool` contracts.
+  Queries are synchronous reads; commands return a `CompletionStage` and receive a
+  core-generated operation ID. The public `AiToolContext` now exposes authoritative
+  session identity, citizen, colony, and authenticated initiating player.
+- Added central `AiToolDispatcher`/schema validation. Core rechecks enabled state,
+  session scope, stable `AiToolPermission`, and custom authorization on the Minecraft
+  server thread immediately before execution. Parameter JSON is validated against the
+  declared object schema, including required/type/enum/unknown-field checks, so model
+  arguments cannot smuggle actor, rank, or session authority.
+- Commands use the provider function-call ID as a per-session idempotency key. Exact
+  retries reuse the existing operation without repeating side effects; conflicting
+  reuse is rejected. Active operations and retained terminal outcomes are bounded,
+  cancellation has a structured outcome, and intentional session close drops retained
+  state.
+- Delayed command completion is routed only to the still-active owning Gemini session.
+  Core never reconnects a closed/unavailable session to deliver a result. The addon
+  `onCompletion` hook still receives the terminal outcome and whether delivery occurred.
+  Later asynchronous world mutations use `runOnServerThread`/`supplyOnServerThread`.
+- Gemini call-ID extraction preserves ordering across mixed batched built-in and addon
+  calls, preventing a preceding built-in tool from shifting an addon's idempotency key.
+- Updated the compile-checked addon example plus `docs/addon-api.md` and
+  `docs/addon-migration.md` with query/command, threading, authorization, outcome,
+  idempotency, and `FunctionAction` migration contracts. No legacy addon compatibility
+  shim was retained; the repository's intentional breaking API policy applies.
+- Validation passed on both supported loaders: full JUnit suites, `verifyApiJar`, and
+  `./gradlew buildAndCollect --no-daemon`. The required real-client smoke test passed
+  `1.21.1-neoforge` and `1.20.1-forge`; because the sandbox could not reach Mojang's
+  asset host, it used the documented `CLIENT_SMOKE_METADATA_ONLY_ASSETS=1` fallback.
