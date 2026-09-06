@@ -3,7 +3,9 @@
 This roadmap implements the recommendations arising from Colonist Errands and
 Colony Meetings feedback. It is an implementation queue, not a record of shipped
 features. All tasks start pending. Complete one task by giving an agent its prompt
-file; each prompt requires the shared execution instructions below.
+file; each prompt requires the shared execution instructions below. A `Partial`
+status means a cross-cutting change implemented part of the task, but one or more
+acceptance criteria still remain and are listed in that task's implementation record.
 
 ## Scope
 
@@ -19,17 +21,17 @@ Voyager owns expedition state. Core exposes the seams these addons need.
 | Order | Task and agent prompt | Depends on | Status |
 | --- | --- | --- | --- |
 | 01 | [Correct deterministic voice selection](01-voice-correction.md) | — | Complete |
-| 02 | [Reliable structured memory generation](02-memory-reliability.md) | — | Pending |
-| 03 | [Composable prompt contributions](03-prompt-contributions.md) | — | Pending |
-| 04 | [Public tools and authorized execution](04-tool-interface.md) | — | Pending |
-| 05 | [Session ownership and bounded recovery](05-session-lifecycle.md) | — | Pending |
-| 06 | [Controlled conversation turns](06-controlled-sessions.md) | 03, 04, 05 | Pending |
-| 07 | [Meetings example and integration contract](07-meetings-example.md) | 06 | Pending |
-| 08 | [Verified facts and memory provenance](08-facts-and-memory.md) | 02, 03, 04 | Pending |
-| 09 | [Audio continuity and interruption](09-audio-lifecycle.md) | 05, 06 | Pending |
-| 10 | [Model-specific voice recovery](10-voice-recovery.md) | 01, 05 | Pending |
+| 02 | [Reliable structured memory generation](02-memory-reliability.md) | — | Partial |
+| 03 | [Composable prompt contributions](03-prompt-contributions.md) | — | Partial |
+| 04 | [Public tools and authorized execution](04-tool-interface.md) | — | Partial |
+| 05 | [Session ownership and bounded recovery](05-session-lifecycle.md) | — | Partial |
+| 06 | [Controlled conversation turns](06-controlled-sessions.md) | 03, 04, 05 | Partial |
+| 07 | [Meetings example and integration contract](07-meetings-example.md) | 06 | Partial |
+| 08 | [Verified facts and memory provenance](08-facts-and-memory.md) | 02, 03, 04 | Partial |
+| 09 | [Audio continuity and interruption](09-audio-lifecycle.md) | 05, 06 | Partial |
+| 10 | [Model-specific voice recovery](10-voice-recovery.md) | 01, 05 | Partial |
 | 11 | [Optional autonomous group discussion](11-group-discussion.md) | 06, 07, 09 | Pending |
-| 12 | [Addon migration and release verification](12-addon-migration.md) | 01–11 | Pending |
+| 12 | [Addon migration and release verification](12-addon-migration.md) | 01–11 | Partial |
 
 Land the small reliability fixes first. Deliver the controlled-turn integration
 before autonomous group discussion. Tasks without dependencies can be implemented

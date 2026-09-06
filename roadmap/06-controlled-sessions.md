@@ -32,3 +32,19 @@ Preserve ordinary player and existing citizen conversations through the same lif
   predictable results without leaking slots or replaying cancelled audio.
 - A fake-backed addon example can use the interface without internal class access.
 - Public Javadocs cover thread ownership, lifecycle, capacity, interruption, and tools.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Added `ControlledConversationSession` and
+  `CitizenConversationService.createControlledSession`. A caller supplies
+  participants/agenda, explicitly grants one participant the floor, can add player
+  statements, update the agenda, interrupt the current turn, and end the session.
+  Silent attendees consume no provider slot. Shared history is bounded and attributed
+  by speaker; a turn future completes from the audible ambient-session completion
+  path rather than generation-complete alone.
+- WebSockets, audio streams, capacity sets, and busy flags remain hidden from addons.
+- This does **not** complete task 06. Typed failure reasons are still coarse,
+  per-session tool permissions/contribution context are missing, there is no explicit
+  podium/moving-audio anchor API, turn/session IDs and stale-late-callback tests are
+  incomplete, and player-interruption/unload behavior has not yet been validated by
+  the required fake-backed acceptance suite.

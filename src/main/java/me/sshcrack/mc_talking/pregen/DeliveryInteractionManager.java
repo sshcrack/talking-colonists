@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DeliveryInteractionManager {
     private DeliveryInteractionManager() {}
@@ -178,10 +179,20 @@ public class DeliveryInteractionManager {
                     finalKey, sp.speaker().getCitizenData() != null ? sp.speaker().getCitizenData().getName() : "unknown",
                     Math.sqrt(distSq));
 
-            startPregeneration(sp.speaker(), sp.prompt(), audio -> {
+            boolean started = startPregeneration(sp.speaker(), sp.prompt(), audio -> {
                 pregenCache.put(finalKey, new CachedAudio(audio, speakerUuid));
                 McTalking.LOGGER.info("[DeliveryInteraction] Pregen complete for {}", finalKey);
+            }, () -> {
+                PendingDelivery current = pendingDeliveries.get(finalKey);
+                if (current == pd) {
+                    pd.pregenStarted = false;
+                    pd.lastRetryTime = System.currentTimeMillis();
+                }
             });
+            if (!started) {
+                pd.pregenStarted = false;
+                pd.lastRetryTime = now;
+            }
         }
     }
 
@@ -225,7 +236,7 @@ public class DeliveryInteractionManager {
             final AbstractEntityCitizen speaker = sp.speaker();
             startPregeneration(sp.speaker(), sp.prompt(), audio -> {
                 PregenerationPlayback.playAudioIfPossible(speaker, audio);
-            });
+            }, () -> { });
         }
     }
 
@@ -363,25 +374,42 @@ public class DeliveryInteractionManager {
         return nearest;
     }
 
-    private static void startPregeneration(AbstractEntityCitizen citizen, String prompt, java.util.function.Consumer<AudioChunk> onComplete) {
-        if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return;
-        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return;
+    private static boolean startPregeneration(
+            AbstractEntityCitizen citizen,
+            String prompt,
+            java.util.function.Consumer<AudioChunk> onComplete,
+            Runnable onError
+    ) {
+        if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return false;
+        ConversationManager.BackgroundReservation reservation =
+                ConversationManager.reserveBackgroundSlot(citizen, BackgroundSlotType.PREGEN);
+        if (reservation == null) return false;
 
+        AtomicBoolean finished = new AtomicBoolean(false);
+        Runnable fail = () -> {
+            if (!finished.compareAndSet(false, true)) return;
+            reservation.close();
+            onError.run();
+        };
         PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, McTalkingConfig.CHEAP_LIVE_MODEL,
                 audio -> {
-                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+                    if (!finished.compareAndSet(false, true)) return;
+                    reservation.close();
                     onComplete.accept(audio);
-                },
-                () -> {
-                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
-                });
+                }, fail);
 
         try {
+            if (!reservation.attachClient(client)) {
+                fail.run();
+                return false;
+            }
             client.connect();
-            ConversationManager.registerBackgroundClient(citizen.getUUID(), client);
+            return true;
         } catch (Exception e) {
             McTalking.LOGGER.error("[DeliveryInteraction] Failed to connect for citizen {}", citizen.getUUID(), e);
-            ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+            try { client.close(); } catch (Exception ignored) { }
+            fail.run();
+            return false;
         }
     }
 }

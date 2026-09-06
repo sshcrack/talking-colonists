@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
 import me.sshcrack.mc_talking.pregen.HeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PlayerHeatmapTracker;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
+import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import me.sshcrack.mc_talking.util.CitizenHelper;
 
 import net.minecraft.server.MinecraftServer;
@@ -87,6 +88,7 @@ public class ServerEventHandler {
     public void onServerStop(ServerStoppingEvent event) {
         MemoryCompactionService.cleanup();
         PregenerationTaskService.cleanup();
+        PregenerationPlayback.cleanup();
         DeliveryInteractionManager.cleanup();
         ConversationManager.cleanup();
 
@@ -130,6 +132,9 @@ public class ServerEventHandler {
 
     private void onServerTickCommon(MinecraftServer server) {
         tickCounter++;
+        // Reap timed-out background/foreground reservations even when no feature-specific
+        // interval fires or no players are online. This keeps lifecycle ownership in core.
+        ConversationManager.tickMaintenance();
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);
         boolean doMumblingCheck = (tickCounter % McTalkingConfig.INSTANCE.instance().mumblingCheckIntervalTicks == 0);

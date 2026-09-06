@@ -152,9 +152,13 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 	private fun Project.configureJarTask(ctx: Context) {
 		val generateTask = tasks.named("generateModManifest")
 		tasks.withType<Jar>().configureEach {
-			archiveBaseName.set(ctx.modId)
-			dependsOn(generateTask)
-			if (ctx.loader is Loader.Forge) {
+			// Dedicated API artifacts own their archive name and contain no mod metadata.
+			// Keep the generic mod-platform defaults on the normal mod/source/javadoc jars only.
+			if (name != "apiJar" && name != "apiSourcesJar") {
+				archiveBaseName.set(ctx.modId)
+				dependsOn(generateTask)
+			}
+			if (ctx.loader is Loader.Forge && name == ctx.extension.jarTask.get()) {
 				manifest.attributes(ctx.loader.mixinConfigAttribute to "${ctx.modId}.mixins.json")
 			}
 		}

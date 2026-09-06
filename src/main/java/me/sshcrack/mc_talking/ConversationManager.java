@@ -3,6 +3,9 @@ package me.sshcrack.mc_talking;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
+import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
+import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
@@ -20,12 +23,18 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
@@ -93,18 +102,47 @@ public class ConversationManager {
      * both, so either being present is sufficient to prevent double-booking.</p>
      */
     private static final Set<UUID> addedEntities = new LinkedHashSet<>();
+    /** Claim timestamp used only to recover reservations that never attach a foreground client. */
+    private static final Map<UUID, Long> foregroundSlotClaimedAtNanos = new ConcurrentHashMap<>();
+    private static final long ORPHAN_FOREGROUND_SLOT_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(2);
 
-    /**
-     * Set of citizens that are currently occupied by a conversation or audio
-     * playback that does not use a Gemini Live WebSocket nor a slot reservation.
-     *
-     * <p>Use {@link #markBusy} / {@link #markNotBusy} to manage this set.
-     * Citizens in this set will be reported as busy by {@link #isCitizenBusy},
-     * preventing them from being selected for new sessions, but they do
-     * <em>not</em> count toward {@link McTalkingConfig#maxConcurrentAgents} and are never
-     * evicted — they are simply blocked from starting new sessions.</p>
-     */
-    private static final Set<UUID> busyEntities = ConcurrentHashMap.newKeySet();
+    /** Token-owned internal activities such as Flash/TTS generation and cached playback. */
+    private static final Map<UUID, CoreActivitySlot> coreBusyReservations = new ConcurrentHashMap<>();
+
+    private static final class CoreActivitySlot {
+        final UUID token;
+        final long deadlineNanos;
+        final Runnable onTimeout;
+        final Runnable onPreempt;
+
+        CoreActivitySlot(UUID token, long deadlineNanos, Runnable onTimeout, Runnable onPreempt) {
+            this.token = token;
+            this.deadlineNanos = deadlineNanos;
+            this.onTimeout = onTimeout;
+            this.onPreempt = onPreempt;
+        }
+    }
+
+    /** Exact-ownership handle for internal non-WebSocket citizen activity. */
+    public static final class CoreActivityReservation implements AutoCloseable {
+        private final UUID citizenId;
+        private final UUID token;
+        private final AtomicBoolean closed = new AtomicBoolean(false);
+
+        private CoreActivityReservation(UUID citizenId, UUID token) {
+            this.citizenId = citizenId;
+            this.token = token;
+        }
+
+        @Override
+        public void close() {
+            if (!closed.compareAndSet(false, true)) return;
+            releaseCoreActivity(citizenId, token);
+        }
+    }
+
+    /** Addon-owned non-conversation activity reservations keyed by citizen and opaque token. */
+    private static final Map<UUID, UUID> addonBusyReservations = new ConcurrentHashMap<>();
 
     /**
      * Citizen UUIDs whose active conversation originated from the urgent-contact
@@ -114,16 +152,56 @@ public class ConversationManager {
      */
     private static final Set<UUID> urgentContactConversations = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Citizen UUID → handler that aborts a non-WebSocket session (e.g. Flash/TTS
-     * conversation) so a player conversation can take over.
-     */
-    private static final Map<UUID, Runnable> abortHandlers = new ConcurrentHashMap<>();
-
     // ---- Background pool (configured cheap/current Live model) ----
-    private static final Set<UUID> backgroundSlots = new LinkedHashSet<>();
-    private static final Map<UUID, BackgroundSlotType> backgroundSlotTypes = new ConcurrentHashMap<>();
-    private static final Map<UUID, GeminiLiveClient> backgroundClients = new ConcurrentHashMap<>();
+    private static final long PREGEN_BACKGROUND_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(3);
+    private static final long COMPACTION_BACKGROUND_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(10);
+    private static final Map<UUID, BackgroundSlot> backgroundSlots = new LinkedHashMap<>();
+
+    private static final class BackgroundSlot {
+        final UUID token;
+        final BackgroundSlotType type;
+        final long deadlineNanos;
+        GeminiLiveClient client;
+
+        BackgroundSlot(UUID token, BackgroundSlotType type, long deadlineNanos) {
+            this.token = token;
+            this.type = type;
+            this.deadlineNanos = deadlineNanos;
+        }
+    }
+
+    /**
+     * Ownership handle for one background task. Cleanup is token-scoped so a delayed callback
+     * from an evicted task can never close a newer task for the same citizen.
+     */
+    public static final class BackgroundReservation implements AutoCloseable {
+        private final UUID citizenId;
+        private final UUID token;
+        private final AtomicBoolean closed = new AtomicBoolean(false);
+
+        private BackgroundReservation(UUID citizenId, UUID token) {
+            this.citizenId = citizenId;
+            this.token = token;
+        }
+
+        public boolean attachClient(GeminiLiveClient client) {
+            if (closed.get()) {
+                closeQuietly(client, "late background client", citizenId);
+                return false;
+            }
+            return registerBackgroundClient(citizenId, token, client);
+        }
+
+        public boolean isActive() {
+            return !closed.get() && isBackgroundReservationActive(citizenId, token);
+        }
+
+        @Override
+        public void close() {
+            if (!closed.compareAndSet(false, true)) return;
+            releaseBackgroundSlot(citizenId, token);
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Slot management (priority-aware, synchronized)
@@ -136,8 +214,9 @@ public class ConversationManager {
      *   <li><b>High-priority</b> ({@code isPlayerConversation=true}): evicts the
      *       oldest non-player session when at capacity, but never another player.</li>
      *   <li><b>Low-priority</b> ({@code isPlayerConversation=false}): succeeds
-     *       only when a slot is free or a non-player slot can be evicted without
-     *       displacing any player. Returns {@code false} otherwise.</li>
+     *       only when a slot is genuinely free. Ambient speech never evicts an
+     *       existing conversation, because doing so can cut audible speech off
+     *       mid-sentence.</li>
      * </ul>
      *
      * @return {@code true} if the slot was granted
@@ -148,8 +227,8 @@ public class ConversationManager {
         // Foreground interactions always take precedence over invisible background
         // work such as greeting pregeneration or memory compaction. Keeping both
         // alive wastes free-tier quota and can make the citizen appear unavailable.
-        if (backgroundSlots.contains(entityId)) {
-            releaseBackgroundSlot(entityId);
+        if (backgroundSlots.containsKey(entityId)) {
+            cancelBackgroundSlot(entityId, "foreground interaction started");
         }
 
         if (addedEntities.contains(entityId)) return true; // already registered
@@ -158,11 +237,16 @@ public class ConversationManager {
 
         if (addedEntities.size() < max) {
             addedEntities.add(entityId);
+            foregroundSlotClaimedAtNanos.put(entityId, System.nanoTime());
             McTalking.LOGGER.info("[ConversationManager] Reserved slot for entity {} (Player: {})", entityId, isPlayerConversation);
             return true;
         }
 
-        // At capacity – find a non-player slot to evict
+        if (!isPlayerConversation) {
+            return false;
+        }
+
+        // Player conversations may preempt the oldest non-player slot.
         UUID victim = findEvictableNonPlayerSlot();
 
         if (victim == null) {
@@ -172,9 +256,11 @@ public class ConversationManager {
         }
 
         addedEntities.remove(victim);
+        foregroundSlotClaimedAtNanos.remove(victim);
 
         evict(victim);
         addedEntities.add(entityId);
+        foregroundSlotClaimedAtNanos.put(entityId, System.nanoTime());
         McTalking.LOGGER.info("[ConversationManager] Reserved slot for entity {} after eviction (Player: {})", entityId, isPlayerConversation);
         return true;
     }
@@ -189,6 +275,7 @@ public class ConversationManager {
 
     public static synchronized void releaseSlot(UUID entityId) {
         urgentContactConversations.remove(entityId);
+        foregroundSlotClaimedAtNanos.remove(entityId);
         if (addedEntities.remove(entityId)) {
             McTalking.LOGGER.info("[ConversationManager] Freed slot for entity {}", entityId);
         }
@@ -230,19 +317,14 @@ public class ConversationManager {
     }
 
     /**
-     * Returns {@code true} if at least {@code slotsNeeded} slots can be granted
-     * at low priority (free slots + evictable non-player slots ≥ slotsNeeded).
+     * Returns {@code true} if at least {@code slotsNeeded} slots are genuinely
+     * free for low-priority work. Existing conversations are not counted as
+     * capacity merely because they would be technically evictable.
      */
     public static synchronized boolean hasLowPriorityCapacity(int slotsNeeded) {
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
         int free = max - addedEntities.size();
-        if (free >= slotsNeeded) return true;
-
-        int evictable = 0;
-        for (UUID id : addedEntities) {
-            if (getPlayerForEntity(id) == null) evictable++;
-        }
-        return (free + evictable) >= slotsNeeded;
+        return free >= slotsNeeded;
     }
 
 
@@ -259,12 +341,14 @@ public class ConversationManager {
     // ---- Background pool methods ----
 
     public static synchronized boolean hasFreeBackgroundCapacity(int slotsNeeded) {
+        if (slotsNeeded < 1) throw new IllegalArgumentException("slotsNeeded must be positive");
         purgeStaleBackgroundSlots();
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
         return (max - backgroundSlots.size()) >= slotsNeeded;
     }
 
     public static synchronized int getUsedBackgroundSlots() {
+        purgeStaleBackgroundSlots();
         return backgroundSlots.size();
     }
 
@@ -272,82 +356,156 @@ public class ConversationManager {
         return McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
     }
 
-    public static synchronized boolean claimBackgroundSlot(AbstractEntityCitizen citizen, BackgroundSlotType type) {
+    /**
+     * Reserves one background slot and returns its ownership handle, or {@code null} when no slot
+     * is available. Compaction may evict the oldest pregeneration task, preserving the existing
+     * background-priority rule.
+     */
+    public static synchronized BackgroundReservation reserveBackgroundSlot(
+            AbstractEntityCitizen citizen,
+            BackgroundSlotType type
+    ) {
         purgeStaleBackgroundSlots();
 
         UUID id = citizen.getUUID();
-        // A citizen may only own one background request at a time. Returning
-        // true here used to let a second task overwrite backgroundClients and
-        // orphan the first connection.
-        if (backgroundSlots.contains(id)) return false;
+        if (backgroundSlots.containsKey(id)) return null;
 
         int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
-
-        if (backgroundSlots.size() < max) {
-            backgroundSlots.add(id);
-            backgroundSlotTypes.put(id, type);
-            McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", id, type);
-            return true;
-        }
-
-        if (type == BackgroundSlotType.COMPACTION) {
+        if (backgroundSlots.size() >= max && type == BackgroundSlotType.COMPACTION) {
             UUID victim = null;
-            for (UUID candidate : backgroundSlots) {
-                if (backgroundSlotTypes.get(candidate) == BackgroundSlotType.PREGEN) {
-                    victim = candidate;
+            for (Map.Entry<UUID, BackgroundSlot> entry : backgroundSlots.entrySet()) {
+                if (entry.getValue().type == BackgroundSlotType.PREGEN) {
+                    victim = entry.getKey();
                     break;
                 }
             }
             if (victim != null) {
-                evictBackgroundSlot(victim);
-                backgroundSlots.add(id);
-                backgroundSlotTypes.put(id, type);
+                cancelBackgroundSlot(victim, "evicted for memory compaction");
                 McTalking.LOGGER.info("[ConversationManager] Evicted pregen bg slot {} for compaction {}", victim, id);
-                return true;
             }
         }
 
-        return false;
+        if (backgroundSlots.size() >= max) return null;
+
+        UUID token = UUID.randomUUID();
+        long timeout = type == BackgroundSlotType.COMPACTION
+                ? COMPACTION_BACKGROUND_TIMEOUT_NANOS
+                : PREGEN_BACKGROUND_TIMEOUT_NANOS;
+        backgroundSlots.put(id, new BackgroundSlot(token, type, System.nanoTime() + timeout));
+        McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", id, type);
+        return new BackgroundReservation(id, token);
     }
 
-    public static synchronized void releaseBackgroundSlot(UUID entityId) {
+    /** Cancels whichever background task currently belongs to this citizen. */
+    public static synchronized boolean cancelBackgroundSlot(UUID entityId, String reason) {
+        BackgroundSlot slot = backgroundSlots.remove(entityId);
+        if (slot == null) return false;
+        closeQuietly(slot.client, reason, entityId);
+        McTalking.LOGGER.info("[ConversationManager] Released background slot for {} ({})", entityId, reason);
+        return true;
+    }
+
+    private static synchronized boolean registerBackgroundClient(UUID entityId, UUID token, GeminiLiveClient client) {
+        java.util.Objects.requireNonNull(client, "client");
+        BackgroundSlot slot = backgroundSlots.get(entityId);
+        if (slot == null || !slot.token.equals(token)) {
+            closeQuietly(client, "background reservation no longer owned", entityId);
+            return false;
+        }
+        if (slot.client != null && slot.client != client) {
+            closeQuietly(client, "duplicate background client registration", entityId);
+            return false;
+        }
+        slot.client = client;
+        return true;
+    }
+
+    private static synchronized boolean isBackgroundReservationActive(UUID entityId, UUID token) {
+        BackgroundSlot slot = backgroundSlots.get(entityId);
+        return slot != null && slot.token.equals(token);
+    }
+
+    private static synchronized boolean releaseBackgroundSlot(UUID entityId, UUID token) {
+        BackgroundSlot slot = backgroundSlots.get(entityId);
+        if (slot == null || !slot.token.equals(token)) return false;
         backgroundSlots.remove(entityId);
-        backgroundSlotTypes.remove(entityId);
-        GeminiLiveClient client = backgroundClients.remove(entityId);
-        if (client != null) {
-            try { client.close(); } catch (Exception e) {
-                McTalking.LOGGER.warn("[ConversationManager] Error closing released bg client {}", entityId, e);
+        closeQuietly(slot.client, "background task completed", entityId);
+        return true;
+    }
+
+    /** Runs bounded lifecycle cleanup independent of whether addon/core work requests new slots. */
+    public static void tickMaintenance() {
+        purgeStaleBackgroundSlots();
+        purgeOrphanForegroundSlots();
+        for (Runnable timeoutAction : purgeExpiredCoreActivities()) {
+            try {
+                timeoutAction.run();
+            } catch (Throwable t) {
+                McTalking.LOGGER.error("[ConversationManager] Core activity timeout cleanup failed", t);
             }
         }
     }
 
-    public static synchronized void registerBackgroundClient(UUID entityId, GeminiLiveClient client) {
-        backgroundClients.put(entityId, client);
-    }
-
-    private static void purgeStaleBackgroundSlots() {
-        var stale = backgroundClients.entrySet().stream()
-                .filter(e -> e.getValue().isClosed())
-                .map(Map.Entry::getKey)
-                .toList();
-        for (UUID id : stale) {
-            McTalking.LOGGER.info("[ConversationManager] Purging stale background slot for {}", id);
-            backgroundSlots.remove(id);
-            backgroundSlotTypes.remove(id);
-            backgroundClients.remove(id);
+    private static synchronized List<Runnable> purgeExpiredCoreActivities() {
+        long now = System.nanoTime();
+        List<Runnable> timeoutActions = new ArrayList<>();
+        var iterator = coreBusyReservations.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, CoreActivitySlot> entry = iterator.next();
+            CoreActivitySlot slot = entry.getValue();
+            if (now < slot.deadlineNanos) continue;
+            iterator.remove();
+            timeoutActions.add(slot.onTimeout);
+            McTalking.LOGGER.warn("[ConversationManager] Recovered timed-out core activity for {}", entry.getKey());
         }
+        return timeoutActions;
     }
 
-    private static void evictBackgroundSlot(UUID entityId) {
-        backgroundSlots.remove(entityId);
-        backgroundSlotTypes.remove(entityId);
-        GeminiLiveClient client = backgroundClients.remove(entityId);
-        if (client != null) {
-            try { client.close(); } catch (Exception e) {
-                McTalking.LOGGER.warn("[ConversationManager] Error closing evicted bg client {}", entityId, e);
+    private static synchronized void purgeStaleBackgroundSlots() {
+        long now = System.nanoTime();
+        var iterator = backgroundSlots.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, BackgroundSlot> entry = iterator.next();
+            UUID id = entry.getKey();
+            BackgroundSlot slot = entry.getValue();
+            boolean closed = slot.client != null && slot.client.isClosed();
+            boolean expired = now >= slot.deadlineNanos;
+            if (!closed && !expired) continue;
+
+            iterator.remove();
+            if (expired && !closed) {
+                McTalking.LOGGER.warn("[ConversationManager] Background {} session for {} exceeded its deadline; closing it",
+                        slot.type, id);
+                closeQuietly(slot.client, "background session deadline exceeded", id);
+            } else {
+                McTalking.LOGGER.debug("[ConversationManager] Purged closed background slot for {}", id);
             }
         }
-        McTalking.LOGGER.info("[ConversationManager] Evicted background slot for {}", entityId);
+    }
+
+    private static synchronized void purgeOrphanForegroundSlots() {
+        long now = System.nanoTime();
+        var iterator = addedEntities.iterator();
+        while (iterator.hasNext()) {
+            UUID id = iterator.next();
+            Long claimedAt = foregroundSlotClaimedAtNanos.get(id);
+            if (claimedAt == null || now - claimedAt < ORPHAN_FOREGROUND_SLOT_TIMEOUT_NANOS) continue;
+            if (clients.containsKey(id) || citizenToPlayer.containsKey(id)) continue;
+
+            iterator.remove();
+            foregroundSlotClaimedAtNanos.remove(id);
+            urgentContactConversations.remove(id);
+            McTalking.LOGGER.warn("[ConversationManager] Recovered orphan foreground slot for {} after timeout", id);
+        }
+    }
+
+    private static void closeQuietly(GeminiLiveClient client, String reason, UUID entityId) {
+        if (client == null) return;
+        try {
+            client.close();
+        } catch (Exception e) {
+            McTalking.LOGGER.warn("[ConversationManager] Error closing background client {} ({})", entityId, reason, e);
+        }
     }
 
     /**
@@ -417,51 +575,51 @@ public class ConversationManager {
     // -------------------------------------------------------------------------
 
     /**
-     * Marks the citizen as busy without claiming a slot.
-     *
-     * <p>Use this only for sessions that consume the citizen's attention but
-     * do not need a Gemini Live WebSocket connection or a slot reservation
-     * (e.g. Flash/TTS-based citizen-to-citizen conversations). The citizen
-     * will be reported as busy by {@link #isCitizenBusy}, preventing
-     * double-booking, but will not count toward {@link McTalkingConfig#maxConcurrentAgents}
-     * and will not be evictable.
-     *
-     * <p>Every call must be paired with a corresponding {@link #markNotBusy}
-     * call (typically in a {@code finally} block).
+     * Claims a token-owned internal activity without consuming a Gemini foreground slot.
+     * Timed-out reservations are removed by {@link #tickMaintenance()} and invoke the supplied
+     * timeout callback after ownership has been released.
      */
-    public static void markBusy(AbstractEntityCitizen citizen) {
-        busyEntities.add(citizen.getUUID());
+    public static synchronized CoreActivityReservation reserveCoreActivity(
+            AbstractEntityCitizen citizen,
+            long timeout,
+            TimeUnit unit,
+            Runnable onTimeout,
+            Runnable onPreempt
+    ) {
+        java.util.Objects.requireNonNull(citizen, "citizen");
+        java.util.Objects.requireNonNull(unit, "unit");
+        java.util.Objects.requireNonNull(onTimeout, "onTimeout");
+        java.util.Objects.requireNonNull(onPreempt, "onPreempt");
+        if (timeout <= 0) throw new IllegalArgumentException("timeout must be positive");
+
+        UUID citizenId = citizen.getUUID();
+        if (clients.containsKey(citizenId) || addedEntities.contains(citizenId)
+                || coreBusyReservations.containsKey(citizenId) || addonBusyReservations.containsKey(citizenId)) {
+            return null;
+        }
+
+        UUID token = UUID.randomUUID();
+        long timeoutNanos = unit.toNanos(timeout);
+        long now = System.nanoTime();
+        long deadline = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
+        coreBusyReservations.put(citizenId, new CoreActivitySlot(token, deadline, onTimeout, onPreempt));
+        return new CoreActivityReservation(citizenId, token);
+    }
+
+    private static boolean releaseCoreActivity(UUID citizenId, UUID token) {
+        CoreActivitySlot current = coreBusyReservations.get(citizenId);
+        return current != null && current.token.equals(token)
+                && coreBusyReservations.remove(citizenId, current);
     }
 
     /**
-     * Removes the busy mark previously set by {@link #markBusy}.
-     *
-     * <p>Call this when the session that called {@link #markBusy} ends
-     * (typically in a {@code finally} block).
+     * Removes the currently-owned internal activity before a player takeover and returns the
+     * matching preemption callback. Removal happens before the callback runs, so cleanup caused by
+     * the old activity cannot affect a replacement reservation.
      */
-    public static void markNotBusy(AbstractEntityCitizen citizen) {
-        busyEntities.remove(citizen.getUUID());
-    }
-
-    /**
-     * Registers an abort handler for a citizen that is occupied by a
-     * non-WebSocket session (e.g. a Flash/TTS conversation).
-     *
-     * <p>When {@link #startPlayerConversation} takes over this citizen,
-     * the handler is executed so the session can stop its work and skip
-     * any lifecycle cleanup that would interfere with the new conversation.
-     *
-     * <p>Must be paired with {@link #unregisterAbortHandler} in a {@code finally} block.
-     */
-    public static void registerAbortHandler(AbstractEntityCitizen citizen, Runnable handler) {
-        abortHandlers.put(citizen.getUUID(), handler);
-    }
-
-    /**
-     * Removes the abort handler previously registered by {@link #registerAbortHandler}.
-     */
-    public static void unregisterAbortHandler(AbstractEntityCitizen citizen) {
-        abortHandlers.remove(citizen.getUUID());
+    private static synchronized Runnable removeCoreActivityForPreemption(UUID citizenId) {
+        CoreActivitySlot slot = coreBusyReservations.remove(citizenId);
+        return slot == null ? null : slot.onPreempt;
     }
 
     /**
@@ -473,7 +631,35 @@ public class ConversationManager {
         UUID id = citizen.getUUID();
         // Background work is intentionally omitted. It does not consume the
         // citizen's attention and claimSlot() cancels it if foreground speech starts.
-        return clients.containsKey(id) || addedEntities.contains(id) || busyEntities.contains(id);
+        return clients.containsKey(id) || addedEntities.contains(id) || coreBusyReservations.containsKey(id)
+                || addonBusyReservations.containsKey(id);
+    }
+
+    /**
+     * Claims an addon-owned non-conversation activity reservation. The opaque token prevents a
+     * stale task from releasing a newer reservation for the same citizen.
+     */
+    public static synchronized boolean claimAddonActivity(AbstractEntityCitizen citizen, UUID token) {
+        UUID citizenId = citizen.getUUID();
+        if (clients.containsKey(citizenId) || addedEntities.contains(citizenId)
+                || coreBusyReservations.containsKey(citizenId) || addonBusyReservations.containsKey(citizenId)) {
+            return false;
+        }
+        addonBusyReservations.put(citizenId, token);
+        return true;
+    }
+
+    /** Releases exactly the addon reservation identified by {@code token}. */
+    public static boolean releaseAddonActivity(UUID citizenId, UUID token) {
+        return addonBusyReservations.remove(citizenId, token);
+    }
+
+    /** Requests the active citizen session to finish its current audible turn and close. */
+    public static boolean requestGracefulEnd(AbstractEntityCitizen citizen) {
+        GeminiWsClient client = clients.get(citizen.getUUID());
+        if (client == null) return false;
+        client.endConversationWhenPossible();
+        return true;
     }
 
     /**
@@ -535,13 +721,23 @@ public class ConversationManager {
     // -------------------------------------------------------------------------
 
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen) {
-        return canCitizenSpeak(citizen, false);
+        return canCitizenSpeak(citizen, ConversationKind.ADDON_AMBIENT);
     }
 
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, boolean isPlayerRequest) {
-        return !citizen.isSleeping()
+        return canCitizenSpeak(citizen, isPlayerRequest ? ConversationKind.PLAYER : ConversationKind.ADDON_AMBIENT);
+    }
+
+    /**
+     * Context-aware speech eligibility used by core and addon integrations. Core invariants are
+     * evaluated first; registered addon policies can only veto an otherwise-eligible citizen.
+     */
+    public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, ConversationKind kind) {
+        boolean playerRequest = kind == ConversationKind.PLAYER;
+        boolean coreAllows = !citizen.isSleeping()
                 && !(citizen instanceof VisitorCitizen)
-                && (isPlayerRequest || (!isCitizenOnCooldown(citizen) && !isCitizenBusy(citizen)));
+                && (playerRequest || (!isCitizenOnCooldown(citizen) && !isCitizenBusy(citizen)));
+        return coreAllows && CitizenConversationRules.addonsAllowSpeech(citizen, kind);
     }
 
 
@@ -553,7 +749,7 @@ public class ConversationManager {
      */
     public static void startMumbling(AbstractEntityCitizen citizen) {
         if (!McTalkingConfig.hasGeminiApiKey()) return;
-        startLowPrioritySession(citizen, MumblingTopicHelper.buildPrompt(citizen));
+        startLowPrioritySession(citizen, MumblingTopicHelper.buildPrompt(citizen), ConversationKind.MUMBLE);
     }
 
     /**
@@ -568,7 +764,8 @@ public class ConversationManager {
     public static boolean startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
         boolean started = startLowPrioritySession(citizen,
-                MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()));
+                MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()),
+                ConversationKind.URGENT_CONTACT);
         if (started) {
             urgentContactConversations.add(citizen.getUUID());
         }
@@ -617,8 +814,52 @@ public class ConversationManager {
      *                   model; see authoring contract above
      */
     public static boolean startLowPrioritySession(AbstractEntityCitizen citizen, String userPrompt) {
+        return startLowPrioritySession(citizen, userPrompt, ConversationKind.ADDON_AMBIENT);
+    }
+
+    /** Supported internal entry used by the public addon conversation service. */
+    public static boolean startAddonAmbientSession(AbstractEntityCitizen citizen, String userPrompt) {
+        return startAddonAmbientSession(citizen, userPrompt, null);
+    }
+
+    /**
+     * Starts one addon-directed ambient line. When supplied, {@code completion} is dispatched on
+     * the Minecraft server thread after audible playback has drained, or when the session closes
+     * terminally before completing.
+     */
+    public static boolean startAddonAmbientSession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            Consumer<AmbientLineResult> completion
+    ) {
+        return startLowPrioritySession(citizen, userPrompt, ConversationKind.ADDON_AMBIENT, completion);
+    }
+
+    /** Cancels an addon/system ambient session without exposing its Gemini client. */
+    public static boolean cancelAddonAmbientSession(AbstractEntityCitizen citizen) {
+        if (getPlayerForEntity(citizen.getUUID()) != null) return false;
+        GeminiWsClient client = clients.get(citizen.getUUID());
+        if (!(client instanceof CitizenWsClient cws) || !cws.isMumbling()) return false;
+        cws.close();
+        return true;
+    }
+
+    private static boolean startLowPrioritySession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            ConversationKind kind
+    ) {
+        return startLowPrioritySession(citizen, userPrompt, kind, null);
+    }
+
+    private static boolean startLowPrioritySession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            ConversationKind kind,
+            Consumer<AmbientLineResult> completion
+    ) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
-        if (!canCitizenSpeak(citizen)) return false;
+        if (!canCitizenSpeak(citizen, kind)) return false;
 
         UUID citizenId = citizen.getUUID();
 
@@ -628,17 +869,37 @@ public class ConversationManager {
         }
 
         try {
-            var client = new CitizenWsClient(citizen,
-                    c -> {
-                        c.close();
-                        synchronized (ConversationManager.class) {
-                            if (clients.get(citizenId) == c) {
-                                clients.remove(citizenId);
-                                releaseSlot(citizen);
-                            }
+            AtomicBoolean audibleCompletion = new AtomicBoolean(false);
+            final CitizenWsClient[] holder = new CitizenWsClient[1];
+            var client = new CitizenWsClient(citizen, c -> {
+                String transcript = c.getSessionTranscriptSnapshot();
+                audibleCompletion.set(true);
+                c.close();
+                if (completion != null) {
+                    var server = citizen.level().getServer();
+                    Runnable notify = () -> completion.accept(AmbientLineResult.completed(transcript));
+                    if (server != null && !server.isSameThread()) server.execute(notify);
+                    else notify.run();
+                }
+            });
+            holder[0] = client;
+            client.addOnCloseAction(() -> {
+                var server = citizen.level().getServer();
+                Runnable cleanup = () -> {
+                    synchronized (ConversationManager.class) {
+                        if (clients.get(citizenId) == holder[0]) {
+                            clients.remove(citizenId);
+                            releaseSlot(citizen);
+                            recordCooldown(citizen);
                         }
-                        recordCooldown(citizen);
-                    });
+                    }
+                    if (completion != null && !audibleCompletion.get()) {
+                        completion.accept(AmbientLineResult.failed("ambient session closed before audible completion"));
+                    }
+                };
+                if (server != null && !server.isSameThread()) server.execute(cleanup);
+                else cleanup.run();
+            });
             client.addPromptTextAfterTalkingComplete(userPrompt);
             clients.put(citizenId, client);
             return true;
@@ -676,7 +937,7 @@ public class ConversationManager {
             return false;
         }
 
-        if (!canCitizenSpeak(citizen, true))
+        if (!canCitizenSpeak(citizen, ConversationKind.PLAYER))
             return false;
 
         UUID playerId = player.getUUID();
@@ -707,11 +968,16 @@ public class ConversationManager {
             // Reuse the mumbling session – slot is already held
             cws.transitionToPlayer(player);
         } else {
-            // If the citizen is busy via a non-WebSocket session (e.g. Flash/TTS),
-            // abort it so the player can take over
-            Runnable abortHandler = abortHandlers.remove(citizenId);
-            if (abortHandler != null) {
-                abortHandler.run();
+            // If the citizen is busy via a token-owned non-WebSocket activity (e.g. Flash/TTS
+            // or cached playback), release that exact ownership before running its preemption
+            // callback. Delayed cleanup from it can no longer disturb the player session.
+            Runnable preemptActivity = removeCoreActivityForPreemption(citizenId);
+            if (preemptActivity != null) {
+                try {
+                    preemptActivity.run();
+                } catch (Throwable t) {
+                    McTalking.LOGGER.error("Failed to preempt core activity for {}", citizenId, t);
+                }
             }
 
             // Close any non-player session that is occupying this citizen's slot
@@ -852,22 +1118,22 @@ public class ConversationManager {
                 McTalking.LOGGER.error("Error closing client during cleanup", e);
             }
         }
-        for (GeminiLiveClient client : backgroundClients.values()) {
-            try { client.close(); } catch (Exception ignored) {}
+        for (BackgroundSlot slot : backgroundSlots.values()) {
+            closeQuietly(slot.client, "server shutdown", null);
         }
         clients.clear();
         activeEntity.clear();
         playerConversationPartners.clear();
         citizenToPlayer.clear();
         addedEntities.clear();
+        foregroundSlotClaimedAtNanos.clear();
         backgroundSlots.clear();
-        backgroundSlotTypes.clear();
-        backgroundClients.clear();
-        busyEntities.clear();
-        abortHandlers.clear();
+        coreBusyReservations.clear();
+        addonBusyReservations.clear();
         lastSessionEndTime.clear();
         lastSessionNeedSignatures.clear();
         QuotaTracker.clear();
+        me.sshcrack.mc_talking.manager.VoiceSelectionService.clear();
         GeminiWsClient.shutdownExecutor();
     }
 }

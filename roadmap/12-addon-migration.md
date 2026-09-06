@@ -33,3 +33,24 @@ blocker and retain the distinction between composite success and release readine
 - Both distributable mod artifacts and their library requirements are verified.
 - Release notes state implemented behavior, compatibility limits, and remaining
   manual checks. Roadmap statuses match evidence rather than planned outcomes.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Cloned and audited Colonist Errands at commit
+  `f270362aca847726087213c623508ad0a65354c1` and Voyager at
+  `6666432ec94e58089635dfe8ea3cc6967b59f12f`. No public Colony Meetings repository
+  was found; its integration remains based on the supplied design feedback.
+- `docs/colonist-errands-migration.md` inventories every reviewed Errands mixin plus
+  direct/reflection access into Talking Colonists and maps each to a public API, a
+  core fix, or a remaining gap. `ItemAssistantHammerMixin` and `BlockHutTavernMixin`
+  target MineColonies itself and therefore cannot be replaced by a Talking Colonists
+  API. `docs/addon-api.md` and compile-checked examples cover tools, prompt facts,
+  memory events, activity reservations, ordinary conversations, and controlled
+  meeting turns. Public API sources now compile in an isolated `addonApi` source set
+  and publish as `me.sshcrack:mc_talking-api`, while the normal runtime mod packages
+  the same API classes plus implementation.
+- This does **not** complete task 12 because tasks 02–11 are not all complete. The
+  simultaneous-two-addon test matrix, provenance/old-save coverage, comprehensive
+  in-world validation, final distributable artifact verification, compatibility
+  statement against a migrated Errands build, and release notes/draft maintainer
+  response still remain.

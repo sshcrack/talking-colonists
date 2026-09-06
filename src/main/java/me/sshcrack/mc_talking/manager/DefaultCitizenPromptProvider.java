@@ -121,7 +121,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         // Personality archetype
         if (view.personality() != null) {
             prompt.append("\n## PERSONALITY\n");
-            prompt.append(view.personality().getPromptLines()).append("\n");
+            prompt.append(view.personality().promptText()).append("\n");
         } else if (view.customPersonalityText() != null) {
             prompt.append("\n## PERSONALITY\n");
             prompt.append(view.customPersonalityText()).append("\n");
@@ -134,7 +134,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         var memories = view.memories();
         if (memories != null) {
             prompt.append("\n## MEMORIES\n");
-            prompt.append(memories.toPrompt(view.interestedParties()));
+            prompt.append(memories.promptText());
         }
     }
 

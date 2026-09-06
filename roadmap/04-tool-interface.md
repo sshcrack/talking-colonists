@@ -30,3 +30,19 @@ world-changing operation. Use bounded result retention, not an unbounded global 
 - Repeated call IDs do not duplicate side effects; distinct operations remain usable.
 - Delayed completion after session closure safely cleans up and does not reopen it.
 - Document execution/thread/error contracts and migration from `FunctionAction`.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Added public `AiToolRegistry`, `AiTool`, `AiToolScope`, and authoritative
+  `AiToolContext`. Addon IDs are namespaced and mapped deterministically to provider
+  function names; built-in tools/config continue to work and the list-tools command
+  understands addon registrations.
+- Central dispatch resolves the initiating `ServerPlayer` from the active session,
+  rechecks enabled/scope/custom authorization at call time, and never accepts actor
+  identity from model parameters. Colonist Errands no longer needs reflective access
+  to `AITools` merely to register tools or recover the player context.
+- Added a compile-checked authorization example and registry tests.
+- This does **not** complete task 04. Schema validation, a core permission abstraction,
+  managed server-thread world mutation, asynchronous operation IDs/results,
+  cancellation, duplicate-call idempotency, bounded result retention, and the full
+  authorization/spoofing test matrix remain.

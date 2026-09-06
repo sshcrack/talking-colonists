@@ -21,6 +21,8 @@ import com.minecolonies.core.entity.citizen.EntityCitizen;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPersonalityView;
+import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenSubState;
 import me.sshcrack.mc_talking.api.prompt.view.MinimalAISubState;
@@ -118,7 +120,12 @@ public final class CitizenPromptViewFactory {
         var personalityExt = (CitizenDataPersonalityExtended) data;
         personalityExt.mc_talking$assignPersonality();
         PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
+        CitizenPersonalityView personalityView = personality == null ? null : new CitizenPersonalityView(
+                personality.name().toLowerCase(Locale.ROOT), personality.getPromptLines(), false);
         String customPersonalityText = personalityExt.mc_talking$getCustomPersonality();
+        var memory = ((CitizenDataMemoryExtended) data).mc_talking$getMemory();
+        CitizenMemorySnapshot memorySnapshot = memory == null ? null : new CitizenMemorySnapshot(
+                memory.getFacts(), memory.getEvents(), memory.getSummarizedMemory(), memory.toPrompt(interestedParties));
         String playerState = extractPlayerState(speakingTo);
         var envInfo = extractEnvironmentInfo(data);
         String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
@@ -162,7 +169,7 @@ public final class CitizenPromptViewFactory {
                 blockingMessages,
                 relation,
                 getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
-                ((CitizenDataMemoryExtended) data).mc_talking$getMemory(),
+                memorySnapshot,
                 interestedParties,
                 colonyName,
                 homeBuildingDisplayName,
@@ -174,7 +181,7 @@ public final class CitizenPromptViewFactory {
                 lastRaidEndTimeTicks,
                 lastRaidLostCitizens,
                 currentGameTimeTicks,
-                personality,
+                personalityView,
                 customPersonalityText,
                 playerState,
                 envInfo.description(),

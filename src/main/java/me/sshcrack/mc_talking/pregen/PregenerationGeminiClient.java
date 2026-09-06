@@ -21,6 +21,7 @@ import java.util.function.Consumer;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.manager.VoiceSelectionService;
 import me.sshcrack.mc_talking.util.AudioHelper;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
@@ -31,6 +32,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
     private final String promptText;
     private final String modelName;
     private final AvailableAI modelAi;
+    private volatile String selectedVoiceName;
     private final Consumer<AudioChunk> onComplete;
     private Runnable onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
@@ -65,7 +67,8 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         var uuid = entity.getUUID();
         setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = modelAi.getRandomVoice(uuid, female);
+        selectedVoiceName = VoiceSelectionService.select(modelAi, uuid, female);
+        setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = selectedVoiceName;
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         var view = CitizenPromptViewFactory.create(entity.getCitizenData(), new HashMap<>(), null);
@@ -172,6 +175,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
+        VoiceSelectionService.noteRejected(modelAi, selectedVoiceName, code, reason);
         try {
             super.onClose(code, reason, remote);
         } catch (Exception e) {

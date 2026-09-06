@@ -179,6 +179,28 @@ public class GeminiStream implements Supplier<short[]> {
         return false;
     }
 
+
+    /**
+     * Drops audio that has been generated but not yet consumed by the voice-chat player.
+     * The currently playing frame is allowed to finish; future queued frames and buffered
+     * producer chunks are discarded. This is used when a Gemini session token is invalidated
+     * and the same prompt must be replayed, preventing the stale answer from being heard twice.
+     *
+     * @return approximate number of queued chunks/frames discarded
+     */
+    public int discardPendingAudio() {
+        int dropped = audioFrames.size();
+        audioFrames.clear();
+        remainingSamples = new short[0];
+        synchronized (incomingData) {
+            dropped += incomingData.size();
+            incomingData.clear();
+            totalBufferedBytes = 0;
+        }
+        isPreBuffering = true;
+        return dropped;
+    }
+
     public void stop() {
         audioFrames.clear();
         remainingSamples = new short[0];

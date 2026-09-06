@@ -2,6 +2,9 @@ package me.sshcrack.mc_talking.pregen;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.api.pregen.PregenerationKind;
+import me.sshcrack.mc_talking.api.pregen.PregenerationPromptContext;
+import me.sshcrack.mc_talking.api.pregen.PregenerationPromptService;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -23,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PregenerationTaskService {
@@ -157,6 +161,16 @@ public class PregenerationTaskService {
                                                          boolean isThreat, boolean isPlayerGreeting) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
 
+        PregenerationKind kind = isThreat
+                ? PregenerationKind.THREAT
+                : (isPlayerGreeting ? PregenerationKind.PLAYER_GREETING : PregenerationKind.CITIZEN_GREETING);
+        if (kind != PregenerationKind.THREAT) {
+            prompt += " IMPORTANT: this line is cached and may be heard much later. "
+                    + "Do not mention the current time of day, light level, weather, or a meal you are about to have; "
+                    + "use wording that remains true whenever the cached line is played.";
+        }
+        prompt = PregenerationPromptService.apply(new PregenerationPromptContext(citizen, kind), prompt);
+
         AvailableAI model = isThreat
                 ? McTalkingConfig.INSTANCE.instance().currentAiModel
                 : McTalkingConfig.CHEAP_LIVE_MODEL;
@@ -167,38 +181,43 @@ public class PregenerationTaskService {
         // Keeping it out of the foreground pool means a player can always preempt
         // it cleanly without a late completion callback releasing the player's slot.
         if (isThreat) {
-            ConversationManager.releaseBackgroundSlot(citizen.getUUID());
+            ConversationManager.cancelBackgroundSlot(citizen.getUUID(), "replaced by immediate threat pregeneration");
         }
-        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.PREGEN)) return false;
+        ConversationManager.BackgroundReservation reservation =
+                ConversationManager.reserveBackgroundSlot(citizen, BackgroundSlotType.PREGEN);
+        if (reservation == null) return false;
 
         generatingCount.incrementAndGet();
         if (isPlayerGreeting) playerGreetingActiveCount.incrementAndGet();
+        AtomicBoolean finished = new AtomicBoolean(false);
+        Runnable finish = () -> {
+            if (!finished.compareAndSet(false, true)) return;
+            reservation.close();
+            generatingCount.decrementAndGet();
+            if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+        };
 
         McTalking.LOGGER.info("[Pregeneration] Starting {} for citizen {} (threat={}, model={})",
                 isThreat ? "threat" : "pregen", citizen.getUUID(), isThreat, model.getName());
 
         PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, model,
                 audio -> {
-                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
-                    generatingCount.decrementAndGet();
-                    if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+                    finish.run();
                     onComplete.accept(audio);
                 },
-                () -> {
-                    ConversationManager.releaseBackgroundSlot(citizen.getUUID());
-                    generatingCount.decrementAndGet();
-                    if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
-                });
+                finish);
 
         try {
+            if (!reservation.attachClient(client)) {
+                finish.run();
+                return false;
+            }
             client.connect();
-            ConversationManager.registerBackgroundClient(citizen.getUUID(), client);
             return true;
         } catch (Exception e) {
             McTalking.LOGGER.error("[Pregeneration] Failed to connect for citizen {}", citizen.getUUID(), e);
-            ConversationManager.releaseBackgroundSlot(citizen.getUUID());
-            generatingCount.decrementAndGet();
-            if (isPlayerGreeting) playerGreetingActiveCount.decrementAndGet();
+            try { client.close(); } catch (Exception ignored) { }
+            finish.run();
             return false;
         }
     }

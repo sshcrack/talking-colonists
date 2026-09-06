@@ -23,13 +23,12 @@ public class ListToolsCommand {
     private static int get_description(CommandContext<CommandSourceStack> context, String toolName) throws CommandSyntaxException {
         var src = context.getSource();
 
-        var tool = AITools.getAction(toolName);
-        if (tool == null) {
+        if (!AITools.hasAction(toolName)) {
             throw TOOL_NOT_FOUND.create();
         }
 
         var strWriter = new StringWriter();
-        var prop = tool.getProperty();
+        var prop = AITools.getToolProperty(toolName);
         if (prop instanceof ObjectProperty objProp) {
             objProp.getProperties().forEach((key, value) -> {
                 strWriter.write("\n");
@@ -58,7 +57,7 @@ public class ListToolsCommand {
         src.sendSuccess(() -> Component.translatable("mc_talking.commands.tool_description",
                 toolName,
                 Component.translatable(categoryKey),
-                tool.getDescription(),
+                AITools.getToolDescription(toolName),
                 strWriter.toString()), true);
         return 0;
     }

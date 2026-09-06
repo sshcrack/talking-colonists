@@ -13,6 +13,7 @@ import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
+import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -135,6 +136,14 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         }
 
         var player = (ServerPlayer) vcPlayer.getPlayer();
+
+        // Pregenerated clips have no Live session listening to the microphone. Feed
+        // voice activity to their playback owner before requiring an active direct
+        // conversation, so deliberate barge-in can stop a cached greeting cleanly.
+        byte[] opusData = packet.getOpusEncodedData();
+        boolean hasVoiceActivity = hasVoiceActivity(opusData);
+        PregenerationPlayback.onPlayerVoicePacket(player, hasVoiceActivity);
+
         LivingEntity entity = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         if (entity == null) {
             return;
@@ -146,10 +155,6 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         }
 
         UUID entityId = entity.getUUID();
-
-        // Process the voice packet
-        byte[] opusData = packet.getOpusEncodedData();
-        boolean hasVoiceActivity = hasVoiceActivity(opusData);
         long currentTime = System.currentTimeMillis();
 
         // Announce the speaker so the AI knows whose voice this is

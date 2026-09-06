@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking.conversations.memory;
 
-import com.google.gson.JsonSyntaxException;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
@@ -123,14 +122,18 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
             GsonMemoryResponse response;
             try {
-                response = GsonMemoryResponse.GSON.fromJson(responseJson, GsonMemoryResponse.class);
-            } catch (JsonSyntaxException e) {
-                McTalking.LOGGER.warn("[PlayerMemory] Failed to parse memory JSON for citizen {}: {}", citizenName, responseJson);
+                response = MemoryResponseParser.parse(responseJson,
+                        MemoryResponseParser.ValidationContext.playerConversation(citizenName, playerName));
+            } catch (MemoryResponseParser.ValidationException e) {
+                McTalking.LOGGER.warn("[PlayerMemory] Rejected invalid memory response for citizen {}: {}",
+                        citizenName, e.getMessage());
                 return;
             }
 
-            server.execute(() -> saveMemories(response, citizenName));
-            McTalking.LOGGER.info("[PlayerMemory] Saved player-interaction memories for citizen {}", citizenName);
+            server.execute(() -> {
+                saveMemories(response, citizenName);
+                McTalking.LOGGER.info("[PlayerMemory] Saved player-interaction memories for citizen {}", citizenName);
+            });
         } finally {
             activeGenerators.remove(this);
         }

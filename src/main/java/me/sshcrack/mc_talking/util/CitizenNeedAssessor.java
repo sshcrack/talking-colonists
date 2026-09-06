@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.ai.JobStatus;
+import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public class CitizenNeedAssessor {
             weight += McTalkingConfig.INSTANCE.instance().blockingTaskUrgencyMultiplier;
         }
 
-        return weight;
+        return CitizenConversationRules.applyUrgencyModifiers(citizen, weight);
     }
 
     /**

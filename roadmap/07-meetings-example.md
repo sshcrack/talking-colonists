@@ -26,3 +26,14 @@ and any initial limitations explicitly.
 - Record manual in-world checks for spatial audio, player interruption, and orderly
   cleanup on both versions. Report unavailable environments as unverified.
 - Publish usage docs in the repository, including a minimal sequence and failure handling.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Added a compile-checked addon example showing a caller creating a controlled
+  meeting, owning navigation/arrival before `requestTurn`, adding a player question,
+  and requesting a subsequent citizen response. `docs/addon-api.md` documents the
+  same ownership split for a Colony Meetings-style addon.
+- This does **not** complete task 07. The example does not yet demonstrate podium
+  anchoring, a full three-citizen floor sequence with failure recovery, or explicit
+  microphone routing; behavioral arrival/playback ordering tests and both-loader
+  in-world validation records remain.

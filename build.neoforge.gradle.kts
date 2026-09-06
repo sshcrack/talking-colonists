@@ -152,6 +152,92 @@ repositories {
     }
 }
 
+// The supported addon API is a real, separately compiled source set. Its compiler sees the
+// loader's external/mapped dependencies, but never main output, so an API source cannot import
+// Talking Colonists implementation classes by accident. Main/test consume the compiled API output.
+val addonApi = sourceSets.create("addonApi") {
+    java.setSrcDirs(listOf(rootProject.file("src/api/java")))
+    compileClasspath = configurations.getByName("compileClasspath")
+}
+
+sourceSets.named("main") {
+    compileClasspath += addonApi.output
+    runtimeClasspath += addonApi.output
+}
+sourceSets.named("test") {
+    compileClasspath += addonApi.output
+    runtimeClasspath += addonApi.output
+}
+
+// The normal mod still contains the API at runtime; the separate artifact below is only the
+// supported compile/IDE surface for addons.
+tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
+    from(addonApi.output)
+}
+tasks.matching { it.name == "sourcesJar" }.configureEach {
+    (this as org.gradle.jvm.tasks.Jar).from(rootProject.file("src/api/java"))
+}
+
+val apiJar = tasks.register<org.gradle.jvm.tasks.Jar>("apiJar") {
+    archiveBaseName.set("${prop("mod.id")}-api")
+    archiveClassifier.set("")
+    from(addonApi.output)
+    include("me/sshcrack/mc_talking/api/**")
+}
+
+val apiSourcesJar = tasks.register<org.gradle.jvm.tasks.Jar>("apiSourcesJar") {
+    archiveBaseName.set("${prop("mod.id")}-api")
+    archiveClassifier.set("sources")
+    from(rootProject.file("src/api/java"))
+    include("me/sshcrack/mc_talking/api/**")
+}
+
+tasks.named("build") {
+    dependsOn(apiJar, apiSourcesJar)
+}
+
+val verifyApiJar = tasks.register("verifyApiJar") {
+    group = "verification"
+    description = "Ensures the addon API artifact contains no Talking Colonists implementation classes"
+    dependsOn(apiJar)
+    doLast {
+        val leaked = zipTree(apiJar.get().archiveFile).matching {
+            include("me/sshcrack/mc_talking/**/*.class")
+            exclude("me/sshcrack/mc_talking/api/**")
+        }.files
+        if (leaked.isNotEmpty()) {
+            throw GradleException("Implementation classes leaked into API jar: ${leaked.joinToString { it.name }}")
+        }
+        val misplacedApiSources = rootProject.fileTree("src/main/java/me/sshcrack/mc_talking/api") {
+            include("**/*.java")
+        }.files
+        if (misplacedApiSources.isNotEmpty()) {
+            throw GradleException("Public API sources must live under src/api/java, not src/main/java")
+        }
+
+        val forbiddenImplementationRef = Regex(
+            "(?m)^\\s*import\\s+me\\.sshcrack\\.mc_talking\\.(?!api(?:\\.|;))"
+        )
+        val leakingSources = rootProject.fileTree("src/api/java") { include("**/*.java") }.files
+            .filter { forbiddenImplementationRef.containsMatchIn(it.readText()) }
+        if (leakingSources.isNotEmpty()) {
+            throw GradleException(
+                "Public API sources reference Talking Colonists implementation packages: " +
+                    leakingSources.joinToString { it.relativeTo(rootProject.projectDir).path }
+            )
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyApiJar)
+}
+
+tasks.matching { it.name == "buildAndCollect" }.configureEach {
+    this as Copy
+    from(apiJar, apiSourcesJar)
+}
+
 var loader = sc.current.component1().split("-")[1];
 publishing {
     publications {
@@ -162,6 +248,14 @@ publishing {
 
             artifact(tasks.named("jar"))
             tasks.findByName("sourcesJar")?.let { artifact(it) }
+        }
+        create<MavenPublication>("api") {
+            groupId = "me.sshcrack"
+            artifactId = "${prop("mod.id")}-api"
+            version = "${prop("mod.version")}${prop("mod.channel_tag")}-${prop("deps.minecraft")}-${loader}"
+
+            artifact(apiJar)
+            artifact(apiSourcesJar)
         }
     }
 

@@ -19,8 +19,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MemoryCompactionService {
     private MemoryCompactionService() {
@@ -33,7 +35,7 @@ public class MemoryCompactionService {
             Retain solely permanent traits, lasting historical milestones, established relationships, and enduring social connections. \
             Ensure all captured information remains true regardless of the current moment.\
             OUTPUT THE SUMMARY IN PLAIN, UNFORMATTED TEXT""";
-    private static final List<UUID> activeCompactionCitizens = new CopyOnWriteArrayList<>();
+    private static final Set<UUID> activeCompactionCitizens = ConcurrentHashMap.newKeySet();
 
     private static int tickCounter = 0;
 
@@ -59,6 +61,7 @@ public class MemoryCompactionService {
                 if (!(entity instanceof AbstractEntityCitizen citizen)) continue;
                 if (citizen.getCitizenData() == null) continue;
                 if (ConversationManager.isCitizenBusy(citizen)) continue;
+                if (activeCompactionCitizens.contains(citizen.getUUID())) continue;
 
                 var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
                 var mem = data.mc_talking$getOrInitializeMemory();
@@ -101,7 +104,7 @@ public class MemoryCompactionService {
 
     private static void startFlashCompaction(AbstractEntityCitizen citizen) {
         UUID citizenId = citizen.getUUID();
-        activeCompactionCitizens.add(citizenId);
+        if (!activeCompactionCitizens.add(citizenId)) return;
         var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
         var mem = data.mc_talking$getOrInitializeMemory();
 
@@ -145,17 +148,26 @@ public class MemoryCompactionService {
         UUID citizenId = citizen.getUUID();
 
         if (QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName())) return;
-        if (!ConversationManager.claimBackgroundSlot(citizen, BackgroundSlotType.COMPACTION)) return;
-
-        activeCompactionCitizens.add(citizenId);
+        ConversationManager.BackgroundReservation reservation =
+                ConversationManager.reserveBackgroundSlot(citizen, BackgroundSlotType.COMPACTION);
+        if (reservation == null) return;
+        if (!activeCompactionCitizens.add(citizenId)) {
+            reservation.close();
+            return;
+        }
 
         var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
         var mem = data.mc_talking$getOrInitializeMemory();
+        AtomicBoolean finished = new AtomicBoolean(false);
+        Runnable finish = () -> {
+            if (!finished.compareAndSet(false, true)) return;
+            activeCompactionCitizens.remove(citizenId);
+            reservation.close();
+        };
 
         MemoryCompactionWsClient client = new MemoryCompactionWsClient(citizen, mem,
                 summary -> {
-                    activeCompactionCitizens.remove(citizenId);
-                    ConversationManager.releaseBackgroundSlot(citizenId);
+                    finish.run();
                     if (summary != null && !summary.isBlank()) {
                         var server = citizen.level().getServer();
                         if (server != null) {
@@ -164,18 +176,23 @@ public class MemoryCompactionService {
                     }
                 },
                 () -> {
-                    activeCompactionCitizens.remove(citizenId);
-                    ConversationManager.releaseBackgroundSlot(citizenId);
-                    McTalking.LOGGER.warn("[MemoryCompaction] Live compaction failed for citizen {}", citizen.getCitizenData().getName());
+                    boolean wasActive = !finished.get();
+                    finish.run();
+                    if (wasActive) {
+                        McTalking.LOGGER.warn("[MemoryCompaction] Live compaction failed for citizen {}", citizen.getCitizenData().getName());
+                    }
                 });
 
         try {
+            if (!reservation.attachClient(client)) {
+                finish.run();
+                return;
+            }
             client.connect();
-            ConversationManager.registerBackgroundClient(citizenId, client);
         } catch (Exception e) {
             McTalking.LOGGER.error("[MemoryCompaction] Failed to connect Live client for citizen {}", citizen.getCitizenData().getName(), e);
-            activeCompactionCitizens.remove(citizenId);
-            ConversationManager.releaseBackgroundSlot(citizenId);
+            try { client.close(); } catch (Exception ignored) { }
+            finish.run();
         }
     }
 

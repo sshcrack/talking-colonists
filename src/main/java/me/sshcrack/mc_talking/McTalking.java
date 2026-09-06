@@ -1,7 +1,9 @@
 package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
+import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.api.TalkingColonistsApiBackend;
 import me.sshcrack.mc_talking.listener.ColonyEventSubscriber;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
@@ -71,6 +73,7 @@ public class McTalking {
     /*?}*/
 
     private void initialize() {
+        TalkingColonistsApi.installBackend(TalkingColonistsApiBackend.INSTANCE);
         AITools.register();
         McTalkingConfig.loadConfig();
         AiStatusPayload.registerMessages();

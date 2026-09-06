@@ -24,3 +24,21 @@ Keep factual content separate from instructions and preserve core safety/behavio
   snapshots; registration/reset behavior does not leak between server lifetimes.
 - All intended conversation modes receive contributions exactly once.
 - Document a minimal addon registration example, thread rules, and compatibility.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Added namespaced, ordered `CitizenPromptContributor` registration on top of the
+  existing replaceable `CitizenPromptProvider`. Contributions are typed as current
+  observations, recollections, or addon guidance, are size-bounded, and a failing
+  contributor is logged/skipped without breaking other contributors.
+- Wired contributors into citizen roleplay, system-controlled roleplay,
+  conversational info, basic info, and detailed info surfaces; pregeneration still
+  uses the system-controlled prompt plus a separate pregeneration modifier hook.
+- Added documentation and compile-checked addon examples. Registration handles are
+  process-lifetime unless explicitly closed; server cleanup intentionally does not
+  erase mod registrations.
+- This does **not** complete task 03. Acceptance tests for two contributors plus a
+  legacy provider, duplicate/error/budget behavior, server-lifetime semantics, and
+  exactly-once coverage across all modes remain. Session-specific contribution
+  context is currently supplied by controlled-session directives rather than a
+  first-class contributor context object.

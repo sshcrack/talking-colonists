@@ -24,3 +24,12 @@ Now the citizen will complain if they are unhappy or missing some resources, jus
 
 ## Can I include this in my modpack?
 Yup
+
+## Addon API
+Addon authors can extend AI tools, prompt context, conversation eligibility/urgency, citizen memories,
+pregenerated prompt constraints, addon activity reservations, ordinary citizen conversations, and
+controlled meeting/council turns through supported interfaces under `me.sshcrack.mc_talking.api`.
+The supported sources are compiled separately from implementation code and published as
+`me.sshcrack:mc_talking-api`; addons should use that artifact as their compile/IDE dependency while
+requiring the normal Talking Colonists mod at runtime. See [docs/addon-api.md](docs/addon-api.md). The pinned Colonist Errands hook audit and migration map is
+in [docs/colonist-errands-migration.md](docs/colonist-errands-migration.md).

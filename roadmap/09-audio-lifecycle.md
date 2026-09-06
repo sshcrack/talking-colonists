@@ -30,3 +30,18 @@ voice-chat abstractions where possible.
 - All supported playback modes exercise equivalent interruption and cleanup behavior.
 - Record in-world checks for moving speakers, podium anchoring, and audible overlap
   on both loaders; preserve reports for cases not reproducible.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Core graceful close now waits for audible output to drain within a bound instead
+  of immediately stopping the stream at turn completion. Invalid-session replay
+  clears queued stale audio, late output after a requested final generation is
+  ignored, and repeated graceful-end state is guarded.
+- Pregenerated playback now has a core-owned interruption/takeover path driven by
+  player voice activity, so addons do not need reflection into `GeminiStream` or the
+  private pregeneration playback map. Flash/TTS paired conversation audio refreshes
+  its locational channel as participants move.
+- This does **not** complete task 09. Playback is not yet uniformly keyed by explicit
+  turn identity, the full barge-in/provider-context semantics are incomplete, podium
+  anchoring is not exposed, fake-audio coverage for every playback mode is missing,
+  and both-loader in-world overlap/location checks remain.

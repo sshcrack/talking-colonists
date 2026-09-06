@@ -201,12 +201,9 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
     @Override
     public void onTurnComplete() {
+        // Gemini reports turn completion before audible playback has drained. Core's
+        // graceful-end path waits for the stream pause before closing the pair.
         super.onTurnComplete();
-
-        if (shouldEndConversation) {
-            McTalking.LOGGER.info("[LiveConvWs] Ending conversation as requested by {}", citizen.getCitizenData().getName());
-            notifyEnded();
-        }
     }
 
     /**
@@ -220,6 +217,12 @@ public class LiveConversationWsClient extends GeminiWsClient {
     @Override
     protected void onConversationEnded() {
         super.onConversationEnded(); // sets our own status to LISTENING
+
+        if (shouldEndConversation) {
+            McTalking.LOGGER.info("[LiveConvWs] Final audio drained for {}; ending pair",
+                    citizen.getCitizenData().getName());
+            return;
+        }
 
         int turn = sharedTurnCounter.incrementAndGet();
         McTalking.LOGGER.info("[LiveConvWs] Turn {} of {} completed by {}",

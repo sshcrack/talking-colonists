@@ -1,7 +1,6 @@
 package me.sshcrack.mc_talking.api.prompt.view;
 
-import me.sshcrack.mc_talking.config.PersonalityArchetype;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
+import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -57,7 +56,7 @@ public record CitizenPromptView(
         List<String> blockingInteractionMessages,
         @Nullable PlayerRelationView playerRelation,
         String responseLanguageName,
-        @Nullable CitizenMemories memories,
+        @Nullable CitizenMemorySnapshot memories,
         Map<UUID, String> interestedParties,
         String colonyName,
         @Nullable String homeBuildingDisplayName,
@@ -69,7 +68,7 @@ public record CitizenPromptView(
         @Nullable Long lastRaidEndTimeTicks,
         int lastRaidLostCitizens,
         long currentGameTimeTicks,
-        @Nullable PersonalityArchetype personality,
+        @Nullable CitizenPersonalityView personality,
         @Nullable String customPersonalityText,
         @Nullable String playerState,
         @Nullable String environment,

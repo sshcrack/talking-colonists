@@ -24,7 +24,10 @@ public class UrgentContactHandler {
     private UrgentContactHandler() {
     }
 
-    private record WalkingTarget(UUID playerId, int lastRepathTick) {
+    private static final long WALK_TIMEOUT_MS = 60_000L;
+    private static final long REPATH_INTERVAL_MS = 1_000L;
+
+    private record WalkingTarget(UUID playerId, long startedAtMs, long lastRepathAtMs) {
     }
 
     private static final Map<UUID, WalkingTarget> walkingCitizens = new HashMap<>();
@@ -98,9 +101,8 @@ public class UrgentContactHandler {
             return false;
         }
 
-        // Use 0 as initial repath tick — the tick counter is now internal to this
-        // method's callers (they pass it or it's managed by server tick timing).
-        walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), 0));
+        long now = System.currentTimeMillis();
+        walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), now, now));
         AiStatusHelper.setAiStatusSynced(citizen, AiStatus.URGENT_WALKING);
         citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
 
@@ -110,11 +112,20 @@ public class UrgentContactHandler {
     }
 
     public static void updateWalkingCitizens(MinecraftServer server) {
+        long now = System.currentTimeMillis();
         var it = walkingCitizens.entrySet().iterator();
         while (it.hasNext()) {
             var entry = it.next();
             UUID citizenId = entry.getKey();
             WalkingTarget target = entry.getValue();
+
+            if (now - target.startedAtMs() >= WALK_TIMEOUT_MS) {
+                McTalking.LOGGER.warn("[CitizenContact] Citizen {} did not reach the player within {}s; aborting walk",
+                        citizenId, WALK_TIMEOUT_MS / 1000L);
+                abortWalking(citizenId, server);
+                it.remove();
+                continue;
+            }
 
             var player = server.getPlayerList().getPlayer(target.playerId());
             if (player == null || !player.isAlive()) {
@@ -165,12 +176,10 @@ public class UrgentContactHandler {
                 }
             }
 
-            // Repath every 20 ticks (roughly 1 second)
-            if (target.lastRepathTick % 20 == 0) {
+            if (now - target.lastRepathAtMs() >= REPATH_INTERVAL_MS) {
                 citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
+                entry.setValue(new WalkingTarget(target.playerId(), target.startedAtMs(), now));
             }
-            // Update the repath tick by incrementing it (since we don't have a global counter)
-            entry.setValue(new WalkingTarget(target.playerId(), target.lastRepathTick + 1));
         }
     }
 

@@ -42,6 +42,11 @@ public enum AvailableAI implements NameableEnum {
         return availableVoices.get(rng.nextInt(availableVoices.size()));
     }
 
+    /** Ordered immutable candidate list used by bounded voice-recovery logic. */
+    public List<String> getVoiceCandidates(boolean isFemale) {
+        return isFemale ? femaleVoices : maleVoices;
+    }
+
     @Override
     public Component getDisplayName() {
         return Component.literal(name());

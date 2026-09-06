@@ -1,7 +1,11 @@
 package me.sshcrack.mc_talking.manager.tools;
 
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
+import me.sshcrack.gemini_live_lib.gson.properties.Property;
+import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
+import me.sshcrack.mc_talking.api.tool.AiToolScope;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+/** Internal bridge between built-in tools and the public addon tool registry. */
 public class AITools {
     private AITools() {
         /* This utility class should not be instantiated */
@@ -29,41 +34,68 @@ public class AITools {
         return playerConversationOnlyTools.get(name);
     }
 
+    public static boolean hasAction(String name) {
+        return getAction(name) != null || AiToolRegistry.findByProviderName(name) != null;
+    }
+
     public static boolean isPlayerOnlyAction(String name) {
         var action = getAction(name);
-        return action != null && action.isPlayerOnly();
+        if (action != null) return action.isPlayerOnly();
+        var addon = AiToolRegistry.findByProviderName(name);
+        return addon != null && addon.tool().scope() == AiToolScope.PLAYER_CONVERSATION;
+    }
+
+    public static @Nullable String getToolDescription(String name) {
+        var action = getAction(name);
+        if (action != null) return action.getDescription();
+        var addon = AiToolRegistry.findByProviderName(name);
+        return addon == null ? null : addon.tool().description();
+    }
+
+    public static @Nullable Property getToolProperty(String name) {
+        var action = getAction(name);
+        if (action != null) return action.getProperty();
+        var addon = AiToolRegistry.findByProviderName(name);
+        return addon == null ? null : addon.tool().parameters();
     }
 
     public static List<String> getRegisteredFunctionNames() {
         var names = new ArrayList<>(registeredFunctions.keySet());
         names.addAll(playerConversationOnlyTools.keySet());
+        AiToolRegistry.registeredTools().stream().map(AiToolRegistry.RegisteredAiTool::providerName).forEach(names::add);
         return names;
     }
 
     public static List<BidiGenerateContentSetup.Tool> getEnabledTools() {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
-
         var tool = new BidiGenerateContentSetup.Tool();
         var rawToolsDisabled = McTalkingConfig.INSTANCE.instance().disabledTools;
 
-        var functions = Stream.concat(
+        var builtIns = Stream.concat(
                 registeredFunctions.values().stream(),
                 playerConversationOnlyTools.values().stream()
         );
 
         tool.functionDeclarations.addAll(
-                functions
+                builtIns
                         .filter(e -> !rawToolsDisabled.contains(e.getName()))
                         .filter(FunctionAction::isEnabled)
                         .map(e -> {
                             var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(e.getName(), e.getDescription());
-                            if (e.getProperty() != null)
-                                declaration.parameters = e.getProperty();
-
+                            if (e.getProperty() != null) declaration.parameters = e.getProperty();
                             return declaration;
                         })
                         .toList()
         );
+
+        for (var addon : AiToolRegistry.registeredTools()) {
+            var addonTool = addon.tool();
+            if (!addonTool.isEnabled() || rawToolsDisabled.contains(addon.providerName())) continue;
+            var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(
+                    addon.providerName(), addonTool.description());
+            if (addonTool.parameters() != null) declaration.parameters = addonTool.parameters();
+            tool.functionDeclarations.add(declaration);
+        }
 
         list.add(tool);
         return list;

@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.handler;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -32,7 +33,7 @@ public class RandomConversationHandler {
             var citizens = player.serverLevel().getEntitiesOfClass(AbstractEntityCitizen.class, nearbyBox);
 
             for (AbstractEntityCitizen citizen : citizens) {
-                if (!ConversationManager.canCitizenSpeak(citizen))
+                if (!ConversationManager.canCitizenSpeak(citizen, ConversationKind.RANDOM_CITIZEN))
                     continue;
 
                 if (Math.random() >= McTalkingConfig.INSTANCE.instance().randomConversationChance)
@@ -42,7 +43,7 @@ public class RandomConversationHandler {
                 for (AbstractEntityCitizen candidate : citizens) {
                     if (candidate == citizen)
                         continue;
-                    if (!ConversationManager.canCitizenSpeak(candidate))
+                    if (!ConversationManager.canCitizenSpeak(candidate, ConversationKind.RANDOM_CITIZEN))
                         continue;
                     partners.add(candidate);
                 }

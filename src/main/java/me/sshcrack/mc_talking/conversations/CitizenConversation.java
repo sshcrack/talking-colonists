@@ -5,6 +5,7 @@ import de.maxhenkel.voicechat.api.audiochannel.LocationalAudioChannel;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
@@ -15,6 +16,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -52,6 +54,8 @@ public class CitizenConversation {
      * Only used in FLASH_TTS mode.
      */
     private GeminiStream stream;
+    /** Flash/TTS uses one mixed channel; keep that channel on the moving group centroid. */
+    private volatile LocationalAudioChannel locationalChannel;
 
     /**
      * Only used in LIVE_WEBSOCKETS mode.
@@ -133,7 +137,7 @@ public class CitizenConversation {
     private void performFlashTtsConversation(Runnable fallback) {
         // Guard: all participants must be able to speak
         for (AbstractEntityCitizen p : participants) {
-            if (!ConversationManager.canCitizenSpeak(p)) {
+            if (!ConversationManager.canCitizenSpeak(p, ConversationKind.CITIZEN_PAIR)) {
                 setState(ConversationState.ENDED);
                 return;
             }
@@ -146,13 +150,38 @@ public class CitizenConversation {
                 setState(ConversationState.ENDED);
                 return;
             }
+            locationalChannel = channel;
             stream = new GeminiStream(channel);
         }
 
-        // Mark participants as busy so they can't be double-booked
+        // Claim exact-ownership activity reservations so delayed cleanup from this
+        // conversation cannot release newer work for the same citizen. The timeout is
+        // a final safety net for a Flash/TTS generation that never returns.
+        List<ConversationManager.CoreActivityReservation> activityReservations = new ArrayList<>();
+        AtomicBoolean activityTimeoutHandled = new AtomicBoolean(false);
+        Runnable timeout = () -> {
+            if (!activityTimeoutHandled.compareAndSet(false, true)) return;
+            abort();
+            server.execute(() -> {
+                for (AbstractEntityCitizen participant : participants) {
+                    if (ConversationManager.getPlayerForEntity(participant.getUUID()) == null) {
+                        AiStatusHelper.setAiStatusSynced(participant, AiStatus.NONE);
+                    }
+                }
+                setState(ConversationState.ENDED);
+            });
+        };
         for (AbstractEntityCitizen p : participants) {
-            ConversationManager.markBusy(p);
-            ConversationManager.registerAbortHandler(p, this::abort);
+            ConversationManager.CoreActivityReservation reservation = ConversationManager.reserveCoreActivity(
+                    p, 10, TimeUnit.MINUTES, timeout, this::abort);
+            if (reservation == null) {
+                for (ConversationManager.CoreActivityReservation acquired : activityReservations) {
+                    acquired.close();
+                }
+                setState(ConversationState.ENDED);
+                return;
+            }
+            activityReservations.add(reservation);
         }
 
         new Thread(() -> {
@@ -176,7 +205,13 @@ public class CitizenConversation {
                 stream.flushAudio();
 
                 long playbackDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
+                long nextLocationUpdate = 0L;
                 while (!aborted && stream.hasPendingPlayback() && System.nanoTime() < playbackDeadline) {
+                    long now = System.nanoTime();
+                    if (now >= nextLocationUpdate) {
+                        nextLocationUpdate = now + TimeUnit.MILLISECONDS.toNanos(100);
+                        server.execute(this::updateLocationalAudioChannel);
+                    }
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException interrupted) {
@@ -213,16 +248,16 @@ public class CitizenConversation {
                     fallback.run();
                 }
             } finally {
-                for (AbstractEntityCitizen p : participants) {
-                    ConversationManager.unregisterAbortHandler(p);
-                    ConversationManager.markNotBusy(p);
-                    if (!fallbackTriggered && !aborted) {
+                for (int i = 0; i < participants.size(); i++) {
+                    AbstractEntityCitizen p = participants.get(i);
+                    activityReservations.get(i).close();
+                    if (!fallbackTriggered && ConversationManager.getPlayerForEntity(p.getUUID()) == null) {
                         ConversationManager.recordCooldown(p);
                         AiStatusHelper.setAiStatusSynced(p, AiStatus.NONE);
                     }
                 }
 
-                if (!fallbackTriggered && !aborted) {
+                if (!fallbackTriggered) {
                     setState(ConversationState.ENDED);
                 }
             }
@@ -244,7 +279,7 @@ public class CitizenConversation {
         AbstractEntityCitizen citizenB = participants.get(1);
 
         // "Already busy" guard: abort if either citizen is already in any session
-        if (!ConversationManager.canCitizenSpeak(citizenA) || !ConversationManager.canCitizenSpeak(citizenB)) {
+        if (!ConversationManager.canCitizenSpeak(citizenA, ConversationKind.CITIZEN_PAIR) || !ConversationManager.canCitizenSpeak(citizenB, ConversationKind.CITIZEN_PAIR)) {
             McTalking.LOGGER.info("[LiveConv] One or both citizens can't speak, aborting");
             setState(ConversationState.ENDED);
             return;
@@ -392,6 +427,25 @@ public class CitizenConversation {
     // Helpers
     // -------------------------------------------------------------------------
 
+    private void updateLocationalAudioChannel() {
+        LocationalAudioChannel channel = locationalChannel;
+        if (channel == null) return;
+
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        int count = 0;
+        for (AbstractEntityCitizen citizen : participants) {
+            if (citizen == null || citizen.isRemoved()) continue;
+            x += citizen.getX();
+            y += citizen.getY();
+            z += citizen.getZ();
+            count++;
+        }
+        if (count == 0) return;
+        channel.updateLocation(vcApi.createPosition(x / count, y / count + 1.5, z / count));
+    }
+
     private LocationalAudioChannel constructLocationalAudioChannel() {
         Vec3 sum = Vec3.ZERO;
         Vec3 minPos = new Vec3(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
@@ -427,8 +481,9 @@ public class CitizenConversation {
     }
 
     private void setState(ConversationState newState) {
+        ConversationState previous = state.getAndSet(newState);
+        if (previous == newState) return;
         McTalking.LOGGER.info("Conversation state changed to {}", newState);
-        state.set(newState);
         if (onStateChanged != null) {
             onStateChanged.accept(newState);
         }

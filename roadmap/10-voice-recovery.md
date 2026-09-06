@@ -26,3 +26,16 @@ behavior. Handle concurrent selections and corrupt stored records safely.
 - A citizen can recover from its preferred rejected voice without changing other
   citizens' preferred voices or entering a reconnect loop.
 - Diagnostics identify model/mode/voice and recovery result without credentials.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Added `VoiceSelectionService`: deterministic preferred voices are preserved, but a
+  narrowly recognized explicit unsupported-voice `1007` temporarily excludes that
+  voice for the selected model and chooses a stable fallback. Generic 1007,
+  authentication, quota, and network failures do not alter exclusions. Pregeneration
+  and Live setup use the same selector. Added focused unit tests for rejection and
+  model isolation.
+- This does **not** complete task 10. Exclusions are currently model-scoped but not
+  separately keyed by Live/TTS backend, terminal candidate exhaustion diagnostics
+  and explicit reset/public lifecycle are incomplete, and the full expiry,
+  concurrency, corrupt-state, auth/quota/network acceptance matrix remains.

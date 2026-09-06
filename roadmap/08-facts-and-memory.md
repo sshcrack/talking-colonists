@@ -34,3 +34,14 @@ core. Preserve existing per-player relationship data and migrate older saves saf
   events do not duplicate memories or relationship changes.
 - Old memory data loads without loss; new provenance survives a save/reload cycle.
 - Document extension examples for Errands outcomes and Voyager expedition facts.
+
+## Implementation record — 2026-09-06 (addon API pass, partial)
+
+- Added `CitizenMemoryService`/`CitizenMemorySnapshot` so addons can append simple
+  facts/events and inspect memory without casting MineColonies citizen data to the
+  Talking Colonists duck interface. Prompt contributions provide a supported place
+  for addon-verified current observations such as Errands/Voyager state.
+- This does **not** complete task 08. The MineColonies truth-gap audit/base fact
+  expansion, explicit observation-vs-unknown freshness semantics, provenance data,
+  stable participant attribution, idempotent addon-confirmed events, relationship
+  change provenance, save migration, and save/reload fixtures remain.
