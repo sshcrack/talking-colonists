@@ -33,14 +33,14 @@ private fun getBuildscript(loader: String, version: String): String {
     return "build.$loader.gradle.kts"
 }
 
-val libraryDir = file("../gemini-live-library")
+val libraryDir = System.getenv("GEMINI_LIVE_LIBRARY_DIR")?.let(::file) ?: file("../gemini-live-library")
 if (libraryDir.exists()) {
     println("Including Gemini Live Library from $libraryDir")
     includeBuild(libraryDir) {
         dependencySubstitution {
-            substitute(module("me.sshcrack:gemini_live_lib:2.3.0-1.20.1-forge"))
+            substitute(module("me.sshcrack:gemini_live_lib:2.3.5-1.20.1-forge"))
                 .using(project(":1.20.1-forge"))
-            substitute(module("me.sshcrack:gemini_live_lib:2.3.0-1.21.1-neoforge"))
+            substitute(module("me.sshcrack:gemini_live_lib:2.3.5-1.21.1-neoforge"))
                 .using(project(":1.21.1-neoforge"))
         }
     }

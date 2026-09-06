@@ -27,11 +27,13 @@ class MemoryResponseParserTest {
 
     @Test
     void acceptsPlainAndSingleJsonFence() throws Exception {
-        var plain = MemoryResponseParser.parse(VALID, CONTEXT);
-        var fenced = MemoryResponseParser.parse("```json\n" + VALID + "\n```", CONTEXT);
+        var plain = MemoryResponseParser.parse("\n  " + VALID + "  \n", CONTEXT);
+        var fenced = MemoryResponseParser.parse("  ```json\n" + VALID + "\n```  ", CONTEXT);
+        var unlabeledFence = MemoryResponseParser.parse("```\n" + VALID + "\n```", CONTEXT);
 
         assertEquals("Anna", plain.citizens.get(0).name);
         assertEquals("Anna", fenced.citizens.get(0).name);
+        assertEquals("Anna", unlabeledFence.citizens.get(0).name);
         assertEquals(0.25f, plain.citizens.get(0).memories.relationships.get(0).change);
     }
 
@@ -68,6 +70,28 @@ class MemoryResponseParserTest {
     }
 
     @Test
+    void rejectsMissingRequiredFields() {
+        assertThrows(MemoryResponseParser.ValidationException.class,
+                () -> MemoryResponseParser.parse("{}", CONTEXT));
+        assertThrows(MemoryResponseParser.ValidationException.class,
+                () -> MemoryResponseParser.parse("{\"citizens\":[{\"memories\":{}}]}", CONTEXT));
+        assertThrows(MemoryResponseParser.ValidationException.class,
+                () -> MemoryResponseParser.parse("{\"citizens\":[{\"name\":\"Anna\"}]}", CONTEXT));
+    }
+
+    @Test
+    void validatesPlayerConversationTargetsSeparately() throws Exception {
+        var playerContext = MemoryResponseParser.ValidationContext.playerConversation("Anna", "Steve");
+        String response = VALID
+                .replace("\"Tomas\"", "\"Steve\"")
+                .replace("Tomas likes apples", "Steve likes apples")
+                .replace("with Tomas", "with Steve");
+
+        var parsed = MemoryResponseParser.parse(response, playerContext);
+        assertEquals("Steve", parsed.citizens.get(0).memories.relationships.get(0).target);
+    }
+
+    @Test
     void rejectsUnknownCitizenTargetAndRelationshipType() {
         assertThrows(MemoryResponseParser.ValidationException.class,
                 () -> MemoryResponseParser.parse(
@@ -85,6 +109,8 @@ class MemoryResponseParserTest {
                 () -> MemoryResponseParser.parse(VALID.replace("0.25", "1.01"), CONTEXT));
         assertThrows(MemoryResponseParser.ValidationException.class,
                 () -> MemoryResponseParser.parse(VALID.replace("0.25", "-1.01"), CONTEXT));
+        assertThrows(MemoryResponseParser.ValidationException.class,
+                () -> MemoryResponseParser.parse(VALID.replace("0.25", "1e309"), CONTEXT));
         assertThrows(MemoryResponseParser.ValidationException.class,
                 () -> MemoryResponseParser.parse(VALID.replace("\"facts\": [\"I learned Tomas likes apples\"]", "\"facts\": null"), CONTEXT));
     }

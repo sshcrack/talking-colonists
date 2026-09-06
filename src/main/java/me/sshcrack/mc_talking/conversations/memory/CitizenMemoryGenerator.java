@@ -79,9 +79,16 @@ public class CitizenMemoryGenerator extends Thread {
         try {
             McTalking.LOGGER.debug("Starting memory generation for {} citizen participants", participants.size());
             String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
+            var names = participants.stream().map(c -> c.getName().getString()).toList();
+            var validationContext = MemoryResponseParser.ValidationContext.citizenConversation(names);
             String memoryString;
             try {
-                memoryString = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, PROMPT, conversation);
+                memoryString = GeminiFlash.sendSimpleFlashRequest(
+                        McTalkingConfig.FLASH_MODEL,
+                        apiKey,
+                        PROMPT,
+                        conversation,
+                        MemoryStructuredOutput.forContext(validationContext));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 saveCoordinator.cancel("memory generation interrupted");
@@ -94,9 +101,7 @@ public class CitizenMemoryGenerator extends Thread {
 
             GsonMemoryResponse json;
             try {
-                var names = participants.stream().map(c -> c.getName().getString()).toList();
-                json = MemoryResponseParser.parse(memoryString,
-                        MemoryResponseParser.ValidationContext.citizenConversation(names));
+                json = MemoryResponseParser.parse(memoryString, validationContext);
             } catch (MemoryResponseParser.ValidationException e) {
                 McTalking.LOGGER.warn("Rejected invalid citizen-memory response: {}", e.getMessage());
                 saveCoordinator.generationFailed("invalid model memory response", e);

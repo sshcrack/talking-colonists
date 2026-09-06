@@ -21,7 +21,7 @@ Voyager owns expedition state. Core exposes the seams these addons need.
 | Order | Task and agent prompt | Depends on | Status |
 | --- | --- | --- | --- |
 | 01 | [Correct deterministic voice selection](01-voice-correction.md) | — | Complete |
-| 02 | [Reliable structured memory generation](02-memory-reliability.md) | — | Partial |
+| 02 | [Reliable structured memory generation](02-memory-reliability.md) | — | Complete |
 | 03 | [Composable prompt contributions](03-prompt-contributions.md) | — | Partial |
 | 04 | [Public tools and authorized execution](04-tool-interface.md) | — | Partial |
 | 05 | [Session ownership and bounded recovery](05-session-lifecycle.md) | — | Partial |
@@ -62,9 +62,10 @@ When implementing any linked task:
    transport/audio and controlled executors; avoid timing-dependent sleeps and tests
    that require Gemini credentials. Record exact commands and results.
 6. Run relevant tests and `./gradlew buildAndCollect --no-daemon` for implementation
-   changes. Verify both `1.21.1-neoforge` and `1.20.1-forge` artifacts. If a mixin
-   changes, run `bash scripts/test-mixin-smoke.sh` and follow `AGENTS.md` for the
-   verification marker. Never fabricate a marker or stage `.sc_active_version`.
+   changes. Verify both `1.21.1-neoforge` and `1.20.1-forge` artifacts. For any
+   launch-relevant runtime/API/resource/build change, run
+   `bash scripts/test-client-smoke.sh` and follow `AGENTS.md` for the verification
+   marker. Never fabricate a marker or stage `.sc_active_version`.
    Update `en_us.json` when configuration values change.
 7. If modifying `../gemini-live-library`, inspect its own instructions and tests,
    report changes in both repositories, and distinguish composite-build validation

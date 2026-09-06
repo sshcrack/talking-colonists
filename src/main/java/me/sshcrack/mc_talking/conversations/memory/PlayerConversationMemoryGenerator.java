@@ -110,7 +110,12 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
             String responseJson;
             try {
-                responseJson = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, prompt, "Generate the memory JSON now.");
+                responseJson = GeminiFlash.sendSimpleFlashRequest(
+                        McTalkingConfig.FLASH_MODEL,
+                        apiKey,
+                        prompt,
+                        "Generate the memory JSON now.",
+                        MemoryStructuredOutput.forPlayerConversation(citizenName, playerName));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);

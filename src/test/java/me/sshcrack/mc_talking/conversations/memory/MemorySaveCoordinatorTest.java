@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -81,4 +85,62 @@ class MemorySaveCoordinatorTest {
         assertEquals(MemorySaveCoordinator.Status.FAILED,
                 coordinator.completion().toCompletableFuture().join().status());
     }
+
+    @Test
+    void simultaneousGenerationAndAuthorizationPersistExactlyOnce() throws Exception {
+        Queue<Runnable> serverQueue = new ArrayDeque<>();
+        AtomicInteger saves = new AtomicInteger();
+        var coordinator = new MemorySaveCoordinator<String>(serverQueue::add, value -> saves.incrementAndGet());
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            var generation = executor.submit(() -> {
+                ready.countDown();
+                go.await();
+                coordinator.generationSucceeded("memory");
+                return null;
+            });
+            var authorization = executor.submit(() -> {
+                ready.countDown();
+                go.await();
+                coordinator.authorizeSave();
+                return null;
+            });
+
+            assertTrue(ready.await(2, TimeUnit.SECONDS));
+            go.countDown();
+            generation.get(2, TimeUnit.SECONDS);
+            authorization.get(2, TimeUnit.SECONDS);
+
+            assertEquals(1, serverQueue.size());
+            serverQueue.remove().run();
+            assertEquals(1, saves.get());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+
+    @Test
+    void persistenceFailureCompletesAsFailedAndDoesNotRetry() {
+        Queue<Runnable> serverQueue = new ArrayDeque<>();
+        AtomicInteger attempts = new AtomicInteger();
+        var coordinator = new MemorySaveCoordinator<String>(serverQueue::add, value -> {
+            attempts.incrementAndGet();
+            throw new IllegalStateException("disk write failed");
+        });
+
+        coordinator.generationSucceeded("memory");
+        coordinator.authorizeSave();
+        coordinator.authorizeSave();
+        assertEquals(1, serverQueue.size());
+
+        serverQueue.remove().run();
+        assertEquals(1, attempts.get());
+        var result = coordinator.completion().toCompletableFuture().join();
+        assertEquals(MemorySaveCoordinator.Status.FAILED, result.status());
+        assertEquals("memory persistence failed", result.detail());
+    }
+
 }

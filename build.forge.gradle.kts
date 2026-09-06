@@ -44,6 +44,10 @@ platform {
     }
 }
 
+// Create the public addon source set before configuring ModDev runs so the normal
+// Talking Colonists mod can expose both implementation and API outputs as one mod.
+configureAddonApi()
+
 legacyForge {
     version = "${prop("deps.minecraft")}-${prop("deps.forge")}"
 
@@ -66,17 +70,18 @@ legacyForge {
             ideName = "Forge Server (${sc.current.version})"
         }
 
-        val autoQuitWorld = providers.gradleProperty("mc_talking.world").orElse("").get().let { name ->
+        val forceCreateAutoQuitWorld = providers.gradleProperty("mc_talking.forceCreateWorld")
+            .map(String::toBoolean)
+            .orElse(false)
+            .get()
+        val autoQuitWorld = if (forceCreateAutoQuitWorld) "" else providers.gradleProperty("mc_talking.world").orElse("").get().let { name ->
             if (name.isNotEmpty()) name
             else file("run/saves").listFiles()
                 ?.filter { it.isDirectory }
                 ?.map { it.name }
                 ?.sorted()
                 ?.firstOrNull()
-                ?: run {
-                    logger.warn(":${sc.current.version} No world in run/saves/ for auto-quit. Use -Pmc_talking.world=<name> or create a world. Defaulting to 'CI_World'.")
-                    "CI_World"
-                }
+                .orEmpty()
         }
 
         register("clientAutoQuit") {
@@ -84,8 +89,11 @@ legacyForge {
             gameDirectory = file("run/")
             ideName = "Forge Client AutoQuit (${sc.current.version})"
             programArgument("--username=Dev")
-            programArgument("--quickPlaySingleplayer=$autoQuitWorld")
+            if (autoQuitWorld.isNotEmpty()) {
+                programArgument("--quickPlaySingleplayer=$autoQuitWorld")
+            }
             jvmArgument("-Dmc_talking.autoQuit=true")
+            jvmArgument("-Djava.io.tmpdir=${file("run").absolutePath}")
         }
     }
 
@@ -93,6 +101,7 @@ legacyForge {
     mods {
         register(prop("mod.id")) {
             sourceSet(sourceSets["main"])
+            sourceSet(sourceSets["addonApi"])
         }
     }
 
@@ -152,8 +161,6 @@ repositories {
         setUrl("https://thedarkcolour.github.io/KotlinForForge/")
     }
 }
-
-configureAddonApi()
 
 var loader = sc.current.component1().split("-")[1];
 publishing {

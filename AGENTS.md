@@ -31,45 +31,64 @@ When working with the Minecolonies API, look at the `scripts/MINECOLONIES_DOCS.m
 
 CI uses `./gradlew buildAndCollect --no-daemon`. JDK 25 (Microsoft) in CI.
 
-## Mixin Smoke Test
+## Required Client Launch Smoke Test
 
-After modifying any mixin class (in `src/main/java/me/sshcrack/mc_talking/mixin/`), you **must** verify it loads correctly on all supported versions. Run:
-
-```sh
-bash scripts/test-mixin-smoke.sh
-```
-
-This script:
-1. Discovers all version subprojects (1.21.1-neoforge, 1.20.1-forge) from `settings.gradle.kts`
-2. Launches each version's Minecraft client in parallel with `runClientAutoQuit`
-3. Each client auto-loads the first singleplayer world and quits after 60 ticks (~3s)
-4. Captures Gradle + Minecraft output to `/tmp/mixin-smoke-<version>-*.log`
-5. Copies each version's `run/logs/latest.log` alongside the Gradle output for deeper inspection
-6. Prints `[PASS]`/`[FAIL]` per version with the log file paths
-
-**What it tests:** The game starts, applies all mixins, enters a world, and shuts down cleanly without a crash. If a mixin has a bad target or causes a class-loading error, the game will fail to start or crash.
-
-**If a version fails:** Read the log file at the printed path and search for `mixin`, `error`, or `Exception`.
-
-### CI Verification
-
-CI does **not** run Minecraft (too slow). Instead, after a successful local run, `scripts/test-mixin-smoke.sh` creates `.mixin-smoke-verified` containing the current commit hash. **Commit this file** alongside your mixin changes:
+After changing runtime Java, API Java, resources, loader/build configuration, or the
+client-smoke infrastructure itself, you **must** verify that both supported clients
+actually launch. Run:
 
 ```sh
-bash scripts/test-mixin-smoke.sh   # creates .mixin-smoke-verified on success
-git add .mixin-smoke-verified
-git commit -m "verify mixin smoke test"
+bash scripts/test-client-smoke.sh
 ```
 
-The `mixin-smoke-verification` CI job checks that `.mixin-smoke-verified` exists and matches `HEAD`. This is a fast (~10s) required check that blocks PR merge if the smoke test isn't current.
+The smoke test:
+1. Discovers every Stonecutter version (`1.21.1-neoforge`, `1.20.1-forge`).
+2. Runs the versions **serially** with `runClientAutoQuit` and one Gradle worker, so
+   Minecraft/NeoForm downloads do not compete with each other.
+3. Uses an existing singleplayer save when available. On a clean checkout with no
+   save, auto mode opens Minecraft's vanilla create-world screen and creates a
+   default disposable smoke-test world automatically. A title screen alone never
+   counts as success.
+4. Requires the explicit `MC_TALKING_AUTOQUIT_SUCCESS:world` marker. Auto mode closes
+   itself only after the player has actually entered a world and remained there for
+   60 client ticks, with an in-client startup deadline.
+5. Watches the Minecraft/Gradle logs for crash markers and terminates the whole
+   client process group immediately on a detected crash. A hard external timeout
+   also terminates hung clients, so auto mode must not leave a crash/loading window
+   open indefinitely.
+6. Captures Gradle and Minecraft logs under `/tmp/client-smoke-*.log`. In headless
+   environments it automatically uses `xvfb-run` when available.
 
-A pre-commit hook (`check-mixin-smoke-required`) **blocks** the commit if mixin files are staged but `.mixin-smoke-verified` doesn't match `HEAD`. Run the smoke test, stage the generated `.mixin-smoke-verified` file, then commit.
+If the sandbox can reach Mojang metadata but its asset CDN is blocked, use
+`CLIENT_SMOKE_METADATA_ONLY_ASSETS=1 bash scripts/test-client-smoke.sh`. This still
+launches the real client, creates/enters the smoke world, and exercises mixins/mod
+construction; it only skips downloading cosmetic vanilla asset objects.
 
-If you need to bypass (e.g., CI-only fix): `git commit --no-verify`.
+On success the script writes `.client-smoke-verified`, which contains a fingerprint
+of all launch-relevant worktree content. Stage the intended changes before running
+the test, then stage the marker:
+
+```sh
+git add <intended runtime/build changes>
+bash scripts/test-client-smoke.sh
+git add .client-smoke-verified
+```
+
+The pre-commit hook compares the marker with the staged launch-relevant content and
+blocks stale or missing verification. CI independently compares the committed marker
+with the committed tree. This avoids the old commit-hash race where a marker could
+only describe the parent commit rather than the code being committed.
+
+Mixin changes receive the same real-launch coverage through this required client
+smoke test, and `scripts/check-mixin-registration.sh` separately enforces mixin
+registration.
+
+If a version fails, inspect the printed Gradle log and its adjacent `-minecraft.log`
+copy. Do not fabricate or hand-edit `.client-smoke-verified`.
 
 ## Local Gemini Live Library
 
-For local development the Gemini Live Library can be included as a composite build at `../gemini-live-library`. When it exists, publishing tasks **fail** unless you confirm with:
+For local development the Gemini Live Library can be included as a composite build at `../gemini-live-library`, or pointed elsewhere with `GEMINI_LIVE_LIBRARY_DIR`. When a composite library is present, publishing tasks **fail** unless you confirm with:
 
 ```sh
 ./gradlew publishMods -PgeminiPublished=true

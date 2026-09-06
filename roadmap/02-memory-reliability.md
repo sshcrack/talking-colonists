@@ -38,19 +38,62 @@ failure result without logging credentials or full private transcripts by defaul
 - Library and mod tests pass; both loaders build. Record the published dependency
   version requirement if the composite build contains necessary library changes.
 
-## Implementation record — 2026-09-06 (addon API pass, partial)
+## Implementation record — 2026-09-06
 
-- Added a shared strict `MemoryResponseParser` and moved both citizen-to-citizen and
-  player-memory parsing through it. It accepts plain JSON or one enclosing `json`
-  fence, normalizes omitted optional collections, and rejects malformed roots,
-  unknown citizens/relationship targets/types, and out-of-range/non-finite deltas
-  before persistent memory is mutated.
-- Replaced the citizen generator's `shouldSaveMemory` / `savedResponse` race with
-  `MemorySaveCoordinator`, which serializes generation, authorization, cancellation,
-  failure, and one-shot server-thread persistence. Added deterministic parser and
-  coordinator tests.
-- This does **not** complete task 02. Opt-in Gemini structured-output MIME/schema
-  support and its request-serialization tests are still missing, as is the explicit
-  compaction-format verification/library dependency record required by acceptance.
-  The standalone task-02 implementation should reconcile with these shared parser
-  and coordinator classes instead of creating competing implementations.
+- Added opt-in structured-output support to `GeminiFlash` in Gemini Live Library
+  **2.3.5**. JSON callers can now supply `generationConfig.responseMimeType =
+  "application/json"` plus `responseJsonSchema`; existing text-only overloads omit
+  `generationConfig` and retain their previous behavior. Request-serialization tests
+  cover both modes on Forge 1.20.1 and NeoForge 1.21.1. Talking Colonists therefore
+  requires Gemini Live Library 2.3.5 once these library changes are published.
+- Added `MemoryStructuredOutput`, with contextual schemas for both citizen↔citizen
+  and player↔citizen extraction. Citizen names and relationship targets are limited
+  to actual conversation participants, relationship dimensions are limited to the
+  public enum, unknown properties are rejected, and relationship deltas are bounded
+  to `[-1, 1]`. Both JSON-generating memory paths opt into this schema.
+- Kept memory compaction intentionally **plain text**. Both Flash compaction and the
+  Live compaction client produce a human-readable summary string that is stored as
+  summarized memory; it is not a machine-consumed JSON document. The Flash path
+  therefore continues using the text-only `GeminiFlash` overload, whose serialization
+  test verifies that structured-output settings are absent.
+- Consolidated persistent-memory parsing through `MemoryResponseParser`. It accepts
+  plain JSON or exactly one enclosing Markdown fence (labeled `json` or unlabeled),
+  tolerates surrounding whitespace, normalizes omitted optional relationship/fact/event
+  collections to empty lists, and rejects null/malformed/truncated roots, missing
+  required fields, embedded prose, explicit-null collections, unknown citizens or
+  relationship targets/types, duplicate citizens, and non-finite/out-of-range deltas
+  before any persistent-memory mutation is scheduled.
+- Replaced the citizen generator's unsynchronized save handoff with
+  `MemorySaveCoordinator`. Generation and save authorization may complete in either
+  order or simultaneously; persistence is dispatched exactly once to the server
+  thread. Repeated authorization/generation, cancellation, generation failure, and
+  persistence exceptions have deterministic terminal results, and success is only
+  reported after persistence returns successfully.
+- The new required real-client smoke test exposed an addon-source-set runtime defect
+  that compile/build tests missed: development runs registered only `main`, so normal
+  mod code could throw `NoClassDefFoundError` for public API classes. Both loader run
+  configurations now register `main` and `addonApi` as the same Talking Colonists mod,
+  while the distributable mod jar still embeds the API and the developer `-api` jar
+  remains stripped to supported API classes only.
+- Replaced the old mixin-only smoke concept with one required client launch smoke test.
+  It starts a real client for both loaders, automatically handles the accessibility
+  onboarding screen, creates a fresh disposable `MC_Talking_Smoke` world, enters it,
+  waits 60 client ticks, and then closes. Headless runs use Xvfb when available; known
+  mod-loading/crash markers terminate the process group immediately rather than leaving
+  an error screen open. Pre-commit/CI use a content fingerprint marker to require fresh
+  launch verification for launch-relevant changes.
+
+### Validation
+
+- `./gradlew test --no-daemon --max-workers=1` passed in Gemini Live Library 2.3.5 on
+  both supported loader projects.
+- `./gradlew buildAndCollect --no-daemon --max-workers=1` passed in Gemini Live Library.
+- Talking Colonists `./gradlew test --no-daemon --max-workers=1` and
+  `./gradlew buildAndCollect --no-daemon --max-workers=1` passed against the local
+  Gemini Live Library 2.3.5 composite build.
+- `CLIENT_SMOKE_METADATA_ONLY_ASSETS=1 bash scripts/test-client-smoke.sh` passed in
+  the Laptop MCP sandbox on both NeoForge 1.21.1 and Forge 1.20.1 after the `addonApi`
+  runtime registration fix, each creating a fresh world and reaching
+  `MC_TALKING_AUTOQUIT_SUCCESS:world`. The metadata-only flag was needed because the
+  sandbox could not reach Mojang's vanilla asset-object CDN; it does not skip mod
+  construction, mixin application, world creation, or in-world ticks.

@@ -58,7 +58,7 @@ jobs:
           name: build-artifacts
           path: build/libs/
 
-  mixin-smoke-verification:
+  client-smoke-verification:
     runs-on: ubuntu-latest
     needs: build
 
@@ -68,44 +68,22 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Verify mixin smoke test was run locally
+      - name: Verify required client launch smoke test was run locally
         run: |
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            echo "No base commit to compare against — skipping mixin detection"
-            exit 0
-          fi
-          mixin_changed=$(git diff --name-only "$base"..HEAD -- 'src/main/java/me/sshcrack/mc_talking/mixin/' 'src/main/resources/*.mixins.json' 2>/dev/null || true)
-          if [ -z "$mixin_changed" ]; then
-            echo "No mixin changes detected — smoke test not required"
-            exit 0
-          fi
-
-          if [ ! -f .mixin-smoke-verified ]; then
-            echo "ERROR: Mixin smoke test not run locally."
-            echo "Run 'bash scripts/test-mixin-smoke.sh' and commit .mixin-smoke-verified."
-            exit 1
-          fi
-          last_mixin_commit=$(git log -1 --format="%H" "$base"..HEAD -- 'src/main/java/me/sshcrack/mc_talking/mixin/' 'src/main/resources/mc_talking.mixins.json' 2>/dev/null || true)
-          if [ -z "$last_mixin_commit" ]; then
-            echo "Could not determine last mixin commit — assuming smoke test is valid"
-            exit 0
-          fi
-
-          verified=$(tr -d ' \n' < .mixin-smoke-verified)
-          if [ -z "$verified" ]; then
-            echo "ERROR: .mixin-smoke-verified is empty."
+          if [ ! -f .client-smoke-verified ]; then
+            echo "ERROR: Client launch smoke test has not been verified."
+            echo "Run 'bash scripts/test-client-smoke.sh' and commit .client-smoke-verified."
             exit 1
           fi
 
-          if ! git merge-base --is-ancestor "$verified" HEAD 2>/dev/null; then
-            echo "ERROR: Verified commit $verified is not an ancestor of HEAD."
+          verified=$(tr -d ' \n' < .client-smoke-verified)
+          expected=$(python3 scripts/client-smoke-fingerprint.py head)
+          if [ -z "$verified" ] || [ "$verified" != "$expected" ]; then
+            echo "ERROR: Client launch smoke verification is stale."
+            echo "verified: $verified"
+            echo "expected: $expected"
+            echo "Re-run 'bash scripts/test-client-smoke.sh' locally and commit .client-smoke-verified."
             exit 1
           fi
 
-          if ! git merge-base --is-ancestor "$last_mixin_commit" "$verified" 2>/dev/null; then
-            echo "ERROR: Mixin smoke test is stale. Last mixin change ($last_mixin_commit) is newer than verified commit ($verified)."
-            echo "Re-run 'bash scripts/test-mixin-smoke.sh' locally and commit .mixin-smoke-verified."
-            exit 1
-          fi
-          echo "✓ Mixin smoke test verified (last mixin change $last_mixin_commit ≤ verified $verified)"
+          echo "✓ Client launch smoke fingerprint matches committed launch-relevant content"

@@ -29,7 +29,7 @@ blocker and retain the distinction between composite success and release readine
 - Public examples compile for both loaders; tests cover simultaneous contributors
   and tools from two addons, session cleanup, permissions, and old-save loading.
 - Record in-world validation for player dialogue, paired dialogue, controlled group
-  turns, interruption, disconnect, and shutdown; run mixin smoke checks if applicable.
+  turns, interruption, disconnect, and shutdown; run the required client launch smoke check.
 - Both distributable mod artifacts and their library requirements are verified.
 - Release notes state implemented behavior, compatibility limits, and remaining
   manual checks. Roadmap statuses match evidence rather than planned outcomes.
