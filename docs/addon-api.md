@@ -4,10 +4,9 @@ Talking Colonists treats addons as a first-class integration surface. Supported 
 under `me.sshcrack.mc_talking.api`; `ConversationManager`, websocket clients, audio queues, handlers,
 `duck` interfaces, pregeneration caches and other implementation packages are not API.
 
-This document describes **API generation 2**, the breaking baseline introduced to replace the legacy
-flat prompt snapshot, isolate MineColonies compatibility behind Talking Colonists-owned types, and remove
-provider-specific declaration types.
-`TalkingColonistsApi.API_MAJOR_VERSION` is `2`.
+This document describes the supported **API generation 2** addon contract.
+`TalkingColonistsApi.API_MAJOR_VERSION` is `2`. Migration guidance is maintained separately in
+[addon-migration.md](addon-migration.md).
 
 ## Runtime vs developer artifact
 
@@ -73,9 +72,8 @@ on a server stop unless the addon will register them again for the next server.
 
 ## Normalized citizen context
 
-The old giant constructible `CitizenPromptView` record was replaced by a read-only grouped interface.
-The Talking Colonists-owned compatibility enums remain intentionally part of the API: they form a stable
-firewall between addon code and MineColonies patch-level API churn.
+`CitizenPromptView` is a read-only grouped interface. Talking Colonists-owned compatibility enums form
+a stable firewall between addon code and MineColonies patch-level API churn.
 
 ```java
 CitizenPromptView snapshot = CitizenContextService.snapshot(citizen, player);
@@ -108,7 +106,7 @@ needs updating. `CitizenStatusType`, `HappinessModifierType`, and `CitizenSkill`
 
 ## Prompt extensions
 
-Most addons should contribute bounded context instead of replacing the full prompt:
+Most addons should contribute bounded context through prompt contributors:
 
 ```java
 var registration = CitizenPromptService.registerContributor(
@@ -128,7 +126,7 @@ Use:
 - `recollection` for remembered/inferred facts.
 - `instruction` for addon-owned conversational guidance, never to bypass core permissions.
 
-An integration that deliberately owns the complete prompt can register a provider override:
+An integration that deliberately owns the complete prompt can register a provider:
 
 ```java
 var registration = CitizenPromptService.registerProvider(
@@ -138,12 +136,11 @@ var registration = CitizenPromptService.registerProvider(
 ```
 
 The highest provider priority wins; ties are deterministic by namespaced ID. Closing that handle
-falls back to the next provider or the Talking Colonists default. There is no mutable global
-`setProvider/resetProvider` singleton API anymore.
+selects the next provider or the Talking Colonists default.
 
 ## AI tools
 
-Register addon tools rather than reflecting into built-in tool maps:
+Addon tools are registered with `AiToolRegistry`:
 
 ```java
 var registration = AiToolRegistry.register("my_addon", "come_here", new AiTool() {
@@ -197,7 +194,7 @@ only your namespaced addon/tool ID.
 
 ## Conversation eligibility and policy
 
-Addon state can veto speech without mixing into random-conversation handlers or need assessment:
+Addon state can participate in speech and urgency policy through registered rules:
 
 ```java
 var speech = CitizenConversationRules.registerSpeechPolicy(
@@ -228,7 +225,7 @@ if (!eligibility.eligible()) {
 
 ## Starting speech and conversations
 
-Player conversation starts return a typed immediate result instead of an ambiguous boolean:
+Player conversation starts return a typed immediate result:
 
 ```java
 ConversationStartResult result =
@@ -254,8 +251,7 @@ CitizenConversationService
 ```
 
 `hasAmbientCapacity(slots)`, `hasPlayerNearby(citizen, range)`, `activePlayerId(citizen)`,
-`activeKind(citizen)` and `requestGracefulEnd(citizen)` cover common queries/actions without
-exposing provider clients or manager collections.
+`activeKind(citizen)` and `requestGracefulEnd(citizen)` provide common conversation queries and actions.
 
 ## Conversation lifecycle observation
 
@@ -303,7 +299,7 @@ A direct player conversation retains core takeover priority; addons never own pr
 
 ## Memories
 
-Use `CitizenMemoryService` instead of casts to Talking Colonists data-extension interfaces:
+Citizen memory is accessed through `CitizenMemoryService`:
 
 ```java
 CitizenMemoryService.addEvent(citizen, "I returned from the End expedition safely.");
@@ -322,11 +318,10 @@ for (CitizenRelationshipView relationship : snapshot.orElseThrow().relationships
 CitizenMemoryService.removeFact(citizen, "My expedition partner is Marta.");
 ```
 
-Relationship dimensions are Talking Colonists-owned semantic values shared by core and addons; the
-internal memory implementation no longer carries a duplicate enum. Relationship deltas use the same
-finite `[-1, 1]` validation as model-generated changes. Exact fact/event removal lets addon-owned
-state be corrected without direct collection access. Memory storage, compaction, session tokens,
-broadcast/rumor propagation and save coordination remain core responsibilities.
+Relationship dimensions are Talking Colonists-owned semantic values shared by core and addons.
+Relationship deltas use finite `[-1, 1]` validation. Exact fact/event removal supports correction of
+addon-owned state. Memory storage, compaction, session tokens, broadcast/rumor propagation and save
+coordination are core responsibilities.
 
 ## Autonomous citizen conversations
 
@@ -402,6 +397,6 @@ The following are intentionally not extension points:
 - Internal memory objects/session tokens/compaction tasks.
 - Urgent-contact walking state and watchdog maps.
 
-If addon functionality requires one of those details, add a semantic API operation/event instead of
-making the internal object public. This keeps addon compatibility tied to gameplay contracts rather
-than Talking Colonists implementation choices.
+If addon functionality requires one of those details, the supported API should gain a semantic
+operation or event while the raw object remains internal. Addon compatibility is tied to gameplay
+contracts rather than Talking Colonists implementation choices.

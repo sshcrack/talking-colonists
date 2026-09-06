@@ -1,105 +1,256 @@
-# Colonist Errands integration audit
+# Addon API migration guide
 
-Reviewed source: `Lovkar-Squid/colonist-errands` commit
-`f270362aca847726087213c623508ad0a65354c1` (GPL-3.0). Voyager was reviewed at
-`6666432ec94e58089635dfe8ea3cc6967b59f12f`; its Talking Colonists integration is currently routed
-through Colonist Errands. No public Colony Meetings source repository was found during this audit.
+This guide is for addon developers migrating integrations to Talking Colonists API generation 2.
+The current API reference is [addon-api.md](addon-api.md); this document focuses on breaking changes,
+legacy integration patterns, and their supported replacements.
 
-This is a migration disposition for the reviewed source revision, not a claim that an existing
-Colonist Errands release already works against the new API.
+API generation 2 deliberately makes `me.sshcrack.mc_talking.api` the addon boundary. Code under
+`ConversationManager`, websocket/provider clients, audio queues, `duck` interfaces, mixins, handlers,
+pregeneration caches, and other implementation packages must be treated as internal.
 
-## Talking Colonists mixins
+## Dependency setup
 
-| Errands mixin | Why it exists in the reviewed addon | Talking Colonists disposition |
-| --- | --- | --- |
-| `GeminiFlashMixin` | Memory JSON can arrive inside a Markdown fence and fail Gson parsing. | **Core fix.** Both memory generators use one strict `MemoryResponseParser` accepting plain JSON or one enclosing `json` fence. Invalid output is rejected before persistent mutation. No Flash-wide response mixin is needed. |
-| `CitizenPromptServiceMixin` | Appends aliases, promises, truth blocks, research/death/build/Voyager context. | **Public extension.** Register composable `CitizenPromptContributor`s. Current observations and recollections are typed and bounded; contributors coexist instead of replacing the provider. |
-| `GeminiWsClientMixin` | Prevent cut-off goodbye, suppress repeated goodbye, discard stale audio after token invalidation, learn rejected voices, stop endless reconnects. | **Core fixes.** Graceful close waits for playback; late post-final-turn output is discarded; invalidated-session queued audio is dropped; explicit voice rejection gets bounded model-scoped fallback; recovery has total-attempt/time bounds and idle non-player close 1008 is terminal. No client/stream mixin is intended. |
-| `CitizenNeedAssessorMixin` | Suppresses urgent contact for addon military duty/promises and state the addon knows is already being handled. | **Public extension.** `CitizenConversationRules.registerUrgencyModifier` receives core's calculated weight; addon rules can reduce/zero it without reflecting config or copying core formulas. Current factual gaps should be contributed as observations until/unless core can derive them itself. |
-| `PregenerationPlaybackMixin` | Captures the pregenerated `GeminiStream` so it can be interrupted. | **Core fix.** `PregenerationPlayback` owns active playback entries and higher-priority takeover cleanup. Addons should not access streams. |
-| `PregenerationTaskServiceMixin` | Prevents cached morning/evening greetings from becoming stale. | **Core fix + public extension.** Non-threat cached prompts are time/weather/meal neutral by default. Additional addon constraints use `PregenerationPromptService`. |
-| `McTalkingVoicechatPluginMixin` | Uses player voice activity to barge into pregenerated clips. | **Core fix.** Voice activity now reaches pregenerated playback even when no direct Live conversation exists, with debounce/early-playback protection. |
-| `CitizenConversationMixin` | Marks small talk priority, flushes Flash/TTS tail, follows moving speakers. | **Core fixes / API.** Flash/TTS tail flushing and playback drain are owned by core; low-priority sessions no longer evict active sessions; the mixed locational channel follows the participants' centroid during playback. Addons use pair/controlled conversation handles rather than state/stream shadows. |
-| `RandomConversationHandlerMixin` | Prevents workers/guards/addon-busy citizens from being selected for gossip. | **Public extension.** Register a `CitizenSpeechPolicy` and veto `ConversationKind.RANDOM_CITIZEN` (or other automatic kinds) from addon state. |
-| `ConversationManagerMixin` | Makes low-priority capacity honest and avoids evicting someone mid-sentence. | **Core fix.** Low-priority capacity now means genuinely free capacity and low-priority claims never evict an existing conversation. Player conversations retain preemption priority. |
+Use the developer-only API artifact for compilation and the normal Talking Colonists mod for the dev
+runtime. See [addon-api.md](addon-api.md#runtime-vs-developer-artifact) for Maven coordinates and the
+public repository.
 
-## Mixins that are not Talking Colonists integration points
+Do not package `mc_talking-api` into the addon JAR and do not ask players to install it separately.
 
-`BlockHutTavernMixin` changes MineColonies' one-tavern placement rule and
-`ItemAssistantHammerMixin` observes a MineColonies assistant-hammer action. Talking Colonists cannot
-remove those mixins by exposing its own API; they target a different mod. If MineColonies exposes an
-event/API for those behaviours, Colonist Errands should migrate to that upstream seam.
+## General migration rule
 
-## Non-mixin internal access
+When an addon previously reached into a Talking Colonists implementation class, migrate to the
+semantic operation, snapshot, registration, event, or reservation exposed by the API. Do not replace
+one internal dependency with another internal dependency.
 
-| Reviewed Errands access | Supported replacement |
+If the API does not expose a concept an addon genuinely needs, request a supported API seam rather
+than depending on manager collections, provider clients, queues, or mixin-only state.
+
+## Common integration replacements
+
+| Legacy integration pattern | API generation 2 replacement |
 | --- | --- |
-| Reflection into `AITools.playerConversationOnlyTools` | `AiToolRegistry.register(namespace, name, AiTool)` |
-| `PlayerFunctionAction` / model-supplied actor lookup | `AiToolScope.PLAYER_CONVERSATION` + authoritative `AiToolContext.player()` |
-| Repeated `ConversationManager.getPlayerForEntity` for tool authorization | Use `AiToolContext.player()` inside tools; otherwise `CitizenConversationService.activePlayerId(citizen)` |
-| `CitizenDataMemoryExtended` casts | `CitizenMemoryService.addEvent`, `addFact`, `snapshot` |
-| `markBusy` / `markNotBusy` for an errand | `CitizenConversationService.reserveActivity(...)` and close its `CitizenActivityReservation` |
-| `getClientForEntity(...).endConversationWhenPossible()` | `CitizenConversationService.requestGracefulEnd(citizen)` |
+| Imports, reflection, accessors, or mixins targeting `ConversationManager` | `CitizenConversationService`, `CitizenConversationRules`, conversation handles, lifecycle listeners |
+| Flat/constructible `CitizenPromptView` field access | Grouped read-only `CitizenPromptView`: `identity()`, `family()`, `wellbeing()`, `work()`, `colony()`, `conversation()`, `activity()`, `memories()` |
+| Global prompt-provider mutation | `CitizenPromptService.registerContributor(...)` for composable context, or `registerProvider(...)` for complete providers |
+| Prompt mixins that append addon facts | `CitizenPromptContributor` + typed `PromptContribution` |
+| Direct MineColonies AI enums or raw state-name strings in addon contracts | Talking Colonists compatibility enums such as `CitizenAIState`, `AIWorkerState`, `MinimalAISubState`, `CitizenStatusType`, `HappinessModifierType`, `CitizenSkill` |
+| Reflection into built-in AI tool maps | `AiToolRegistry.register(...)` |
+| `FunctionAction` / player-only internal tool subclasses | `AiTool`, `AiToolScope`, and authoritative `AiToolContext.player()` / `requirePlayer()` |
+| Provider-specific tool schema classes | `AiToolParameter` |
+| World mutation directly from an AI callback thread | `AiToolContext.runOnServerThread(...)` or `supplyOnServerThread(...)` |
+| Boolean-only conversation start handling | `ConversationStartResult`, `ConversationEligibility`, and `AmbientLineResult` |
+| Polling manager/client state to learn when conversations start or end | `CitizenConversationService.registerLifecycleListener(...)` |
+| Manual busy maps / `markBusy` / `markNotBusy` | `CitizenConversationService.reserveActivity(...)` and `CitizenActivityReservation` |
 | Direct `new CitizenConversation(...)` | `createPairConversation(...)` or `createControlledSession(...)` |
-| `forceRemoveCooldown` | `CitizenConversationService.resetAutomaticCooldown(citizen)` |
-| `hasLowPriorityCapacity` plus max-agent config reflection | `CitizenConversationService.hasAmbientCapacity(slots)` |
-| `ConversationManager.hasPlayerNearby` for audible group-chat gating | `CitizenConversationService.hasPlayerNearby(citizen, range)` |
-| Reflection into `CitizenConversation.state/stream` | Pair-handle state or controlled-turn completion future; stream remains private |
-| Reflection into `CitizenWsClient.onSystemConversationEnded` | Controlled/ambient completion fires after audible playback |
-| Reflection into `GeminiStream` queues/player | No replacement by design: queue drain, stale-output discard, cancellation and barge-in are core responsibilities |
-| Reflection into `ConversationManager` slot/busy/background maps | No replacement by design: use availability/reservation/conversation services; lifecycle bookkeeping stays private and token-owned |
-| Errands `SessionReaper` cleanup of pregeneration/compaction slots, orphan foreground slots, urgent walks and stale busy marks | **Core fix.** Background reservations are ownership-token scoped and deadline-bounded (pregen 3 min, compaction 10 min); orphan foreground claims are reaped after 2 min when no client/player owns them; urgent walks abort after 60 s; Flash/TTS and cached-playback busy state use bounded token-owned core activity reservations. Addons should not inspect or reap these maps. |
-| Reflection into `UrgentContactHandler.walkingCitizens` | No replacement by design: core bounds walk lifecycle and repathing; addon policy can veto urgency/speech rather than reaping core state |
-| Reflection into `LiveConversationWsClient.heldAudioChunks` | No replacement by design: playback ordering/drain is core-owned |
-| Reflection into `McTalkingConfig.blockingTaskUrgencyMultiplier` | Urgency modifier receives the already-calculated core weight |
+| Direct client shutdown / `endConversationWhenPossible()` | `CitizenConversationService.requestGracefulEnd(...)` |
+| Internal cooldown mutation | `CitizenConversationService.resetAutomaticCooldown(...)` |
+| Internal foreground/ambient slot inspection | `CitizenConversationService.hasAmbientCapacity(...)` and typed eligibility/start results |
+| Internal player-conversation lookup | `AiToolContext.player()` inside tools or `CitizenConversationService.activePlayerId(...)` elsewhere |
+| Direct memory duck-interface casts | `CitizenMemoryService` and `CitizenMemorySnapshot` |
+| Pregeneration service/cache prompt mixins | `PregenerationPromptService.registerModifier(...)` |
+| Raw audio queues, provider websocket streams, stale-token cleanup, playback drain/reaping | No addon API replacement; these are core-owned lifecycle responsibilities |
 
-Other reflection in the reviewed addon targets MineColonies, optional economy/marketplace mods, or its
-own compatibility layers and is outside Talking Colonists' API responsibility.
+## Prompt-context migration
 
-## Behaviour fixes incorporated into core
+API generation 1 exposed a wide prompt snapshot. API generation 2 groups context by domain.
 
-The reviewed workarounds also identified reliability issues that should not be extension points:
+Typical field migrations look like this:
 
-- Flash/TTS audio is flushed and drained before a normal conversation finishes.
-- Low-priority background speech cannot cut off another ambient speaker to obtain capacity.
-- A requested final turn drains audibly before graceful close and has a bounded fallback timeout.
-- Output generated after that final turn is ignored, avoiding a second tool-driven goodbye.
-- Replaying after an invalid session token discards stale queued audio first.
-- Non-player sessions cannot reconnect indefinitely: recovery has a total attempt/time budget, and a
-  silent provider-aborted `1008` session becomes terminal.
-- Explicit unsupported-voice `1007` errors can select a stable fallback without treating unrelated
-  websocket errors as voice failures.
-- Pregenerated clips can be interrupted by deliberate nearby player speech and by higher-priority
-  conversation takeover.
-- Cached greetings are authored to remain valid when played later.
-- Flash/TTS citizen-to-citizen audio follows the moving conversation group instead of remaining at
-  its generation-time coordinate.
-- Memory generation validates the complete response before mutation and coordinates generation vs
-  save authorization exactly once.
-- Background Live work has core-owned deadlines and ownership tokens, so an evicted task's delayed
-  callback cannot close a replacement task for the same citizen.
-- Orphan foreground reservations, hung internal busy activities, and urgent walk-to-player attempts
-  have bounded core cleanup rather than requiring an addon watchdog.
-- Delivery pregeneration failure/eviction clears its in-flight marker so the delivery can retry.
+```java
+// API generation 1 style
+view.name();
+view.jobName();
+view.workAiState();
+view.happiness();
 
-## Colony Meetings mapping
+// API generation 2
+view.identity().name();
+view.work().jobName();
+view.activity().workState();
+view.wellbeing().happiness();
+```
 
-No implementation repository was available to inspect. The proposed ownership split maps directly to
-`ControlledConversationSession`:
+Addon-owned facts should generally be supplied with a contributor:
 
-- **Meetings addon:** attendee selection, podium block, seats, navigation, hand raising, arrival,
-  floor decisions, meeting start/end.
-- **Talking Colonists:** one current speaker, prompt/dialogue context, Gemini capacity, audible
-  playback completion, interruption, transcript attribution, cleanup.
+```java
+AddonRegistration registration = CitizenPromptService.registerContributor(
+        "my_addon:expedition",
+        100,
+        (view, target) -> List.of(PromptContribution.observation(
+                "Expedition state",
+                view.identity().name() + " returned from the expedition.")));
+```
 
-A meeting should move the selected citizen first, then call `requestTurn`. Advance the floor only
-when the returned future reports `COMPLETED`; this represents audible playback completion. Player
-statements can be added to shared context with `addPlayerStatement`. Opening a meeting does not open
-one provider connection per silent attendee.
+Use a full `CitizenPromptProvider` only when the addon intentionally owns complete prompt generation.
 
-## Compatibility note
+## MineColonies state migration
 
-The reviewed Colonist Errands source declares Talking Colonists `[1.7,1.8)`. It still imports and
-mixes into 1.7-era internals. It must be migrated before claiming compatibility with the API described
-here. The purpose of this work is to make that migration possible without replacing those hooks with
-new internal dependencies.
+Talking Colonists-owned compatibility enums are intentionally separate from MineColonies enums.
+This keeps addon binaries insulated from MineColonies patch releases that change enum classes or
+constants.
+
+Addon code should switch on the Talking Colonists types:
+
+```java
+switch (view.activity().workState()) {
+    case FARMER_HARVEST -> onHarvesting();
+    case NEEDS_ITEM -> onWaitingForSupplies();
+    case UNKNOWN -> onUnknownWorkState();
+    default -> { }
+}
+```
+
+`UNKNOWN` is the runtime compatibility fallback. Talking Colonists' own compatibility tests require
+known states in each supported MineColonies dependency to map to explicit API values, so MineColonies
+updates are handled in Talking Colonists instead of every addon.
+
+The same rule applies to citizen AI state, fine-grained activity state, visible status, happiness
+modifier type, and citizen skill.
+
+## AI tool migration
+
+An internal/player-aware tool should become an `AiTool` registration:
+
+```java
+AddonRegistration registration = AiToolRegistry.register("my_addon", "accept_job", new AiTool() {
+    @Override
+    public String description() {
+        return "Accept the offered addon job.";
+    }
+
+    @Override
+    public AiToolScope scope() {
+        return AiToolScope.PLAYER_CONVERSATION;
+    }
+
+    @Override
+    public AiToolParameter parameters() {
+        return AiToolParameter.object(Map.of(
+                "job", AiToolParameter.string(true)
+        ));
+    }
+
+    @Override
+    public JsonObject execute(AiToolContext context, JsonObject parameters) {
+        ServerPlayer player = context.requirePlayer();
+        context.runOnServerThread(() -> acceptJob(context.citizen(), player));
+        return new JsonObject();
+    }
+});
+```
+
+Do not trust a player UUID/name supplied by model JSON. `AiToolContext.player()` is tied to the actual
+conversation and is the authorization source for player-scoped tools.
+
+## Conversation migration
+
+For availability, use typed eligibility:
+
+```java
+ConversationEligibility eligibility =
+        CitizenConversationService.eligibility(citizen, ConversationKind.ADDON_AMBIENT);
+```
+
+For a player-started conversation:
+
+```java
+ConversationStartResult result =
+        CitizenConversationService.startPlayerConversation(player, citizen);
+```
+
+For one-sided addon speech that must finish audibly before gameplay continues:
+
+```java
+CitizenConversationService
+        .requestAmbientLine(citizen, "Thank the player for completing the task.")
+        .thenAccept(result -> {
+            if (result.completed()) {
+                continueTask();
+            }
+        });
+```
+
+Use `registerLifecycleListener(...)` when the addon needs start/end observation instead of polling
+internal manager or client state.
+
+## Activity/busy-state migration
+
+Addon activities that should temporarily exclude automatic speech must use a reservation:
+
+```java
+Optional<CitizenActivityReservation> reservation =
+        CitizenConversationService.reserveActivity(citizen, "my_addon:delivery");
+
+reservation.ifPresent(handle -> {
+    try (handle) {
+        runDelivery();
+    }
+});
+```
+
+Reservations have bounded leases. Long activities can call `renew(...)`. Closing or expiration is
+ownership-token safe, so a stale handle cannot clear a replacement reservation.
+
+Do not maintain a shadow copy of Talking Colonists busy/foreground/background maps and do not build
+an addon watchdog that reaps core-owned sessions.
+
+## Memory migration
+
+Use `CitizenMemoryService` for facts, events, relationship changes, and immutable snapshots. Structured
+snapshot data includes relationships, broadcasts, and rumors.
+
+```java
+CitizenMemoryService.addFact(citizen, "The player promised to repair the bakery.");
+CitizenMemoryService.addRelationshipChange(
+        citizen,
+        player.getUUID(),
+        CitizenRelationshipDimension.TRUST,
+        0.15,
+        "The player kept a promise");
+```
+
+Prompt text assembled from memory is presentation logic and should not be parsed as a data format.
+
+## Pregeneration migration
+
+Addon constraints for pregenerated speech belong in a registered modifier:
+
+```java
+AddonRegistration registration = PregenerationPromptService.registerModifier(
+        "my_addon:delivery_context",
+        100,
+        (context, prompt) -> prompt + "\nMention the completed delivery if relevant.");
+```
+
+Playback streams, provider reconnect state, queued audio, interruption cleanup, and cached-session
+ownership stay inside Talking Colonists.
+
+## Meetings and multi-citizen flows
+
+Use `ControlledConversationSession` when an addon controls agenda, floor order, seating, navigation,
+or other gameplay while Talking Colonists controls AI turns and audible playback.
+
+A typical meeting addon should:
+
+1. Select/move attendees using its own gameplay logic.
+2. Create a controlled session with the participants and agenda.
+3. Call `requestTurn(...)` for the selected speaker.
+4. Advance the floor after the returned `AmbientLineResult` reports completion.
+5. Add authenticated player statements with `addPlayerStatement(...)` when needed.
+6. Read `transcript()` for structured speaker attribution.
+7. Close/end the session when the meeting finishes.
+
+Use `createPairConversation(...)` for ordinary two-citizen autonomous conversation flow.
+
+## Migration checklist
+
+Before declaring an addon API-generation-2 compatible:
+
+- Compile against `me.sshcrack:mc_talking-api`, not the full implementation JAR as an API surface.
+- Remove imports/reflection/mixins targeting Talking Colonists implementation packages.
+- Replace raw/MineColonies closed-state contracts with Talking Colonists compatibility enums.
+- Store every returned `AddonRegistration` for the lifetime of the registration.
+- Use typed conversation results instead of inferring failure from manager state.
+- Use activity reservations instead of shadow busy bookkeeping.
+- Keep provider/audio/session internals out of addon code.
+- Test against every Minecraft/loader artifact the addon declares compatible.

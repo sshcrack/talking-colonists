@@ -36,5 +36,5 @@ developer-only `me.sshcrack:mc_talking-api` artifact on the [public sshcrack Mav
 Addon projects can resolve it from `https://maven.sshcrack.me/releases` as a compile/IDE dependency
 while requiring the normal Talking Colonists mod at runtime. **Players install only the normal
 Talking Colonists mod; the API artifact is not a second mod.** See [docs/addon-api.md](docs/addon-api.md)
-for coordinates, setup, and the supported API contract. The pinned Colonist Errands hook audit and
-migration map is in [docs/colonist-errands-migration.md](docs/colonist-errands-migration.md).
+for coordinates, setup, and the supported API contract. Addon developers upgrading existing
+integrations should use the general [addon migration guide](docs/addon-migration.md).
