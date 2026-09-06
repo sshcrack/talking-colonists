@@ -32,7 +32,9 @@ eligibility/start results, observe conversation lifecycle, work with citizen mem
 pregenerated prompt constraints, hold renewable activity leases, and run ordinary or controlled
 meeting/council conversations through `me.sshcrack.mc_talking.api`.
 The supported sources are compiled separately from implementation code and published as the
-developer-only `me.sshcrack:mc_talking-api` artifact. Addons should use it as a compile/IDE
-dependency while requiring the normal Talking Colonists mod at runtime. **Players install only the
-normal Talking Colonists mod; the API artifact is not a second mod.** See [docs/addon-api.md](docs/addon-api.md). The pinned Colonist Errands hook audit and migration map is
-in [docs/colonist-errands-migration.md](docs/colonist-errands-migration.md).
+developer-only `me.sshcrack:mc_talking-api` artifact on the [public sshcrack Maven](https://maven.sshcrack.me/#/).
+Addon projects can resolve it from `https://maven.sshcrack.me/releases` as a compile/IDE dependency
+while requiring the normal Talking Colonists mod at runtime. **Players install only the normal
+Talking Colonists mod; the API artifact is not a second mod.** See [docs/addon-api.md](docs/addon-api.md)
+for coordinates, setup, and the supported API contract. The pinned Colonist Errands hook audit and
+migration map is in [docs/colonist-errands-migration.md](docs/colonist-errands-migration.md).

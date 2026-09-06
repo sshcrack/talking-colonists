@@ -4,8 +4,9 @@ Talking Colonists treats addons as a first-class integration surface. Supported 
 under `me.sshcrack.mc_talking.api`; `ConversationManager`, websocket clients, audio queues, handlers,
 `duck` interfaces, pregeneration caches and other implementation packages are not API.
 
-This document describes **API generation 2**, the breaking baseline introduced to remove the legacy
-flat prompt snapshot, mirrored MineColonies enums and provider-specific declaration types.
+This document describes **API generation 2**, the breaking baseline introduced to replace the legacy
+flat prompt snapshot, isolate MineColonies compatibility behind Talking Colonists-owned types, and remove
+provider-specific declaration types.
 `TalkingColonistsApi.API_MAJOR_VERSION` is `2`.
 
 ## Runtime vs developer artifact
@@ -13,20 +14,32 @@ flat prompt snapshot, mirrored MineColonies enums and provider-specific declarat
 **Players and servers install only the normal Talking Colonists mod.** There is no second API mod to
 install.
 
-Addon developers should use the matching developer artifact as a compile/IDE dependency:
-
-```text
-me.sshcrack:mc_talking-api:<matching Talking Colonists / Minecraft / loader version>
-```
+Addon developers should use the matching developer artifact as a compile/IDE dependency. Published
+API artifacts are available from the public sshcrack Maven repository, browsable at
+<https://maven.sshcrack.me/#/>. Gradle should use the repository endpoint
+<https://maven.sshcrack.me/releases>:
 
 ```kotlin
+repositories {
+    maven("https://maven.sshcrack.me/releases")
+}
+
 dependencies {
-    compileOnly("me.sshcrack:mc_talking-api:<matching-version>")
+    compileOnly("me.sshcrack:mc_talking-api:<talking-colonists-version>-<minecraft-version>-<loader>")
 
     // Your dev runtime should contain the normal Talking Colonists mod.
     // Do not package mc_talking-api into your addon jar.
 }
 ```
+
+For example, API generation 2 for Talking Colonists `1.7.1`, Minecraft `1.21.1`, NeoForge uses:
+
+```kotlin
+compileOnly("me.sshcrack:mc_talking-api:1.7.1-1.21.1-neoforge")
+```
+
+The API artifact uses the same version tuple as the normal published mod artifact. Always choose the
+artifact matching the Talking Colonists version, Minecraft version, and loader your addon targets.
 
 The supported sources live in `src/api/java` and are compiled as a separate `addonApi` source set
 that cannot see Talking Colonists `main` output. The developer JAR contains no Forge/NeoForge mod
