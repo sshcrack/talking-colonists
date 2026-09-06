@@ -94,6 +94,9 @@ neoForge {
             sourceSet(sourceSets["main"])
         }
     }
+
+    addModdingDependenciesTo(sourceSets["test"])
+
     sourceSets["main"].resources.srcDir("${rootDir}/versions/datagen/${sc.current.version.split("-")[0]}/src/main/generated")
 }
 
@@ -178,6 +181,10 @@ publishing {
 }
 
 dependencies {
+    testImplementation(enforcedPlatform("org.junit:junit-bom:5.14.1"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
     implementation(libs.moulberry.mixinconstraints)
     jarJar(libs.moulberry.mixinconstraints)
 
@@ -191,6 +198,10 @@ dependencies {
     runtimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
 
     implementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+1.21.1-neoforge")
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    useJUnitPlatform()
 }
 
 tasks.named("createMinecraftArtifacts") {

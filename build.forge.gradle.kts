@@ -95,6 +95,8 @@ legacyForge {
             sourceSet(sourceSets["main"])
         }
     }
+
+    addModdingDependenciesTo(sourceSets["test"])
 }
 
 mixin {
@@ -180,6 +182,10 @@ publishing {
 }
 
 dependencies {
+    testImplementation(enforcedPlatform("org.junit:junit-bom:5.14.1"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
     annotationProcessor("org.spongepowered:mixin:${libs.versions.mixin.get()}:processor")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4") as Any)
 
@@ -202,6 +208,10 @@ dependencies {
     modRuntimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
 
     modImplementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+${prop("deps.minecraft")}-forge")
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    useJUnitPlatform()
 }
 
 sourceSets {

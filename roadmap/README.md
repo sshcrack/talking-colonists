@@ -18,7 +18,7 @@ Voyager owns expedition state. Core exposes the seams these addons need.
 
 | Order | Task and agent prompt | Depends on | Status |
 | --- | --- | --- | --- |
-| 01 | [Correct deterministic voice selection](01-voice-correction.md) | — | Pending |
+| 01 | [Correct deterministic voice selection](01-voice-correction.md) | — | Complete |
 | 02 | [Reliable structured memory generation](02-memory-reliability.md) | — | Pending |
 | 03 | [Composable prompt contributions](03-prompt-contributions.md) | — | Pending |
 | 04 | [Public tools and authorized execution](04-tool-interface.md) | — | Pending |
