@@ -65,8 +65,10 @@ launches the real client, creates/enters the smoke world, and exercises mixins/m
 construction; it only skips downloading cosmetic vanilla asset objects.
 
 On success the script writes `.client-smoke-verified`, which contains a fingerprint
-of all launch-relevant worktree content. Stage the intended changes before running
-the test, then stage the marker:
+of the staged launch-relevant content. Stage the intended changes before running the
+test, then stage the marker. Stonecutter may temporarily rewrite the active source
+view during the launch; fingerprinting the index keeps that generated view out of the
+verification contract:
 
 ```sh
 git add <intended runtime/build changes>
@@ -94,6 +96,14 @@ For local development the Gemini Live Library can be included as a composite bui
 ./gradlew publishMods -PgeminiPublished=true
 # or set GEMINI_PUBLISHED=true
 ```
+
+## Addon API Compatibility Policy
+
+The addon API is currently in an intentional breaking-change phase. **Do not preserve or reintroduce
+legacy addon API methods, adapters, aliases, or deprecated compatibility shims unless the user
+explicitly asks for them.** Prefer the cleanest supported API baseline and document migration in
+`docs/addon-migration.md` instead of carrying old interfaces forward. Runtime compatibility for
+normal Talking Colonists users is separate from source compatibility for addon developers.
 
 ## Code Style
 

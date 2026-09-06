@@ -19,6 +19,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -135,6 +136,11 @@ public class CitizenConversation {
     }
 
     private void performFlashTtsConversation(Runnable fallback) {
+        if (!server.isSameThread()) {
+            server.execute(() -> performFlashTtsConversation(fallback));
+            return;
+        }
+
         // Guard: all participants must be able to speak
         for (AbstractEntityCitizen p : participants) {
             if (!ConversationManager.canCitizenSpeak(p, ConversationKind.CITIZEN_PAIR)) {
@@ -184,6 +190,20 @@ public class CitizenConversation {
             activityReservations.add(reservation);
         }
 
+        Map<UUID, String> interestedParties = new HashMap<>();
+        for (AbstractEntityCitizen participant : participants) {
+            interestedParties.put(participant.getUUID(), participant.getCitizenData().getName());
+        }
+        List<CitizenConversationGenerator.PromptParticipant> promptParticipants = new ArrayList<>();
+        for (AbstractEntityCitizen participant : participants) {
+            promptParticipants.add(new CitizenConversationGenerator.PromptParticipant(
+                    participant.getUUID(),
+                    CitizenPromptViewFactory.create(participant.getCitizenData(), interestedParties, null)
+            ));
+        }
+        List<CitizenConversationGenerator.PromptParticipant> immutablePromptParticipants =
+                List.copyOf(promptParticipants);
+
         new Thread(() -> {
             setState(ConversationState.GENERATING);
             boolean fallbackTriggered = false;
@@ -191,7 +211,7 @@ public class CitizenConversation {
             try {
                 AtomicBoolean playbackStarted = new AtomicBoolean(false);
                 String completedTranscript = CitizenConversationGenerator.generateConversation(
-                        participants, server,
+                        immutablePromptParticipants,
                         chunk -> {
                             if (playbackStarted.compareAndSet(false, true)) {
                                 setState(ConversationState.PLAYING_AUDIO);
@@ -269,6 +289,10 @@ public class CitizenConversation {
     // -------------------------------------------------------------------------
 
     private void performLiveWebsocketConversation() {
+        if (!server.isSameThread()) {
+            server.execute(this::performLiveWebsocketConversation);
+            return;
+        }
         if (participants.size() < 2) {
             McTalking.LOGGER.warn("[LiveConv] Need at least 2 participants, got {}. Aborting.", participants.size());
             setState(ConversationState.ENDED);
@@ -341,7 +365,17 @@ public class CitizenConversation {
         };
 
         var citizenDataA = citizenA.getCitizenData();
-        var viewA = CitizenPromptViewFactory.create(citizenDataA, new HashMap<>(), null);
+        var citizenDataB = citizenB.getCitizenData();
+        var viewA = CitizenPromptViewFactory.create(
+                citizenDataA,
+                Map.of(citizenB.getUUID(), citizenDataB.getName()),
+                null
+        );
+        var viewB = CitizenPromptViewFactory.create(
+                citizenDataB,
+                Map.of(citizenA.getUUID(), citizenDataA.getName()),
+                null
+        );
 
         var basicPromptB = """
                 You are about to start a conversation with a fellow citizen %s.
@@ -354,12 +388,12 @@ public class CitizenConversation {
         try {
             clientA = new LiveConversationWsClient(
                     new CitizenEntityAudioProvider(citizenA, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                    citizenA, sharedTurnCounter, onClientEnded);
+                    citizenA, viewA, sharedTurnCounter, onClientEnded);
             clientARef.set(clientA);
 
             clientB = new LiveConversationWsClient(
                     new CitizenEntityAudioProvider(citizenB, McTalkingVoicechatPlugin.CITIZEN_CONVERSATION),
-                    citizenB, sharedTurnCounter, onClientEnded, basicPromptB);
+                    citizenB, viewB, sharedTurnCounter, onClientEnded, basicPromptB);
             clientBRef.set(clientB);
         } catch (RuntimeException e) {
             // Client construction happens after both foreground slots are claimed.
@@ -398,10 +432,9 @@ public class CitizenConversation {
 
         // Kick off the dialogue from A's side
 
-        var citizenDataB = citizenB.getCitizenData();
-        var view = CitizenPromptViewFactory.create(citizenDataB, new HashMap<>(), null);
         clientA.addPromptTextAfterTalkingComplete(
-                "Start the conversation! You are talking to a fellow " + citizenDataB.getName() + " basic information about them:" + PromptRuntime.getBasicCitizenInfoPrompt(view));
+                "Start the conversation! You are talking to a fellow " + citizenDataB.getName()
+                        + " basic information about them:" + PromptRuntime.getBasicCitizenInfoPrompt(viewB));
 
         setState(ConversationState.PLAYING_AUDIO);
     }

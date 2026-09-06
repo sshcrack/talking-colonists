@@ -184,6 +184,6 @@ fi
 cleanup
 trap - EXIT
 
-python3 scripts/client-smoke-fingerprint.py worktree > .client-smoke-verified
+python3 scripts/client-smoke-fingerprint.py index > .client-smoke-verified
 echo "Created .client-smoke-verified ($(cat .client-smoke-verified))"
 echo "All client launch smoke tests passed."

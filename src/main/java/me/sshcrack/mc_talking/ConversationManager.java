@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
+import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.internal.api.ConversationEventRuntime;
 import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
@@ -954,7 +955,17 @@ public class ConversationManager {
             String userPrompt,
             Consumer<AmbientLineResult> completion
     ) {
-        return startLowPrioritySession(citizen, userPrompt, ConversationKind.ADDON_AMBIENT, completion);
+        return startAddonAmbientSession(citizen, userPrompt, completion, PromptSessionContext.empty());
+    }
+
+    public static boolean startAddonAmbientSession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            Consumer<AmbientLineResult> completion,
+            PromptSessionContext promptSessionContext
+    ) {
+        return startLowPrioritySession(citizen, userPrompt, ConversationKind.ADDON_AMBIENT, completion,
+                promptSessionContext);
     }
 
     /** Cancels an addon/system ambient session without exposing its Gemini client. */
@@ -971,7 +982,7 @@ public class ConversationManager {
             String userPrompt,
             ConversationKind kind
     ) {
-        return startLowPrioritySession(citizen, userPrompt, kind, null);
+        return startLowPrioritySession(citizen, userPrompt, kind, null, PromptSessionContext.empty());
     }
 
     private static boolean startLowPrioritySession(
@@ -979,6 +990,16 @@ public class ConversationManager {
             String userPrompt,
             ConversationKind kind,
             Consumer<AmbientLineResult> completion
+    ) {
+        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty());
+    }
+
+    private static boolean startLowPrioritySession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            ConversationKind kind,
+            Consumer<AmbientLineResult> completion,
+            PromptSessionContext promptSessionContext
     ) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
         if (!canCitizenSpeak(citizen, kind)) return false;
@@ -1003,7 +1024,7 @@ public class ConversationManager {
                     if (server != null && !server.isSameThread()) server.execute(notify);
                     else notify.run();
                 }
-            });
+            }, promptSessionContext);
             holder[0] = client;
             client.addOnCloseAction(() -> {
                 var server = citizen.level().getServer();

@@ -106,27 +106,67 @@ needs updating. `CitizenStatusType`, `HappinessModifierType`, and `CitizenSkill`
 
 ## Prompt extensions
 
-Most addons should contribute bounded context through prompt contributors:
+Most addons should contribute bounded context through prompt contributors. The callback receives one
+immutable `PromptContributionContext` containing the citizen snapshot, the prompt surface, and
+per-session context:
 
 ```java
-var registration = CitizenPromptService.registerContributor(
+var expedition = CitizenPromptService.registerContributor(
         "my_addon:expedition",
         100,
-        (view, target) -> List.of(PromptContribution.observation(
+        context -> List.of(PromptContribution.observation(
+                "my_addon:expedition_state",
                 "Expedition state",
-                view.identity().name() + " returned with two chorus flowers.")));
+                context.view().identity().name() + " returned with two chorus flowers.")));
+
+var meetingAgenda = CitizenPromptService.registerContributor(
+        "my_addon:meeting_agenda",
+        110,
+        context -> context.session().agenda() == null
+                ? List.of()
+                : List.of(PromptContribution.instruction(
+                        "my_addon:meeting_agenda",
+                        "Meeting agenda",
+                        "Keep this turn relevant to: " + context.session().agenda())));
 ```
 
-Contributors run in ascending `order`, then namespaced ID. A failing contributor is isolated from
-core and other addons. Per-contribution and total addon text budgets are bounded.
+`context.view()` is a server-thread snapshot assembled before provider/background generation begins.
+Its nested lists/maps are immutable copies. Contributor callbacks may run on provider/background
+threads, so **do not read or mutate Minecraft/MineColonies world state from a contributor**; capture
+addon state into your own immutable data before it is needed or expose it through a core-supported
+snapshot/service.
+
+`context.target()` identifies the exact prompt surface (`CITIZEN_ROLEPLAY`,
+`SYSTEM_CONTROLLED_ROLEPLAY`, `CONVERSATIONAL_INFO`, `BASIC_CITIZEN_INFO`, or
+`DETAILED_CITIZEN_INFO`). Each surface invokes a contributor at most once per assembled prompt.
+Pregenerated Live speech uses `SYSTEM_CONTROLLED_ROLEPLAY`; Flash/TTS multi-citizen generation uses
+`CONVERSATIONAL_INFO`.
+
+`context.session()` is a fresh immutable value for the current session/turn. Controlled sessions
+expose their current agenda there; `setAgenda(...)` affects subsequent turns, never a prompt already
+being assembled. Session data is not stored in the global contributor registry, so one meeting cannot
+leak agenda/context into another server/session.
+
+Contributors run in ascending `order`, then namespaced registration ID. Duplicate IDs are rejected.
+A failing contributor is logged and skipped without disabling core or other addons. Each contribution
+and the total rendered addon block budget are bounded. `source` is required and rendered with the block so provenance is explicit. Section/source labels
+must be single-line values.
 
 Use:
 
-- `observation` for current server-verified facts.
-- `recollection` for remembered/inferred facts.
-- `instruction` for addon-owned conversational guidance, never to bypass core permissions.
+- `observation` for current server/addon-verified facts.
+- `recollection` for remembered/inferred facts that may be stale.
+- `instruction` for addon-owned conversational guidance, never as permission or authority.
 
-An integration that deliberately owns the complete prompt can register a provider:
+These categories render as separate prompt sections. Talking Colonists appends a core-priority
+boundary after addon context: addon guidance cannot override core safety, permissions, tool authority,
+or roleplay rules, and current observations take precedence over contradictory recollections.
+
+Registrations have process/mod lifetime until their `AddonRegistration` is closed. Keep normal mod
+registrations alive across integrated/dedicated server restarts; put changing session state in
+`PromptContributionContext.session()` rather than unregistering/re-registering global contributors.
+
+An integration that deliberately owns the complete base prompt can register a provider:
 
 ```java
 var registration = CitizenPromptService.registerProvider(
@@ -136,7 +176,8 @@ var registration = CitizenPromptService.registerProvider(
 ```
 
 The highest provider priority wins; ties are deterministic by namespaced ID. Closing that handle
-selects the next provider or the Talking Colonists default.
+selects the next provider or the Talking Colonists default. API generation 2 is intentionally a clean
+breaking baseline; legacy global-provider mutation methods are not retained as compatibility shims.
 
 ## AI tools
 

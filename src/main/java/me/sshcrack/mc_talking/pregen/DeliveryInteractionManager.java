@@ -13,6 +13,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import net.minecraft.core.BlockPos;
@@ -391,7 +392,8 @@ public class DeliveryInteractionManager {
             reservation.close();
             onError.run();
         };
-        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, McTalkingConfig.CHEAP_LIVE_MODEL,
+        var promptView = CitizenPromptViewFactory.create(citizen.getCitizenData(), Map.of(), null);
+        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen.getUUID(), promptView, prompt, McTalkingConfig.CHEAP_LIVE_MODEL,
                 audio -> {
                     if (!finished.compareAndSet(false, true)) return;
                     reservation.close();

@@ -1,7 +1,6 @@
 package me.sshcrack.mc_talking.pregen;
 
 import com.google.gson.JsonObject;
-import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
@@ -15,12 +14,12 @@ import me.sshcrack.mc_talking.config.QuotaTracker;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.internal.api.PromptRuntime;
-import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.manager.VoiceSelectionService;
 import me.sshcrack.mc_talking.util.AudioHelper;
 
@@ -28,7 +27,8 @@ import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class PregenerationGeminiClient extends GeminiLiveClient {
-    private final AbstractEntityCitizen entity;
+    private final UUID citizenId;
+    private final CitizenPromptView promptView;
     private final String promptText;
     private final String modelName;
     private final AvailableAI modelAi;
@@ -46,9 +46,17 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
      */
     private boolean completed = false;
 
-    public PregenerationGeminiClient(AbstractEntityCitizen entity, String promptText, AvailableAI model, Consumer<AudioChunk> onComplete, Runnable onError) {
+    public PregenerationGeminiClient(
+            UUID citizenId,
+            CitizenPromptView promptView,
+            String promptText,
+            AvailableAI model,
+            Consumer<AudioChunk> onComplete,
+            Runnable onError
+    ) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
-        this.entity = entity;
+        this.citizenId = citizenId;
+        this.promptView = promptView;
         this.promptText = promptText;
         this.modelAi = model;
         this.modelName = model.getName();
@@ -63,16 +71,15 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         setup.generationConfig.speechConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig();
         setup.generationConfig.speechConfig.language_code = McTalkingConfig.INSTANCE.instance().language;
 
-        var female = entity.getCitizenData().isFemale();
-        var uuid = entity.getUUID();
+        var female = promptView.identity().female();
+        var uuid = citizenId;
         setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
         selectedVoiceName = VoiceSelectionService.select(modelAi, uuid, female);
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = selectedVoiceName;
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
-        var view = CitizenPromptViewFactory.create(entity.getCitizenData(), new HashMap<>(), null);
-        var prompt = PromptRuntime.generateSystemControlledRoleplayPrompt(view);
+        var prompt = PromptRuntime.generateSystemControlledRoleplayPrompt(promptView);
         var p = new BidiGenerateContentSetup.SystemInstruction.Part(prompt);
         sys.parts.add(p);
         setup.systemInstruction = sys;

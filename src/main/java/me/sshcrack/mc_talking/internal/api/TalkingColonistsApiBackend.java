@@ -20,6 +20,7 @@ import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.api.pregen.PregenerationPromptModifier;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptContributor;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
+import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import me.sshcrack.mc_talking.api.tool.AiTool;
@@ -489,7 +490,9 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
             CompletableFuture<AmbientLineResult> future = new CompletableFuture<>();
             activeSpeaker.set(speaker);
             activeFuture.set(future);
-            String prompt = buildTurnPrompt(topicOrInstruction);
+            String turnAgenda = agenda;
+            String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda);
+            PromptSessionContext promptSessionContext = PromptSessionContext.withAgenda(turnAgenda);
 
             server.execute(() -> {
                 if (state.get() != State.TURN_ACTIVE || activeSpeaker.get() != speaker) {
@@ -510,7 +513,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
                     activeFuture.compareAndSet(future, null);
                     state.compareAndSet(State.TURN_ACTIVE, State.OPEN);
                     future.complete(result);
-                });
+                }, promptSessionContext);
                 if (!started) {
                     activeSpeaker.compareAndSet(speaker, null);
                     activeFuture.compareAndSet(future, null);
@@ -558,7 +561,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
             }
         }
 
-        private String buildTurnPrompt(String topicOrInstruction) {
+        private String buildTurnPrompt(String topicOrInstruction, String turnAgenda) {
             String history = sharedTranscript();
             String boundedTopic = topicOrInstruction.length() > 2_000
                     ? topicOrInstruction.substring(0, 2_000)
@@ -571,7 +574,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
                     Shared transcript so far:
                     %s
                     Do not invent statements for other attendees and do not decide who speaks next.
-                    """.formatted(agenda, boundedTopic, history.isBlank() ? "(none yet)" : history);
+                    """.formatted(turnAgenda, boundedTopic, history.isBlank() ? "(none yet)" : history);
         }
 
         private void appendTranscript(ConversationTranscriptEntry entry) {

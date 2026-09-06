@@ -2,10 +2,10 @@ package me.sshcrack.mc_talking.conversations;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
-import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
@@ -14,10 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -63,6 +60,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
      * The citizen entity this client represents.
      */
     private final AbstractEntityCitizen citizen;
+    private final CitizenPromptView promptView;
 
     private volatile boolean holdAudio = false;
     private final List<AudioChunk> heldAudioChunks = new ArrayList<>();
@@ -75,19 +73,22 @@ public class LiveConversationWsClient extends GeminiWsClient {
     public LiveConversationWsClient(
             AudioProvider audioProvider,
             AbstractEntityCitizen citizen,
+            CitizenPromptView promptView,
             AtomicInteger sharedTurnCounter,
             Consumer<LiveConversationWsClient> onEnded) {
-        this(audioProvider, citizen, sharedTurnCounter, onEnded, null);
+        this(audioProvider, citizen, promptView, sharedTurnCounter, onEnded, null);
     }
 
     public LiveConversationWsClient(
             AudioProvider audioProvider,
             AbstractEntityCitizen citizen,
+            CitizenPromptView promptView,
             AtomicInteger sharedTurnCounter,
             Consumer<LiveConversationWsClient> onEnded,
             @Nullable String systemPromptAddition) {
         super(audioProvider, citizen);
         this.citizen = citizen;
+        this.promptView = promptView;
         this.sharedTurnCounter = sharedTurnCounter;
         this.onEnded = onEnded;
         this.systemPromptAddition = systemPromptAddition;
@@ -120,12 +121,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
 
     @Override
     protected String getSystemPrompt() {
-        Map<UUID, String> others = new HashMap<>();
-        if (peer != null) {
-            others.put(peer.citizen.getUUID(), peer.citizen.getCitizenData().getName());
-        }
-        var view = CitizenPromptViewFactory.create(citizen.getCitizenData(), others, null);
-        var prompt = PromptRuntime.generateSystemControlledRoleplayPrompt(view);
+        var prompt = PromptRuntime.generateSystemControlledRoleplayPrompt(promptView);
         if (systemPromptAddition != null) {
             prompt += "\n\n" + systemPromptAddition;
         }

@@ -22,7 +22,7 @@ Voyager owns expedition state. Core exposes the seams these addons need.
 | --- | --- | --- | --- |
 | 01 | [Correct deterministic voice selection](01-voice-correction.md) | — | Complete |
 | 02 | [Reliable structured memory generation](02-memory-reliability.md) | — | Complete |
-| 03 | [Composable prompt contributions](03-prompt-contributions.md) | — | Partial |
+| 03 | [Composable prompt contributions](03-prompt-contributions.md) | — | Complete |
 | 04 | [Public tools and authorized execution](04-tool-interface.md) | — | Partial |
 | 05 | [Session ownership and bounded recovery](05-session-lifecycle.md) | — | Partial |
 | 06 | [Controlled conversation turns](06-controlled-sessions.md) | 03, 04, 05 | Partial |

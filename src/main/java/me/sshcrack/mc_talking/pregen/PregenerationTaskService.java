@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.internal.api.PregenerationPromptRuntime;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.CitizenHelper;
@@ -200,7 +201,8 @@ public class PregenerationTaskService {
         McTalking.LOGGER.info("[Pregeneration] Starting {} for citizen {} (threat={}, model={})",
                 isThreat ? "threat" : "pregen", citizen.getUUID(), isThreat, model.getName());
 
-        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen, prompt, model,
+        var promptView = CitizenPromptViewFactory.create(citizen.getCitizenData(), Map.of(), null);
+        PregenerationGeminiClient client = new PregenerationGeminiClient(citizen.getUUID(), promptView, prompt, model,
                 audio -> {
                     finish.run();
                     onComplete.accept(audio);

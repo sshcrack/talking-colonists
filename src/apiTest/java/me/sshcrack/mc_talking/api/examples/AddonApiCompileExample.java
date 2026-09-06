@@ -80,13 +80,24 @@ final class AddonApiCompileExample {
         registrations.add(CitizenPromptService.registerContributor(
                 "example_addon:verified_state",
                 100,
-                (view, target) -> target == PromptTarget.CITIZEN_ROLEPLAY
-                        || target == PromptTarget.SYSTEM_CONTROLLED_ROLEPLAY
+                context -> context.target() == PromptTarget.CITIZEN_ROLEPLAY
+                        || context.target() == PromptTarget.SYSTEM_CONTROLLED_ROLEPLAY
                         ? List.of(PromptContribution.observation(
+                                "example_addon:verified_state",
                                 "Verified addon state",
-                                "Current addon context for " + view.identity().name()
-                                        + "; core activity=" + view.activity().category()))
+                                "Current addon context for " + context.view().identity().name()
+                                        + "; core activity=" + context.view().activity().category()))
                         : List.of()));
+
+        registrations.add(CitizenPromptService.registerContributor(
+                "example_addon:meeting_agenda",
+                110,
+                context -> context.session().agenda() == null
+                        ? List.of()
+                        : List.of(PromptContribution.instruction(
+                                "example_addon:meeting_agenda",
+                                "Meeting agenda",
+                                "Keep this turn relevant to: " + context.session().agenda()))));
 
         registrations.add(CitizenConversationRules.registerSpeechPolicy(
                 "example_addon:military_duty",

@@ -4,6 +4,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.internal.api.PromptRuntime;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
@@ -14,7 +16,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -64,6 +65,8 @@ public class CitizenWsClient extends GeminiWsClient {
      * Determines which system prompt is used at connection time.
      */
     private final boolean startedInSystemMode;
+    private final CitizenPromptView promptView;
+    private final PromptSessionContext promptSessionContext;
 
     // -------------------------------------------------------------------------
     // Constructors
@@ -77,10 +80,20 @@ public class CitizenWsClient extends GeminiWsClient {
      * @param onSystemConversationEnded callback invoked when each mumbling turn ends
      */
     public CitizenWsClient(AbstractEntityCitizen entity, @Nullable Consumer<CitizenWsClient> onSystemConversationEnded) {
+        this(entity, onSystemConversationEnded, PromptSessionContext.empty());
+    }
+
+    public CitizenWsClient(
+            AbstractEntityCitizen entity,
+            @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
+            PromptSessionContext promptSessionContext
+    ) {
         super(new CitizenEntityAudioProvider(entity, null), entity);
         this.player = null;
         this.onSystemConversationEnded = onSystemConversationEnded;
         this.startedInSystemMode = true;
+        this.promptSessionContext = Objects.requireNonNull(promptSessionContext, "promptSessionContext");
+        this.promptView = CitizenPromptViewFactory.create(entity.getCitizenData(), Map.of(), null);
     }
 
     /**
@@ -95,6 +108,11 @@ public class CitizenWsClient extends GeminiWsClient {
         this.player = player;
         this.onSystemConversationEnded = null;
         this.startedInSystemMode = false;
+        this.promptSessionContext = PromptSessionContext.empty();
+        Map<UUID, String> interestedParties = player == null
+                ? Map.of()
+                : Map.of(player.getUUID(), player.getName().getString());
+        this.promptView = CitizenPromptViewFactory.create(entity.getCitizenData(), interestedParties, player);
     }
 
     // -------------------------------------------------------------------------
@@ -146,16 +164,9 @@ public class CitizenWsClient extends GeminiWsClient {
     @Override
     protected String getSystemPrompt() {
         if (startedInSystemMode) {
-            var view = CitizenPromptViewFactory.create(getEntity().getCitizenData(), new HashMap<>(), null);
-            return PromptRuntime.generateSystemControlledRoleplayPrompt(view);
-        } else {
-            Map<UUID, String> interestedParties = new HashMap<>();
-            if (player != null)
-                interestedParties.put(player.getUUID(), player.getName().getString());
-
-            var promptView = CitizenPromptViewFactory.create(getEntity().getCitizenData(), interestedParties, player);
-            return PromptRuntime.generateCitizenRoleplayPrompt(promptView);
+            return PromptRuntime.generateSystemControlledRoleplayPrompt(promptView, promptSessionContext);
         }
+        return PromptRuntime.generateCitizenRoleplayPrompt(promptView, promptSessionContext);
     }
 
     /**

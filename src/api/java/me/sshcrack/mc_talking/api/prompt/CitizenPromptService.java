@@ -26,6 +26,9 @@ public final class CitizenPromptService {
     /**
      * Registers composable addon context without replacing the active prompt provider.
      * Contributors run in ascending {@code order}, then lexicographic namespaced ID order.
+     *
+     * <p>The returned handle has process/mod-registration lifetime until closed. Per-session state
+     * belongs in {@link PromptContributionContext#session()}, not in global registrations.</p>
      */
     public static @NotNull AddonRegistration registerContributor(
             @NotNull String id,

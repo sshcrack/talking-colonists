@@ -76,9 +76,10 @@ Addon-owned facts should generally be supplied with a contributor:
 AddonRegistration registration = CitizenPromptService.registerContributor(
         "my_addon:expedition",
         100,
-        (view, target) -> List.of(PromptContribution.observation(
+        context -> List.of(PromptContribution.observation(
+                "my_addon:expedition",
                 "Expedition state",
-                view.identity().name() + " returned from the expedition.")));
+                context.view().identity().name() + " returned from the expedition.")));
 ```
 
 Use a full `CitizenPromptProvider` only when the addon intentionally owns complete prompt generation.
