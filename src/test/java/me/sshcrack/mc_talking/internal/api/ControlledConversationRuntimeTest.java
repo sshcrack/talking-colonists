@@ -157,6 +157,44 @@ class ControlledConversationRuntimeTest {
     }
 
     @Test
+    void terminalFutureCompletionAndExactCancellationUseTheConfiguredExecutor() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant speaker = hooks.add("Ada");
+        hooks.executeImmediately = false;
+        var runtime = runtime(hooks, speaker);
+
+        CompletableFuture<ControlledTurnResult> turn = runtime.requestTurn(speaker, "Speak", null);
+        assertFalse(turn.isDone());
+        hooks.drainExecutor();
+        assertEquals(1, hooks.startCalls);
+
+        assertTrue(runtime.interruptTurn());
+        assertFalse(turn.isDone(), "caller thread must not complete public turn futures directly");
+        hooks.drainExecutor();
+
+        ControlledTurnResult result = turn.join();
+        assertEquals(ControlledTurnResult.Status.INTERRUPTED, result.status());
+        assertEquals(runtime.sessionId(), hooks.lastCancelledSessionId);
+        assertEquals(result.turnId(), hooks.lastCancelledTurnId);
+    }
+
+    @Test
+    void immediateRejectionsAreAlsoCompletedThroughTheConfiguredExecutor() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant participant = hooks.add("Ada");
+        FakeParticipant outsider = hooks.add("Outsider");
+        hooks.executeImmediately = false;
+        var runtime = new ControlledConversationRuntime<>(List.of(participant), "Agenda",
+                ControlledConversationOptions.noAddonTools(), hooks);
+
+        CompletableFuture<ControlledTurnResult> rejected = runtime.requestTurn(outsider, "No", null);
+        assertFalse(rejected.isDone());
+        hooks.drainExecutor();
+        assertEquals(ControlledTurnResult.FailureReason.SPEAKER_NOT_PARTICIPANT,
+                rejected.join().failureReason());
+    }
+
+    @Test
     void sessionAndTurnIdentityToolPolicyAndAnchorArePassedToBackend() {
         FakeHooks hooks = new FakeHooks();
         FakeParticipant speaker = hooks.add("Ada");
@@ -198,6 +236,10 @@ class ControlledConversationRuntimeTest {
         private FakeAnchor lastAnchor;
         private Consumer<AmbientLineResult> currentCompletion;
         private long clock;
+        private boolean executeImmediately = true;
+        private final List<Runnable> queuedTasks = new ArrayList<>();
+        private UUID lastCancelledSessionId;
+        private UUID lastCancelledTurnId;
 
         FakeParticipant add(String name) {
             FakeParticipant participant = new FakeParticipant(UUID.randomUUID(), name);
@@ -207,7 +249,10 @@ class ControlledConversationRuntimeTest {
         }
 
         @Override
-        public void execute(Runnable task) { task.run(); }
+        public void execute(Runnable task) {
+            if (executeImmediately) task.run();
+            else queuedTasks.add(task);
+        }
 
         @Override
         public UUID id(FakeParticipant participant) { return participant.id(); }
@@ -243,11 +288,23 @@ class ControlledConversationRuntimeTest {
         }
 
         @Override
-        public void cancel(FakeParticipant participant) { cancelCalls++; }
+        public void cancel(FakeParticipant participant, UUID sessionId, UUID turnId) {
+            cancelCalls++;
+            lastCancelledSessionId = sessionId;
+            lastCancelledTurnId = turnId;
+        }
 
         @Override
         public boolean playerOwnsConversation(FakeParticipant participant) {
             return playerOwned.getOrDefault(participant.id(), false);
+        }
+
+        void drainExecutor() {
+            while (!queuedTasks.isEmpty()) {
+                List<Runnable> batch = new ArrayList<>(queuedTasks);
+                queuedTasks.clear();
+                batch.forEach(Runnable::run);
+            }
         }
 
         void signalGenerationCompleteOnly() {

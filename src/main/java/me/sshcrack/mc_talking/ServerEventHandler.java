@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.handler.CitizenMumblingHandler;
 import me.sshcrack.mc_talking.handler.PregeneratedGreetingHandler;
 import me.sshcrack.mc_talking.handler.RandomConversationHandler;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
+import me.sshcrack.mc_talking.internal.api.TalkingColonistsApiBackend;
 import me.sshcrack.mc_talking.rumor.RumorMillService;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
@@ -90,9 +91,11 @@ public class ServerEventHandler {
         PregenerationTaskService.cleanup();
         PregenerationPlayback.cleanup();
         DeliveryInteractionManager.cleanup();
-        ConversationManager.cleanup();
 
         MinecraftServer server = event.getServer();
+        TalkingColonistsApiBackend.onServerStopping(server);
+        ConversationManager.cleanup();
+
         UrgentContactHandler.onServerStop(server);
         CasualGreetingHandler.onServerStop();
         PlayerHeatmapTracker.clear();

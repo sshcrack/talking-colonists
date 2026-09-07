@@ -49,6 +49,11 @@ public record AmbientLineResult(
     }
 
     public static AmbientLineResult cancelled() {
-        return new AmbientLineResult(Status.CANCELLED, "", null, "session cancelled");
+        return cancelled("session cancelled");
+    }
+
+    public static AmbientLineResult cancelled(String detail) {
+        return new AmbientLineResult(Status.CANCELLED, "", null,
+                detail == null || detail.isBlank() ? "session cancelled" : detail);
     }
 }

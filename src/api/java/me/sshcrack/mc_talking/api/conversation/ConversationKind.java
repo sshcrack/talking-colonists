@@ -8,5 +8,6 @@ public enum ConversationKind {
     RANDOM_CITIZEN,
     CITIZEN_PAIR,
     PREGENERATED,
-    ADDON_AMBIENT
+    ADDON_AMBIENT,
+    CONTROLLED
 }

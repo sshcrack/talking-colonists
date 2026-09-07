@@ -452,6 +452,7 @@ public class ConversationManager {
             if (wasActive) {
                 dispatchLifecycleEnded(snapshot.entity(), snapshot.kind(), snapshot.playerId());
                 if (snapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT
+                        && snapshot.kind() != ConversationKind.CONTROLLED
                         && switch (ended.reason()) {
                             case COMPLETED, CANCELLED, PROVIDER_FAILURE, RECOVERY_EXHAUSTED -> true;
                             default -> false;
@@ -537,7 +538,7 @@ public class ConversationManager {
         }
 
         if (kind != ConversationKind.PLAYER) {
-            if (isCitizenOnCooldown(citizen)) {
+            if (kind != ConversationKind.CONTROLLED && isCitizenOnCooldown(citizen)) {
                 return ConversationEligibility.rejected(ConversationEligibility.Status.COOLDOWN, "automatic conversation cooldown is active");
             }
             if (isCitizenBusy(citizen)) {
@@ -673,6 +674,34 @@ public class ConversationManager {
                 promptSessionContext, audioAnchor);
     }
 
+    /** Starts an exact addon-controlled floor turn without automatic-conversation cooldown semantics. */
+    public static boolean startControlledAmbientSession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            Consumer<AmbientLineResult> completion,
+            PromptSessionContext promptSessionContext,
+            ControlledAudioAnchor audioAnchor
+    ) {
+        return startLowPrioritySession(citizen, userPrompt, ConversationKind.CONTROLLED, completion,
+                promptSessionContext, audioAnchor);
+    }
+
+    /** Cancels only the exact controlled turn identity; stale cancellation cannot kill a replacement turn. */
+    public static boolean cancelControlledAmbientSession(
+            AbstractEntityCitizen citizen,
+            UUID sessionId,
+            UUID turnId
+    ) {
+        UUID citizenId = citizen.getUUID();
+        if (foregroundSessions.playerForCitizen(citizenId) != null) return false;
+        GeminiWsClient client = foregroundSessions.client(citizenId);
+        ForegroundSessionRegistry.Token token = foregroundSessions.token(citizenId);
+        if (token == null || !(client instanceof CitizenWsClient cws)
+                || !cws.ownsControlledTurn(sessionId, turnId)) return false;
+        return foregroundSessions.end(token, ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                "controlled turn cancelled");
+    }
+
     /** Cancels an addon/system ambient session without exposing its Gemini client. */
     public static boolean cancelAddonAmbientSession(AbstractEntityCitizen citizen) {
         UUID citizenId = citizen.getUUID();
@@ -721,13 +750,16 @@ public class ConversationManager {
 
         try {
             AtomicBoolean audibleCompletion = new AtomicBoolean(false);
+            AtomicBoolean completionDelivered = new AtomicBoolean(false);
             CitizenWsClient client = new CitizenWsClient(new ControlledTurnAudioProvider(citizen, audioAnchor), citizen, c -> {
                 String transcript = c.getSessionTranscriptSnapshot();
-                audibleCompletion.set(true);
                 runOnServerThread(citizen, () -> {
+                    audibleCompletion.set(true);
                     if (!reservation.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
                             "ambient audible turn completed")) return;
-                    if (completion != null) completion.accept(AmbientLineResult.completed(transcript));
+                    if (completion != null && completionDelivered.compareAndSet(false, true)) {
+                        completion.accept(AmbientLineResult.completed(transcript));
+                    }
                 });
             }, promptSessionContext);
 
@@ -739,9 +771,12 @@ public class ConversationManager {
 
             client.addOnCloseAction(() -> runOnServerThread(citizen, () -> {
                 var diagnostic = client.getRecoveryDiagnostic();
-                boolean ended = reservation.end(providerTerminalReason(client), diagnostic.detail());
-                if (ended && completion != null && !audibleCompletion.get()) {
-                    completion.accept(AmbientLineResult.failed(diagnostic.detail()));
+                reservation.end(providerTerminalReason(client), diagnostic.detail());
+                if (completion != null && !audibleCompletion.get()
+                        && completionDelivered.compareAndSet(false, true)) {
+                    completion.accept(client.isPlayerTakeoverPending()
+                            ? AmbientLineResult.cancelled("player conversation preempted controlled turn")
+                            : AmbientLineResult.failed(diagnostic.detail()));
                 }
             }));
 
@@ -818,7 +853,7 @@ public class ConversationManager {
         ForegroundSessionRegistry.Token existingToken = foregroundSessions.token(citizenId);
         var existingSnapshot = foregroundSessions.snapshot(citizenId).orElse(null);
 
-        if (existingClient instanceof CitizenWsClient cws && cws.isMumbling()
+        if (existingClient instanceof CitizenWsClient cws && cws.isMumbling() && cws.isPlayerTakeoverAllowed()
                 && existingToken != null && existingSnapshot != null
                 && existingSnapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT) {
             var promoted = foregroundSessions.promoteToPlayer(existingToken, playerId, ConversationKind.PLAYER);
@@ -843,6 +878,9 @@ public class ConversationManager {
         }
 
         if (existingToken != null) {
+            if (existingClient instanceof CitizenWsClient cws && !cws.isPlayerTakeoverAllowed()) {
+                cws.markPlayerTakeoverPending();
+            }
             foregroundSessions.end(existingToken, ForegroundSessionRegistry.TerminalReason.REPLACED,
                     "replaced by direct player conversation");
         }

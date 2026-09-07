@@ -482,7 +482,10 @@ The handle hides provider clients, streams, audio queues, slot ownership and tea
 The addon owns attendance, navigation, seats, hand raising and floor policy. Talking Colonists owns
 provider capacity, prompt grounding, spatial playback and cancellation. Opening a controlled session
 is cheap: silent attendees do **not** reserve a provider slot or open Live connections. Only the
-current speaker claims foreground capacity for the duration of one turn.
+current speaker claims foreground capacity for the duration of one turn. Controlled turns use their
+own `ConversationKind.CONTROLLED`: deliberate meeting speech is not blocked by, and does not record,
+the automatic ambient-conversation cooldown. Addon speech policies can still distinguish and veto
+controlled turns explicitly.
 
 ```java
 var meeting = CitizenConversationService.createControlledSession(
@@ -526,8 +529,11 @@ terminal state. Provider generation completion alone is not audible completion. 
 completes the current turn as `INTERRUPTED`, cancels playback/provider work, leaves the meeting open,
 and ignores every late completion for that turn. `end(reason)` is idempotent, cancels an active turn,
 and prevents late work from reopening the session. A direct player conversation may preempt the
-controlled speaker; that turn reports interruption and ordinary player-conversation priority remains
-unchanged.
+controlled speaker; that exact turn reports interruption and ordinary player-conversation priority
+remains unchanged. Controlled provider sessions are never promoted in-place into player sessions, so
+meeting prompt/tool identity cannot leak into the replacement direct conversation. Cancellation is
+matched by `sessionId` and `turnId`, preventing delayed caller work from cancelling a newer turn.
+Idle as well as active controlled sessions transition to `SERVER_SHUTDOWN` during server teardown.
 
 Without an audio anchor, the voice uses the citizen entity channel and follows the moving speaker.
 A `ControlledAudioAnchor` creates fixed locational audio in the speaker's current dimension, suitable

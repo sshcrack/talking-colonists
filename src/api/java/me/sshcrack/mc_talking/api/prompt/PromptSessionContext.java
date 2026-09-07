@@ -19,6 +19,9 @@ public record PromptSessionContext(
 
     public PromptSessionContext {
         allowedAddonTools = Set.copyOf(Objects.requireNonNull(allowedAddonTools, "allowedAddonTools"));
+        if ((sessionId == null) != (turnId == null)) {
+            throw new IllegalArgumentException("controlled session and turn IDs must be supplied together");
+        }
         if (allowAllAddonTools && !allowedAddonTools.isEmpty()) {
             throw new IllegalArgumentException("allowAllAddonTools and explicit allowedAddonTools are mutually exclusive");
         }
@@ -43,6 +46,11 @@ public record PromptSessionContext(
 
     public boolean allowsAddonTool(@NotNull String id) {
         return allowAllAddonTools || allowedAddonTools.contains(id);
+    }
+
+    /** Whether this snapshot belongs to one explicitly controlled floor turn. */
+    public boolean isControlledTurn() {
+        return sessionId != null;
     }
 
     public boolean isEmpty() {

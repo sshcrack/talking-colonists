@@ -35,7 +35,7 @@ final class ControlledConversationRuntime<P, A> {
                                    @NotNull PromptSessionContext promptContext,
                                    @Nullable A audioAnchor,
                                    @NotNull Consumer<AmbientLineResult> audibleCompletion);
-        void cancel(@NotNull P participant);
+        void cancel(@NotNull P participant, @NotNull UUID sessionId, @NotNull UUID turnId);
         boolean playerOwnsConversation(@NotNull P participant);
     }
 
@@ -102,16 +102,16 @@ final class ControlledConversationRuntime<P, A> {
         Objects.requireNonNull(topicOrInstruction, "topicOrInstruction");
         UUID turnId = UUID.randomUUID();
         if (!byId.containsKey(hooks.id(speaker))) {
-            return CompletableFuture.completedFuture(ControlledTurnResult.rejected(
+            return completeOnExecutor(ControlledTurnResult.rejected(
                     sessionId, turnId, ControlledTurnResult.FailureReason.SPEAKER_NOT_PARTICIPANT,
                     "speaker is not a session participant"));
         }
         if (state.get() == ControlledConversationSession.State.ENDED) {
-            return CompletableFuture.completedFuture(ControlledTurnResult.sessionEnded(sessionId, turnId, "session has ended"));
+            return completeOnExecutor(ControlledTurnResult.sessionEnded(sessionId, turnId, "session has ended"));
         }
         if (!state.compareAndSet(ControlledConversationSession.State.OPEN,
                                  ControlledConversationSession.State.TURN_ACTIVE)) {
-            return CompletableFuture.completedFuture(ControlledTurnResult.rejected(
+            return completeOnExecutor(ControlledTurnResult.rejected(
                     sessionId, turnId, ControlledTurnResult.FailureReason.TURN_ALREADY_ACTIVE,
                     "another speaker already has the floor"));
         }
@@ -120,10 +120,7 @@ final class ControlledConversationRuntime<P, A> {
         ActiveTurn<P> turn = new ActiveTurn<>(turnId, speaker, future);
         activeTurn.set(turn);
         String turnAgenda = agenda;
-        String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda);
-        PromptSessionContext promptContext = PromptSessionContext.controlled(
-                sessionId, turnId, turnAgenda, options.allowAllAddonTools(), options.allowedAddonTools());
-        hooks.execute(() -> startTurn(turn, prompt, promptContext, audioAnchor));
+        hooks.execute(() -> startTurn(turn, topicOrInstruction, turnAgenda, audioAnchor));
         return future;
     }
 
@@ -132,8 +129,10 @@ final class ControlledConversationRuntime<P, A> {
         if (turn == null || !activeTurn.compareAndSet(turn, null)) return false;
         state.compareAndSet(ControlledConversationSession.State.TURN_ACTIVE,
                             ControlledConversationSession.State.OPEN);
-        turn.future().complete(ControlledTurnResult.interrupted(sessionId, turn.turnId()));
-        hooks.execute(() -> hooks.cancel(turn.speaker()));
+        hooks.execute(() -> {
+            turn.future().complete(ControlledTurnResult.interrupted(sessionId, turn.turnId()));
+            hooks.cancel(turn.speaker(), sessionId, turn.turnId());
+        });
         return true;
     }
 
@@ -143,9 +142,11 @@ final class ControlledConversationRuntime<P, A> {
         if (previous == ControlledConversationSession.State.ENDED) return;
         ActiveTurn<P> turn = activeTurn.getAndSet(null);
         if (turn != null) {
-            turn.future().complete(ControlledTurnResult.sessionEnded(
-                    sessionId, turn.turnId(), "session ended: " + reason.name().toLowerCase(java.util.Locale.ROOT)));
-            hooks.execute(() -> hooks.cancel(turn.speaker()));
+            hooks.execute(() -> {
+                turn.future().complete(ControlledTurnResult.sessionEnded(
+                        sessionId, turn.turnId(), "session ended: " + reason.name().toLowerCase(java.util.Locale.ROOT)));
+                hooks.cancel(turn.speaker(), sessionId, turn.turnId());
+            });
         }
     }
 
@@ -160,9 +161,12 @@ final class ControlledConversationRuntime<P, A> {
         }
     }
 
-    private void startTurn(ActiveTurn<P> turn, String prompt, PromptSessionContext promptContext,
+    private void startTurn(ActiveTurn<P> turn, String topicOrInstruction, String turnAgenda,
                            @Nullable A audioAnchor) {
         if (!isCurrent(turn)) return;
+        String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda);
+        PromptSessionContext promptContext = PromptSessionContext.controlled(
+                sessionId, turn.turnId(), turnAgenda, options.allowAllAddonTools(), options.allowedAddonTools());
         Availability availability = hooks.availability(turn.speaker(), audioAnchor);
         if (!availability.available()) {
             finish(turn, ControlledTurnResult.rejected(sessionId, turn.turnId(),
@@ -200,6 +204,11 @@ final class ControlledConversationRuntime<P, A> {
             finish(turn, ControlledTurnResult.completed(sessionId, turn.turnId(), result.transcript()));
             return;
         }
+        if (result.status() == AmbientLineResult.Status.CANCELLED) {
+            finish(turn, new ControlledTurnResult(sessionId, turn.turnId(), ControlledTurnResult.Status.INTERRUPTED,
+                    null, "", result.detail()));
+            return;
+        }
         Availability availability = hooks.availability(speaker, null);
         ControlledTurnResult terminal;
         if (!availability.available() && availability.reason() == ControlledTurnResult.FailureReason.SPEAKER_UNLOADED) {
@@ -227,6 +236,12 @@ final class ControlledConversationRuntime<P, A> {
                                 ControlledConversationSession.State.OPEN);
         }
         turn.future().complete(result);
+    }
+
+    private CompletableFuture<ControlledTurnResult> completeOnExecutor(ControlledTurnResult result) {
+        CompletableFuture<ControlledTurnResult> future = new CompletableFuture<>();
+        hooks.execute(() -> future.complete(result));
+        return future;
     }
 
     private String buildTurnPrompt(String topicOrInstruction, String turnAgenda) {

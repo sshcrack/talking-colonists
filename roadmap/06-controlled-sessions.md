@@ -95,3 +95,33 @@ Preserve ordinary player and existing citizen conversations through the same lif
   metadata-only fallback skipped only Mojang cosmetic asset-object downloads.
 
 No task-06 acceptance criteria remain.
+
+
+## Post-merge audit — 2026-09-07
+
+A fresh audit after merging the independent task-06 implementation found and corrected several
+real integration gaps that the fake runtime did not exercise:
+
+- Controlled `CitizenWsClient` instances were still considered ordinary mumbling sessions by the
+  direct-player takeover path. A player could therefore promote the controlled provider session
+  in-place, clearing its system-turn callback and leaving the meeting stuck in `TURN_ACTIVE`.
+  Controlled sessions are now explicitly non-promotable; player takeover replaces the turn and the
+  turn completes as an interruption.
+- Controlled turns now use `ConversationKind.CONTROLLED` instead of `ADDON_AMBIENT`. Deliberate
+  meeting turns do not inherit or record the automatic ambient cooldown, while addon speech policies
+  can distinguish controlled speech from ambient lines.
+- Caller cancellation now carries the exact controlled `sessionId`/`turnId` into core before ending
+  the foreground reservation. A delayed cancellation cannot terminate a newer turn for the same
+  citizen. Ambient terminal delivery was hardened so externally replaced/closed sessions still
+  complete their owner instead of hanging.
+- Immediate rejection, interruption, and session-end futures are completed through the configured
+  server executor, matching the public server-thread completion contract. Player statements marshal
+  their world-time read to the server thread, and prompt construction occurs on that path so a
+  previously queued statement is visible to the following turn.
+- Controlled sessions are registered per server and explicitly ended with `SERVER_SHUTDOWN` before
+  foreground provider cleanup, including sessions that are idle when shutdown begins. Public
+  controlled prompt identities and addon-tool IDs now receive stricter invariant validation.
+
+Additional deterministic tests cover executor-thread terminal completion and exact cancellation
+identity. The normal player/mumbling promotion optimization remains unchanged for non-controlled
+system sessions.

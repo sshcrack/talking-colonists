@@ -68,6 +68,7 @@ public class CitizenWsClient extends GeminiWsClient {
     private final boolean startedInSystemMode;
     private final CitizenPromptView promptView;
     private final PromptSessionContext promptSessionContext;
+    private final AtomicBoolean playerTakeoverPending = new AtomicBoolean(false);
     /** Prevents repeated close calls from scheduling duplicate player-memory writes. */
     private final AtomicBoolean playerMemoryCloseHandled = new AtomicBoolean(false);
 
@@ -138,6 +139,26 @@ public class CitizenWsClient extends GeminiWsClient {
         return player == null;
     }
 
+    /** Controlled turns are system-mode sessions but must be preempted, never promoted in-place. */
+    public boolean isPlayerTakeoverAllowed() {
+        return !promptSessionContext.isControlledTurn();
+    }
+
+    /** Whether this provider client belongs to the exact controlled session/turn identity. */
+    public boolean ownsControlledTurn(UUID sessionId, UUID turnId) {
+        return promptSessionContext.isControlledTurn()
+                && sessionId.equals(promptSessionContext.sessionId())
+                && turnId.equals(promptSessionContext.turnId());
+    }
+
+    public void markPlayerTakeoverPending() {
+        playerTakeoverPending.set(true);
+    }
+
+    public boolean isPlayerTakeoverPending() {
+        return playerTakeoverPending.get();
+    }
+
     /**
      * Transitions this client from mumbling mode to player conversation mode.
      * The existing WebSocket session is reused – no reconnect happens.
@@ -147,6 +168,9 @@ public class CitizenWsClient extends GeminiWsClient {
      * @param player the player who is starting the conversation
      */
     public void transitionToPlayer(ServerPlayer player) {
+        if (!isPlayerTakeoverAllowed()) {
+            throw new IllegalStateException("Controlled turns cannot be promoted into player conversations");
+        }
         this.player = player;
         this.onSystemConversationEnded = null;
         this.playerInputStarted = false;

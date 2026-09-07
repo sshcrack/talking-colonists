@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -60,6 +61,8 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private static final Duration MAX_ADDON_ACTIVITY_LEASE = Duration.ofHours(1);
     private static final Pattern OWNER_ID = Pattern.compile("[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}");
     private static final CitizenPromptProvider DEFAULT_PROMPT_PROVIDER = new DefaultCitizenPromptProvider();
+    private static final Map<MinecraftServer, java.util.Set<ControlledSession>> CONTROLLED_SESSIONS =
+            new ConcurrentHashMap<>();
 
     private TalkingColonistsApiBackend() {
     }
@@ -270,7 +273,25 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
             @NotNull String agenda,
             @NotNull ControlledConversationOptions options
     ) {
-        return new ControlledSession(server, participants, agenda, options);
+        ControlledSession session = new ControlledSession(server, participants, agenda, options);
+        CONTROLLED_SESSIONS.computeIfAbsent(server, ignored -> ConcurrentHashMap.newKeySet()).add(session);
+        return session;
+    }
+
+    /** Ends even idle controlled sessions before foreground provider shutdown starts. */
+    public static void onServerStopping(@NotNull MinecraftServer server) {
+        java.util.Set<ControlledSession> sessions = CONTROLLED_SESSIONS.remove(server);
+        if (sessions == null) return;
+        for (ControlledSession session : List.copyOf(sessions)) {
+            session.end(ControlledConversationSession.EndReason.SERVER_SHUTDOWN);
+        }
+    }
+
+    private static void unregisterControlledSession(MinecraftServer server, ControlledSession session) {
+        CONTROLLED_SESSIONS.computeIfPresent(server, (ignored, sessions) -> {
+            sessions.remove(session);
+            return sessions.isEmpty() ? null : sessions;
+        });
     }
 
     @Override
@@ -450,10 +471,17 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
         @Override
         public void addPlayerStatement(@NotNull ServerPlayer player, @NotNull String statement) {
             java.util.Objects.requireNonNull(player, "player");
+            java.util.Objects.requireNonNull(statement, "statement");
             if (statement.isBlank()) return;
-            runtime.addTranscript(new ConversationTranscriptEntry(
-                    ConversationTranscriptEntry.SpeakerKind.PLAYER,
-                    player.getUUID(), player.getName().getString(), statement.trim(), player.level().getGameTime()));
+            if (runtime.state() == State.ENDED) throw new IllegalStateException("session ended");
+            Runnable append = () -> {
+                if (runtime.state() == State.ENDED) return;
+                runtime.addTranscript(new ConversationTranscriptEntry(
+                        ConversationTranscriptEntry.SpeakerKind.PLAYER,
+                        player.getUUID(), player.getName().getString(), statement.trim(), player.level().getGameTime()));
+            };
+            if (server.isSameThread()) append.run();
+            else server.execute(append);
         }
 
         @Override
@@ -469,7 +497,10 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
         public boolean interruptTurn() { return runtime.interruptTurn(); }
 
         @Override
-        public void end(@NotNull EndReason reason) { runtime.end(reason); }
+        public void end(@NotNull EndReason reason) {
+            runtime.end(reason);
+            unregisterControlledSession(server, this);
+        }
 
         @Override
         public @NotNull List<ConversationTranscriptEntry> transcript() { return runtime.transcript(); }
@@ -526,7 +557,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
                             "Gemini provider is unavailable");
                 }
                 ConversationEligibility eligibility = ConversationManager.conversationEligibility(
-                        participant, ConversationKind.ADDON_AMBIENT);
+                        participant, ConversationKind.CONTROLLED);
                 if (!eligibility.eligible()) {
                     return ControlledConversationRuntime.Availability.rejected(
                             ControlledTurnResult.FailureReason.SPEAKER_UNAVAILABLE,
@@ -552,7 +583,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;
                 }
-                boolean started = ConversationManager.startAddonAmbientSession(
+                boolean started = ConversationManager.startControlledAmbientSession(
                         participant, prompt, audibleCompletion, promptContext, audioAnchor);
                 if (started) return ControlledConversationRuntime.StartResult.STARTED;
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
@@ -562,8 +593,12 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
             }
 
             @Override
-            public void cancel(@NotNull AbstractEntityCitizen participant) {
-                ConversationManager.cancelAddonAmbientSession(participant);
+            public void cancel(
+                    @NotNull AbstractEntityCitizen participant,
+                    @NotNull UUID sessionId,
+                    @NotNull UUID turnId
+            ) {
+                ConversationManager.cancelControlledAmbientSession(participant, sessionId, turnId);
             }
 
             @Override
