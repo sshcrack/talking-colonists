@@ -142,6 +142,17 @@ public class CitizenMemories {
         return summarizedMemory;
     }
 
+    /**
+     * Replaces compactable fact/event detail with a summary while keeping relationships,
+     * broadcasts, rumors, and addon idempotency history intact.
+     */
+    public synchronized void replaceFactsAndEventsWithSummary(@NotNull String summary) {
+        summarizedMemory = summary;
+        facts.clear();
+        events.clear();
+        entries.removeIf(entry -> entry.type() == MemoryEntryType.FACT || entry.type() == MemoryEntryType.EVENT);
+    }
+
     public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipDimension type, float change) {
         addRelationshipChange(targetUUID, type, change, MemoryProvenance.LEGACY_UNATTRIBUTED, null, null, null);
     }

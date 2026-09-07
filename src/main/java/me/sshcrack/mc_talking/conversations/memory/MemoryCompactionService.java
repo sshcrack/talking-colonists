@@ -221,9 +221,7 @@ public class MemoryCompactionService {
         McTalking.LOGGER.info("[MemoryCompaction] Applied compaction for citizen {} ({} events + {} facts -> {} chars)",
                 citizen.getCitizenData().getName(), eventCount, factCount, summary.length());
 
-        mem.setSummarizedMemory(summary);
-        mem.getEvents().clear();
-        mem.getFacts().clear();
+        mem.replaceFactsAndEventsWithSummary(summary);
         // TODO: consider compacting stale relationship entries in the future
     }
 

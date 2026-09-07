@@ -60,21 +60,13 @@ public class CitizenConversation {
     /** Flash/TTS uses one mixed channel; keep that channel on the moving group centroid. */
     private volatile LocationalAudioChannel locationalChannel;
 
-    /**
-     * Only used in LIVE_WEBSOCKETS mode.
-     */
-    private List<LiveConversationWsClient> liveClients;
-
     private Consumer<ConversationState> onStateChanged;
 
     /**
-     * Set to {@code true} when a player takes over one of the participants via
-     * {@link me.sshcrack.mc_talking.item.CitizenTalkingDevice}.
-     * The {@code finally} block in {@link #performFlashTtsConversation(Runnable)}
-     * checks this flag to skip lifecycle cleanup that would interfere with the
-     * player conversation.
+     * Shared terminal flag used when this pair conversation is cancelled or a player takes over one
+     * of the participants via {@link me.sshcrack.mc_talking.item.CitizenTalkingDevice}.
      */
-    private volatile boolean aborted;
+    private final ConversationCancellation cancellation = new ConversationCancellation();
 
     public enum ConversationState {
         GENERATING,
@@ -104,6 +96,7 @@ public class CitizenConversation {
      * The conversation state will be updated via the {@link #setOnStateChanged} callback.
      */
     public void performConversation() {
+        if (cancellation.isCancelled()) return;
         switch (mode) {
             case AUTO -> performAutoConversation();
             case FLASH_TTS -> performFlashTtsConversation();
@@ -122,7 +115,7 @@ public class CitizenConversation {
      * which would interfere with the player conversation's AiStatus.
      */
     public void abort() {
-        this.aborted = true;
+        cancellation.cancel();
         if (stream != null) {
             UUID turnId = flashPlaybackTurnId;
             if (turnId != null) stream.cancelTurn(turnId);
@@ -143,6 +136,7 @@ public class CitizenConversation {
             server.execute(() -> performFlashTtsConversation(fallback));
             return;
         }
+        if (cancellation.isCancelled()) return;
 
         // Guard: all participants must be able to speak
         for (AbstractEntityCitizen p : participants) {
@@ -232,7 +226,7 @@ public class CitizenConversation {
 
                 long playbackDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
                 long nextLocationUpdate = 0L;
-                while (!aborted && stream.hasPendingPlayback() && System.nanoTime() < playbackDeadline) {
+                while (!cancellation.isCancelled() && stream.hasPendingPlayback() && System.nanoTime() < playbackDeadline) {
                     long now = System.nanoTime();
                     if (now >= nextLocationUpdate) {
                         nextLocationUpdate = now + TimeUnit.MILLISECONDS.toNanos(100);
@@ -247,7 +241,7 @@ public class CitizenConversation {
                 }
 
                 boolean playbackCompleted = !stream.hasPendingPlayback();
-                if (!aborted && !playbackCompleted) {
+                if (!cancellation.isCancelled() && !playbackCompleted) {
                     McTalking.LOGGER.warn("[Flash/TTS] Playback did not drain before timeout; stopping stream");
                     stream.stop();
                 }
@@ -255,7 +249,7 @@ public class CitizenConversation {
                 // Only spend the optional extra Flash request on memories after the
                 // generated conversation was actually heard to completion. Aborted or
                 // timed-out playback must not create memories for unheard dialogue.
-                if (!aborted && playbackCompleted && playbackStarted.get()
+                if (!cancellation.isCancelled() && playbackCompleted && playbackStarted.get()
                         && McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
                     CitizenMemoryGenerator.addAndGenerateMemory(completedTranscript, participants, server)
                             .scheduleOrSaveMemory();
@@ -264,7 +258,7 @@ public class CitizenConversation {
             } catch (ConversationGenerationException e) {
                 McTalking.LOGGER.error("Failed to generate Flash/TTS conversation: {}, cause: {}",
                         e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
-                if (fallback != null) {
+                if (fallback != null && !cancellation.isCancelled()) {
                     fallbackTriggered = true;
                     McTalking.LOGGER.info("[Auto] Flash/TTS failed, falling back to Live WebSockets");
                     if (stream != null) {
@@ -305,6 +299,7 @@ public class CitizenConversation {
             server.execute(this::performLiveWebsocketConversation);
             return;
         }
+        if (cancellation.isCancelled()) return;
         if (participants.size() < 2) {
             McTalking.LOGGER.warn("[LiveConv] Need at least 2 participants, got {}. Aborting.", participants.size());
             setState(ConversationState.ENDED);
@@ -353,8 +348,22 @@ public class CitizenConversation {
         AtomicReference<LiveConversationWsClient> clientARef = new AtomicReference<>();
         AtomicReference<LiveConversationWsClient> clientBRef = new AtomicReference<>();
 
+        Runnable cancelLive = () -> {
+            Runnable cleanup = () -> {
+                if (!cleanupStarted.compareAndSet(false, true)) return;
+                reservationA.end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                        "paired citizen conversation cancelled");
+                reservationB.end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                        "paired citizen conversation cancelled");
+            };
+            if (server.isSameThread()) cleanup.run();
+            else server.execute(cleanup);
+        };
+        if (!cancellation.registerLiveCancellation(cancelLive)) return;
+
         Consumer<LiveConversationWsClient> onClientEnded = client -> {
             if (!cleanupStarted.compareAndSet(false, true)) return;
+            cancellation.clearLiveCancellation(cancelLive);
             server.execute(() -> {
                 reservationA.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
                         "paired citizen conversation completed");
@@ -397,6 +406,7 @@ public class CitizenConversation {
             clientBRef.set(clientB);
         } catch (RuntimeException e) {
             cleanupStarted.set(true);
+            cancellation.clearLiveCancellation(cancelLive);
             LiveConversationWsClient partialA = clientARef.get();
             LiveConversationWsClient partialB = clientBRef.get();
             if (partialA != null) try { partialA.close(); } catch (Exception ignored) { }
@@ -412,12 +422,16 @@ public class CitizenConversation {
 
         clientA.setPeer(clientB);
         clientB.setPeer(clientA);
-        liveClients = List.of(clientA, clientB);
+        if (cancellation.isCancelled()) {
+            cancelLive.run();
+            return;
+        }
 
         boolean attachedA = reservationA.attachClient(clientA);
         boolean attachedB = reservationB.attachClient(clientB);
         if (!attachedA || !attachedB) {
             cleanupStarted.set(true);
+            cancellation.clearLiveCancellation(cancelLive);
             if (!attachedA && !clientA.isLifecycleClosed()) clientA.close();
             if (!attachedB && !clientB.isLifecycleClosed()) clientB.close();
             reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
@@ -427,9 +441,14 @@ public class CitizenConversation {
             setState(ConversationState.ENDED);
             return;
         }
+        if (cancellation.isCancelled()) {
+            cancelLive.run();
+            return;
+        }
 
         clientA.addOnCloseAction(() -> server.execute(() -> {
             if (!cleanupStarted.compareAndSet(false, true)) return;
+            cancellation.clearLiveCancellation(cancelLive);
             var diagnostic = clientA.getRecoveryDiagnostic();
             reservationA.end(
                     diagnostic.terminalReason() == me.sshcrack.mc_talking.internal.session.ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
@@ -442,6 +461,7 @@ public class CitizenConversation {
         }));
         clientB.addOnCloseAction(() -> server.execute(() -> {
             if (!cleanupStarted.compareAndSet(false, true)) return;
+            cancellation.clearLiveCancellation(cancelLive);
             var diagnostic = clientB.getRecoveryDiagnostic();
             reservationB.end(
                     diagnostic.terminalReason() == me.sshcrack.mc_talking.internal.session.ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
@@ -458,6 +478,7 @@ public class CitizenConversation {
             clientB.connect();
         } catch (RuntimeException e) {
             cleanupStarted.set(true);
+            cancellation.clearLiveCancellation(cancelLive);
             reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "failed to connect paired provider session");
             reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
@@ -466,9 +487,14 @@ public class CitizenConversation {
             setState(ConversationState.ENDED);
             return;
         }
+        if (cancellation.isCancelled()) {
+            cancelLive.run();
+            return;
+        }
 
         if (!reservationA.activate() || !reservationB.activate()) {
             cleanupStarted.set(true);
+            cancellation.clearLiveCancellation(cancelLive);
             reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "paired ownership changed before activation");
             reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,

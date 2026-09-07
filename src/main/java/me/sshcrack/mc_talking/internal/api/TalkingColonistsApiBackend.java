@@ -642,13 +642,16 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
             this.server = server;
             this.delegate = delegate;
             delegate.setOnStateChanged(coreState -> {
+                if (cancelled.get()) return;
                 State mapped = switch (coreState) {
                     case GENERATING -> State.GENERATING;
                     case PLAYING_AUDIO -> State.PLAYING_AUDIO;
                     case ENDED -> State.ENDED;
                 };
                 state.set(mapped);
-                server.execute(() -> listener.accept(mapped));
+                server.execute(() -> {
+                    if (!cancelled.get()) listener.accept(mapped);
+                });
             });
         }
 
