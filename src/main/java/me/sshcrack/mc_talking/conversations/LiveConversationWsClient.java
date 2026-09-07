@@ -13,8 +13,6 @@ import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -23,9 +21,9 @@ import java.util.function.Consumer;
  * A {@link GeminiWsClient} that represents one participant in a Live-WebSocket
  * citizen-to-citizen conversation.
  *
- * <p>After the AI finishes speaking, the raw PCM audio is forwarded directly to
- * {@link #peer}'s {@link #addPromptAudio} so that the two instances keep
- * conversing without any extra API calls.</p>
+ * <p>After one participant's audible output has fully drained, its output transcript is forwarded
+ * to the peer as text. The peer never receives a speculative transcript or held audio for speech
+ * that the listener did not actually hear.</p>
  *
  * <p>A round counter limits the total number of speaking turns so the
  * conversation eventually ends.</p>
@@ -39,9 +37,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
     @Nullable
     private final String systemPromptAddition;
 
-    /**
-     * Peer client that will receive our generated audio as its input.
-     */
+    /** Peer client that receives the just-heard transcript as its next input. */
     @Nullable
     private LiveConversationWsClient peer;
 
@@ -61,12 +57,6 @@ public class LiveConversationWsClient extends GeminiWsClient {
      */
     private final AbstractEntityCitizen citizen;
     private final CitizenPromptView promptView;
-
-    private volatile boolean holdAudio = false;
-    private final List<AudioChunk> heldAudioChunks = new ArrayList<>();
-
-    private record AudioChunk(byte[] data, int sampleRate) {
-    }
 
     // -------------------------------------------------------------------------
 
@@ -98,9 +88,7 @@ public class LiveConversationWsClient extends GeminiWsClient {
     // Peer wiring
     // -------------------------------------------------------------------------
 
-    /**
-     * Sets the other participant who will receive this client's audio output.
-     */
+    /** Sets the other participant who will receive this client's heard transcript. */
     public void setPeer(@Nullable LiveConversationWsClient peer) {
         this.peer = peer;
     }
@@ -110,9 +98,8 @@ public class LiveConversationWsClient extends GeminiWsClient {
     // -------------------------------------------------------------------------
 
     /**
-     * Citizen-to-citizen live conversations always use TEXT_AND_AUDIO so we can
-     * forward the text transcript to the peer before audio finishes playing,
-     * reducing the silence gap between turns.
+     * Citizen-to-citizen live conversations use TEXT_AND_AUDIO so an output transcript can be
+     * forwarded to the peer after the exact audible turn drains.
      */
     @Override
     protected ModalityModes getEffectiveModality() {
@@ -171,72 +158,37 @@ public class LiveConversationWsClient extends GeminiWsClient {
     }
 
     /**
-     * Called when text + audio generation for this turn is fully complete (audio
-     * may still be playing back locally).
-     *
-     * <p>We immediately:
-     * <ol>
-     *   <li>Put the peer into audio-hold mode so its generated audio is buffered
-     *       rather than played right away.</li>
-     *   <li>Send our transcript directly to the peer's Gemini session so it
-     *       starts generating its response without waiting for our audio to finish.</li>
-     * </ol>
-     * The peer's audio will only be released (and heard) once our own audio has
-     * fully played back, via {@link #onConversationEnded()}.
+     * Forwards a turn only after its local voice-chat playback has actually drained. This keeps the
+     * peer's provider context aligned with what was heard and removes the old hidden audio buffer
+     * that could otherwise resurrect a reply after interruption.
      */
     @Override
-    protected void onTranscriptComplete(String transcript) {
-        if (peer == null || peer.isClosed()) return;
-        McTalking.LOGGER.info("[LiveConvWs] Turn complete - holding peer audio and forwarding transcript to {} ({})",
-                peer.getEntity().getCitizenData().getName(), transcript);
-        // Hold peer's audio so it doesn't play while we're still speaking.
-        peer.holdAudio();
-        // Send text immediately so peer starts generating right now.
-        peer.addPromptTextImmediate(transcript);
-    }
-
-    @Override
-    public void onTurnComplete() {
-        // Gemini reports turn completion before audible playback has drained. Core's
-        // graceful-end path waits for the stream pause before closing the pair.
-        super.onTurnComplete();
-    }
-
-    /**
-     * Called once our audio has fully played back (stream drained).
-     *
-     * <p>The peer has been generating since our {@link #onTurnComplete()} fired and
-     * its audio has been held in a buffer. We now release that hold so the peer's
-     * audio starts playing immediately (or as soon as it finishes generating, if
-     * generation is not yet done).
-     */
-    @Override
-    protected void onConversationEnded() {
-        super.onConversationEnded(); // sets our own status to LISTENING
-
-        if (shouldEndConversation) {
-            McTalking.LOGGER.info("[LiveConvWs] Final audio drained for {}; ending pair",
-                    citizen.getCitizenData().getName());
-            return;
-        }
+    protected void onAudibleTranscriptComplete(String transcript) {
+        if (shouldEndConversation) return;
 
         int turn = sharedTurnCounter.incrementAndGet();
-        McTalking.LOGGER.info("[LiveConvWs] Turn {} of {} completed by {}",
+        McTalking.LOGGER.info("[LiveConvWs] Audible turn {} of {} completed by {}",
                 turn, MAX_TOTAL_TURNS, citizen.getCitizenData().getName());
-
         if (turn >= MAX_TOTAL_TURNS) {
-            McTalking.LOGGER.info("[LiveConvWs] Max turns reached – ending conversation");
+            McTalking.LOGGER.info("[LiveConvWs] Max turns reached after audible playback – ending conversation");
             notifyEnded();
             return;
         }
 
-        // Release the peer's held audio now that we've finished speaking.
-        // If peer generation is already complete the buffered audio plays immediately;
-        // if still generating it plays as soon as generation finishes.
-        if (peer != null && !peer.isClosed()) {
-            McTalking.LOGGER.info("[LiveConvWs] Releasing held audio for peer {}",
-                    peer.getEntity().getCitizenData().getName());
-            peer.releaseHeldAudio();
+        LiveConversationWsClient currentPeer = peer;
+        if (currentPeer != null && !currentPeer.isClosed()) {
+            McTalking.LOGGER.info("[LiveConvWs] Forwarding heard transcript to {}",
+                    currentPeer.getEntity().getCitizenData().getName());
+            currentPeer.addPromptTextImmediate(transcript);
+        }
+    }
+
+    @Override
+    protected void onConversationEnded() {
+        super.onConversationEnded();
+        if (shouldEndConversation) {
+            McTalking.LOGGER.info("[LiveConvWs] Final audio drained for {}; ending pair",
+                    citizen.getCitizenData().getName());
         }
     }
 
@@ -262,53 +214,6 @@ public class LiveConversationWsClient extends GeminiWsClient {
     @Override
     public boolean sendStatusUpdates() {
         return false;
-    }
-
-    // -------------------------------------------------------------------------
-    // Audio hold / release
-    // -------------------------------------------------------------------------
-
-    public void holdAudio() {
-        holdAudio = true;
-    }
-
-    public void releaseHeldAudio() {
-        List<AudioChunk> toFlush;
-        synchronized (heldAudioChunks) {
-            toFlush = new ArrayList<>(heldAudioChunks);
-            heldAudioChunks.clear();
-            holdAudio = false;
-        }
-
-        if (toFlush.isEmpty()) {
-            if (generationComplete) {
-                onConversationEnded();
-            }
-            return;
-        }
-
-        for (AudioChunk chunk : toFlush) {
-            super.onGeneratedAudio(chunk.data(), chunk.sampleRate());
-        }
-    }
-
-    @Override
-    public void onGeneratedAudio(byte[] data, int sampleRate) {
-        synchronized (heldAudioChunks) {
-            if (holdAudio) {
-                heldAudioChunks.add(new AudioChunk(data, sampleRate));
-                return;
-            }
-        }
-        super.onGeneratedAudio(data, sampleRate);
-    }
-
-    @Override
-    protected void onStreamPause() {
-        if (generationComplete && holdAudio) {
-            return;
-        }
-        super.onStreamPause();
     }
 
 }

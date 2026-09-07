@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.internal.api.AiToolDispatcher;
 import me.sshcrack.mc_talking.internal.api.AiToolExecutionContext;
 import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
+import me.sshcrack.mc_talking.internal.audio.PlaybackDrainCoordinator;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.QuotaTracker;
@@ -79,14 +80,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             Collections.synchronizedList(new ArrayList<>());
     private final AtomicBoolean closeStarted = new AtomicBoolean(false);
     private final AtomicBoolean providerTerminalEventFired = new AtomicBoolean(false);
+    private final AtomicBoolean gracefulEndSignal = new AtomicBoolean(false);
     private volatile boolean finalGenerationCompleted = false;
-    private final AtomicBoolean gracefulEndRequested = new AtomicBoolean(false);
-    private final AtomicBoolean gracefulEndFinished = new AtomicBoolean(false);
-    @Nullable
-    private ScheduledFuture<?> gracefulEndFuture;
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
-    protected boolean generationComplete = false;
+    protected volatile boolean generationComplete = false;
+    private volatile boolean providerTurnComplete = false;
+    private volatile boolean outputTurnInterrupted = false;
+    private volatile boolean suppressProviderOutput = false;
+    @Nullable private UUID outputTurnId;
+    @Nullable private UUID pendingAudibleTranscriptTurnId;
+    @Nullable private String pendingAudibleTranscript;
+    private final PlaybackDrainCoordinator gracefulPlaybackClose;
     /**
      * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
      */
@@ -150,6 +155,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         this.decoder = audioProvider.createDecoder();
         stream = new GeminiStream(channel);
         stream.setOnPause(this::onStreamPause);
+        gracefulPlaybackClose = new PlaybackDrainCoordinator(
+                this::flushCurrentOutputTurn,
+                stream::hasPendingPlayback,
+                GRACEFUL_CLOSE_TIMEOUT_MS,
+                (task, delayMillis) -> {
+                    ScheduledFuture<?> future = getReconnectExecutor().schedule(() -> {
+                        McTalking.LOGGER.warn("{} Graceful close timed out after {} ms; forcing session end",
+                                logPrefix, GRACEFUL_CLOSE_TIMEOUT_MS);
+                        task.run();
+                    }, delayMillis, TimeUnit.MILLISECONDS);
+                    return () -> future.cancel(false);
+                },
+                this::finishGracefulEnd
+        );
 
         var citizenData = entity.getCitizenData();
         if (citizenData == null) {
@@ -196,31 +215,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     public void endConversationWhenPossible() {
+        if (!gracefulEndSignal.compareAndSet(false, true)) return;
         this.shouldEndConversation = true;
     }
 
     private void requestGracefulEndAfterPlayback() {
-        if (!gracefulEndRequested.compareAndSet(false, true)) return;
-        stream.flushAudio();
-        if (!stream.hasPendingPlayback()) {
-            finishGracefulEnd();
-            return;
-        }
-        gracefulEndFuture = getReconnectExecutor().schedule(() -> {
-            McTalking.LOGGER.warn("{} Graceful close timed out after {} ms; forcing session end",
-                    logPrefix, GRACEFUL_CLOSE_TIMEOUT_MS);
-            finishGracefulEnd();
-        }, GRACEFUL_CLOSE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        gracefulPlaybackClose.request();
     }
 
     private void finishGracefulEnd() {
-        if (!gracefulEndFinished.compareAndSet(false, true)) return;
-        ScheduledFuture<?> future = gracefulEndFuture;
-        if (future != null) {
-            future.cancel(false);
-            gracefulEndFuture = null;
-        }
-
         var server = entity.level().getServer();
         Runnable finish = () -> {
             var playerUUID = ConversationManager.getPlayerForEntity(entity.getUUID());
@@ -234,6 +237,101 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             server.execute(finish);
         } else {
             finish.run();
+        }
+    }
+
+    private synchronized UUID ensureOutputTurn() {
+        if (outputTurnId == null) {
+            outputTurnId = UUID.randomUUID();
+            outputTurnInterrupted = false;
+            providerTurnComplete = false;
+            pendingAudibleTranscriptTurnId = null;
+            pendingAudibleTranscript = null;
+            stream.beginTurn(outputTurnId);
+        }
+        return outputTurnId;
+    }
+
+    @Nullable
+    private synchronized UUID currentOutputTurn() {
+        return outputTurnId;
+    }
+
+    private void flushCurrentOutputTurn() {
+        UUID turnId = currentOutputTurn();
+        if (turnId != null) stream.flushAudio(turnId);
+    }
+
+    private void interruptCurrentOutputForBargeIn() {
+        UUID turnId = currentOutputTurn();
+        if (turnId == null) return;
+        boolean providerAlreadyFinished;
+        synchronized (this) {
+            if (!turnId.equals(outputTurnId)) return;
+            outputTurnInterrupted = true;
+            pendingAudibleTranscriptTurnId = null;
+            pendingAudibleTranscript = null;
+            providerAlreadyFinished = providerTurnComplete;
+        }
+        stream.cancelTurn(turnId);
+
+        // If Gemini had already completed generation, there will be no later interruption/turn
+        // completion event to retire this local playback identity. Retire it now so the user's
+        // audio can immediately start a fresh provider turn instead of inheriting a cancelled ID.
+        if (providerAlreadyFinished) {
+            completeInterruptedTurn(turnId);
+            onConversationEnded();
+            gracefulPlaybackClose.onPlaybackDrained();
+        }
+    }
+
+    private void invalidateCurrentOutputTurn() {
+        UUID turnId;
+        synchronized (this) {
+            turnId = outputTurnId;
+            outputTurnInterrupted = true;
+            providerTurnComplete = false;
+            pendingAudibleTranscriptTurnId = null;
+            pendingAudibleTranscript = null;
+            currentTurnTranscript = "";
+            outputTurnId = null;
+        }
+        if (turnId != null) stream.cancelTurn(turnId);
+        else stream.stop();
+    }
+
+    /** Commits only a transcript whose exact audio turn reached the end of playback. */
+    private boolean completeAudibleTurn(UUID turnId) {
+        String heardTranscript = null;
+        synchronized (this) {
+            if (!turnId.equals(outputTurnId) || outputTurnInterrupted || !providerTurnComplete) return false;
+            if (turnId.equals(pendingAudibleTranscriptTurnId)) {
+                heardTranscript = pendingAudibleTranscript;
+            }
+            pendingAudibleTranscriptTurnId = null;
+            pendingAudibleTranscript = null;
+            outputTurnId = null;
+            providerTurnComplete = false;
+        }
+        if (heardTranscript != null && !heardTranscript.isBlank()) {
+            synchronized (sessionTranscript) {
+                if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
+                sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(heardTranscript.trim());
+            }
+            onAudibleTranscriptComplete(heardTranscript.trim());
+        }
+        return true;
+    }
+
+    private void completeInterruptedTurn(UUID turnId) {
+        synchronized (this) {
+            if (!turnId.equals(outputTurnId)) return;
+            pendingAudibleTranscriptTurnId = null;
+            pendingAudibleTranscript = null;
+            currentTurnTranscript = "";
+            outputTurnId = null;
+            providerTurnComplete = false;
+            outputTurnInterrupted = false;
         }
     }
 
@@ -443,11 +541,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     protected void onStreamPause() {
-        if (generationComplete) {
+        UUID turnId = currentOutputTurn();
+        if (turnId != null && providerTurnComplete && completeAudibleTurn(turnId)) {
             onConversationEnded();
-            if (shouldEndConversation) {
-                finishGracefulEnd();
-            }
+            gracefulPlaybackClose.onPlaybackDrained();
         } else if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
         }
@@ -520,41 +617,31 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onGenerationComplete() {
         McTalking.LOGGER.info("{} Gemini generation complete", logPrefix);
+        if (suppressProviderOutput) return;
 
         producedOutputSinceSetup = true;
+        UUID turnId = ensureOutputTurn();
         if (shouldEndConversation) finalGenerationCompleted = true;
-        stream.flushAudio();
-
-        if (!currentTurnTranscript.isBlank()) {
-            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
-            sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
-        }
-
-        // NOTE: Do NOT clear currentTurnTranscript here.
-        // onTurnComplete() fires after onGenerationComplete() and subclasses
-        // (e.g. LiveConversationWsClient) need the transcript to forward it to
-        // the peer.  Clearing and chat-sending is done in onTurnComplete instead.
-
+        stream.flushAudio(turnId);
         generationComplete = true;
     }
 
     @Override
     public void onInterrupted() {
         McTalking.LOGGER.info("{} Gemini generation interrupted", logPrefix);
-        stream.stop();
+        if (suppressProviderOutput) return;
+        UUID turnId = ensureOutputTurn();
+        outputTurnInterrupted = true;
+        stream.cancelTurn(turnId);
 
-        if (!currentTurnTranscript.isBlank()) {
-            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
-            sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(currentTurnTranscript.trim());
-        }
-
+        // Provider-side interruption already updates Gemini's conversation state. The local
+        // transcript may describe audio that was queued but never heard, so it is intentionally
+        // not committed to persistent/session memory or forwarded to a peer as heard speech.
         var sPlayer = resolveActivePlayer();
-        if (currentTurnTranscript.isBlank()) {
-            return;
-        }
-
-        sendTranscriptToChat(sPlayer);
+        if (!currentTurnTranscript.isBlank()) sendTranscriptToChat(sPlayer);
         currentTurnTranscript = "";
+        pendingAudibleTranscriptTurnId = null;
+        pendingAudibleTranscript = null;
     }
 
     private void sendTranscriptToChat(@Nullable ServerPlayer sPlayer) {
@@ -581,7 +668,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onGeneratedText(String text) {
-        if (finalGenerationCompleted) return;
+        if (finalGenerationCompleted || suppressProviderOutput) return;
+        ensureOutputTurn();
         producedOutputSinceSetup = true;
         var hasTextEnabled = getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO;
         if (!hasTextEnabled)
@@ -592,7 +680,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onOutputTranscription(String transcription) {
-        if (finalGenerationCompleted) return;
+        if (finalGenerationCompleted || suppressProviderOutput) return;
+        ensureOutputTurn();
         producedOutputSinceSetup = true;
         currentTurnTranscript += transcription;
     }
@@ -600,16 +689,32 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onTurnComplete() {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
+        if (suppressProviderOutput) return;
+        UUID turnId = ensureOutputTurn();
         generationComplete = true;
+        providerTurnComplete = true;
 
-        // Send the transcript to chat and notify subclasses before clearing.
-        // This is done here (not in onGenerationComplete) so that subclasses
-        // can still act on the transcript via the onTranscriptComplete hook.
+        if (outputTurnInterrupted) {
+            completeInterruptedTurn(turnId);
+            onConversationEnded();
+            if (shouldEndConversation) requestGracefulEndAfterPlayback();
+            return;
+        }
+
         var sPlayer = resolveActivePlayer();
         if (!currentTurnTranscript.isBlank()) {
+            String transcript = currentTurnTranscript.trim();
             sendTranscriptToChat(sPlayer);
-            onTranscriptComplete(currentTurnTranscript.trim());
+            synchronized (this) {
+                pendingAudibleTranscriptTurnId = turnId;
+                pendingAudibleTranscript = transcript;
+            }
             currentTurnTranscript = "";
+        }
+
+        stream.flushAudio(turnId);
+        if (!stream.hasPendingPlayback() && completeAudibleTurn(turnId)) {
+            onConversationEnded();
         }
 
         if (shouldEndConversation) {
@@ -618,16 +723,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
     }
 
-    /**
-     * Called from {@link #onTurnComplete()} with the completed transcript text,
-     * right before {@link #currentTurnTranscript} is cleared.
-     *
-     * <p>The default implementation is a no-op. Subclasses may override this
-     * to act on the finished transcript (e.g. forwarding it to a peer).
-     *
-     * @param transcript the non-empty, trimmed transcript for the just-completed turn
-     */
-    protected void onTranscriptComplete(String transcript) {
+    /** Called only after the transcript's exact audible turn has drained successfully. */
+    protected void onAudibleTranscriptComplete(String transcript) {
         // no-op by default
     }
 
@@ -639,12 +736,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
-        if (finalGenerationCompleted) {
-            McTalking.LOGGER.debug("{} Dropping audio generated after the requested final turn", logPrefix);
+        if (finalGenerationCompleted || suppressProviderOutput) {
+            McTalking.LOGGER.debug("{} Dropping audio outside the active provider turn", logPrefix);
             return;
         }
         producedOutputSinceSetup = true;
-        var isJustStarted = stream.addGeminiPcmWithPitch(data, sampleRate);
+        UUID turnId = ensureOutputTurn();
+        var isJustStarted = stream.addGeminiPcmWithPitch(turnId, data, sampleRate);
         if (!isJustStarted)
             return;
         onGenerationStarted();
@@ -672,6 +770,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onSetupComplete() {
         QuotaTracker.reportSuccess(getModelName());
+        suppressProviderOutput = false;
         producedOutputSinceSetup = false;
         synchronized (this) {
             reconnectScheduled = false;
@@ -894,7 +993,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.info("{} Session token invalidated; clearing resumable state before bounded reconnect", logPrefix);
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
+            suppressProviderOutput = true;
             int discardedAudio = stream.discardPendingAudio();
+            invalidateCurrentOutputTurn();
             if (discardedAudio > 0) {
                 McTalking.LOGGER.info("{} Discarded {} stale queued audio chunks before replaying invalidated session",
                         logPrefix, discardedAudio);
@@ -944,6 +1045,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void addPromptAudio(short[] audio) {
+        // Stop local playback immediately; provider automatic VAD receives the same input and
+        // remains authoritative for provider-side interruption context.
+        interruptCurrentOutputForBargeIn();
         var input = new RealtimeInput();
         var byteAudio = vcApi.getAudioConverter().shortsToBytes(audio);
         input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
@@ -1025,11 +1129,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 reconnectFuture.cancel(false);
                 reconnectFuture = null;
             }
-            if (gracefulEndFuture != null) {
-                gracefulEndFuture.cancel(false);
-                gracefulEndFuture = null;
-            }
         }
+        gracefulPlaybackClose.cancel();
+        invalidateCurrentOutputTurn();
         ADDON_TOOL_DISPATCHER.forgetSession(toolOperationScopeId());
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         try {

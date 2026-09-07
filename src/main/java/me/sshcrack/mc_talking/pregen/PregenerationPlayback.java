@@ -32,6 +32,7 @@ public final class PregenerationPlayback {
 
     private static final class PlaybackEntry {
         final AbstractEntityCitizen citizen;
+        final UUID turnId = UUID.randomUUID();
         final long startedAtMs = System.currentTimeMillis();
         final AtomicBoolean cleaned = new AtomicBoolean(false);
         final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -55,7 +56,7 @@ public final class PregenerationPlayback {
             GeminiStream current = stream;
             if (current != null) {
                 try {
-                    current.stop();
+                    current.cancelTurn(turnId);
                 } catch (Throwable ignored) {
                 }
                 try {
@@ -163,6 +164,7 @@ public final class PregenerationPlayback {
             }
 
             GeminiStream stream = new GeminiStream(channel);
+            stream.beginTurn(entry.turnId);
             entry.attach(stream, cleanup);
             if (entry.cancelled.get()) return false;
 
@@ -177,8 +179,8 @@ public final class PregenerationPlayback {
                     cleanup.run();
                 }
             });
-            stream.addGeminiPcmWithPitch(audioData.audioBytes(), audioData.sampleRate());
-            stream.flushAudio();
+            stream.addGeminiPcmWithPitch(entry.turnId, audioData.audioBytes(), audioData.sampleRate());
+            stream.flushAudio(entry.turnId);
             return true;
         } catch (RuntimeException e) {
             entry.stop("playback startup failed");

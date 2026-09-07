@@ -56,6 +56,7 @@ public class CitizenConversation {
      * Only used in FLASH_TTS mode.
      */
     private GeminiStream stream;
+    private volatile UUID flashPlaybackTurnId;
     /** Flash/TTS uses one mixed channel; keep that channel on the moving group centroid. */
     private volatile LocationalAudioChannel locationalChannel;
 
@@ -123,7 +124,8 @@ public class CitizenConversation {
     public void abort() {
         this.aborted = true;
         if (stream != null) {
-            stream.stop();
+            UUID turnId = flashPlaybackTurnId;
+            if (turnId != null) stream.cancelTurn(turnId);
             stream.close();
         }
     }
@@ -160,6 +162,9 @@ public class CitizenConversation {
             locationalChannel = channel;
             stream = new GeminiStream(channel);
         }
+        UUID playbackTurnId = UUID.randomUUID();
+        flashPlaybackTurnId = playbackTurnId;
+        stream.beginTurn(playbackTurnId);
 
         // Claim exact-ownership activity reservations so delayed cleanup from this
         // conversation cannot release newer work for the same citizen. The timeout is
@@ -217,13 +222,13 @@ public class CitizenConversation {
                             if (playbackStarted.compareAndSet(false, true)) {
                                 setState(ConversationState.PLAYING_AUDIO);
                             }
-                            stream.addGeminiPcmWithPitch(chunk.audioBytes(), chunk.sampleRate());
+                            stream.addGeminiPcmWithPitch(playbackTurnId, chunk.audioBytes(), chunk.sampleRate());
                         });
 
                 // The websocket client flushes its stream when generation completes,
                 // but the Flash/TTS path is synchronous and has to do it explicitly.
                 // Without this, a short final chunk can remain buffered forever.
-                stream.flushAudio();
+                stream.flushAudio(playbackTurnId);
 
                 long playbackDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
                 long nextLocationUpdate = 0L;
@@ -269,6 +274,12 @@ public class CitizenConversation {
                     fallback.run();
                 }
             } finally {
+                if (stream != null) {
+                    try { stream.close(); } catch (RuntimeException ignored) { }
+                }
+                stream = null;
+                locationalChannel = null;
+                flashPlaybackTurnId = null;
                 for (int i = 0; i < participants.size(); i++) {
                     AbstractEntityCitizen p = participants.get(i);
                     activityReservations.get(i).close();

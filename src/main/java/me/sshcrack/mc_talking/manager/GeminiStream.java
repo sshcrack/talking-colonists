@@ -4,6 +4,7 @@ import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
+import me.sshcrack.mc_talking.internal.audio.PlaybackTurnGate;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
@@ -25,6 +27,7 @@ public class GeminiStream implements Supplier<short[]> {
     private static final int MIN_FRAMES_BEFORE_PLAYBACK = 25;
 
     private final Queue<short[]> audioFrames = new ConcurrentLinkedQueue<>();
+    private final PlaybackTurnGate turnGate = new PlaybackTurnGate();
     private final AudioChannel channel;
     @Nullable AudioPlayer player;
     private short[] remainingSamples = new short[0]; // For storing leftover samples
@@ -48,11 +51,18 @@ public class GeminiStream implements Supplier<short[]> {
         this.onPause = onPause;
     }
 
-    public void flushAudio() {
-        // Process any remaining buffered data
-        if (!incomingData.isEmpty()) {
-            processBufferedData(lastSampleRate, true);
-        }
+    public void beginTurn(UUID turnId) {
+        turnGate.begin(turnId);
+    }
+
+    public boolean flushAudio(UUID turnId) {
+        return turnGate.beginDrain(turnId, () -> {
+            // Seal the producer side before moving the tail into playback so a racing late
+            // provider chunk cannot sneak in behind the final flush.
+            if (!incomingData.isEmpty()) {
+                processBufferedData(lastSampleRate, true);
+            }
+        });
     }
 
     /**
@@ -61,25 +71,24 @@ public class GeminiStream implements Supplier<short[]> {
      * @param data       Raw PCM audio data as byte array
      * @param sampleRate Sample rate of the audio data
      */
-    public boolean addGeminiPcmWithPitch(byte[] data, int sampleRate) {
-        lastSampleRate = sampleRate;
+    public boolean addGeminiPcmWithPitch(UUID turnId, byte[] data, int sampleRate) {
+        final boolean[] started = {false};
+        boolean accepted = turnGate.accept(turnId, () -> {
+            lastSampleRate = sampleRate;
 
-        // Add the new data to our buffer
-        if (data.length > 0) {
-            synchronized (incomingData) {
-                incomingData.add(data);
-                totalBufferedBytes += data.length;
+            if (data.length > 0) {
+                synchronized (incomingData) {
+                    incomingData.add(data);
+                    totalBufferedBytes += data.length;
+                }
             }
-        }
 
-        // Only process if we have enough data for effective pitch shifting.
-        // We collect more data before processing to ensure smoother playback.
-        int bufferedBytes = totalBufferedBytes;
-        if (bufferedBytes >= MIN_BUFFER_SIZE_FOR_PITCH * 2) {
-            return processBufferedData(sampleRate, false);
-        }
-
-        return false;
+            int bufferedBytes = totalBufferedBytes;
+            if (bufferedBytes >= MIN_BUFFER_SIZE_FOR_PITCH * 2) {
+                started[0] = processBufferedData(sampleRate, false);
+            }
+        });
+        return accepted && started[0];
     }
 
     /**
@@ -166,12 +175,14 @@ public class GeminiStream implements Supplier<short[]> {
 
             // Only start playing when we have enough buffered frames
             if (!audioFrames.isEmpty() && (!isPreBuffering || audioFrames.size() >= MIN_FRAMES_BEFORE_PLAYBACK || flushed)) {
-                encoder = vcApi.createEncoder(OpusEncoderMode.AUDIO);
-                player = vcApi.createAudioPlayer(channel, encoder, this);
-
+                OpusEncoder createdEncoder = vcApi.createEncoder(OpusEncoderMode.AUDIO);
+                AudioPlayer createdPlayer = vcApi.createAudioPlayer(channel, createdEncoder, this);
+                encoder = createdEncoder;
+                player = createdPlayer;
+                createdPlayer.setOnStopped(() -> releaseStoppedPlayer(createdPlayer, createdEncoder));
 
                 isPreBuffering = false;
-                player.startPlaying();
+                createdPlayer.startPlaying();
                 return true;
             }
         }
@@ -201,26 +212,47 @@ public class GeminiStream implements Supplier<short[]> {
         return dropped;
     }
 
+    /** Immediately cancels one exact turn, stopping playback and rejecting all late chunks. */
+    public boolean cancelTurn(UUID turnId) {
+        return turnGate.cancel(turnId, this::stopAndDiscard);
+    }
+
     public void stop() {
+        UUID turnId = turnGate.turnId();
+        if (turnId != null && turnGate.cancel(turnId, this::stopAndDiscard)) return;
+        stopAndDiscard();
+    }
+
+    private void stopAndDiscard() {
         audioFrames.clear();
         remainingSamples = new short[0];
+        synchronized (incomingData) {
+            incomingData.clear();
+            totalBufferedBytes = 0;
+        }
         isPreBuffering = true;
-        if (player != null) {
-            player.stopPlaying();
-            long deadline = System.currentTimeMillis() + 2000;
-            try {
-                while (!player.isStopped() && System.currentTimeMillis() < deadline) {
-                    Thread.sleep(1);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            player = null;
+        AudioPlayer currentPlayer = player;
+        OpusEncoder currentEncoder = encoder;
+        player = null;
+        encoder = null;
+        if (currentPlayer != null) {
+            // Voice-chat stop is asynchronous; do not block the server/barge-in path waiting for
+            // the player thread. Its on-stopped hook owns encoder cleanup.
+            currentPlayer.stopPlaying();
+        } else {
+            closeEncoder(currentEncoder);
         }
-        if (encoder != null) {
-            try { encoder.close(); } catch (Exception e) { /* swallow */ }
-            encoder = null;
-        }
+    }
+
+    private synchronized void releaseStoppedPlayer(AudioPlayer stoppedPlayer, OpusEncoder stoppedEncoder) {
+        if (player == stoppedPlayer) player = null;
+        if (encoder == stoppedEncoder) encoder = null;
+        closeEncoder(stoppedEncoder);
+    }
+
+    private static void closeEncoder(@Nullable OpusEncoder encoder) {
+        if (encoder == null) return;
+        try { encoder.close(); } catch (Exception ignored) { }
     }
 
     public void close() {
@@ -234,8 +266,10 @@ public class GeminiStream implements Supplier<short[]> {
             return frame;
         }
 
-        // Queue is empty — pause playback and notify the client
+        // Queue is empty — pause playback and notify the client. A draining turn becomes
+        // terminal here; cancelled turns remain cancelled and cannot be resurrected.
         isPreBuffering = true;
+        turnGate.completeDrainedTurn();
         if (onPause != null) {
             onPause.run();
         }
@@ -245,7 +279,7 @@ public class GeminiStream implements Supplier<short[]> {
 
     /**
      * Returns whether generated audio is still buffered or actively playing.
-     * Callers use this after the producer has finished and {@link #flushAudio()}
+     * Callers use this after the producer has finished and {@link #flushAudio(UUID)}
      * has been called, so no new frames are expected to arrive.
      */
     public boolean hasPendingPlayback() {

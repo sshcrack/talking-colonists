@@ -10,7 +10,9 @@ import org.jetbrains.annotations.Nullable;
 public class EndConversationAction extends GeneralFunctionAction {
     public EndConversationAction() {
         super("end_conversation", """
-                Terminates the current autonomous conversation. The other party will not be able to respond.
+                Gracefully terminates the current autonomous conversation after audible playback drains.
+                If a farewell is appropriate, say exactly one short goodbye BEFORE invoking this tool.
+                After invoking it, do not repeat or rephrase the farewell.
                 WARNING: This CANNOT be used while a real player is speaking to you directly.
                 Only use this in autonomous contexts (mumbling, citizen-to-citizen conversations).
                 """);
@@ -38,6 +40,8 @@ public class EndConversationAction extends GeneralFunctionAction {
 
         client.endConversationWhenPossible();
         obj.addProperty("success", true);
+        obj.addProperty("ending", true);
+        obj.addProperty("instruction", "Conversation is ending; do not generate another farewell.");
 
         return obj;
     }
