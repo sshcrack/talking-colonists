@@ -6,9 +6,6 @@ import me.sshcrack.mc_talking.api.context.CitizenContextService;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
-import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
-import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
-import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
@@ -26,13 +23,11 @@ import me.sshcrack.mc_talking.api.tool.AiToolParameter;
 import me.sshcrack.mc_talking.api.tool.AiToolPermission;
 import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
 import me.sshcrack.mc_talking.api.tool.AiToolScope;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -193,37 +188,4 @@ final class AddonApiCompileExample {
                 });
     }
 
-    static ControlledConversationSession openMeeting(
-            MinecraftServer server,
-            List<AbstractEntityCitizen> attendees,
-            AbstractEntityCitizen selectedSpeaker
-    ) {
-        ControlledConversationSession meeting = CitizenConversationService.createControlledSession(
-                server, attendees, "Discuss the colony's food supply and defenses.",
-                ControlledConversationOptions.allowAddonTools(Set.of("meetings:record_vote")));
-
-        // Colony Meetings owns navigation. Call requestTurn only after selectedSpeaker has arrived.
-        meeting.requestTurn(selectedSpeaker, "Give your view on the first agenda item.")
-                .thenAccept(result -> {
-                    if (!result.completed()) {
-                        // Advance/recover floor control based on result.failureReason(); never wait forever.
-                    }
-                });
-        return meeting;
-    }
-
-    static void playerQuestionThenCitizenTurn(
-            ControlledConversationSession meeting,
-            ServerPlayer player,
-            AbstractEntityCitizen speaker
-    ) {
-        meeting.addPlayerStatement(player, "What should we improve first?");
-        meeting.requestTurn(speaker, "Answer the player's question using the meeting context.");
-    }
-
-    static List<String> meetingMinuteLines(ControlledConversationSession meeting) {
-        return meeting.transcript().stream()
-                .map(entry -> entry.speakerName() + ": " + entry.text())
-                .toList();
-    }
 }

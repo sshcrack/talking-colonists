@@ -31,6 +31,7 @@ fun Project.configureAddonApi() {
         runtimeClasspath += addonApi.output
     }
     javaExtension.sourceSets.named("test") {
+        java.srcDir(rootProject.file("src/apiTest/java"))
         compileClasspath += addonApi.output
         runtimeClasspath += addonApi.output
     }

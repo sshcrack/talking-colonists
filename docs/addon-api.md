@@ -479,6 +479,8 @@ The handle hides provider clients, streams, audio queues, slot ownership and tea
 
 ## Controlled meetings and councils
 
+For a complete three-citizen Colony Meetings-style flow, including caller-owned arrival gates, player questions, failure recovery, podium output routing, microphone limitations, and manual validation notes, see [Controlled meetings integration](meetings-integration.md).
+
 The addon owns attendance, navigation, seats, hand raising and floor policy. Talking Colonists owns
 provider capacity, prompt grounding, spatial playback and cancellation. Opening a controlled session
 is cheap: silent attendees do **not** reserve a provider slot or open Live connections. Only the

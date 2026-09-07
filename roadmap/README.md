@@ -26,7 +26,7 @@ Voyager owns expedition state. Core exposes the seams these addons need.
 | 04 | [Public tools and authorized execution](04-tool-interface.md) | — | Complete |
 | 05 | [Session ownership and bounded recovery](05-session-lifecycle.md) | — | Complete |
 | 06 | [Controlled conversation turns](06-controlled-sessions.md) | 03, 04, 05 | Complete |
-| 07 | [Meetings example and integration contract](07-meetings-example.md) | 06 | Partial |
+| 07 | [Meetings example and integration contract](07-meetings-example.md) | 06 | Complete |
 | 08 | [Verified facts and memory provenance](08-facts-and-memory.md) | 02, 03, 04 | Partial |
 | 09 | [Audio continuity and interruption](09-audio-lifecycle.md) | 05, 06 | Partial |
 | 10 | [Model-specific voice recovery](10-voice-recovery.md) | 01, 05 | Partial |

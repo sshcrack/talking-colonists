@@ -37,3 +37,47 @@ and any initial limitations explicitly.
   anchoring, a full three-citizen floor sequence with failure recovery, or explicit
   microphone routing; behavioral arrival/playback ordering tests and both-loader
   in-world validation records remain.
+
+## Implementation record — 2026-09-07 (complete)
+
+- Replaced the earlier minimal meeting snippet with a dedicated compile-checked
+  `ColonyMeetingsExample` and addon-side `MeetingTurnSequencer`. The example supplies attendees,
+  agenda, and podium position; waits for a caller-owned movement/arrival stage before requesting a
+  turn; records a player question; updates the agenda for later turns; runs a three-citizen floor
+  sequence; demonstrates interruption and caller cancellation; and ends a normally completed
+  meeting. Seating, navigation, podium/block validity, hand raising, and floor UI remain caller
+  responsibilities.
+- The sequencing helper advances only from terminal `ControlledTurnResult` futures, so audible
+  completion gates the next floor grant. Unavailable/unloaded speakers are distinguished from an
+  ended/closed meeting, while other rejected/failed turns release caller waiting state and continue
+  according to addon policy. Movement or request exceptions are also terminal to that example step
+  rather than leaving the floor permanently waiting.
+- Added deterministic `MeetingsIntegrationContractTest` coverage for arrival-before-floor/speech,
+  audible-completion-before-next-floor across three citizens, player/agenda context updates between
+  turns, recoverable unavailable/capacity failures, and stopping on an ended meeting. `src/apiTest`
+  is also compiled in the normal test source set so the same example-side sequencer is exercised,
+  while `compileAddonApiExamples` continues compiling the example separately against only the
+  stripped developer API jar.
+- Added `docs/meetings-integration.md` and linked it from `docs/addon-api.md`. The guide documents the
+  minimal sequence, typed failure handling, output anchoring, interruption/cleanup, and the current
+  microphone contract. `ControlledAudioAnchor` is citizen **output** spatialization; controlled
+  sessions do not ingest player Simple Voice Chat microphone packets. A normal direct player/citizen
+  conversation owns current microphone routing and preempts an active controlled turn rather than
+  automatically inserting spoken player audio into meeting history.
+- Human in-world checks for fixed podium spatial audio, player barge-in, and orderly cleanup are
+  explicitly recorded as **Unverified** for both supported loaders because the available automated
+  client environment cannot evaluate what a listener hears or perform interactive meeting actions.
+  This is the acceptance-prescribed unavailable-environment outcome, not an automated-pass claim.
+
+### Validation
+
+- `GRADLE_USER_HOME=/cache/gradle ./gradlew test compileAddonApiExamples --no-daemon --max-workers=1`
+  passed for both `1.20.1-forge` and `1.21.1-neoforge`.
+- `GRADLE_USER_HOME=/cache/gradle ./gradlew buildAndCollect verifyApiJar --no-daemon --max-workers=1`
+  passed for both loaders, including isolated addon API jar/example verification and collected
+  artifacts.
+- `GRADLE_USER_HOME=/cache/gradle CLIENT_SMOKE_METADATA_ONLY_ASSETS=1 bash scripts/test-client-smoke.sh`
+  passed for both loaders. Each client reached the real in-world auto-quit success path; the
+  metadata-only fallback skipped only cosmetic Mojang asset-object downloads.
+
+No implementation acceptance criteria remain for task 07.
