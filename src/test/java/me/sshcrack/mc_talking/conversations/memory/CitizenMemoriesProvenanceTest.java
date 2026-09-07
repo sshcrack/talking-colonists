@@ -156,4 +156,43 @@ class CitizenMemoriesProvenanceTest {
         assertNull(entry.source());
         assertNull(entry.idempotencyId());
     }
+
+    @Test
+    void compactionRemovesFactEventProvenanceButKeepsRelationshipAndIdempotencyHistory() {
+        UUID player = UUID.randomUUID();
+        var outcome = new AddonConfirmedOutcome(
+                "colonist_errands",
+                "delivery:42",
+                "The delivery arrived.",
+                player,
+                List.of("The bakery has flour again."),
+                List.of(new ConfirmedRelationshipChange(
+                        player, CitizenRelationshipDimension.TRUST, 0.25f))
+        );
+        CitizenMemories memory = new CitizenMemories();
+        assertEquals(AddonMemoryWriteResult.ADDED, memory.addConfirmedOutcome(outcome));
+
+        memory.replaceFactsAndEventsWithSummary("I remember the successful bakery delivery.");
+
+        var snapshot = MemorySnapshotFactory.create(memory);
+        assertTrue(snapshot.facts().isEmpty());
+        assertTrue(snapshot.events().isEmpty());
+        assertTrue(snapshot.entries().isEmpty());
+        assertEquals("I remember the successful bakery delivery.", snapshot.summarizedMemory());
+        assertEquals(1, snapshot.relationships().size());
+        assertEquals(1, snapshot.relationshipChanges().size());
+
+        CitizenMemories reloaded = new CitizenMemories();
+        reloaded.deserializeNbt(memory.serializeNbt());
+        var reloadedSnapshot = MemorySnapshotFactory.create(reloaded);
+        assertTrue(reloadedSnapshot.facts().isEmpty());
+        assertTrue(reloadedSnapshot.events().isEmpty());
+        assertTrue(reloadedSnapshot.entries().isEmpty());
+        assertEquals("I remember the successful bakery delivery.", reloadedSnapshot.summarizedMemory());
+        assertEquals(1, reloadedSnapshot.relationships().size());
+        assertEquals(1, reloadedSnapshot.relationshipChanges().size());
+        assertEquals(AddonMemoryWriteResult.DUPLICATE, reloaded.addConfirmedOutcome(outcome),
+                "compaction must not forget confirmed-outcome idempotency keys");
+    }
+
 }
