@@ -14,6 +14,9 @@ stonecutter {
     }
 }
 
+val geminiLiveLibVersion = prop("deps.gemini_live_lib_version")
+val geminiLiveLibVersionRange = compatibleMajorVersionRange(geminiLiveLibVersion)
+
 platform {
     loader = "neoforge"
     dependencies {
@@ -29,7 +32,7 @@ platform {
         }
         required("gemini_live_lib") {
             curseforge = "gemini-live-lib"
-            forgeLikeVersionRange = "[${prop("deps.gemini_live_lib_version")},)"
+            forgeLikeVersionRange = geminiLiveLibVersionRange
         }
         required("voicechat") {
             curseforge = "simple-voice-chat"
@@ -199,7 +202,7 @@ dependencies {
 
     implementation("de.maxhenkel.voicechat:voicechat-api:${prop("deps.voicechat_api_version")}")
     runtimeOnly("maven.modrinth:simple-voice-chat:neoforge-${voicechat_version}")
-    implementation("me.sshcrack:gemini_live_lib:${prop("deps.gemini_live_lib_version")}-${prop("deps.minecraft")}-neoforge")
+    implementation("me.sshcrack:gemini_live_lib:$geminiLiveLibVersion-${prop("deps.minecraft")}-neoforge")
 
     implementation("com.ldtteam:minecolonies:${prop("deps.minecolonies_version")}")
     runtimeOnly("com.ldtteam:domum-ornamentum:${prop("deps.domum_version")}")

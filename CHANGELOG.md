@@ -1,6 +1,30 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-09-07
+
+### Breaking changes
+
+- Introduces addon API generation 2 as the supported integration baseline. Legacy addon API methods, direct manager/client access, and compatibility shims are intentionally not retained; addon migrations use `me.sshcrack.mc_talking.api` and `docs/addon-migration.md`.
+- Publishes the developer-only `me.sshcrack:mc_talking-api` artifact separately from the normal runtime mod. Players still install only Talking Colonists.
+
+### Added
+
+- Composable prompt contributors, authorized addon query/command tools, activity reservations, typed conversation lifecycle APIs, controlled multi-citizen turns, and optional bounded autonomous group discussion.
+- Provenance-aware verified facts and memory writes, including durable addon-confirmed outcomes and lossless migration of legacy memory data.
+- Meetings integration examples and compile-checked public API examples for both supported loaders.
+
+### Reliability
+
+- Token-owned foreground/background session lifecycle, bounded provider recovery, exact stale-callback protection, and deterministic shutdown cleanup.
+- Audible playback drain, exact-turn cancellation, barge-in/stale-audio protection, pregenerated interruption, and non-overlapping paired Live turns.
+- Model/backend-specific voice rejection recovery with stable fallback and bounded retries.
+- Structured memory generation and strict response validation before persistent mutation.
+
+### Dependencies
+
+- Requires Gemini Live Library `>=2.4.0,<3.0.0`. The upper bound prevents a future breaking Gemini 3.x release from being accepted implicitly.
+
 ## [1.3.4] - 2026-02-15
 - Fixed compatibility with the newest minecolonies version
 

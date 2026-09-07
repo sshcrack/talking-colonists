@@ -101,3 +101,36 @@ blocker and retain the distinction between composite success and release readine
   group turns, interruption, provider disconnect, and shutdown. No existing Colonist
   Errands release is declared API-generation-2 compatible until a migrated addon
   build is compiled and tested against the declared targets.
+
+
+## Final roadmap review — 2026-09-07
+
+- Re-reviewed tasks 01–11 against their acceptance records and the integrated implementation. The
+  full automated contract remains covered by the two-loader unit suites, isolated addon API/example
+  compilation, collected artifacts, and required real-client smoke. The review found one release
+  compatibility defect: mod metadata accepted every Gemini version above the minimum, including a
+  future breaking 3.x. Both loaders now derive and enforce the compatible-major range from the single
+  dependency property.
+- Talking Colonists is intentionally source-breaking for addon developers: API generation 2 removes
+  legacy addon methods/adapters and is now released as `2.0.0` rather than another `1.7.x` build.
+  Existing normal-user save data remains migration-covered; the major bump reflects the addon API
+  contract break.
+- Gemini Live Library changes since published `2.3.4` retain existing public constructors/methods and
+  add structured Flash output, Live translation support, and structured TTS HTTP failure details.
+  They are additive rather than breaking, so the release candidate is `2.4.0` (minor), not `3.0.0`.
+  Talking Colonists now requires `2.4.0` and constrains runtime metadata to `[2.4.0,3.0.0)` so a future
+  breaking Gemini major is not silently accepted.
+- Task 12 remains `Partial` for the same release-only/manual reasons: Gemini Live Library `2.4.0` must
+  be published for both loader coordinates, then the credentialed in-world release-candidate matrix
+  must be recorded.
+- Final validation against the versioned candidates passed:
+  - Gemini Live Library `2.4.0`: `./gradlew test buildAndCollect --no-daemon --max-workers=1`, plus
+    local-only `publishToMavenLocal` for downstream validation.
+  - Binary API comparison against published Gemini `2.3.4` found all 82 pre-existing top-level
+    library classes present and zero removed/changed public members.
+  - Talking Colonists `2.0.0`: `./gradlew test buildAndCollect verifyApiJar compileAddonApiExamples
+    --no-daemon --max-workers=1` against the local `2.4.0` candidate on both loaders.
+  - Real-client smoke passed NeoForge 1.21.1 and Forge 1.20.1 after world entry with fingerprint
+    `c9671e005fe6ee64148d9b61009a9fad6d50ea7272d1230939ccd175f4e3a2bb`.
+  - `scripts/verify-release-readiness.sh` correctly exits `2` because both public Gemini `2.4.0`
+    POM/JAR coordinates still return HTTP 404.

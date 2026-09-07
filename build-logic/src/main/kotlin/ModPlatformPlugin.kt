@@ -32,6 +32,12 @@ fun Project.env(variable: String): String? = providers.environmentVariable(varia
 
 fun Project.envTrue(variable: String): Boolean = env(variable)?.toDefaultLowerCase() == "true"
 
+fun compatibleMajorVersionRange(version: String): String {
+    val major = version.substringBefore('.').toIntOrNull()
+        ?: throw IllegalArgumentException("Version must start with a numeric semantic-version major: $version")
+    return "[$version,${major + 1}.0.0)"
+}
+
 fun RepositoryHandler.strictMaven(
 	url: String, vararg groups: String, configure: MavenArtifactRepository.() -> Unit = {}
 ) = exclusiveContent {

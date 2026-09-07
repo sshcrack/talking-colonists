@@ -31,10 +31,10 @@ dependencies {
 }
 ```
 
-For example, API generation 2 for Talking Colonists `1.7.1`, Minecraft `1.21.1`, NeoForge uses:
+For example, API generation 2 for Talking Colonists `2.0.0`, Minecraft `1.21.1`, NeoForge uses:
 
 ```kotlin
-compileOnly("me.sshcrack:mc_talking-api:1.7.1-1.21.1-neoforge")
+compileOnly("me.sshcrack:mc_talking-api:2.0.0-1.21.1-neoforge")
 ```
 
 The API artifact uses the same version tuple as the normal published mod artifact. Always choose the

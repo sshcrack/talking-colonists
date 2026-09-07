@@ -5,10 +5,17 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
 GEMINI_VERSION=$(sed -n 's/^deps\.gemini_live_lib_version=//p' gradle.properties | tail -1)
-if [[ -z "$GEMINI_VERSION" ]]; then
-  echo "Could not read deps.gemini_live_lib_version from gradle.properties" >&2
+MOD_VERSION=$(sed -n 's/^mod\.version = "\([^"]*\)"/\1/p' stonecutter.properties.toml | tail -1)
+if [[ -z "$GEMINI_VERSION" || -z "$MOD_VERSION" ]]; then
+  echo "Could not read release versions from gradle.properties / stonecutter.properties.toml" >&2
   exit 2
 fi
+GEMINI_MAJOR=${GEMINI_VERSION%%.*}
+if ! [[ "$GEMINI_MAJOR" =~ ^[0-9]+$ ]]; then
+  echo "Gemini Live Library version must start with a numeric semantic-version major: $GEMINI_VERSION" >&2
+  exit 2
+fi
+GEMINI_COMPAT_RANGE="[$GEMINI_VERSION,$((GEMINI_MAJOR + 1)).0.0)"
 
 variants=(
   "1.21.1 neoforge"
@@ -49,8 +56,8 @@ rm -rf build/libs
 
 for variant in "${variants[@]}"; do
   read -r minecraft loader <<<"$variant"
-  mod_jar=$(find build/libs -type f -name "mc_talking-*${loader}+${minecraft}*.jar" ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'mc_talking-api-*' -print -quit)
-  api_jar=$(find build/libs -type f -name "mc_talking-api-*${loader}+${minecraft}*.jar" ! -name '*-sources.jar' -print -quit)
+  mod_jar=$(find build/libs -type f -name "mc_talking-${MOD_VERSION}-${loader}+${minecraft}.jar" -print -quit)
+  api_jar=$(find build/libs -type f -name "mc_talking-api-${MOD_VERSION}-${loader}+${minecraft}.jar" -print -quit)
 
   if [[ -z "$mod_jar" || -z "$api_jar" ]]; then
     echo "Missing collected ${minecraft}-${loader} mod/API artifact under build/libs" >&2
@@ -74,6 +81,21 @@ for variant in "${variants[@]}"; do
     exit 3
   fi
   rm -f "$mod_listing" "$api_listing"
+
+  metadata_path="META-INF/mods.toml"
+  if [[ "$loader" == "neoforge" ]]; then
+    metadata_path="META-INF/neoforge.mods.toml"
+  fi
+  metadata_dir=$(mktemp -d)
+  (cd "$metadata_dir" && jar xf "$ROOT/$mod_jar" "$metadata_path")
+  metadata_file="$metadata_dir/$metadata_path"
+  if ! grep -Fq 'modId = "gemini_live_lib"' "$metadata_file" \
+      || ! grep -Fq "versionRange = \"$GEMINI_COMPAT_RANGE\"" "$metadata_file"; then
+    echo "Mod metadata does not constrain Gemini Live Library to $GEMINI_COMPAT_RANGE: $mod_jar" >&2
+    rm -rf "$metadata_dir"
+    exit 3
+  fi
+  rm -rf "$metadata_dir"
 
   echo "Verified collected artifacts for ${minecraft}-${loader}:"
   echo "  mod: $mod_jar"

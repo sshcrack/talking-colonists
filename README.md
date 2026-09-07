@@ -26,7 +26,7 @@ Now the citizen will complain if they are unhappy or missing some resources, jus
 Yup
 
 ## Addon API
-Addon API generation 2 is a breaking, first-class integration baseline. Addons can register AI
+Talking Colonists 2.0.0 introduces addon API generation 2 as a breaking, first-class integration baseline. Addons can register AI
 tools and prompt context/providers, consume normalized citizen snapshots, inspect typed conversation
 eligibility/start results, observe conversation lifecycle, work with citizen memories, modify
 pregenerated prompt constraints, hold renewable activity leases, and run ordinary or controlled

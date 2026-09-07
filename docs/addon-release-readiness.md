@@ -5,17 +5,19 @@ not a compatibility claim for any external addon release.
 
 ## Compatibility baseline
 
-Talking Colonists `1.7.1` exposes addon API generation `2` (`TalkingColonistsApi.API_MAJOR_VERSION`).
+Talking Colonists `2.0.0` exposes addon API generation `2` (`TalkingColonistsApi.API_MAJOR_VERSION`).
 The supported game/loader targets in this repository are:
 
 | Minecraft | Loader baseline | MineColonies compile baseline | Addon API artifact coordinate |
 | --- | --- | --- | --- |
-| `1.21.1` | NeoForge `21.1.213` | `1.1.1305-1.21.1-snapshot` | `me.sshcrack:mc_talking-api:1.7.1-1.21.1-neoforge` |
-| `1.20.1` | Forge `47.2.0` | `1.20.1-1.1.1218-snapshot` | `me.sshcrack:mc_talking-api:1.7.1-1.20.1-forge` |
+| `1.21.1` | NeoForge `21.1.213` | `1.1.1305-1.21.1-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-1.21.1-neoforge` |
+| `1.20.1` | Forge `47.2.0` | `1.20.1-1.1.1218-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-1.20.1-forge` |
 
-The normal Talking Colonists runtime currently requires Gemini Live Library `2.3.6` or newer through
-its loader metadata. Players install only the normal Talking Colonists mod; `mc_talking-api` is a
-developer compile artifact and must not be packaged or installed as a second mod.
+The normal Talking Colonists runtime currently requires Gemini Live Library `>=2.4.0,<3.0.0` through
+its loader metadata. The upper bound is intentional: a future Gemini Live Library 3.x release may
+contain breaking API changes and must not be accepted implicitly. Players install only the normal
+Talking Colonists mod; `mc_talking-api` is a developer compile artifact and must not be packaged or
+installed as a second mod.
 
 API generation 2 is an intentional breaking addon baseline. Compatibility is only claimed for code
 that compiles against the matching `mc_talking-api` artifact and uses `me.sshcrack.mc_talking.api` as
@@ -72,19 +74,21 @@ GRADLE_USER_HOME=/cache/gradle ./gradlew \
 4. clears stale collected JARs, enables release-version output, and runs `buildAndCollect` for both
    Stonecutter targets;
 5. verifies both normal mod JARs and stripped addon API JARs, including the API/implementation
-   separation.
+   separation;
+6. verifies the runtime mod metadata constrains Gemini Live Library to the compatible semantic-version
+   major (`[2.4.0,3.0.0)` for this release).
 
 ### Current blocker recorded 2026-09-07
 
-The configured dependency is `deps.gemini_live_lib_version=2.3.6`. Direct public-repository checks
+The configured dependency is `deps.gemini_live_lib_version=2.4.0`. Direct public-repository checks
 returned HTTP `404` for both the POM and JAR of:
 
-- `me.sshcrack:gemini_live_lib:2.3.6-1.21.1-neoforge`
-- `me.sshcrack:gemini_live_lib:2.3.6-1.20.1-forge`
+- `me.sshcrack:gemini_live_lib:2.4.0-1.21.1-neoforge`
+- `me.sshcrack:gemini_live_lib:2.4.0-1.20.1-forge`
 
-The repository metadata returned HTTP `200` but did not list either `2.3.6` variant. Therefore a
+The repository metadata returned HTTP `200` but did not list either `2.4.0` variant. Therefore a
 composite build or an existing Gradle cache can validate development, but **release readiness remains
-blocked until both 2.3.6 artifacts are publicly published**. Do not bypass this distinction with
+blocked until both 2.4.0 artifacts are publicly published**. Do not bypass this distinction with
 `-PgeminiPublished=true`; that flag is for an already-published library when a local composite happens
 to be present.
 
@@ -141,7 +145,7 @@ saves migrate without dropping old facts/events/relationship aggregates.
 Compatibility limits: no existing Colonist Errands release is declared compatible until a migrated
 build is compiled and tested against API generation 2. Colony Meetings has an integration guide and
 compile-checked example, but no external release was available to test. Final release remains blocked
-until Gemini Live Library `2.3.6` is published for both supported loaders and the credentialed in-world
+until Gemini Live Library `2.4.0` is published for both supported loaders and the credentialed in-world
 matrix above is recorded.
 
 ## Draft response to addon maintainers
