@@ -31,6 +31,13 @@ When working with the Minecolonies API, look at the `scripts/MINECOLONIES_DOCS.m
 
 CI uses `./gradlew buildAndCollect --no-daemon`. JDK 25 (Microsoft) in CI.
 
+## Review Subagents
+
+For branch/release reviews that fan out across specialized review-only agents, use
+`docs/agents/reviewers/README.md`. It defines the shared fixed-diff contract and the
+separate spec, standards, API, lifecycle, Minecraft, Gemini/audio, memory/tools, and
+validation lenses.
+
 ## Required Client Launch Smoke Test
 
 After changing runtime Java, API Java, resources, loader/build configuration, or the
