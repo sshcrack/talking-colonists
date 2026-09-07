@@ -54,3 +54,50 @@ blocker and retain the distinction between composite success and release readine
   in-world validation, final distributable artifact verification, compatibility
   statement against a migrated Errands build, and release notes/draft maintainer
   response still remain.
+
+## Implementation record — 2026-09-07 (release verification pass, partial)
+
+- Revalidated the pinned Colonist Errands audit at
+  `f270362aca847726087213c623508ad0a65354c1` and its GPL-3.0 license. The migration
+  guide now inventories every observed Talking Colonists-facing mixin and the
+  non-mixin internal/reflection categories found in that source, with an explicit
+  public-API, core-fix, or intentionally-internal disposition. No Colonist Errands
+  source code was copied into Talking Colonists. The two MineColonies-targeting
+  mixins remain correctly outside this API migration.
+- Added `AddonCoexistenceContractTest`, which exercises prompt contributors and tools
+  from two independent addon namespaces at the same time, deterministic ordering,
+  and ownership-safe unregister/cleanup. Existing tests cover current permission
+  rechecks/authoritative actors, asynchronous tool cleanup, controlled-session
+  interruption/end behavior, ownership registries at shutdown, and legacy memory
+  save migration/idempotency. Public compile examples and stripped-API verification
+  pass for both supported loaders.
+- Added `docs/addon-release-readiness.md` with the API/loader/library compatibility
+  baseline, explicit non-claims for untested external addon releases, the remaining
+  credentialed in-world matrix, maintainer-facing release notes, and a draft addon
+  maintainer response. `scripts/verify-release-readiness.sh` reads the configured
+  Gemini library version dynamically and refuses to treat a local composite or cache
+  as release evidence before checking the exact public Maven coordinates.
+- Validation passed:
+  - `GRADLE_USER_HOME=/cache/gradle ./gradlew :1.21.1-neoforge:test
+    :1.21.1-neoforge:verifyApiJar :1.20.1-forge:test
+    :1.20.1-forge:verifyApiJar --no-daemon --max-workers=1`
+  - `GRADLE_USER_HOME=/cache/gradle ./gradlew buildAndCollect --no-daemon
+    --max-workers=1`, producing normal mod and stripped addon-API artifacts for both
+    Forge 1.20.1 and NeoForge 1.21.1.
+  - `GRADLE_USER_HOME=/cache/gradle CLIENT_SMOKE_METADATA_ONLY_ASSETS=1 bash
+    scripts/test-client-smoke.sh`; both real clients entered a world and emitted the
+    required success marker. The metadata-only fallback was used because the sandbox
+    stalled on Mojang's asset-index/CDN path before client launch.
+- Release readiness is **blocked** rather than falsely marked successful: on
+  2026-09-07 the public Maven repository returned HTTP 404 for both
+  `me.sshcrack:gemini_live_lib:2.3.6-1.21.1-neoforge` and
+  `me.sshcrack:gemini_live_lib:2.3.6-1.20.1-forge`. Repository metadata also did not
+  list either 2.3.6 variant. `scripts/verify-release-readiness.sh` therefore exits 2
+  before a release build, as intended.
+- Task 12 remains **Partial**. All implementation/test/documentation work that can be
+  completed in this checkout is in place, but acceptance still requires publishing
+  the configured Gemini 2.3.6 artifacts and then recording credentialed in-world
+  release-candidate validation for player dialogue, paired dialogue, controlled
+  group turns, interruption, provider disconnect, and shutdown. No existing Colonist
+  Errands release is declared API-generation-2 compatible until a migrated addon
+  build is compiled and tested against the declared targets.
