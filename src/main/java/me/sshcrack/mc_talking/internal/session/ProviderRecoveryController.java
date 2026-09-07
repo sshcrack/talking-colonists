@@ -65,7 +65,8 @@ public final class ProviderRecoveryController {
     private final int maxAttempts;
     private final long maxWindowMillis;
     private final LongSupplier millisClock;
-    private final long startedAtMillis;
+    private long recoveryStartedAtMillis;
+    private boolean recoveryWindowActive = true;
 
     private State state = State.NEW;
     private TerminalReason terminalReason = TerminalReason.NONE;
@@ -80,7 +81,7 @@ public final class ProviderRecoveryController {
         this.maxAttempts = maxAttempts;
         this.maxWindowMillis = maxWindowMillis;
         this.millisClock = Objects.requireNonNull(millisClock, "millisClock");
-        this.startedAtMillis = millisClock.getAsLong();
+        this.recoveryStartedAtMillis = millisClock.getAsLong();
     }
 
     public synchronized void markConnecting(String detail) {
@@ -101,10 +102,15 @@ public final class ProviderRecoveryController {
         terminalReason = TerminalReason.NONE;
         detail = "setup complete";
         consecutiveRecoveryAttempts = 0;
+        recoveryWindowActive = false;
     }
 
     /** Reserves one bounded recovery attempt and returns its exponential-backoff delay. */
     public synchronized RecoveryAttempt beginRecovery(String cause) {
+        if (!terminal() && !recoveryWindowActive) {
+            recoveryStartedAtMillis = millisClock.getAsLong();
+            recoveryWindowActive = true;
+        }
         if (!canRecoverLocked()) {
             if (!terminal()) {
                 state = State.TERMINAL_ERROR;
@@ -135,13 +141,14 @@ public final class ProviderRecoveryController {
     }
 
     public synchronized void closeNormal(String detail) {
-        if (intentionalClose) return;
+        if (terminal()) return;
         state = State.CLOSED;
         terminalReason = TerminalReason.NORMAL_CLOSE;
         this.detail = safe(detail, "normal close");
     }
 
     public synchronized void quotaExceeded(String detail) {
+        if (terminal()) return;
         state = State.QUOTA_EXCEEDED;
         terminalReason = TerminalReason.QUOTA;
         this.detail = safe(detail, "quota exceeded");
@@ -167,7 +174,7 @@ public final class ProviderRecoveryController {
 
     private boolean canRecoverLocked() {
         if (intentionalClose || terminal()) return false;
-        if (totalRecoveryAttempts >= maxAttempts) return false;
+        if (consecutiveRecoveryAttempts >= maxAttempts) return false;
         return elapsedMillisLocked() < maxWindowMillis;
     }
 
@@ -176,7 +183,7 @@ public final class ProviderRecoveryController {
     }
 
     private String recoveryExhaustionDetail(@Nullable String cause) {
-        String why = totalRecoveryAttempts >= maxAttempts
+        String why = consecutiveRecoveryAttempts >= maxAttempts
                 ? "attempt limit " + maxAttempts + " reached"
                 : "recovery window " + maxWindowMillis + " ms exceeded";
         String source = cause == null || cause.isBlank() ? "provider recovery" : cause;
@@ -195,7 +202,7 @@ public final class ProviderRecoveryController {
     }
 
     private long elapsedMillisLocked() {
-        return Math.max(0L, millisClock.getAsLong() - startedAtMillis);
+        return recoveryWindowActive ? Math.max(0L, millisClock.getAsLong() - recoveryStartedAtMillis) : 0L;
     }
 
     /** Classifies generic WebSocket closures after narrower voice/quota checks have run. */

@@ -27,6 +27,7 @@ public class DevAutoQuit {
     private static boolean worldCreationConfirmed = false;
     private static int ticksSinceStart = 0;
     private static int ticksInWorld = 0;
+    private static java.util.concurrent.CompletableFuture<Void> runtimeVerification;
     private static final int QUIT_DELAY_TICKS = 60;
     private static final int STARTUP_TIMEOUT_TICKS = 20 * 90;
     private static final int ENTER_KEY = 257;
@@ -68,6 +69,17 @@ public class DevAutoQuit {
                 McTalking.LOGGER.info("MC_TALKING_AUTOQUIT_READY:world");
             }
             if (ticksInWorld >= QUIT_DELAY_TICKS) {
+                if (runtimeVerification == null) {
+                    runtimeVerification = DevRuntimeVerification.verify(mc.getSingleplayerServer());
+                }
+                if (!runtimeVerification.isDone()) return;
+                if (runtimeVerification.isCompletedExceptionally()) {
+                    quitting = true;
+                    try { runtimeVerification.join(); }
+                    catch (RuntimeException error) { McTalking.LOGGER.error("MC_TALKING_AUTOQUIT_FAILURE: runtime verification", error); }
+                    mc.execute(mc::stop);
+                    return;
+                }
                 quitting = true;
                 McTalking.LOGGER.info("MC_TALKING_AUTOQUIT_SUCCESS:world");
                 mc.execute(mc::stop);

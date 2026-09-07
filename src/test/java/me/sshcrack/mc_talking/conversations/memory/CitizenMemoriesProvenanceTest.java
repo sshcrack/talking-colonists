@@ -150,7 +150,7 @@ class CitizenMemoriesProvenanceTest {
 
         assertEquals(AddonMemoryWriteResult.ADDED, memory.addConfirmedOutcome(outcome));
         assertEquals(2, memory.getEntries().size());
-        memory.compactFactsAndEvents("The delivery was completed and remembered.");
+        assertTrue(memory.applyCompaction(memory.snapshotCompaction(), "The delivery was completed and remembered."));
 
         assertTrue(memory.getFacts().isEmpty());
         assertTrue(memory.getEvents().isEmpty());
@@ -195,7 +195,7 @@ class CitizenMemoriesProvenanceTest {
         CitizenMemories memory = new CitizenMemories();
         assertEquals(AddonMemoryWriteResult.ADDED, memory.addConfirmedOutcome(outcome));
 
-        memory.replaceFactsAndEventsWithSummary("I remember the successful bakery delivery.");
+        assertTrue(memory.applyCompaction(memory.snapshotCompaction(), "I remember the successful bakery delivery."));
 
         var snapshot = MemorySnapshotFactory.create(memory);
         assertTrue(snapshot.facts().isEmpty());

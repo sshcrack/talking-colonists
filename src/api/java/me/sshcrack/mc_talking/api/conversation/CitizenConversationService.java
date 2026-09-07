@@ -69,6 +69,15 @@ public final class CitizenConversationService {
         return TalkingColonistsApi.services().conversations().activeKind(citizen);
     }
 
+    /**
+     * Snapshot of the foreground Live provider, including startup and recovery. Empty when no
+     * foreground Live client exists (including Flash-only work). Call on the server thread.
+     * Gameplay ownership and provider readiness are deliberately separate concepts.
+     */
+    public static @NotNull Optional<ProviderSessionStatus> providerStatus(@NotNull AbstractEntityCitizen citizen) {
+        return TalkingColonistsApi.services().conversations().providerStatus(citizen);
+    }
+
     /** Returns the player currently speaking directly to this citizen, if any. */
     public static @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen) {
         return TalkingColonistsApi.services().conversations().activePlayerId(citizen);

@@ -52,13 +52,45 @@ public class CitizenMemories {
     private final Set<String> knownRumorIds = new HashSet<>();
     private String sessionToken = "";
     private String summarizedMemory = "";
+    private long compactionRevision;
 
-    public List<String> getFacts() {
-        return facts;
+    public record CompactionSnapshot(long revision, String summary, List<String> facts,
+                                     List<String> events, List<CitizenMemoryEntryView> entries) {
+        public CompactionSnapshot {
+            facts = List.copyOf(facts);
+            events = List.copyOf(events);
+            entries = List.copyOf(entries);
+        }
     }
 
-    public List<String> getEvents() {
-        return events;
+    /** Capture on the server thread before starting provider work. */
+    public synchronized CompactionSnapshot snapshotCompaction() {
+        return new CompactionSnapshot(compactionRevision, summarizedMemory, facts, events, entries);
+    }
+
+    /** Commit only the captured corpus; concurrent additions and their provenance survive. */
+    public synchronized boolean applyCompaction(CompactionSnapshot snapshot, String summary) {
+        if (summary == null || summary.isBlank() || snapshot.revision() != compactionRevision
+                || !summarizedMemory.equals(snapshot.summary())) return false;
+        // Identity matters: deleting a recollection and adding an equal one invalidates the
+        // old request instead of letting its completion erase the new recollection.
+        for (var old : snapshot.entries()) {
+            if (entries.stream().noneMatch(current -> current == old)) return false;
+        }
+        summarizedMemory = summary;
+        snapshot.facts().forEach(facts::remove);
+        snapshot.events().forEach(events::remove);
+        entries.removeIf(current -> snapshot.entries().stream().anyMatch(old -> current == old));
+        compactionRevision++;
+        return true;
+    }
+
+    public synchronized List<String> getFacts() {
+        return List.copyOf(facts);
+    }
+
+    public synchronized List<String> getEvents() {
+        return List.copyOf(events);
     }
 
     public List<CitizenMemoryEntryView> getEntries() {
@@ -77,7 +109,7 @@ public class CitizenMemories {
         addFact(fact, MemoryProvenance.LEGACY_UNATTRIBUTED, null, null, null);
     }
 
-    public void addFact(
+    public synchronized void addFact(
             String fact,
             @NotNull MemoryProvenance provenance,
             @Nullable UUID participantId,
@@ -90,7 +122,7 @@ public class CitizenMemories {
         rememberAddonId(provenance, source, idempotencyId);
     }
 
-    public boolean removeFact(String fact) {
+    public synchronized boolean removeFact(String fact) {
         boolean removed = facts.remove(fact);
         if (removed) removeFirstEntry(MemoryEntryType.FACT, fact);
         return removed;
@@ -100,7 +132,7 @@ public class CitizenMemories {
         addEvent(event, MemoryProvenance.LEGACY_UNATTRIBUTED, null, null, null);
     }
 
-    public void addEvent(
+    public synchronized void addEvent(
             String event,
             @NotNull MemoryProvenance provenance,
             @Nullable UUID participantId,
@@ -113,13 +145,13 @@ public class CitizenMemories {
         rememberAddonId(provenance, source, idempotencyId);
     }
 
-    public boolean removeEvent(String event) {
+    public synchronized boolean removeEvent(String event) {
         boolean removed = events.remove(event);
         if (removed) removeFirstEntry(MemoryEntryType.EVENT, event);
         return removed;
     }
 
-    public void removeEventsIf(Predicate<String> predicate) {
+    public synchronized void removeEventsIf(Predicate<String> predicate) {
         events.removeIf(predicate);
         entries.removeIf(entry -> entry.type() == MemoryEntryType.EVENT && predicate.test(entry.content()));
     }
@@ -134,31 +166,13 @@ public class CitizenMemories {
         }
     }
 
-    public void setSummarizedMemory(String summarizedMemory) {
+    public synchronized void setSummarizedMemory(String summarizedMemory) {
         this.summarizedMemory = summarizedMemory == null ? "" : summarizedMemory;
+        compactionRevision++;
     }
 
     public String getSummarizedMemory() {
         return summarizedMemory;
-    }
-
-    /**
-     * Replaces compactable fact/event detail with a summary while keeping relationships,
-     * broadcasts, rumors, and addon idempotency history intact.
-     */
-    public synchronized void replaceFactsAndEventsWithSummary(@NotNull String summary) {
-        summarizedMemory = summary;
-        facts.clear();
-        events.clear();
-        entries.removeIf(entry -> entry.type() == MemoryEntryType.FACT || entry.type() == MemoryEntryType.EVENT);
-    }
-
-    /** Replaces the raw fact/event corpus with one compacted summary without leaving stale provenance entries. */
-    public void compactFactsAndEvents(String summary) {
-        setSummarizedMemory(summary);
-        facts.clear();
-        events.clear();
-        entries.removeIf(entry -> entry.type() == MemoryEntryType.FACT || entry.type() == MemoryEntryType.EVENT);
     }
 
     public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipDimension type, float change) {

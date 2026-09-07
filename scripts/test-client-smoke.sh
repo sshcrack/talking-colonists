@@ -161,7 +161,8 @@ for VERSION in $VERSIONS; do
     set -e
 
     SUCCESS_MARKER=0
-    if { [ -f "$MC_LOG" ] && grep -q 'MC_TALKING_AUTOQUIT_SUCCESS:' "$MC_LOG"; } || grep -q 'MC_TALKING_AUTOQUIT_SUCCESS:' "$LOG_FILE"; then
+    if { [ -f "$MC_LOG" ] && grep -q 'MC_TALKING_AUTOQUIT_SUCCESS:world' "$MC_LOG" && grep -q 'MC_TALKING_RUNTIME_SUCCESS:' "$MC_LOG"; } \
+        || { grep -q 'MC_TALKING_AUTOQUIT_SUCCESS:world' "$LOG_FILE" && grep -q 'MC_TALKING_RUNTIME_SUCCESS:' "$LOG_FILE"; }; then
         SUCCESS_MARKER=1
     fi
 

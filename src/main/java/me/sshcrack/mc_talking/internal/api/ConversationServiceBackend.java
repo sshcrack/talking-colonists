@@ -20,6 +20,7 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
+import me.sshcrack.mc_talking.api.conversation.ProviderSessionStatus;
 import me.sshcrack.mc_talking.api.memory.AddonConfirmedOutcome;
 import me.sshcrack.mc_talking.api.memory.AddonMemoryWriteResult;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
@@ -148,6 +149,26 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
     @Override
     public @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen) {
         return Optional.ofNullable(ConversationManager.getPlayerForEntity(citizen.getUUID()));
+    }
+
+    @Override
+    public @NotNull Optional<ProviderSessionStatus> providerStatus(@NotNull AbstractEntityCitizen citizen) {
+        var client = ConversationManager.getClientForEntity(citizen.getUUID());
+        if (client == null) return Optional.empty();
+        var diagnostic = client.getRecoveryDiagnostic();
+        var state = switch (diagnostic.state()) {
+            case NEW -> ProviderSessionStatus.State.NEW;
+            case CONNECTING -> ProviderSessionStatus.State.CONNECTING;
+            case SETTING_UP -> ProviderSessionStatus.State.SETTING_UP;
+            case ACTIVE -> ProviderSessionStatus.State.ACTIVE;
+            case RECOVERING -> ProviderSessionStatus.State.RECOVERING;
+            case CLOSED -> ProviderSessionStatus.State.CLOSED;
+            case TERMINAL_ERROR -> ProviderSessionStatus.State.TERMINAL_ERROR;
+            case QUOTA_EXCEEDED -> ProviderSessionStatus.State.QUOTA_EXCEEDED;
+        };
+        return Optional.of(new ProviderSessionStatus(state,
+                state == ProviderSessionStatus.State.ACTIVE && client.isSessionReadyForInput(),
+                diagnostic.totalRecoveryAttempts()));
     }
 
     @Override

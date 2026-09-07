@@ -40,6 +40,7 @@ than depending on manager collections, provider clients, queues, or mixin-only s
 | World mutation directly from an AI callback thread | `AiToolContext.runOnServerThread(...)` or `supplyOnServerThread(...)` |
 | Boolean-only conversation start handling | `ConversationStartResult`, `ConversationEligibility`, and `AmbientLineResult` |
 | Polling manager/client state to learn when conversations start or end | `CitizenConversationService.registerLifecycleListener(...)` |
+| Inspecting websocket clients to distinguish ownership from readiness | `CitizenConversationService.providerStatus(citizen)`; server-thread, credential-free snapshot, empty without a foreground Live client |
 | Manual busy maps / `markBusy` / `markNotBusy` | `CitizenConversationService.reserveActivity(...)` and `CitizenActivityReservation` |
 | Direct `new CitizenConversation(...)` | `createPairConversation(...)` or `createControlledSession(...)` |
 | Meetings mixins that manipulate Gemini/audio/session state | `ControlledConversationSession`, typed `ControlledTurnResult`, `ControlledAudioAnchor`, and `ControlledConversationOptions` |

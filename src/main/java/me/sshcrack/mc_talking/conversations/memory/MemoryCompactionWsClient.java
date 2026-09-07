@@ -10,23 +10,23 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.config.QuotaTracker;
-import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 
 import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MemoryCompactionWsClient extends GeminiLiveClient {
     private final AbstractEntityCitizen citizen;
-    private final CitizenMemories memories;
+    private final String prompt;
     private final Consumer<String> onComplete;
     private final Runnable onError;
     private final StringBuilder summaryBuffer = new StringBuilder();
-    private volatile boolean completed = false;
+    private final AtomicBoolean completed = new AtomicBoolean();
 
-    public MemoryCompactionWsClient(AbstractEntityCitizen citizen, CitizenMemories memories,
+    public MemoryCompactionWsClient(AbstractEntityCitizen citizen, String prompt,
                                     Consumer<String> onComplete, Runnable onError) {
         super(McTalkingConfig.INSTANCE.instance().geminiApiKey);
         this.citizen = citizen;
-        this.memories = memories;
+        this.prompt = prompt;
         this.onComplete = onComplete;
         this.onError = onError;
     }
@@ -64,7 +64,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
     @Override
     public void onSetupComplete() {
         var input = new RealtimeInput();
-        input.text = MemoryCompactionService.buildPrompt(citizen, memories);
+        input.text = prompt;
         send(ClientMessages.input(input));
     }
 
@@ -85,7 +85,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public void onTurnComplete() {
-        completed = true;
+        if (!completed.compareAndSet(false, true)) return;
         String summary = summaryBuffer.toString().trim();
         if (summary.isEmpty()) {
             McTalking.LOGGER.warn("[MemoryCompaction] Live client produced empty summary for citizen {}",
@@ -95,7 +95,8 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
             QuotaTracker.reportSuccess(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
             onComplete.accept(summary);
         }
-        close();
+        // The owner closes the transport after applying the result on the server thread.
+        // Closing here can make background maintenance release ownership before that commit.
     }
 
     @Override
@@ -105,6 +106,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public void onQuotaExceeded() {
+        if (!completed.compareAndSet(false, true)) return;
         McTalking.LOGGER.warn("[MemoryCompaction] Quota exceeded during Live compaction");
         QuotaTracker.reportQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
         onError.run();
@@ -113,6 +115,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
 
     @Override
     public void onError(Exception ex) {
+        if (!completed.compareAndSet(false, true)) return;
         McTalking.LOGGER.error("[MemoryCompaction] Error during Live compaction", ex);
         onError.run();
         close();
@@ -121,7 +124,7 @@ public class MemoryCompactionWsClient extends GeminiLiveClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         super.onClose(code, reason, remote);
-        if (!completed) {
+        if (completed.compareAndSet(false, true)) {
             McTalking.LOGGER.warn("[MemoryCompaction] Unexpected close for citizen {} (code={}, reason={}, remote={})",
                     citizen.getCitizenData().getName(), code, reason, remote);
             onError.run();

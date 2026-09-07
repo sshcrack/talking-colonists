@@ -21,6 +21,7 @@ public interface ConversationService {
     @NotNull CompletableFuture<AmbientLineResult> requestAmbientLine(@NotNull AbstractEntityCitizen citizen, @NotNull String promptDirective);
     @NotNull AddonRegistration registerLifecycleListener(@NotNull String id, int order, @NotNull ConversationLifecycleListener listener);
     @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen);
+    @NotNull Optional<ProviderSessionStatus> providerStatus(@NotNull AbstractEntityCitizen citizen);
     @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen);
     boolean isPlayerInConversation(@NotNull ServerPlayer player);
     boolean hasAmbientCapacity(int slotsNeeded);

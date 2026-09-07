@@ -49,7 +49,17 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build with Gradle
-        run: ./gradlew buildAndCollect --no-daemon
+        run: ./gradlew buildAndCollect --no-daemon --max-workers=1
+
+      - name: Run both loader test suites
+        run: ./gradlew :1.21.1-neoforge:test :1.20.1-forge:test --no-daemon --max-workers=1
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-test-reports
+          path: versions/*/build/reports/tests/
 
       - name: Upload artifacts
         id: upload
@@ -61,6 +71,10 @@ jobs:
   client-smoke-verification:
     runs-on: ubuntu-latest
     needs: build
+    timeout-minutes: 30
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      CLIENT_SMOKE_TIMEOUT_SECONDS: '600'
 
     steps:
       - uses: actions/checkout@v4
@@ -87,3 +101,25 @@ jobs:
           fi
 
           echo "✓ Client launch smoke fingerprint matches committed launch-relevant content"
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 25
+          distribution: microsoft
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install headless graphics runtime
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dri libasound2t64
+
+      - name: Launch both clients and verify real citizen conversations
+        run: xvfb-run -a bash scripts/test-client-smoke.sh
+
+      - name: Upload launch and runtime verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-smoke-logs
+          path: /tmp/client-smoke-*.log

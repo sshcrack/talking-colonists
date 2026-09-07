@@ -41,9 +41,8 @@ public class MemoryCompactionService {
 
     public static void tick(MinecraftServer server) {
         tickCounter++;
-        int interval = McTalkingConfig.INSTANCE.instance().memoryCompactionIntervalTicks;
+        int interval = Math.max(1, McTalkingConfig.INSTANCE.instance().memoryCompactionIntervalTicks);
         if (tickCounter % interval != 0) return;
-        if (McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
         if (!McTalkingConfig.INSTANCE.instance().enableMemoryCompaction) return;
 
         var candidate = findBestCandidate(server);
@@ -107,22 +106,24 @@ public class MemoryCompactionService {
         if (!activeCompactionCitizens.add(citizenId)) return;
         var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
         var mem = data.mc_talking$getOrInitializeMemory();
+        var snapshot = mem.snapshotCompaction();
+        String prompt = MemoryCompactionPrompt.render(citizen.getCitizenData().getName(), snapshot);
+        var server = citizen.level().getServer();
+        String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
 
         Thread thread = new Thread(() -> {
+            boolean handedOff = false;
             try {
-                String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
 
                 String responseText;
                 try {
-                    responseText = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, SYSTEM_PROMPT, buildPrompt(citizen, mem));
+                    responseText = GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, SYSTEM_PROMPT, prompt);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     return;
                 } catch (UnexpectedResponseException | IOException e) {
                     McTalking.LOGGER.error("[MemoryCompaction] Flash request failed for citizen {}", citizen.getCitizenData().getName(), e);
                     return;
-                } finally {
-                    activeCompactionCitizens.remove(citizenId);
                 }
 
                 String summary = extractSummaryFromResponse(responseText);
@@ -131,12 +132,15 @@ public class MemoryCompactionService {
                     return;
                 }
 
-                var server = citizen.level().getServer();
                 if (server != null) {
-                    server.execute(() -> applyCompaction(citizen, summary));
+                    server.execute(() -> {
+                        try { applyCompaction(citizen, snapshot, summary); }
+                        finally { activeCompactionCitizens.remove(citizenId); }
+                    });
+                    handedOff = true;
                 }
             } finally {
-                activeCompactionCitizens.remove(citizenId);
+                if (!handedOff) activeCompactionCitizens.remove(citizenId);
             }
         }, "mc-talking-memory-flash-compaction");
 
@@ -158,6 +162,8 @@ public class MemoryCompactionService {
 
         var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
         var mem = data.mc_talking$getOrInitializeMemory();
+        var snapshot = mem.snapshotCompaction();
+        String prompt = MemoryCompactionPrompt.render(citizen.getCitizenData().getName(), snapshot);
         AtomicBoolean finished = new AtomicBoolean(false);
         Runnable finish = () -> {
             if (!finished.compareAndSet(false, true)) return;
@@ -165,15 +171,20 @@ public class MemoryCompactionService {
             reservation.close();
         };
 
-        MemoryCompactionWsClient client = new MemoryCompactionWsClient(citizen, mem,
+        MemoryCompactionWsClient client = new MemoryCompactionWsClient(citizen, prompt,
                 summary -> {
-                    finish.run();
                     if (summary != null && !summary.isBlank()) {
                         var server = citizen.level().getServer();
                         if (server != null) {
-                            server.execute(() -> applyCompaction(citizen, summary));
+                            server.execute(() -> {
+                                try {
+                                    if (!finished.get() && reservation.isActive()) applyCompaction(citizen, snapshot, summary);
+                                } finally { finish.run(); }
+                            });
+                            return;
                         }
                     }
+                    finish.run();
                 },
                 () -> {
                     boolean wasActive = !finished.get();
@@ -209,7 +220,7 @@ public class MemoryCompactionService {
         return response;
     }
 
-    private static void applyCompaction(AbstractEntityCitizen citizen, String summary) {
+    private static void applyCompaction(AbstractEntityCitizen citizen, CitizenMemories.CompactionSnapshot snapshot, String summary) {
         if (!citizen.isAlive()) return;
         var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
         if (data == null) return;
@@ -221,7 +232,7 @@ public class MemoryCompactionService {
         McTalking.LOGGER.info("[MemoryCompaction] Applied compaction for citizen {} ({} events + {} facts -> {} chars)",
                 citizen.getCitizenData().getName(), eventCount, factCount, summary.length());
 
-        mem.compactFactsAndEvents(summary);
+        mem.applyCompaction(snapshot, summary);
         // TODO: consider compacting stale relationship entries in the future
     }
 
@@ -237,28 +248,4 @@ public class MemoryCompactionService {
         activeCompactionCitizens.clear();
     }
 
-    static String buildPrompt(AbstractEntityCitizen citizen, CitizenMemories memories) {
-        String name = citizen.getCitizenData().getName();
-        StringBuilder sb = new StringBuilder();
-        sb.append("Summarize these memories for ").append(name).append(":\n\n");
-
-        if (!memories.getEvents().isEmpty()) {
-            sb.append("Events:\n");
-            for (String event : memories.getEvents()) {
-                sb.append("- ").append(event).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        if (!memories.getFacts().isEmpty()) {
-            sb.append("Facts:\n");
-            for (String fact : memories.getFacts()) {
-                sb.append("- ").append(fact).append("\n");
-            }
-            sb.append("\n");
-        }
-
-        sb.append("Summary:");
-        return sb.toString();
-    }
 }

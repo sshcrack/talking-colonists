@@ -1,5 +1,15 @@
 # Addon API
 
+## Provider readiness
+
+`CitizenConversationService.providerStatus(citizen)` returns an immutable, credential-free
+`Optional<ProviderSessionStatus>` for the current foreground Live client. Query it on the server
+thread. `state()` distinguishes startup, active operation, recovery, and terminal states;
+`readyForInput()` also checks transport/setup readiness; `recoveryAttempts()` counts retries.
+Empty means no foreground Live client, not a provider error. Background/Flash work is not included.
+The snapshot can immediately become stale; it is not an ownership reservation or delivery guarantee.
+Use lifecycle listeners for gameplay ownership changes, not `ACTIVE` as a synonym for those events.
+
 Talking Colonists treats addons as a first-class integration surface. Supported addon code lives
 under `me.sshcrack.mc_talking.api`; `ConversationManager`, websocket clients, audio queues, handlers,
 `duck` interfaces, pregeneration caches and other implementation packages are not API.

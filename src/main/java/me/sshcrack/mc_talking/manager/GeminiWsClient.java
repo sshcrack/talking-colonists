@@ -18,6 +18,8 @@ import me.sshcrack.mc_talking.internal.tool.AiToolExecutionContext;
 import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import me.sshcrack.mc_talking.internal.audio.PlaybackDrainCoordinator;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
+import me.sshcrack.mc_talking.internal.session.ProviderInputBuffer;
+import me.sshcrack.mc_talking.internal.session.ServerThreadGate;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.QuotaTracker;
@@ -124,8 +126,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private volatile boolean selectedVoiceFemale;
     private final AbstractEntityCitizen entity;
     private final OpusDecoder decoder;
-    private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
-    private final List<String> pendingSystemText = Collections.synchronizedList(new ArrayList<>());
+    private final ProviderInputBuffer pendingInput = new ProviderInputBuffer();
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
     private final List<Runnable> onCloseActions = Collections.synchronizedList(new ArrayList<>());
     private final AtomicBoolean closeActionsFired = new AtomicBoolean(false);
@@ -339,8 +340,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
     }
 
-    protected boolean isSessionReadyForInput() {
-        return recoveryController.diagnostic().state() == ProviderRecoveryController.State.ACTIVE && !this.isClosed();
+    public boolean isSessionReadyForInput() {
+        return !closeStarted.get() && recoveryController.diagnostic().state() == ProviderRecoveryController.State.ACTIVE
+                && this.isOpen() && this.isSetupComplete();
     }
 
     /** Observable bounded-recovery state used by lifecycle/debug ownership code. */
@@ -577,13 +579,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * had a chance to drain.
      */
     protected void flushPendingText() {
-        if (!pendingTextAfterTalking.isEmpty()) {
-            String message = String.join("\n", pendingTextAfterTalking);
-            pendingTextAfterTalking.clear();
-            var input = new RealtimeInput();
-            input.text = message;
-
-            send(ClientMessages.input(input));
+        synchronized (pendingTextAfterTalking) {
+            if (!pendingTextAfterTalking.isEmpty()) {
+                String message = String.join("\n", pendingTextAfterTalking);
+                pendingTextAfterTalking.clear();
+                addPromptTextImmediate(message);
+            }
         }
     }
 
@@ -620,7 +621,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!resumable || !shouldResumeAndSaveSession())
             return;
 
-        McTalking.LOGGER.info("{} Received session token {}. Saving...", logPrefix, newHandle);
+        McTalking.LOGGER.debug("{} Received updated session-resumption handle", logPrefix);
         var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
         mem.setSessionToken(newHandle);
     }
@@ -770,21 +771,24 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * queued and sent as soon as setup completes, just like audio prompts.
      */
     public void addPromptTextImmediate(String text) {
-        if (!isSessionReadyForInput()) {
-            synchronized (pendingSystemText) {
-                pendingSystemText.add(text);
-            }
-            ensureConnectionForQueuedInput("addPromptTextImmediate");
-            return;
-        }
-
         var input = new RealtimeInput();
         input.text = text;
-        send(ClientMessages.input(input));
+        submitInput(ClientMessages.input(input));
+    }
+
+    private void submitInput(String frame) {
+        if (closeStarted.get() || recoveryController.diagnostic().terminal()) return;
+        try {
+            pendingInput.submit(frame, this::isSessionReadyForInput, this::send);
+        } catch (RuntimeException error) {
+            onError(error);
+        }
+        ensureConnectionForQueuedInput("queued input");
     }
 
     @Override
     public void onSetupComplete() {
+        if (closeStarted.get() || recoveryController.diagnostic().terminal()) return;
         suppressProviderOutput = false;
         producedOutputSinceSetup = false;
         synchronized (this) {
@@ -798,32 +802,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
 
         McTalking.LOGGER.info("{} Gemini setup complete", logPrefix);
-        synchronized (pendingSystemText) {
-            if (!pendingSystemText.isEmpty()) {
-                List<String> textToProcess = new ArrayList<>(pendingSystemText);
-                pendingSystemText.clear();
-
-                for (String text : textToProcess) {
-                    var input = new RealtimeInput();
-                    input.text = text;
-                    send(ClientMessages.input(input));
-                }
-            }
-        }
-
-        synchronized (pendingPrompt) {
-            if (!pendingPrompt.isEmpty()) {
-                McTalking.LOGGER.info("{} Sending {} pending audio inputs", logPrefix, pendingPrompt.size());
-                List<short[]> audioToProcess = new ArrayList<>(pendingPrompt);
-                pendingPrompt.clear();
-
-                for (short[] data : audioToProcess) {
-                    var input = new RealtimeInput();
-                    var byteAudio = vcApi.getAudioConverter().shortsToBytes(data);
-                    input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
-                    send(ClientMessages.input(input));
-                }
-            }
+        try {
+            pendingInput.flush(this::isSessionReadyForInput, this::send);
+        } catch (RuntimeException error) {
+            onError(error);
         }
     }
 
@@ -903,7 +885,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 };
                 result = ADDON_TOOL_DISPATCHER.dispatch(providerCallId, name, args, endpoint);
             } else {
-                result = action.execute(this.entity, colony, args);
+                var server = Objects.requireNonNull(entity.level().getServer(), "Citizen has no server");
+                var builtin = action;
+                result = new ServerThreadGate(server, server::isSameThread).call(
+                        () -> isSessionReadyForInput() && entity.isAlive()
+                                && (!builtin.isPlayerOnly() || resolveActivePlayer() != null),
+                        () -> builtin.execute(entity, entity.getCitizenColonyHandler().getColony(), args),
+                        10_000);
             }
         } catch (Exception e) {
             McTalking.LOGGER.error("{} [TOOL-CALL] Tool threw an unexpected exception. Params are {}.", logPrefix, (new Gson()).toJson(args), e);
@@ -1030,9 +1018,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                         logPrefix, discardedAudio);
             }
             if (lastPromptText != null) {
-                synchronized (pendingSystemText) {
-                    if (!pendingSystemText.contains(lastPromptText)) pendingSystemText.add(lastPromptText);
-                }
+                var replay = new RealtimeInput();
+                replay.text = lastPromptText;
+                pendingInput.enqueueIfAbsent(ClientMessages.input(replay));
             }
             scheduleRecovery("session token invalidated");
             return;
@@ -1079,6 +1067,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         ProviderRecoveryController.Diagnostic diagnostic = recoveryController.diagnostic();
         if (recoveryController.intentionalClose() || diagnostic.terminal()
                 || QuotaTracker.isQuotaExceeded(getModelName())) return;
+        if (isOpen()) {
+            closeConnection(1006, "websocket error: " + ex.getClass().getSimpleName());
+            return;
+        }
         scheduleRecovery("websocket error: " + ex.getClass().getSimpleName());
     }
 
@@ -1095,20 +1087,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             onGenerationPaused();
 
 
-        if (!isSessionReadyForInput()) {
-            synchronized (pendingPrompt) {
-                pendingPrompt.add(audio);
-            }
-            ensureConnectionForQueuedInput("addPromptAudio");
-            return;
-        }
-
-        send(ClientMessages.input(input));
+        submitInput(ClientMessages.input(input));
     }
 
     /**
      * Queues {@code text} to be sent to the API after the current AI turn finishes.
-     * If the session is not yet ready the text is buffered in {@link #pendingSystemText}
+     * If the session is not yet ready the text is buffered in {@link #pendingInput}
      * and sent once setup completes.
      *
      * <p>The text is also saved to {@link #lastPromptText} so that if the session
@@ -1123,15 +1107,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (sentGeneratingStatus)
             onGenerationPaused();
 
-        if (!isSessionReadyForInput()) {
-            synchronized (pendingSystemText) {
-                pendingSystemText.add(text);
+        synchronized (pendingTextAfterTalking) {
+            if (isSessionReadyForInput() && currentOutputTurn() != null) {
+                pendingTextAfterTalking.add(text);
+                return;
             }
-            ensureConnectionForQueuedInput("addPromptTextAfterTalkingComplete");
-            return;
         }
-
-        pendingTextAfterTalking.add(text);
+        addPromptTextImmediate(text);
     }
 
     @Override
@@ -1161,6 +1143,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void close() {
         if (!closeStarted.compareAndSet(false, true)) return;
+        pendingInput.close();
+        pendingTextAfterTalking.clear();
         synchronized (this) {
             transitionRecovery("close()", () -> recoveryController.closeIntentional("close()"));
             reconnectScheduled = false;

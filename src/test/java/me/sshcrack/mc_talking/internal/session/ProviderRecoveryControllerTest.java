@@ -29,7 +29,9 @@ class ProviderRecoveryControllerTest {
         var second = controller.beginRecovery("transport loss");
         assertTrue(second.allowed());
         assertEquals(2, second.attemptNumber());
-        assertEquals(1_000, second.delayMillis(), "successful setup resets consecutive backoff only");
+        assertEquals(1_000, second.delayMillis(), "successful setup resets the recovery episode");
+
+        assertTrue(controller.beginRecovery("still unavailable").allowed());
 
         var exhausted = controller.beginRecovery("still unavailable");
         assertFalse(exhausted.allowed());
@@ -38,6 +40,18 @@ class ProviderRecoveryControllerTest {
         assertEquals(ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED,
                 exhausted.diagnostic().terminalReason());
         assertTrue(exhausted.diagnostic().detail().contains("attempt limit 2"));
+    }
+
+    @Test
+    void healthyConversationAgeDoesNotSpendTheNextRecoveryBudget() {
+        AtomicLong clock = new AtomicLong();
+        var controller = new ProviderRecoveryController(2, 5_000, clock::get);
+        controller.setupSucceeded();
+        clock.set(30 * 60_000);
+        assertTrue(controller.beginRecovery("first outage after thirty healthy minutes").allowed());
+        clock.addAndGet(5_001);
+        assertFalse(controller.beginRecovery("outage still ongoing").allowed());
+        assertTrue(controller.diagnostic().terminal());
     }
 
     @Test
