@@ -1,12 +1,15 @@
 package me.sshcrack.mc_talking.internal.api;
 
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionHandle;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionPolicy;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
 import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -215,6 +218,178 @@ class ControlledConversationRuntimeTest {
         assertEquals(context.turnId(), turn.join().turnId());
     }
 
+    @Test
+    void autonomousDiscussionUsesFairSingleProviderTurnsAndStopsAtTurnLimit() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant a = hooks.add("Ada");
+        hooks.add("Borin");
+        hooks.add("Cora");
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Council",
+                ControlledConversationOptions.noAddonTools(), hooks);
+        var policy = new AutonomousDiscussionPolicy(3, Duration.ofMinutes(1), 80);
+
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(policy);
+        assertEquals(List.of("Ada"), hooks.startedSpeakers);
+        assertEquals(1, hooks.maxConcurrentStarts);
+        assertTrue(hooks.lastPrompt.contains("maximum of 80 output tokens"));
+        assertEquals(80, hooks.lastMaxOutputTokens);
+
+        hooks.completeAudibly(AmbientLineResult.completed("A".repeat(120)));
+        assertEquals(List.of("Ada", "Borin"), hooks.startedSpeakers);
+        hooks.completeAudibly(AmbientLineResult.completed("Borin replies."));
+        assertEquals(List.of("Ada", "Borin", "Cora"), hooks.startedSpeakers);
+        hooks.completeAudibly(AmbientLineResult.completed("Cora replies."));
+
+        assertEquals(AutonomousDiscussionHandle.State.COMPLETED, discussion.state());
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.TURN_LIMIT, discussion.completion().join());
+        assertEquals(3, discussion.completedTurns());
+        assertEquals(List.of("Ada", "Borin", "Cora"), runtime.transcript().stream()
+                .map(entry -> entry.speakerName()).toList());
+        assertEquals(120, runtime.transcript().get(0).text().length(),
+                "provider token limiting is distinct from transcript character accounting");
+        assertEquals(1, hooks.maxConcurrentStarts, "automatic discussion must never overlap provider turns");
+        assertEquals(a.id(), runtime.transcript().get(0).speakerId());
+    }
+
+    @Test
+    void autonomousDiscussionSkipsUnavailableParticipantsWithoutOpeningConnectionsForThem() {
+        FakeHooks hooks = new FakeHooks();
+        hooks.add("Ada");
+        FakeParticipant unavailable = hooks.add("Borin");
+        hooks.add("Cora");
+        hooks.availability.put(unavailable.id(), ControlledConversationRuntime.Availability.rejected(
+                ControlledTurnResult.FailureReason.SPEAKER_UNLOADED, "unloaded"));
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Council",
+                ControlledConversationOptions.noAddonTools(), hooks);
+
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(
+                new AutonomousDiscussionPolicy(4, Duration.ofMinutes(1), 100));
+        hooks.completeAudibly(AmbientLineResult.completed("Ada one"));
+        hooks.completeAudibly(AmbientLineResult.completed("Cora one"));
+        hooks.completeAudibly(AmbientLineResult.completed("Ada two"));
+        hooks.completeAudibly(AmbientLineResult.completed("Cora two"));
+
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.TURN_LIMIT, discussion.completion().join());
+        assertEquals(List.of("Ada", "Cora", "Ada", "Cora"), hooks.startedSpeakers);
+        assertFalse(hooks.startedSpeakers.contains("Borin"));
+    }
+
+    @Test
+    void autonomousDiscussionPausesForPlayerInterruptionAndResumesFairly() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant a = hooks.add("Ada");
+        hooks.add("Borin");
+        hooks.add("Cora");
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Council",
+                ControlledConversationOptions.noAddonTools(), hooks);
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(
+                new AutonomousDiscussionPolicy(2, Duration.ofMinutes(1), 100));
+
+        hooks.playerOwned.put(a.id(), true);
+        hooks.completeAudibly(AmbientLineResult.failed("player takeover"));
+        assertEquals(AutonomousDiscussionHandle.State.PAUSED, discussion.state());
+        assertEquals(AutonomousDiscussionHandle.PauseReason.PLAYER_INTERRUPTED, discussion.pauseReason().orElseThrow());
+        assertEquals(1, hooks.startCalls, "player interruption must not trigger another automatic speaker");
+
+        hooks.playerOwned.put(a.id(), false);
+        discussion.resume();
+        assertEquals(AutonomousDiscussionHandle.State.RUNNING, discussion.state());
+        assertEquals(List.of("Ada", "Borin"), hooks.startedSpeakers);
+        hooks.completeAudibly(AmbientLineResult.completed("Borin continues"));
+        assertEquals(List.of("Ada", "Borin", "Cora"), hooks.startedSpeakers);
+        hooks.completeAudibly(AmbientLineResult.completed("Cora continues"));
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.TURN_LIMIT, discussion.completion().join());
+    }
+
+    @Test
+    void policyPauseReturnsManualFloorAndResumeWaitsForManualTurnCompletion() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant a = hooks.add("Ada");
+        FakeParticipant b = hooks.add("Borin");
+        FakeParticipant c = hooks.add("Cora");
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Council",
+                ControlledConversationOptions.noAddonTools(), hooks);
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(
+                new AutonomousDiscussionPolicy(2, Duration.ofMinutes(1), 100));
+
+        discussion.pause();
+        assertEquals(AutonomousDiscussionHandle.State.PAUSED, discussion.state());
+        hooks.completeAudibly(AmbientLineResult.completed("Ada finishes before pause"));
+        assertEquals(1, hooks.startCalls);
+
+        CompletableFuture<ControlledTurnResult> manual = runtime.requestTurn(b, "Manual floor", null);
+        assertEquals(2, hooks.startCalls);
+        discussion.resume();
+        ControlledTurnResult blocked = runtime.requestTurn(c, "Cannot steal delegated floor", null).join();
+        assertEquals(ControlledTurnResult.FailureReason.TURN_ALREADY_ACTIVE, blocked.failureReason());
+        hooks.completeAudibly(AmbientLineResult.completed("Manual reply"));
+
+        assertEquals(3, hooks.startCalls, "automatic selection resumes only after manual audible completion");
+        assertTrue(manual.join().completed());
+        hooks.completeAudibly(AmbientLineResult.completed("Automatic reply"));
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.TURN_LIMIT, discussion.completion().join());
+        assertEquals(1, hooks.maxConcurrentStarts);
+    }
+
+    @Test
+    void stopInterruptsAutomaticTurnBeforeDiscussionCompletionIsObserved() {
+        FakeHooks hooks = new FakeHooks();
+        hooks.add("Ada");
+        hooks.add("Borin");
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Council",
+                ControlledConversationOptions.noAddonTools(), hooks);
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(
+                new AutonomousDiscussionPolicy(8, Duration.ofMinutes(1), 100));
+
+        discussion.completion().thenAccept(reason -> {
+            assertEquals(AutonomousDiscussionHandle.CompletionReason.STOPPED, reason);
+            assertEquals(ControlledConversationSession.State.OPEN, runtime.state(),
+                    "the active automatic turn must release the floor before discussion completion");
+            assertEquals(1, hooks.cancelCalls);
+        });
+
+        discussion.stop();
+
+        assertEquals(AutonomousDiscussionHandle.State.STOPPED, discussion.state());
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.STOPPED, discussion.completion().join());
+        assertEquals(1, hooks.cancelCalls);
+        assertEquals(ControlledConversationSession.State.OPEN, runtime.state());
+    }
+
+    @Test
+    void autonomousDiscussionStopsSchedulingAfterDurationLimit() {
+        FakeHooks hooks = new FakeHooks();
+        hooks.add("Ada");
+        hooks.add("Borin");
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Council",
+                ControlledConversationOptions.noAddonTools(), hooks);
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(
+                new AutonomousDiscussionPolicy(8, Duration.ofSeconds(5), 100));
+
+        hooks.advanceNanos(Duration.ofSeconds(6).toNanos());
+        hooks.completeAudibly(AmbientLineResult.completed("Only one turn is allowed to finish"));
+
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.DURATION_LIMIT, discussion.completion().join());
+        assertEquals(1, hooks.startCalls);
+    }
+
+    @Test
+    void twoCitizenAutonomousDiscussionUsesTheSameControlledLifecycle() {
+        FakeHooks hooks = new FakeHooks();
+        hooks.add("Ada");
+        hooks.add("Borin");
+        var runtime = new ControlledConversationRuntime<>(hooks.participants, "Pair chat",
+                ControlledConversationOptions.noAddonTools(), hooks);
+        AutonomousDiscussionHandle discussion = runtime.delegateAutonomousDiscussion(
+                new AutonomousDiscussionPolicy(2, Duration.ofMinutes(1), 100));
+
+        hooks.completeAudibly(AmbientLineResult.completed("Hello"));
+        hooks.completeAudibly(AmbientLineResult.completed("Hi"));
+
+        assertEquals(List.of("Ada", "Borin"), hooks.startedSpeakers);
+        assertEquals(AutonomousDiscussionHandle.CompletionReason.TURN_LIMIT, discussion.completion().join());
+    }
+
     private static ControlledConversationRuntime<FakeParticipant, FakeAnchor> runtime(
             FakeHooks hooks, FakeParticipant participant) {
         return new ControlledConversationRuntime<>(List.of(participant), "Agenda",
@@ -231,15 +406,20 @@ class ControlledConversationRuntimeTest {
         private boolean capacity = true;
         private int startCalls;
         private int cancelCalls;
+        private int activeStarts;
+        private int maxConcurrentStarts;
+        private final List<String> startedSpeakers = new ArrayList<>();
         private String lastPrompt;
         private PromptSessionContext lastContext;
         private FakeAnchor lastAnchor;
+        private int lastMaxOutputTokens;
         private Consumer<AmbientLineResult> currentCompletion;
         private long clock;
         private boolean executeImmediately = true;
         private final List<Runnable> queuedTasks = new ArrayList<>();
         private UUID lastCancelledSessionId;
         private UUID lastCancelledTurnId;
+        private long monotonicNanos;
 
         FakeParticipant add(String name) {
             FakeParticipant participant = new FakeParticipant(UUID.randomUUID(), name);
@@ -277,12 +457,18 @@ class ControlledConversationRuntimeTest {
                 String prompt,
                 PromptSessionContext promptContext,
                 FakeAnchor audioAnchor,
+                int maxOutputTokens,
                 Consumer<AmbientLineResult> audibleCompletion
         ) {
             startCalls++;
+            activeStarts++;
+            maxConcurrentStarts = Math.max(maxConcurrentStarts, activeStarts);
+            startedSpeakers.add(participant.name());
             lastPrompt = prompt;
             lastContext = promptContext;
             lastAnchor = audioAnchor;
+            lastMaxOutputTokens = maxOutputTokens;
+            assertNull(currentCompletion, "only one fake provider turn may be active");
             currentCompletion = audibleCompletion;
             return ControlledConversationRuntime.StartResult.STARTED;
         }
@@ -292,11 +478,24 @@ class ControlledConversationRuntimeTest {
             cancelCalls++;
             lastCancelledSessionId = sessionId;
             lastCancelledTurnId = turnId;
+            if (currentCompletion != null) {
+                currentCompletion = null;
+                activeStarts--;
+            }
         }
 
         @Override
         public boolean playerOwnsConversation(FakeParticipant participant) {
             return playerOwned.getOrDefault(participant.id(), false);
+        }
+
+        @Override
+        public long monotonicNanos() {
+            return monotonicNanos;
+        }
+
+        void advanceNanos(long nanos) {
+            monotonicNanos += nanos;
         }
 
         void drainExecutor() {
@@ -315,6 +514,7 @@ class ControlledConversationRuntimeTest {
             assertNotNull(currentCompletion, "turn must have started");
             Consumer<AmbientLineResult> callback = currentCompletion;
             currentCompletion = null;
+            activeStarts--;
             callback.accept(result);
         }
     }

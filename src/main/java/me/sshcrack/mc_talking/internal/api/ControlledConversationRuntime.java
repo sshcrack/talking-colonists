@@ -1,6 +1,8 @@
 package me.sshcrack.mc_talking.internal.api;
 
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionHandle;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionPolicy;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
 import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
@@ -14,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,9 +37,13 @@ final class ControlledConversationRuntime<P, A> {
         @NotNull StartResult start(@NotNull P participant, @NotNull String prompt,
                                    @NotNull PromptSessionContext promptContext,
                                    @Nullable A audioAnchor,
+                                   int maxOutputTokens,
                                    @NotNull Consumer<AmbientLineResult> audibleCompletion);
         void cancel(@NotNull P participant, @NotNull UUID sessionId, @NotNull UUID turnId);
         boolean playerOwnsConversation(@NotNull P participant);
+
+        /** Monotonic clock used only for autonomous scheduling limits. */
+        default long monotonicNanos() { return System.nanoTime(); }
     }
 
     record Availability(boolean available, @Nullable ControlledTurnResult.FailureReason reason,
@@ -58,6 +65,7 @@ final class ControlledConversationRuntime<P, A> {
     private final AtomicReference<ControlledConversationSession.State> state =
             new AtomicReference<>(ControlledConversationSession.State.OPEN);
     private final AtomicReference<ActiveTurn<P>> activeTurn = new AtomicReference<>();
+    private final AtomicReference<AutomaticDiscussion> automaticDiscussion = new AtomicReference<>();
     private final ArrayDeque<ConversationTranscriptEntry> transcript = new ArrayDeque<>();
     private int transcriptChars;
     private volatile String agenda;
@@ -98,6 +106,43 @@ final class ControlledConversationRuntime<P, A> {
     @NotNull CompletableFuture<ControlledTurnResult> requestTurn(@NotNull P speaker,
                                                                   @NotNull String topicOrInstruction,
                                                                   @Nullable A audioAnchor) {
+        AutomaticDiscussion automatic = automaticDiscussion.get();
+        if (automatic != null && automatic.ownsFloor()) {
+            UUID turnId = UUID.randomUUID();
+            return completeOnExecutor(ControlledTurnResult.rejected(
+                    sessionId, turnId, ControlledTurnResult.FailureReason.TURN_ALREADY_ACTIVE,
+                    "automatic discussion currently owns the floor"));
+        }
+        return requestTurnInternal(speaker, topicOrInstruction, audioAnchor, false, 0);
+    }
+
+    @NotNull AutonomousDiscussionHandle delegateAutonomousDiscussion(@NotNull AutonomousDiscussionPolicy policy) {
+        Objects.requireNonNull(policy, "policy");
+        if (participants.size() < 2) {
+            throw new IllegalStateException("Autonomous discussion requires at least two participants");
+        }
+        if (state.get() == ControlledConversationSession.State.ENDED) {
+            throw new IllegalStateException("session ended");
+        }
+        if (state.get() != ControlledConversationSession.State.OPEN || activeTurn.get() != null) {
+            throw new IllegalStateException("cannot delegate automatic floor while a turn is active");
+        }
+
+        AutomaticDiscussion discussion = new AutomaticDiscussion(policy);
+        if (!automaticDiscussion.compareAndSet(null, discussion)) {
+            throw new IllegalStateException("automatic floor is already delegated");
+        }
+        hooks.execute(discussion::start);
+        return discussion;
+    }
+
+    private @NotNull CompletableFuture<ControlledTurnResult> requestTurnInternal(
+            @NotNull P speaker,
+            @NotNull String topicOrInstruction,
+            @Nullable A audioAnchor,
+            boolean automatic,
+            int responseTokenLimit
+    ) {
         Objects.requireNonNull(speaker, "speaker");
         Objects.requireNonNull(topicOrInstruction, "topicOrInstruction");
         UUID turnId = UUID.randomUUID();
@@ -117,7 +162,7 @@ final class ControlledConversationRuntime<P, A> {
         }
 
         CompletableFuture<ControlledTurnResult> future = new CompletableFuture<>();
-        ActiveTurn<P> turn = new ActiveTurn<>(turnId, speaker, future);
+        ActiveTurn<P> turn = new ActiveTurn<>(turnId, speaker, future, automatic, responseTokenLimit);
         activeTurn.set(turn);
         String turnAgenda = agenda;
         hooks.execute(() -> startTurn(turn, topicOrInstruction, turnAgenda, audioAnchor));
@@ -130,8 +175,10 @@ final class ControlledConversationRuntime<P, A> {
         state.compareAndSet(ControlledConversationSession.State.TURN_ACTIVE,
                             ControlledConversationSession.State.OPEN);
         hooks.execute(() -> {
-            turn.future().complete(ControlledTurnResult.interrupted(sessionId, turn.turnId()));
+            ControlledTurnResult result = ControlledTurnResult.interrupted(sessionId, turn.turnId());
+            turn.future().complete(result);
             hooks.cancel(turn.speaker(), sessionId, turn.turnId());
+            notifyTurnTerminal(turn, result);
         });
         return true;
     }
@@ -140,12 +187,18 @@ final class ControlledConversationRuntime<P, A> {
         Objects.requireNonNull(reason, "reason");
         ControlledConversationSession.State previous = state.getAndSet(ControlledConversationSession.State.ENDED);
         if (previous == ControlledConversationSession.State.ENDED) return;
+        AutomaticDiscussion automatic = automaticDiscussion.getAndSet(null);
         ActiveTurn<P> turn = activeTurn.getAndSet(null);
-        if (turn != null) {
+        if (automatic != null || turn != null) {
             hooks.execute(() -> {
-                turn.future().complete(ControlledTurnResult.sessionEnded(
-                        sessionId, turn.turnId(), "session ended: " + reason.name().toLowerCase(java.util.Locale.ROOT)));
-                hooks.cancel(turn.speaker(), sessionId, turn.turnId());
+                if (automatic != null) automatic.terminateForSessionEnd();
+                if (turn != null) {
+                    ControlledTurnResult result = ControlledTurnResult.sessionEnded(
+                            sessionId, turn.turnId(), "session ended: "
+                                    + reason.name().toLowerCase(java.util.Locale.ROOT));
+                    turn.future().complete(result);
+                    hooks.cancel(turn.speaker(), sessionId, turn.turnId());
+                }
             });
         }
     }
@@ -164,7 +217,7 @@ final class ControlledConversationRuntime<P, A> {
     private void startTurn(ActiveTurn<P> turn, String topicOrInstruction, String turnAgenda,
                            @Nullable A audioAnchor) {
         if (!isCurrent(turn)) return;
-        String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda);
+        String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda, turn.responseTokenLimit());
         PromptSessionContext promptContext = PromptSessionContext.controlled(
                 sessionId, turn.turnId(), turnAgenda, options.allowAllAddonTools(), options.allowedAddonTools());
         Availability availability = hooks.availability(turn.speaker(), audioAnchor);
@@ -179,7 +232,7 @@ final class ControlledConversationRuntime<P, A> {
             return;
         }
         StartResult started = hooks.start(turn.speaker(), prompt, promptContext, audioAnchor,
-                result -> hooks.execute(() -> completeAudibly(turn, result)));
+                turn.responseTokenLimit(), result -> hooks.execute(() -> completeAudibly(turn, result)));
         if (started == StartResult.STARTED || !isCurrent(turn)) return;
         ControlledTurnResult.FailureReason reason = switch (started) {
             case PROVIDER_UNAVAILABLE -> ControlledTurnResult.FailureReason.PROVIDER_UNAVAILABLE;
@@ -196,12 +249,13 @@ final class ControlledConversationRuntime<P, A> {
         if (!isCurrent(turn)) return;
         P speaker = turn.speaker();
         if (result.status() == AmbientLineResult.Status.COMPLETED) {
-            if (!result.transcript().isBlank()) {
+            String boundedTranscript = result.transcript() == null ? "" : result.transcript().trim();
+            if (!boundedTranscript.isBlank()) {
                 appendTranscript(new ConversationTranscriptEntry(
                         ConversationTranscriptEntry.SpeakerKind.CITIZEN,
-                        hooks.id(speaker), hooks.name(speaker), result.transcript().trim(), hooks.gameTime(speaker)));
+                        hooks.id(speaker), hooks.name(speaker), boundedTranscript, hooks.gameTime(speaker)));
             }
-            finish(turn, ControlledTurnResult.completed(sessionId, turn.turnId(), result.transcript()));
+            finish(turn, ControlledTurnResult.completed(sessionId, turn.turnId(), boundedTranscript));
             return;
         }
         if (result.status() == AmbientLineResult.Status.CANCELLED) {
@@ -236,6 +290,14 @@ final class ControlledConversationRuntime<P, A> {
                                 ControlledConversationSession.State.OPEN);
         }
         turn.future().complete(result);
+        notifyTurnTerminal(turn, result);
+    }
+
+    private void notifyTurnTerminal(ActiveTurn<P> turn, ControlledTurnResult result) {
+        AutomaticDiscussion automatic = automaticDiscussion.get();
+        if (automatic == null) return;
+        if (turn.automatic()) automatic.onAutomaticTurnTerminal(turn, result);
+        else automatic.onManualFloorAvailable();
     }
 
     private CompletableFuture<ControlledTurnResult> completeOnExecutor(ControlledTurnResult result) {
@@ -244,9 +306,13 @@ final class ControlledConversationRuntime<P, A> {
         return future;
     }
 
-    private String buildTurnPrompt(String topicOrInstruction, String turnAgenda) {
+    private String buildTurnPrompt(String topicOrInstruction, String turnAgenda, int responseTokenLimit) {
         String history = sharedTranscript();
         String boundedTopic = topicOrInstruction.length() > 2_000 ? topicOrInstruction.substring(0, 2_000) : topicOrInstruction;
+        String responseLimit = responseTokenLimit > 0
+                ? "Keep this response concise; the provider will enforce a maximum of "
+                        + responseTokenLimit + " output tokens."
+                : "";
         return """
                 ## CONTROLLED ADDON CONVERSATION
                 You have explicitly been given the floor. Speak exactly one natural turn, then stop and wait.
@@ -254,8 +320,9 @@ final class ControlledConversationRuntime<P, A> {
                 Requested topic/instruction for your turn: %s
                 Shared transcript so far:
                 %s
+                %s
                 Do not invent statements for other attendees and do not decide who speaks next.
-                """.formatted(turnAgenda, boundedTopic, history.isBlank() ? "(none yet)" : history);
+                """.formatted(turnAgenda, boundedTopic, history.isBlank() ? "(none yet)" : history, responseLimit);
     }
 
     private void appendTranscript(ConversationTranscriptEntry entry) {
@@ -277,6 +344,195 @@ final class ControlledConversationRuntime<P, A> {
         }
     }
 
+    private final class AutomaticDiscussion implements AutonomousDiscussionHandle {
+        private final AutonomousDiscussionPolicy policy;
+        private final CompletableFuture<CompletionReason> completion = new CompletableFuture<>();
+        private final AtomicReference<State> automaticState = new AtomicReference<>(State.RUNNING);
+        private volatile PauseReason pauseReason;
+        private long startedNanos;
+        private volatile int completedTurns;
+        private int nextParticipantIndex;
+        private int unavailableAttempts;
+        private UUID lastCompletedSpeaker;
+
+        private AutomaticDiscussion(AutonomousDiscussionPolicy policy) {
+            this.policy = policy;
+        }
+
+        private void start() {
+            if (state.get() == ControlledConversationSession.State.ENDED) {
+                terminate(CompletionReason.STOPPED, State.STOPPED, false);
+                return;
+            }
+            startedNanos = hooks.monotonicNanos();
+            scheduleNext();
+        }
+
+        private boolean ownsFloor() {
+            return automaticState.get() == State.RUNNING;
+        }
+
+        @Override
+        public @NotNull State state() {
+            return automaticState.get();
+        }
+
+        @Override
+        public int completedTurns() {
+            return completedTurns;
+        }
+
+        @Override
+        public @NotNull Optional<PauseReason> pauseReason() {
+            return automaticState.get() == State.PAUSED ? Optional.ofNullable(pauseReason) : Optional.empty();
+        }
+
+        @Override
+        public void pause() {
+            hooks.execute(() -> pauseInternal(PauseReason.CALLER));
+        }
+
+        @Override
+        public void resume() {
+            hooks.execute(() -> {
+                if (!automaticState.compareAndSet(State.PAUSED, State.RUNNING)) return;
+                pauseReason = null;
+                if (activeTurn.get() == null && state.get() == ControlledConversationSession.State.OPEN) {
+                    scheduleNext();
+                }
+            });
+        }
+
+        @Override
+        public void stop() {
+            hooks.execute(() -> terminate(CompletionReason.STOPPED, State.STOPPED, true));
+        }
+
+        @Override
+        public @NotNull CompletableFuture<CompletionReason> completion() {
+            return completion;
+        }
+
+        private void scheduleNext() {
+            if (automaticState.get() != State.RUNNING) return;
+            if (state.get() == ControlledConversationSession.State.ENDED) {
+                terminate(CompletionReason.STOPPED, State.STOPPED, false);
+                return;
+            }
+            if (activeTurn.get() != null || state.get() != ControlledConversationSession.State.OPEN) return;
+            if (completedTurns >= policy.maxTurns()) {
+                terminate(CompletionReason.TURN_LIMIT, State.COMPLETED, false);
+                return;
+            }
+            if (hooks.monotonicNanos() - startedNanos >= policy.maxDuration().toNanos()) {
+                terminate(CompletionReason.DURATION_LIMIT, State.COMPLETED, false);
+                return;
+            }
+            if (!hooks.hasCapacity()) {
+                pauseInternal(PauseReason.CAPACITY_UNAVAILABLE);
+                return;
+            }
+
+            P speaker = selectNextAvailableParticipant();
+            if (speaker == null) {
+                terminate(CompletionReason.NO_AVAILABLE_PARTICIPANTS, State.COMPLETED, false);
+                return;
+            }
+
+            String instruction = "Continue the shared group discussion naturally from your own perspective. "
+                    + "Respond to what has actually been said, stay on the agenda, and leave selection of the next "
+                    + "speaker to the conversation controller.";
+            requestTurnInternal(speaker, instruction, null, true, policy.maxResponseTokens());
+        }
+
+        @Nullable
+        private P selectNextAvailableParticipant() {
+            int checked = 0;
+            int size = participants.size();
+            while (checked < size) {
+                int index = nextParticipantIndex % size;
+                nextParticipantIndex = (index + 1) % size;
+                checked++;
+                P candidate = participants.get(index);
+                UUID candidateId = hooks.id(candidate);
+                if (candidateId.equals(lastCompletedSpeaker)) continue;
+                Availability availability = hooks.availability(candidate, null);
+                if (!availability.available()) continue;
+                return candidate;
+            }
+            return null;
+        }
+
+        private void onAutomaticTurnTerminal(ActiveTurn<P> turn, ControlledTurnResult result) {
+            if (automaticState.get() == State.STOPPED || automaticState.get() == State.COMPLETED) return;
+
+            if (result.status() == ControlledTurnResult.Status.COMPLETED) {
+                completedTurns++;
+                unavailableAttempts = 0;
+                lastCompletedSpeaker = hooks.id(turn.speaker());
+                if (automaticState.get() == State.RUNNING) scheduleNext();
+                return;
+            }
+
+            if (result.status() == ControlledTurnResult.Status.INTERRUPTED) {
+                pauseInternal(hooks.playerOwnsConversation(turn.speaker())
+                        ? PauseReason.PLAYER_INTERRUPTED
+                        : PauseReason.CALLER);
+                return;
+            }
+            if (result.status() == ControlledTurnResult.Status.SESSION_ENDED) {
+                terminate(CompletionReason.STOPPED, State.STOPPED, false);
+                return;
+            }
+
+            ControlledTurnResult.FailureReason reason = result.failureReason();
+            if (reason == ControlledTurnResult.FailureReason.CAPACITY_EXHAUSTED) {
+                pauseInternal(PauseReason.CAPACITY_UNAVAILABLE);
+                return;
+            }
+            if (reason == ControlledTurnResult.FailureReason.SPEAKER_UNAVAILABLE
+                    || reason == ControlledTurnResult.FailureReason.SPEAKER_UNLOADED) {
+                unavailableAttempts++;
+                if (unavailableAttempts >= participants.size()) {
+                    terminate(CompletionReason.NO_AVAILABLE_PARTICIPANTS, State.COMPLETED, false);
+                } else if (automaticState.get() == State.RUNNING) {
+                    scheduleNext();
+                }
+                return;
+            }
+            terminate(CompletionReason.PROVIDER_FAILURE, State.COMPLETED, false);
+        }
+
+        private void onManualFloorAvailable() {
+            if (automaticState.get() == State.RUNNING) scheduleNext();
+        }
+
+        private void pauseInternal(PauseReason reason) {
+            if (automaticState.compareAndSet(State.RUNNING, State.PAUSED)) {
+                pauseReason = reason;
+            }
+        }
+
+        private void terminateForSessionEnd() {
+            State previous = automaticState.getAndSet(State.STOPPED);
+            if (previous == State.STOPPED || previous == State.COMPLETED) return;
+            completion.complete(CompletionReason.STOPPED);
+        }
+
+        private void terminate(CompletionReason reason, State terminalState, boolean interruptAutomaticTurn) {
+            State previous = automaticState.getAndSet(terminalState);
+            if (previous == State.STOPPED || previous == State.COMPLETED) return;
+            pauseReason = null;
+            automaticDiscussion.compareAndSet(this, null);
+            if (interruptAutomaticTurn) {
+                ActiveTurn<P> turn = activeTurn.get();
+                if (turn != null && turn.automatic()) interruptTurn();
+            }
+            completion.complete(reason);
+        }
+    }
+
     private record ActiveTurn<P>(@NotNull UUID turnId, @NotNull P speaker,
-                                 @NotNull CompletableFuture<ControlledTurnResult> future) { }
+                                 @NotNull CompletableFuture<ControlledTurnResult> future,
+                                 boolean automatic, int responseTokenLimit) { }
 }

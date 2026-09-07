@@ -5,6 +5,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionHandle;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationHandle;
 import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
@@ -506,6 +508,13 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
         }
 
         @Override
+        public @NotNull AutonomousDiscussionHandle delegateAutonomousDiscussion(
+                @NotNull AutonomousDiscussionPolicy policy
+        ) {
+            return runtime.delegateAutonomousDiscussion(policy);
+        }
+
+        @Override
         public boolean interruptTurn() { return runtime.interruptTurn(); }
 
         @Override
@@ -587,6 +596,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
                     @NotNull String prompt,
                     @NotNull PromptSessionContext promptContext,
                     @Nullable ControlledAudioAnchor audioAnchor,
+                    int maxOutputTokens,
                     @NotNull Consumer<AmbientLineResult> audibleCompletion
             ) {
                 if (!McTalkingConfig.hasGeminiApiKey()) {
@@ -596,7 +606,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;
                 }
                 boolean started = ConversationManager.startControlledAmbientSession(
-                        participant, prompt, audibleCompletion, promptContext, audioAnchor);
+                        participant, prompt, audibleCompletion, promptContext, audioAnchor, maxOutputTokens);
                 if (started) return ControlledConversationRuntime.StartResult.STARTED;
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;

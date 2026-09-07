@@ -671,7 +671,7 @@ public class ConversationManager {
             ControlledAudioAnchor audioAnchor
     ) {
         return startLowPrioritySession(citizen, userPrompt, ConversationKind.ADDON_AMBIENT, completion,
-                promptSessionContext, audioAnchor);
+                promptSessionContext, audioAnchor, null);
     }
 
     /** Starts an exact addon-controlled floor turn without automatic-conversation cooldown semantics. */
@@ -680,10 +680,12 @@ public class ConversationManager {
             String userPrompt,
             Consumer<AmbientLineResult> completion,
             PromptSessionContext promptSessionContext,
-            ControlledAudioAnchor audioAnchor
+            ControlledAudioAnchor audioAnchor,
+            int maxOutputTokens
     ) {
+        if (maxOutputTokens < 0) throw new IllegalArgumentException("maxOutputTokens must not be negative");
         return startLowPrioritySession(citizen, userPrompt, ConversationKind.CONTROLLED, completion,
-                promptSessionContext, audioAnchor);
+                promptSessionContext, audioAnchor, maxOutputTokens == 0 ? null : maxOutputTokens);
     }
 
     /** Cancels only the exact controlled turn identity; stale cancellation cannot kill a replacement turn. */
@@ -718,7 +720,7 @@ public class ConversationManager {
             String userPrompt,
             ConversationKind kind
     ) {
-        return startLowPrioritySession(citizen, userPrompt, kind, null, PromptSessionContext.empty(), null);
+        return startLowPrioritySession(citizen, userPrompt, kind, null, PromptSessionContext.empty(), null, null);
     }
 
     private static boolean startLowPrioritySession(
@@ -727,7 +729,7 @@ public class ConversationManager {
             ConversationKind kind,
             Consumer<AmbientLineResult> completion
     ) {
-        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty(), null);
+        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty(), null, null);
     }
 
     private static boolean startLowPrioritySession(
@@ -736,7 +738,8 @@ public class ConversationManager {
             ConversationKind kind,
             Consumer<AmbientLineResult> completion,
             PromptSessionContext promptSessionContext,
-            ControlledAudioAnchor audioAnchor
+            ControlledAudioAnchor audioAnchor,
+            Integer maxOutputTokens
     ) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
         if (!canCitizenSpeak(citizen, kind)) return false;
@@ -761,7 +764,7 @@ public class ConversationManager {
                         completion.accept(AmbientLineResult.completed(transcript));
                     }
                 });
-            }, promptSessionContext);
+            }, promptSessionContext, maxOutputTokens);
 
             if (!reservation.attachClient(client)) {
                 reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,

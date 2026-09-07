@@ -1,6 +1,8 @@
 package me.sshcrack.mc_talking.api.examples;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionHandle;
+import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
@@ -107,6 +109,14 @@ final class ColonyMeetingsExample {
                     return result;
                 });
         return new RunningMeeting(meeting, completion);
+    }
+
+    /**
+     * Optional delegation: normal meetings keep manual floor ownership unless the addon calls this.
+     * The returned handle can be paused to regain manual floor control without ending the meeting.
+     */
+    static AutonomousDiscussionHandle delegateBoundedDiscussion(ControlledConversationSession meeting) {
+        return meeting.delegateAutonomousDiscussion(AutonomousDiscussionPolicy.defaults());
     }
 
     /** Demonstrates player/caller barge-in. The current turn ends; the meeting itself stays open. */

@@ -549,7 +549,10 @@ conversation.setStateListener(state -> {
 conversation.start();
 ```
 
-The handle hides provider clients, streams, audio queues, slot ownership and teardown.
+The handle hides provider clients, streams, audio queues, slot ownership and teardown. Existing
+two-citizen conversations remain available through this convenience handle. Addons that want the
+new bounded/fair automatic-floor contract can instead open a controlled session with two or more
+participants and delegate it as described below.
 
 ## Controlled meetings and councils
 
@@ -599,6 +602,60 @@ session ID plus a unique `turnId()`, so orchestration can reject stale work with
 names. Only one turn may be active. A non-participant, an unavailable/unloaded speaker, exhausted
 capacity, an already-active floor, a closed session, and an unsupported operation have typed results.
 Provider/network failures are also terminal results rather than leaked busy state.
+
+### Optional autonomous group discussion
+
+A controlled session remains manually floor-owned unless its caller **explicitly** delegates floor
+selection. This keeps Colony Meetings-style orchestration exclusive by default while allowing a
+small council, family, shop crew, or similar group to converse automatically when an addon wants it:
+
+```java
+AutonomousDiscussionHandle discussion = meeting.delegateAutonomousDiscussion(
+        AutonomousDiscussionPolicy.defaults());
+
+discussion.pause();  // current audible turn may finish; no new automatic turn starts
+// Once the floor is idle while paused, meeting.requestTurn(...) is manual again.
+discussion.resume();
+
+discussion.completion().thenAccept(reason -> {
+    // TURN_LIMIT / DURATION_LIMIT / NO_AVAILABLE_PARTICIPANTS / PROVIDER_FAILURE / STOPPED
+});
+```
+
+The default policy allows at most **8 successfully audible turns**, schedules new turns for at most
+**2 minutes**, and configures each automatic Gemini Live connection with
+**`maxOutputTokens = 256`**. Policy construction is itself bounded: 1–64 turns, a positive duration
+up to 15 minutes, and 32–2048 output tokens. The duration is checked before starting each new turn;
+an already-audible turn is allowed to reach the same controlled playback-completion boundary rather
+than being cut off merely because the scheduling deadline elapsed. Shared transcript retention keeps
+the existing 8,000-character bound independently of provider output limits.
+
+Automatic selection is deterministic round-robin over the supplied participant order. An automatic
+speaker cannot immediately follow itself; unloaded/ineligible participants are skipped without
+opening provider connections. If no fair/available participant remains, the delegation completes
+with `NO_AVAILABLE_PARTICIPANTS` instead of looping. Exactly **one** provider turn is active at a
+time, and the next speaker is not scheduled until the prior turn is audibly terminal and its
+foreground reservation has been released. Silent attendees therefore consume no provider slots.
+
+While the handle is `RUNNING`, manual `requestTurn(...)` calls are rejected as an already-owned floor
+so automatic and caller-selected speakers cannot overlap. `pause()` prevents a subsequent automatic
+turn but does not truncate audio already playing; after that turn finishes, manual floor requests are
+allowed. `resume()` waits for any manual turn already in progress before automatic selection
+continues. `stop()` permanently relinquishes the delegation and interrupts an automatic turn if one
+is active, without ending the controlled session itself.
+
+A direct player conversation that preempts the active automatic speaker pauses the delegation with
+`PLAYER_INTERRUPTED`. A capacity race pauses it with `CAPACITY_UNAVAILABLE`. Neither condition spins
+or retries indefinitely; the addon decides when to call `resume()`. Ordinary caller interruption
+pauses with `CALLER`. Policy completion likewise returns floor ownership to the caller and does not
+automatically end the surrounding controlled session.
+
+Every automatic turn is still an ordinary controlled turn internally: it has the same session/turn
+identity, shared attributed history, stale-callback rejection, player-interruption behavior, and
+audible playback completion. Prompt contributors therefore receive the same
+`PromptContributionContext.session()` and can add family/shop/group facts for the current speaker.
+Talking Colonists does not infer attendance, pathing, schedules, seats, movement, or addon-specific
+group membership; the caller chooses participants and supplies that context.
 
 A turn future completes on the **Minecraft server thread** only after audible playback reaches its
 terminal state. Provider generation completion alone is not audible completion. `interruptTurn()`

@@ -119,6 +119,17 @@ the semantic boundaries:
 The reference `MeetingTurnSequencer` is intentionally example-side code. It proves the ordering
 contract without making Talking Colonists a meeting/navigation framework.
 
+## Optional automatic floor delegation
+
+Meetings keep exclusive manual floor control unless they explicitly call
+`meeting.delegateAutonomousDiscussion(...)`. The compile-checked example includes a bounded
+`AutonomousDiscussionPolicy.defaults()` delegation helper. Automatic discussion uses the same
+controlled session and attributed transcript; it does not move attendees or choose who belongs in
+the meeting. Pause the returned handle before returning to caller-selected floor grants. A current
+audible automatic turn is allowed to finish, after which the paused session accepts manual
+`requestTurn(...)` calls. See `docs/addon-api.md` for policy limits, fairness, provider concurrency,
+player-preemption behavior, and completion reasons.
+
 ## In-world validation record
 
 Automated tests cover arrival-before-request, audible-completion-before-next-floor, three-citizen

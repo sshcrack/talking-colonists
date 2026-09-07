@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.api.conversation;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,4 +40,19 @@ class ControlledConversationContractTest {
         assertThrows(IllegalArgumentException.class,
                 () -> ControlledConversationOptions.allowAddonTools(Set.of("Bad:Name")));
     }
+    @Test
+    void autonomousDiscussionPolicyHasBoundedDefaultsAndRejectsUnboundedValues() {
+        AutonomousDiscussionPolicy defaults = AutonomousDiscussionPolicy.defaults();
+        assertEquals(8, defaults.maxTurns());
+        assertEquals(Duration.ofMinutes(2), defaults.maxDuration());
+        assertEquals(256, defaults.maxResponseTokens());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new AutonomousDiscussionPolicy(0, Duration.ofMinutes(1), 600));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AutonomousDiscussionPolicy(1, Duration.ofMinutes(16), 600));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AutonomousDiscussionPolicy(1, Duration.ofMinutes(1), 31));
+    }
+
 }

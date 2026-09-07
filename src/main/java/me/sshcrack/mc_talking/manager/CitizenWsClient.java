@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
@@ -68,6 +69,8 @@ public class CitizenWsClient extends GeminiWsClient {
     private final boolean startedInSystemMode;
     private final CitizenPromptView promptView;
     private final PromptSessionContext promptSessionContext;
+    @Nullable
+    private final Integer maxOutputTokens;
     private final AtomicBoolean playerTakeoverPending = new AtomicBoolean(false);
     /** Prevents repeated close calls from scheduling duplicate player-memory writes. */
     private final AtomicBoolean playerMemoryCloseHandled = new AtomicBoolean(false);
@@ -92,7 +95,7 @@ public class CitizenWsClient extends GeminiWsClient {
             @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
             PromptSessionContext promptSessionContext
     ) {
-        this(new CitizenEntityAudioProvider(entity, null), entity, onSystemConversationEnded, promptSessionContext);
+        this(new CitizenEntityAudioProvider(entity, null), entity, onSystemConversationEnded, promptSessionContext, null);
     }
 
     public CitizenWsClient(
@@ -101,11 +104,25 @@ public class CitizenWsClient extends GeminiWsClient {
             @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
             PromptSessionContext promptSessionContext
     ) {
+        this(audioProvider, entity, onSystemConversationEnded, promptSessionContext, null);
+    }
+
+    public CitizenWsClient(
+            AudioProvider audioProvider,
+            AbstractEntityCitizen entity,
+            @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
+            PromptSessionContext promptSessionContext,
+            @Nullable Integer maxOutputTokens
+    ) {
         super(audioProvider, entity);
+        if (maxOutputTokens != null && maxOutputTokens <= 0) {
+            throw new IllegalArgumentException("maxOutputTokens must be positive when supplied");
+        }
         this.player = null;
         this.onSystemConversationEnded = onSystemConversationEnded;
         this.startedInSystemMode = true;
         this.promptSessionContext = Objects.requireNonNull(promptSessionContext, "promptSessionContext");
+        this.maxOutputTokens = maxOutputTokens;
         this.promptView = CitizenPromptViewFactory.create(entity.getCitizenData(), Map.of(), null);
     }
 
@@ -122,6 +139,7 @@ public class CitizenWsClient extends GeminiWsClient {
         this.onSystemConversationEnded = null;
         this.startedInSystemMode = false;
         this.promptSessionContext = PromptSessionContext.empty();
+        this.maxOutputTokens = null;
         Map<UUID, String> interestedParties = player == null
                 ? Map.of()
                 : Map.of(player.getUUID(), player.getName().getString());
@@ -196,6 +214,15 @@ public class CitizenWsClient extends GeminiWsClient {
     // -------------------------------------------------------------------------
     // GeminiWsClient overrides
     // -------------------------------------------------------------------------
+
+    @Override
+    public BidiGenerateContentSetup getSetup() {
+        BidiGenerateContentSetup setup = super.getSetup();
+        if (maxOutputTokens != null) {
+            setup.generationConfig.maxOutputTokens = Integer.toString(maxOutputTokens);
+        }
+        return setup;
+    }
 
     @Override
     protected boolean allowAddonTool(String toolId) {

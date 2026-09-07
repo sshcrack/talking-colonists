@@ -54,6 +54,16 @@ public interface ControlledConversationSession extends AutoCloseable {
             @Nullable ControlledAudioAnchor audioAnchor
     );
 
+    /**
+     * Explicitly delegates floor selection to the bounded core autonomous policy.
+     *
+     * <p>The session must currently have no active turn or automatic delegation. While the returned
+     * handle is running, manual {@link #requestTurn(AbstractEntityCitizen, String)} calls are rejected
+     * so a meetings addon retains exclusive floor control unless it opts into this method. Pausing,
+     * stopping, or reaching a policy limit returns idle floor ownership to the caller.</p>
+     */
+    @NotNull AutonomousDiscussionHandle delegateAutonomousDiscussion(@NotNull AutonomousDiscussionPolicy policy);
+
     /** Immediately cancels current playback/generation and rejects all late work for that turn. */
     boolean interruptTurn();
 

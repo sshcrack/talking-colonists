@@ -30,7 +30,7 @@ Voyager owns expedition state. Core exposes the seams these addons need.
 | 08 | [Verified facts and memory provenance](08-facts-and-memory.md) | 02, 03, 04 | Complete |
 | 09 | [Audio continuity and interruption](09-audio-lifecycle.md) | 05, 06 | Complete |
 | 10 | [Model-specific voice recovery](10-voice-recovery.md) | 01, 05 | Complete |
-| 11 | [Optional autonomous group discussion](11-group-discussion.md) | 06, 07, 09 | Pending |
+| 11 | [Optional autonomous group discussion](11-group-discussion.md) | 06, 07, 09 | Complete |
 | 12 | [Addon migration and release verification](12-addon-migration.md) | 01–11 | Partial |
 
 Land the small reliability fixes first. Deliver the controlled-turn integration
