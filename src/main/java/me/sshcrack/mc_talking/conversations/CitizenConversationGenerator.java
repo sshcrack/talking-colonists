@@ -160,29 +160,32 @@ public class CitizenConversationGenerator {
             Consumer<GeminiTTS.AudioChunk> chunkConsumer
     ) throws ConversationGenerationException {
         StringBuilder citizenInfo = new StringBuilder("-----\n");
-        List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs = new ArrayList<>();
+        List<TtsVoiceRecovery.Speaker> ttsSpeakers = new ArrayList<>();
 
         for (PromptParticipant participant : participants) {
             CitizenPromptView view = participant.view();
             citizenInfo.append(PromptRuntime.generateConversationalInfoPrompt(view)).append("\n-----\n");
-
-            var voiceName = McTalkingConfig.INSTANCE.instance().currentAiModel
-                    .getRandomVoice(participant.citizenId(), view.identity().female());
-            var config = new GeminiTTS.RequestPayload.SpeakerVoiceConfig();
-            config.speaker = view.identity().name();
-            config.voice_config = new GeminiTTS.RequestPayload.VoiceConfig();
-            config.voice_config.prebuilt_voice_config = new GeminiTTS.RequestPayload.PrebuiltVoiceConfig();
-            config.voice_config.prebuilt_voice_config.voice_name = voiceName;
-            speakerVoiceConfigs.add(config);
+            ttsSpeakers.add(new TtsVoiceRecovery.Speaker(
+                    participant.citizenId(),
+                    view.identity().name(),
+                    view.identity().female()));
         }
 
         String conversation = generateConversationScript(participants.size(), citizenInfo);
 
         String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
+        var selectedAi = McTalkingConfig.INSTANCE.instance().currentAiModel;
         try {
             McTalking.LOGGER.info("Sending TTS generation request to Gemini TTS for {} citizens", participants.size());
-            GeminiTTS.streamGenerateAudioConversation(
-                    McTalkingConfig.TTS_MODEL, apiKey, getTTSPrompt(conversation, speakerVoiceConfigs), chunkConsumer);
+            TtsVoiceRecovery.generate(
+                    selectedAi,
+                    McTalkingConfig.TTS_MODEL,
+                    ttsSpeakers,
+                    speakerVoiceConfigs -> GeminiTTS.streamGenerateAudioConversation(
+                            McTalkingConfig.TTS_MODEL,
+                            apiKey,
+                            getTTSPrompt(conversation, speakerVoiceConfigs),
+                            chunkConsumer));
             TtsQuotaManager.reportSuccess();
         } catch (IOException | UnexpectedResponseException e) {
             McTalking.LOGGER.error("Failed to generate conversation audio using Gemini TTS", e);
@@ -193,6 +196,9 @@ public class CitizenConversationGenerator {
             McTalking.LOGGER.error("Conversation audio generation was interrupted", e);
             TtsQuotaManager.reportFailure(e);
             throw new ConversationGenerationException("Conversation audio generation was interrupted", e);
+        } catch (me.sshcrack.mc_talking.manager.VoiceSelectionService.VoiceCandidatesExhaustedException e) {
+            McTalking.LOGGER.error("TTS voice recovery exhausted before generation: {}", e.getMessage());
+            throw new ConversationGenerationException(e.getMessage(), e);
         }
 
         return conversation;

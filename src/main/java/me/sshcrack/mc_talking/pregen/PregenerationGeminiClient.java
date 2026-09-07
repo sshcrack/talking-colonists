@@ -15,6 +15,9 @@ import me.sshcrack.mc_talking.config.QuotaTracker;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
@@ -34,9 +37,13 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
     private final AvailableAI modelAi;
     private volatile String selectedVoiceName;
     private final Consumer<AudioChunk> onComplete;
-    private Runnable onError;
+    private final AtomicReference<Runnable> onError;
     private final ByteArrayOutputStream audioBuffer = new ByteArrayOutputStream();
     private static final int MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50 MB max
+    private static final int MAX_VOICE_RECOVERY_ATTEMPTS = 3;
+    private final AtomicInteger voiceRecoveryAttempts = new AtomicInteger();
+    private final AtomicBoolean voiceRecoveryScheduled = new AtomicBoolean(false);
+    private final AtomicBoolean terminal = new AtomicBoolean(false);
 
     /**
      * Set to {@code true} once {@link #onTurnComplete} fires (successfully or not).
@@ -61,7 +68,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         this.modelAi = model;
         this.modelName = model.getName();
         this.onComplete = onComplete;
-        this.onError = onError;
+        this.onError = new AtomicReference<>(onError);
     }
 
     @Override
@@ -75,7 +82,12 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         var uuid = citizenId;
         setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
-        selectedVoiceName = VoiceSelectionService.select(modelAi, uuid, female);
+        selectedVoiceName = VoiceSelectionService.select(
+                VoiceSelectionService.Backend.LIVE,
+                modelName,
+                modelAi,
+                uuid,
+                female);
         setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = selectedVoiceName;
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
@@ -89,7 +101,12 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public void onOpen(ServerHandshake data) {
-        super.onOpen(data);
+        voiceRecoveryScheduled.set(false);
+        try {
+            super.onOpen(data);
+        } catch (VoiceSelectionService.VoiceCandidatesExhaustedException e) {
+            failTerminalVoiceRecovery(e.getMessage());
+        }
     }
 
     @Override
@@ -115,10 +132,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         try {
             if (audioBuffer.size() + processed.length > MAX_BUFFER_SIZE) {
                 McTalking.LOGGER.error("Pregenerated audio buffer exceeded maximum size, aborting");
-                if (onError != null) {
-                    onError.run();
-                    onError = null;
-                }
+                runOnErrorOnce();
                 close();
                 return;
             }
@@ -136,11 +150,9 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
             onComplete.accept(new AudioChunk(audioData, TARGET_SAMPLE_RATE));
         } else {
             McTalking.LOGGER.warn("Pregeneration completed without producing audio");
-            if (onError != null) {
-                onError.run();
-                onError = null;
-            }
+            runOnErrorOnce();
         }
+        terminal.set(true);
         close();
     }
 
@@ -161,42 +173,96 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public void onQuotaExceeded() {
+        terminal.set(true);
         McTalking.LOGGER.warn("Quota exceeded during audio pregeneration");
         QuotaTracker.reportQuotaExceeded(modelName);
-        if (onError != null) {
-            onError.run();
-            onError = null;
-        }
+        runOnErrorOnce();
         close();
     }
 
     @Override
     public void onError(Exception ex) {
-        McTalking.LOGGER.error("Error during pregeneration", ex);
-        if (onError != null) {
-            onError.run();
-            onError = null;
+        if (voiceRecoveryScheduled.get() && !terminal.get()) {
+            McTalking.LOGGER.debug("Ignoring transient pregeneration websocket error while voice recovery is scheduled", ex);
+            return;
         }
+        terminal.set(true);
+        McTalking.LOGGER.error("Error during pregeneration", ex);
+        runOnErrorOnce();
         close();
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        VoiceSelectionService.noteRejected(modelAi, selectedVoiceName, code, reason);
         try {
             super.onClose(code, reason, remote);
         } catch (Exception e) {
             McTalking.LOGGER.error("Error in PregenerationGeminiClient.onClose", e);
         }
 
+        if (!terminal.get()
+                && VoiceSelectionService.noteLiveRejected(modelAi, selectedVoiceName, code, reason)) {
+            if (voiceRecoveryAttempts.get() >= MAX_VOICE_RECOVERY_ATTEMPTS) {
+                failTerminalVoiceRecovery("Voice recovery exhausted backend=live model=" + modelName
+                        + " voice=" + selectedVoiceName
+                        + " attempts=" + MAX_VOICE_RECOVERY_ATTEMPTS);
+                return;
+            }
+            if (!voiceRecoveryScheduled.compareAndSet(false, true)) return;
+
+            int attempt = voiceRecoveryAttempts.incrementAndGet();
+            audioBuffer.reset();
+            final String rejectedVoice = selectedVoiceName;
+            McTalking.LOGGER.warn(
+                    "Voice recovery backend=live model={} rejected={} attempt={}/{} result=retry-pregeneration",
+                    modelName, rejectedVoice, attempt, MAX_VOICE_RECOVERY_ATTEMPTS);
+
+            Thread retryThread = new Thread(() -> {
+                if (terminal.get()) return;
+                try {
+                    PregenerationGeminiClient.super.reconnect();
+                } catch (RuntimeException e) {
+                    failTerminalVoiceRecovery("Voice recovery reconnect failed backend=live model=" + modelName
+                            + " voice=" + rejectedVoice + " cause=" + e.getClass().getSimpleName());
+                }
+            }, "mc_talking_pregen_voice_recovery");
+            retryThread.setDaemon(true);
+            retryThread.start();
+            return;
+        }
+
         // If the session closed before onTurnComplete fired (e.g. auth failure,
         // server-side error during setup, or an abnormal WebSocket close), clean
         // up the slot and counters so no stale entries are left behind.
-        if (!completed && onError != null) {
+        if (!completed && onError.get() != null) {
+            terminal.set(true);
             McTalking.LOGGER.warn("Pregeneration session closed before completion (code={}, reason={})", code, reason);
-            onError.run();
-            onError = null;
+            runOnErrorOnce();
         }
+    }
+
+    private void runOnErrorOnce() {
+        Runnable callback = onError.getAndSet(null);
+        if (callback != null) callback.run();
+    }
+
+    private void failTerminalVoiceRecovery(String detail) {
+        if (!terminal.compareAndSet(false, true)) return;
+        voiceRecoveryScheduled.set(false);
+        McTalking.LOGGER.error("{} result=terminal", detail);
+        runOnErrorOnce();
+        try {
+            super.close();
+        } catch (RuntimeException e) {
+            McTalking.LOGGER.debug("Error closing terminal pregeneration voice recovery", e);
+        }
+    }
+
+    @Override
+    public void close() {
+        terminal.set(true);
+        voiceRecoveryScheduled.set(false);
+        super.close();
     }
 
     @Override

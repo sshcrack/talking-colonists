@@ -19,6 +19,7 @@ import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
 import me.sshcrack.mc_talking.internal.audio.PlaybackDrainCoordinator;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
@@ -118,6 +119,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected final GeminiStream stream;
     @Nullable
     private volatile String selectedVoiceName;
+    @Nullable
+    private volatile AvailableAI selectedVoiceAi;
+    private volatile boolean selectedVoiceFemale;
     private final AbstractEntityCitizen entity;
     private final OpusDecoder decoder;
     private final List<short[]> pendingPrompt = Collections.synchronizedList(new ArrayList<>());    // Audio batching variables
@@ -490,7 +494,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 setup.generationConfig.speechConfig.voice_config = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.VoiceConfig();
                 setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig = new BidiGenerateContentSetup.GenerationConfig.SpeechConfig.PrebuiltVoiceConfig();
                 var selectedAi = McTalkingConfig.INSTANCE.instance().currentAiModel;
-                selectedVoiceName = VoiceSelectionService.select(selectedAi, uuid, female);
+                selectedVoiceAi = selectedAi;
+                selectedVoiceFemale = female;
+                selectedVoiceName = VoiceSelectionService.select(
+                        VoiceSelectionService.Backend.LIVE,
+                        selectedAi.getName(),
+                        selectedAi,
+                        uuid,
+                        female);
                 setup.generationConfig.speechConfig.voice_config.prebuiltVoiceConfig.voice_name = selectedVoiceName;
             }
         }
@@ -731,7 +742,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onOpen(ServerHandshake data) {
         transitionRecovery("websocket opened", () -> recoveryController.markSettingUp("websocket opened"));
-        super.onOpen(data);
+        try {
+            super.onOpen(data);
+        } catch (VoiceSelectionService.VoiceCandidatesExhaustedException e) {
+            terminateVoiceRecovery(e);
+        }
     }
 
     @Override
@@ -978,10 +993,24 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (QuotaTracker.isQuotaExceeded(getModelName())
                 || recoveryState() == ProviderRecoveryController.State.QUOTA_EXCEEDED) return;
 
-        var selectedAi = McTalkingConfig.INSTANCE.instance().currentAiModel;
-        if (VoiceSelectionService.isExplicitVoiceRejection(code, reason)) {
-            VoiceSelectionService.noteRejected(selectedAi, selectedVoiceName, code, reason);
-            McTalking.LOGGER.warn("{} Retrying setup with a fallback voice after explicit voice rejection", logPrefix);
+        AvailableAI rejectedAi = selectedVoiceAi;
+        if (VoiceSelectionService.isExplicitLiveVoiceRejection(code, reason)
+                && rejectedAi != null
+                && VoiceSelectionService.noteLiveRejected(rejectedAi, selectedVoiceName, code, reason)) {
+            try {
+                String fallback = VoiceSelectionService.select(
+                        VoiceSelectionService.Backend.LIVE,
+                        rejectedAi.getName(),
+                        rejectedAi,
+                        entity.getUUID(),
+                        selectedVoiceFemale);
+                McTalking.LOGGER.warn(
+                        "{} Voice recovery backend=live model={} rejected={} selected={} result=retry",
+                        logPrefix, rejectedAi.getName(), selectedVoiceName, fallback);
+            } catch (VoiceSelectionService.VoiceCandidatesExhaustedException e) {
+                terminateVoiceRecovery(e);
+                return;
+            }
             scheduleRecovery("explicit voice rejection");
             return;
         }
@@ -1032,6 +1061,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         transitionRecovery(detail, () -> recoveryController.terminal(terminalReason, detail));
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         finishProviderTerminal(new RuntimeException(detail));
+    }
+
+    private void terminateVoiceRecovery(VoiceSelectionService.VoiceCandidatesExhaustedException error) {
+        String detail = error.getMessage();
+        McTalking.LOGGER.error("{} {} result=terminal", logPrefix, detail);
+        transitionRecovery(detail, () -> recoveryController.terminal(
+                ProviderRecoveryController.TerminalReason.CONFIGURATION, detail));
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
+        finishProviderTerminal(error);
+        close();
     }
 
     @Override
