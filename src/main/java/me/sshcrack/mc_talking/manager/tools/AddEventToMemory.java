@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager.tools;
 
+import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
@@ -41,7 +42,7 @@ public class AddEventToMemory extends GeneralFunctionAction {
         var event = parameters.get("event").getAsString();
         var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
 
-        memory.addEvent(event);
+        memory.addEvent(event, MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
         obj.addProperty("success", true);
 
         return obj;

@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenFamilyView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenIdentityView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenWellbeingView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenVerifiedFactsView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenWorkView;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
@@ -21,6 +22,7 @@ record CitizenPromptSnapshot(
         @NotNull ColonyPromptView colony,
         @NotNull ConversationPromptView conversation,
         @NotNull CitizenActivityView activity,
+        @NotNull CitizenVerifiedFactsView verifiedFacts,
         @Nullable CitizenMemorySnapshot memories
 ) implements CitizenPromptView {
 }

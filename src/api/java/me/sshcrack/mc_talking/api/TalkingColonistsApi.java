@@ -13,6 +13,8 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
+import me.sshcrack.mc_talking.api.memory.AddonConfirmedOutcome;
+import me.sshcrack.mc_talking.api.memory.AddonMemoryWriteResult;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.api.pregen.PregenerationPromptModifier;
@@ -224,6 +226,11 @@ public final class TalkingColonistsApi {
                 @NotNull UUID targetId,
                 @NotNull CitizenRelationshipDimension dimension,
                 float delta
+        );
+
+        @NotNull AddonMemoryWriteResult confirmMemoryOutcome(
+                @NotNull ICitizenData citizen,
+                @NotNull AddonConfirmedOutcome outcome
         );
 
         @NotNull Optional<CitizenMemorySnapshot> memorySnapshot(@NotNull ICitizenData citizen);

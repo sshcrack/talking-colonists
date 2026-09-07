@@ -18,6 +18,8 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
+import me.sshcrack.mc_talking.api.memory.AddonConfirmedOutcome;
+import me.sshcrack.mc_talking.api.memory.AddonMemoryWriteResult;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.api.pregen.PregenerationPromptModifier;
@@ -354,6 +356,16 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
         if (memories == null) return false;
         memories.addRelationshipChange(targetId, dimension, delta);
         return true;
+    }
+
+    @Override
+    public @NotNull AddonMemoryWriteResult confirmMemoryOutcome(
+            @NotNull ICitizenData citizen,
+            @NotNull AddonConfirmedOutcome outcome
+    ) {
+        java.util.Objects.requireNonNull(outcome, "outcome");
+        CitizenMemories memories = getOrCreate(citizen);
+        return memories == null ? AddonMemoryWriteResult.UNAVAILABLE : memories.addConfirmedOutcome(outcome);
     }
 
     @Override

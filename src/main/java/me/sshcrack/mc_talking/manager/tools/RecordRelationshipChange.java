@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager.tools;
 
+import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.ICivilianData;
 import com.minecolonies.api.colony.IColony;
@@ -83,7 +84,8 @@ public class RecordRelationshipChange extends GeneralFunctionAction {
         var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
 
         McTalking.LOGGER.info("Recording relationship change for citizen {}: target={}, type={}, change={}", citizen.getName(), targetUUID, type, change);
-        memory.addRelationshipChange(targetUUID, type, change);
+        memory.addRelationshipChange(targetUUID, type, change,
+                MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
         obj.addProperty("success", true);
         return obj;
     }

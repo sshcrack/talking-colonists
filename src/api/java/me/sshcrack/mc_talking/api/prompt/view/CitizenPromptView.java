@@ -27,5 +27,8 @@ public interface CitizenPromptView {
 
     @NotNull CitizenActivityView activity();
 
+    /** Current authoritative observations. Prefer these over contradictory recollections. */
+    @NotNull CitizenVerifiedFactsView verifiedFacts();
+
     @Nullable CitizenMemorySnapshot memories();
 }

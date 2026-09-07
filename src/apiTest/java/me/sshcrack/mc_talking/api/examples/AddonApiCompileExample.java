@@ -9,8 +9,12 @@ import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
+import me.sshcrack.mc_talking.api.memory.AddonConfirmedOutcome;
+import me.sshcrack.mc_talking.api.memory.AddonMemoryWriteResult;
 import me.sshcrack.mc_talking.api.memory.CitizenMemoryService;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
+import me.sshcrack.mc_talking.api.memory.ConfirmedRelationshipChange;
+import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.pregen.PregenerationKind;
 import me.sshcrack.mc_talking.api.pregen.PregenerationPromptService;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptService;
@@ -173,10 +177,27 @@ final class AddonApiCompileExample {
         return result.started();
     }
 
-    static void confirmedOutcome(AbstractEntityCitizen citizen, ServerPlayer player) {
-        CitizenMemoryService.addEvent(citizen, "I completed the delivery I promised to make.");
-        CitizenMemoryService.addRelationshipChange(
-                citizen, player.getUUID(), CitizenRelationshipDimension.TRUST, 0.1f);
+    static AddonMemoryWriteResult confirmedOutcome(
+            AbstractEntityCitizen citizen,
+            ServerPlayer player,
+            String deliveryId
+    ) {
+        return CitizenMemoryService.confirmOutcome(citizen, new AddonConfirmedOutcome(
+                "example_addon:deliveries",
+                deliveryId,
+                "The tracked delivery was completed.",
+                player.getUUID(),
+                List.of("The tracked delivery is fulfilled."),
+                List.of(new ConfirmedRelationshipChange(
+                        player.getUUID(), CitizenRelationshipDimension.TRUST, 0.1f))
+        ));
+    }
+
+    static Optional<Double> currentHealth(AbstractEntityCitizen citizen) {
+        var health = CitizenContextService.snapshot(citizen).verifiedFacts().healthPercent();
+        return health.state() == ObservationState.CURRENT
+                ? Optional.of(health.value())
+                : Optional.empty();
     }
 
     static void speakThenContinue(AbstractEntityCitizen citizen) {

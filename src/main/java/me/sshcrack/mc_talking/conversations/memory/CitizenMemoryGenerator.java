@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory;
 
+import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
@@ -129,14 +130,19 @@ public class CitizenMemoryGenerator extends Thread {
             var data = (CitizenDataMemoryExtended) citizen.getCitizenData();
             var memory = data.mc_talking$getOrInitializeMemory();
             var gsonMemory = gsonCitizens.memories;
-            for (String fact : gsonMemory.facts) memory.addFact(fact);
-            for (String event : gsonMemory.events) memory.addEvent(event);
+            for (String fact : gsonMemory.facts) {
+                memory.addFact(fact, MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
+            }
+            for (String event : gsonMemory.events) {
+                memory.addEvent(event, MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
+            }
             for (GsonMemoryResponse.GsonRelationshipMemory relationship : gsonMemory.relationships) {
                 var target = participants.stream()
                         .filter(c -> c.getName().getString().equals(relationship.target))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("validated relationship target disappeared: " + relationship.target));
-                memory.addRelationshipChange(target.getUUID(), relationship.type, relationship.change);
+                memory.addRelationshipChange(target.getUUID(), relationship.type, relationship.change,
+                        MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
             }
         }
     }

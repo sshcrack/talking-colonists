@@ -94,7 +94,8 @@ The groups are:
 - `colony()` — colony identity, world/raid context, history, diplomacy and recent events.
 - `conversation()` — response language and optional authenticated speaking-player context.
 - `activity()` — stable semantic category, typed compatibility states/sub-state, normalized description and recent actions.
-- `memories()` — immutable Talking Colonists memory snapshot when present.
+- `verifiedFacts()` — point-in-time health, citizen inventory/equipment, housing, request state and builder activity with explicit freshness/availability.
+- `memories()` — immutable provenance-aware Talking Colonists memory snapshot when present.
 
 Talking Colonists owns semantic categories such as `WORKING`, `EATING` and `MOURNING`. Exact state
 concepts needed by addons are exposed through Talking Colonists-owned compatibility enums
@@ -103,6 +104,34 @@ switches and typo safety without linking their API contract to MineColonies enum
 MineColonies values map to `UNKNOWN` at runtime; Talking Colonists' compatibility tests deliberately fail
 when a newly selected MineColonies version contains an unmapped known value, so only Talking Colonists
 needs updating. `CitizenStatusType`, `HappinessModifierType`, and `CitizenSkill` follow the same pattern.
+
+### Verified fact freshness
+
+`verifiedFacts()` separates values from observation state. `CURRENT` with a zero/empty value is a real
+observation; `UNLOADED` means the authoritative entity/chunk needed for that field is not loaded;
+`UNAVAILABLE` means no usable backing value was exposed; `STALE` is reserved for retained observations
+that are no longer current. Do not turn an unavailable observation into `0`, `false`, "empty", or an
+opposite state.
+
+```java
+var facts = snapshot.verifiedFacts();
+if (facts.healthPercent().state() == ObservationState.CURRENT) {
+    double hp = facts.healthPercent().value();
+}
+
+switch (facts.housingStatus()) {
+    case HOUSED -> { /* assigned residence */ }
+    case GUARD_QUARTERS -> { /* guard workplace is quarters */ }
+    case HOMELESS -> { /* verified no home assignment */ }
+    case UNKNOWN -> { /* do not infer either way */ }
+}
+```
+
+A `CitizenPromptView` is a point-in-time server-thread snapshot, not a live subscription. The core
+prompt path deliberately avoids colony-wide warehouse scans. When gameplay is about to act on a
+possibly changed fact, take a fresh `CitizenContextService.snapshot(...)` or use a current query/tool
+rather than relying on a prompt or recollection assembled earlier in the conversation. Exact colony
+stock counts belong in an explicit server-thread query where that cost is intentional.
 
 ## Prompt extensions
 
@@ -439,29 +468,74 @@ lifecycle result instead of attempting provider recovery themselves.
 
 ## Memories
 
-Citizen memory is accessed through `CitizenMemoryService`:
+Citizen memory exposes provenance as well as compatibility `facts()` / `events()` lists. Persistent
+entries identify participants by UUID; names may appear in human-readable prose but are not the
+attribution key. `MemoryProvenance` distinguishes observed gameplay events, explicit player statements,
+citizen statements, addon-confirmed outcomes, and migrated legacy data. Citizen-only speech is never
+proof that a player spoke, promised, agreed, or completed an action.
+
+For an addon-owned gameplay outcome, use `confirmOutcome`. The `(source, idempotencyId)` pair is a
+durable idempotency key: retrying it does not duplicate event/fact memories and does not reapply any
+relationship delta, including after save/reload or if the displayed memory text is later removed.
+
+### Colonist Errands-style promise fulfillment
+
+The addon should confirm the **fulfilled gameplay outcome**, not ask the citizen model to infer a player
+promise from speech:
 
 ```java
-CitizenMemoryService.addEvent(citizen, "I returned from the End expedition safely.");
-CitizenMemoryService.addFact(citizen, "My expedition partner is Marta.");
-CitizenMemoryService.addRelationshipChange(
-        citizen,
+String fulfillmentId = "promise:" + promise.id() + ":fulfilled";
+var result = CitizenMemoryService.confirmOutcome(citizen, new AddonConfirmedOutcome(
+        "colonist_errands:promises",
+        fulfillmentId,
+        "The bread delivery I was waiting for was completed.",
         player.getUUID(),
-        CitizenRelationshipDimension.TRUST,
-        0.2f);
+        List.of("The tracked bread promise is fulfilled."),
+        List.of(new ConfirmedRelationshipChange(
+                player.getUUID(),
+                CitizenRelationshipDimension.TRUST,
+                0.2f))
+));
 
-var snapshot = CitizenMemoryService.snapshot(citizen);
-for (CitizenRelationshipView relationship : snapshot.orElseThrow().relationships()) {
-    // targetId(), dimension(), factor()
+if (result == AddonMemoryWriteResult.DUPLICATE) {
+    // Safe retry: no second memory and no second +0.2 trust change.
 }
-
-CitizenMemoryService.removeFact(citizen, "My expedition partner is Marta.");
 ```
 
-Relationship dimensions are Talking Colonists-owned semantic values shared by core and addons.
-Relationship deltas use finite `[-1, 1]` validation. Exact fact/event removal supports correction of
-addon-owned state. Memory storage, compaction, session tokens, broadcast/rumor propagation and save
-coordination are core responsibilities.
+Promise rules, rewards, due dates and whether a delivery actually satisfies a promise remain Errands
+policy. Talking Colonists stores the confirmed outcome and provenance; it does not own promise gameplay.
+
+### Voyager-style expedition facts
+
+An expedition addon can persist the return event and compact facts in the same idempotent transaction:
+
+```java
+CitizenMemoryService.confirmOutcome(voyager, new AddonConfirmedOutcome(
+        "colonist_errands:voyager",
+        expedition.id() + ":returned",
+        "I returned safely from the End expedition.",
+        voyager.getUUID(),
+        List.of(
+                "My last expedition destination was the End.",
+                "The expedition brought back two chorus flowers."),
+        List.of()
+));
+```
+
+Read provenance through `snapshot.entries()` and relationship contribution provenance through
+`snapshot.relationshipChanges()`:
+
+```java
+var memory = CitizenMemoryService.snapshot(citizen).orElseThrow();
+for (CitizenMemoryEntryView entry : memory.entries()) {
+    // type(), provenance(), participantId(), source(), idempotencyId(), content()
+}
+```
+
+The older direct `addEvent`, `addFact`, and `addRelationshipChange` operations remain low-level memory
+writes and do not establish addon-confirmed provenance. Use `confirmOutcome` whenever the addon is
+asserting that a concrete gameplay outcome happened. Memory storage, compaction, session tokens,
+broadcast/rumor propagation and save coordination remain core responsibilities.
 
 ## Autonomous citizen conversations
 

@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory;
 
+import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
@@ -34,9 +35,12 @@ public class PlayerConversationMemoryGenerator extends Thread {
             Return ONLY valid JSON.
 
             Rules:
-            - Write facts and events in first person from the citizen's perspective
-            - Only include meaningful information (ignore small talk)
-            - Relationship changes should reflect how the citizen's feelings toward the player changed, as a float between -1.0 and 1.0
+            - This transcript contains ONLY the citizen's captured speech. It contains no captured player words.
+            - NEVER infer or record that the player said, promised, agreed to, offered, admitted, or committed to anything.
+            - A citizen saying "you promised me X" is only the citizen's claim and cannot establish a player promise.
+            - Write facts/events only about what the citizen themself said, felt, noticed, or discussed.
+            - Only include meaningful information (ignore small talk).
+            - Relationship changes may reflect the citizen's own feelings toward the player, as a float between -1.0 and 1.0.
             - Allowed relationship types: %s
 
             Format:
@@ -49,7 +53,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
                       {"target": "%s", "type": "trust", "change": 0.1}
                     ],
                     "facts": [
-                      "Player %s is a good leader who cares about the colony's well-being."
+                      "I told %s that I care about the colony's well-being."
                     ],
                     "events": [
                       "Had a conversation with %s about colony supplies"
@@ -152,14 +156,15 @@ public class PlayerConversationMemoryGenerator extends Thread {
             var memory = data.mc_talking$getOrInitializeMemory();
 
             for (String fact : gsonCitizen.memories.facts) {
-                memory.addFact(fact);
+                memory.addFact(fact, MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
             }
             for (String event : gsonCitizen.memories.events) {
-                memory.addEvent(event);
+                memory.addEvent(event, MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
             }
             for (var rel : gsonCitizen.memories.relationships) {
                 if (rel.target.equals(playerName) && rel.type != null) {
-                    memory.addRelationshipChange(playerUuid, rel.type, rel.change);
+                    memory.addRelationshipChange(playerUuid, rel.type, rel.change,
+                            MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
                 }
             }
         }

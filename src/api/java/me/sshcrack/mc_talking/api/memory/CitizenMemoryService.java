@@ -74,6 +74,26 @@ public final class CitizenMemoryService {
                 citizen, targetId, dimension, delta);
     }
 
+    /**
+     * Persists an authoritative addon outcome exactly once. Retries with the same source/idempotency
+     * pair return {@link AddonMemoryWriteResult#DUPLICATE} and do not reapply relationship deltas.
+     */
+    public static @NotNull AddonMemoryWriteResult confirmOutcome(
+            @NotNull ICitizenData citizen,
+            @NotNull AddonConfirmedOutcome outcome
+    ) {
+        return TalkingColonistsApi.services().confirmMemoryOutcome(citizen, outcome);
+    }
+
+    public static @NotNull AddonMemoryWriteResult confirmOutcome(
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull AddonConfirmedOutcome outcome
+    ) {
+        return citizen.getCitizenData() == null
+                ? AddonMemoryWriteResult.UNAVAILABLE
+                : confirmOutcome(citizen.getCitizenData(), outcome);
+    }
+
     public static @NotNull Optional<CitizenMemorySnapshot> snapshot(@NotNull AbstractEntityCitizen citizen) {
         return citizen.getCitizenData() == null
                 ? Optional.empty()

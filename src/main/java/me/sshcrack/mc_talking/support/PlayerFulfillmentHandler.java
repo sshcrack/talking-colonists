@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.level.ServerPlayer;
@@ -61,9 +62,15 @@ public class PlayerFulfillmentHandler {
         var mem = ((CitizenDataMemoryExtended) foundCitizen).mc_talking$getOrInitializeMemory();
         String fulfillmentPrefix = CitizenMemories.SYSTEM_EVENT_PREFIX + " The player ";
         mem.removeEventsIf(e -> e.startsWith(fulfillmentPrefix));
-        mem.addEvent(String.format(
-                CitizenMemories.SYSTEM_EVENT_PREFIX + " The player %s brought me the %s I needed. I'm grateful.",
-                playerName, itemName));
+        mem.addEvent(
+                String.format(
+                        CitizenMemories.SYSTEM_EVENT_PREFIX + " The player %s brought me the %s I needed. I'm grateful.",
+                        playerName, itemName),
+                MemoryProvenance.OBSERVED_EVENT,
+                player.getUUID(),
+                "mc_talking:request_fulfillment",
+                request.getId().toString()
+        );
 
         McTalking.LOGGER.info("[Fulfillment] Citizen {} remembers fulfillment by {} of {}",
                 foundCitizen.getName(), playerName, itemName);

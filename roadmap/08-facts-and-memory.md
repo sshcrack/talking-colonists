@@ -35,13 +35,38 @@ core. Preserve existing per-player relationship data and migrate older saves saf
 - Old memory data loads without loss; new provenance survives a save/reload cycle.
 - Document extension examples for Errands outcomes and Voyager expedition facts.
 
-## Implementation record — 2026-09-06 (addon API pass, partial)
+## Implementation record — 2026-09-07
 
-- Added `CitizenMemoryService`/`CitizenMemorySnapshot` so addons can append simple
-  facts/events and inspect memory without casting MineColonies citizen data to the
-  Talking Colonists duck interface. Prompt contributions provide a supported place
-  for addon-verified current observations such as Errands/Voyager state.
-- This does **not** complete task 08. The MineColonies truth-gap audit/base fact
-  expansion, explicit observation-vs-unknown freshness semantics, provenance data,
-  stable participant attribution, idempotent addon-confirmed events, relationship
-  change provenance, save migration, and save/reload fixtures remain.
+Status: **Complete**.
+
+- Audited the core prompt/memory paths and current Colonist Errands truth workarounds in
+  `docs/facts-and-memory-audit.md`, including the misleading baseline cases and the
+  expensive prompt-time warehouse scan.
+- Added `CitizenPromptView.verifiedFacts()` with explicit `CURRENT`, `STALE`, `UNLOADED`,
+  and `UNAVAILABLE` observation semantics for health, equipment/inventory, housing,
+  request lifecycle, and builder activity. Prompt construction now uses bounded
+  citizen/work-building data and no longer scans all colony warehouses.
+- Current verified facts are rendered ahead of provenance-labelled recollections with
+  an explicit precedence rule. `get_current_situation` rebuilds the snapshot before
+  answering instead of treating an older prompt snapshot as live state.
+- Added provenance-aware persistent memory entries and relationship contributions with
+  stable participant UUIDs. Citizen-only transcript extraction is always
+  `CITIZEN_STATEMENT` and is explicitly forbidden from establishing player speech or
+  promises. Observed fulfillment is labelled `OBSERVED_EVENT`.
+- Added `CitizenMemoryService.confirmOutcome(...)` for source-labelled, durable,
+  idempotent addon-confirmed events/facts and relationship effects. The idempotency
+  journal survives save/reload and remains effective even if display memory text is
+  later removed. Promise policy/rewards remain addon-owned.
+- Legacy facts/events/relationship aggregates migrate losslessly as
+  `LEGACY_UNATTRIBUTED`; new provenance and relationship contribution metadata survive
+  reload. Addon documentation includes Errands promise-fulfillment and Voyager
+  expedition examples.
+- Regression fixtures cover healthy/equipped, homeless-vs-unknown, sleeping-vs-material
+  waiting builders, empty-vs-unavailable inventory, current-fact precedence wording,
+  citizen promise claims, duplicate addon outcomes, and old/new save round trips.
+
+Validation:
+
+- `GRADLE_USER_HOME=/cache/gradle ./gradlew test --no-daemon --max-workers 1`
+- `GRADLE_USER_HOME=/cache/gradle ./gradlew buildAndCollect --no-daemon --max-workers 1`
+- `CLIENT_SMOKE_METADATA_ONLY_ASSETS=1 bash scripts/test-client-smoke.sh` (required staged Forge 1.20.1 and NeoForge 1.21.1 real-client smoke; sandbox asset CDN fallback)

@@ -25,7 +25,9 @@ public final class MemorySnapshotFactory {
         return new CitizenMemorySnapshot(
                 memories.getFacts(),
                 memories.getEvents(),
+                memories.getEntries(),
                 relationships,
+                memories.getRelationshipChanges(),
                 broadcasts,
                 rumors,
                 memories.getSummarizedMemory()

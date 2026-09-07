@@ -6,6 +6,8 @@ import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenSkill;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
+import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.MiscUtil;
@@ -49,16 +51,18 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append(", sick");
         }
 
-        if (view.wellbeing().homeless()) {
+        if (view.verifiedFacts().housingStatus() == CitizenHousingStatus.HOMELESS) {
             prompt.append(", homeless");
         }
 
         prompt.append(".\n");
         prompt.append("Colony: **").append(view.colony().name()).append("**");
-        if (view.work().home() != null && !view.wellbeing().homeless()) {
+        if (view.work().home() != null
+                && view.verifiedFacts().housingStatus() == CitizenHousingStatus.HOUSED) {
             prompt.append(" | Home: ").append(view.work().home().displayName())
                     .append(" (level ").append(view.work().home().level()).append(")");
-        } else if (view.identity().guard() && view.work().workplace() != null) {
+        } else if (view.verifiedFacts().housingStatus() == CitizenHousingStatus.GUARD_QUARTERS
+                && view.work().workplace() != null) {
             prompt.append(" | Home: ").append(view.work().workplace().displayName())
                     .append(" (level ").append(view.work().workplace().level())
                     .append(") — your guard post serves as your living quarters");
@@ -136,13 +140,23 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append(" Summarized Memory:\n ")
                     .append(memories.summarizedMemory()).append("\n\n");
         }
-        if (!memories.events().isEmpty()) {
-            prompt.append(" Recent Events:\n");
-            memories.events().forEach(event -> prompt.append("- ").append(event).append("\n"));
-        }
-        if (!memories.facts().isEmpty()) {
-            prompt.append(" Recent Facts:\n");
-            memories.facts().forEach(fact -> prompt.append("- ").append(fact).append("\n"));
+        if (!memories.entries().isEmpty()) {
+            prompt.append(" Recollections (provenance-labelled; current verified facts above take precedence):\n");
+            memories.entries().forEach(entry -> {
+                prompt.append("- [").append(entry.provenance());
+                if (entry.participantId() != null) prompt.append(" participant=").append(entry.participantId());
+                if (entry.source() != null) prompt.append(" source=").append(entry.source());
+                prompt.append("] ").append(entry.content()).append("\n");
+            });
+        } else {
+            if (!memories.events().isEmpty()) {
+                prompt.append(" Legacy Events:\n");
+                memories.events().forEach(event -> prompt.append("- ").append(event).append("\n"));
+            }
+            if (!memories.facts().isEmpty()) {
+                prompt.append(" Legacy Facts:\n");
+                memories.facts().forEach(fact -> prompt.append("- ").append(fact).append("\n"));
+            }
         }
 
         var parties = view.conversation().interestedParties();
@@ -189,6 +203,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     private void addObservations(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder obs = new StringBuilder();
+        obs.append(VerifiedFactPromptRenderer.render(view.verifiedFacts()));
 
         if (view.conversation().playerState() != null) {
             obs.append("- The player you are speaking to appears ").append(view.conversation().playerState()).append("\n");
@@ -204,33 +219,12 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("- Recently noted: ").append(view.colony().milestone()).append(" This may come up in conversation.\n");
         }
 
-        if (!view.work().blockedItemRequests().isEmpty()) {
-            obs.append("- IMPORTANT: You are currently blocked and cannot work because these items are missing from the colony — no warehouse stock and no deliverer has been assigned:\n");
-            for (String req : view.work().blockedItemRequests()) {
-                obs.append("  - ").append(req).append("\n");
-            }
-            obs.append("- Urgently mention this if the player asks how you are doing or why you are not working.\n");
-        }
-
-        if (!view.work().fulfillableItemRequests().isEmpty()) {
-            obs.append("- Some items are in the warehouse or already being delivered to you:\n");
-            for (String req : view.work().fulfillableItemRequests()) {
-                obs.append("  - ").append(req).append("\n");
-            }
-            obs.append("- The supply system is handling these; no need to raise an alarm, but you can mention it casually if asked.\n");
-        }
-
         if (!view.work().activeQuests().isEmpty()) {
             obs.append("- You are currently involved in the following quests:\n");
-            for (String q : view.work().activeQuests()) {
-                obs.append("  - ").append(q).append("\n");
-            }
-            obs.append("- Since you have ongoing quests, you can naturally mention them if the topic comes up.\n");
+            for (String q : view.work().activeQuests()) obs.append("  - ").append(q).append("\n");
         }
 
-        if (!obs.isEmpty()) {
-            prompt.append("\n## OBSERVATIONS\n").append(obs);
-        }
+        prompt.append("\n## OBSERVATIONS\n").append(obs);
     }
 
     private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick) {
@@ -263,15 +257,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
-        if (view.wellbeing().healthPercent() != null) {
-            double healthPercent = view.wellbeing().healthPercent();
+        if (view.verifiedFacts().healthPercent().state() == ObservationState.CURRENT) {
+            double healthPercent = view.verifiedFacts().healthPercent().value();
             if (healthPercent < 20) {
                 prompt.append("- Severely injured, in intense pain\n");
             } else if (healthPercent < 50) {
                 prompt.append("- Injured and in pain\n");
             } else if (healthPercent < 75) {
                 prompt.append("- Slightly hurt\n");
-            } else if (healthPercent == 100) {
+            } else if (healthPercent >= 99.999) {
                 prompt.append("- In perfect health\n");
             }
         }
@@ -280,7 +274,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Sick and feeling terrible. Needs medical attention\n");
         }
 
-        if (view.wellbeing().homeless()) {
+        if (view.verifiedFacts().housingStatus() == CitizenHousingStatus.HOMELESS) {
             prompt.append("- Very concerned about not having a home\n");
         }
 

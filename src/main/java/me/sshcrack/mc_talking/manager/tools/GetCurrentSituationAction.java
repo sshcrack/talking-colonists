@@ -38,26 +38,35 @@ public class GetCurrentSituationAction extends GeneralFunctionAction {
         String activity = view.activity().description();
         if (activity != null) result.addProperty("current_activity", activity);
 
-        String workStatus;
-        if (!view.work().blockedItemRequests().isEmpty()) {
-            workStatus = "STUCK";
-        } else if (view.activity().category() == CitizenActivityCategory.WORKING) {
-            workStatus = "WORKING";
-        } else {
-            workStatus = "IDLE";
-        }
-        result.addProperty("work_status", workStatus);
+        result.addProperty("work_status", data.getJobStatus().name());
 
-        if (!view.work().blockedItemRequests().isEmpty()) {
-            result.add("blocked_item_requests", toJsonArray(view.work().blockedItemRequests()));
-        }
-        if (!view.work().fulfillableItemRequests().isEmpty()) {
-            result.add("fulfillable_item_requests", toJsonArray(view.work().fulfillableItemRequests()));
+        var verified = view.verifiedFacts();
+        result.addProperty("fact_snapshot_game_time", verified.capturedAtGameTime());
+        result.addProperty("housing_status", verified.housingStatus().name());
+        result.addProperty("builder_activity", verified.builderActivity().name());
+
+        result.addProperty("request_observation_state", verified.requests().state().name());
+        if (verified.requests().value() != null) {
+            if (!verified.requests().value().waitingForResolver().isEmpty()) {
+                result.add("requests_waiting_for_resolver",
+                        toJsonArray(verified.requests().value().waitingForResolver()));
+            }
+            if (!verified.requests().value().assignedOrInProgress().isEmpty()) {
+                result.add("requests_assigned_or_in_progress",
+                        toJsonArray(verified.requests().value().assignedOrInProgress()));
+            }
         }
 
         result.addProperty("saturation_level_0_to_20", view.wellbeing().saturation());
-        if (view.wellbeing().healthPercent() != null) {
-            result.addProperty("health_percent", view.wellbeing().healthPercent());
+        result.addProperty("health_observation_state", verified.healthPercent().state().name());
+        if (verified.healthPercent().value() != null) {
+            result.addProperty("health_percent", verified.healthPercent().value());
+        }
+
+        result.addProperty("equipment_observation_state", verified.equipment().state().name());
+        if (verified.equipment().value() != null) {
+            result.add("worn_armor", toJsonArray(verified.equipment().value().wornArmor()));
+            result.add("carried_items", toJsonArray(verified.equipment().value().carriedItems()));
         }
 
         if (view.work().jobName() != null) result.addProperty("job_name", view.work().jobName());

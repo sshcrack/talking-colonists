@@ -1,9 +1,11 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.minecolonies.api.colony.ColonyState;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
+import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
 import com.minecolonies.api.colony.connections.ColonyConnection;
@@ -31,6 +33,13 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenFamilyView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenIdentityView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenWellbeingView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenWorkView;
+import me.sshcrack.mc_talking.api.prompt.view.BuilderActivityStatus;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenEquipmentView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenRequestAvailabilityView;
+import me.sshcrack.mc_talking.api.prompt.view.CitizenVerifiedFactsView;
+import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
+import me.sshcrack.mc_talking.api.prompt.view.ObservedValue;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPersonalityView;
@@ -68,11 +77,8 @@ import java.util.Objects;
 import java.util.TreeMap;
 import java.util.UUID;
 
-
-
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.util.MumblingTopicHelper;
 import net.minecraft.core.BlockPos;
 
 /**
@@ -90,10 +96,18 @@ public final class CitizenPromptViewFactory {
         static final CategorizedRequests EMPTY = new CategorizedRequests(null, null);
     }
 
+    private record RequestSnapshot(
+            @NotNull ObservedValue<CitizenRequestAvailabilityView> observation,
+            @NotNull CategorizedRequests categorized
+    ) {
+    }
+
     public static CitizenPromptView create(ICitizenData data, @NotNull Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
         String jobName = extractJobName(data);
+        long snapshotGameTime = data.getColony().getWorld() == null ? -1L : data.getColony().getWorld().getGameTime();
         List<String> parents = extractParents(data);
-        Double healthPercent = extractHealthPercent(data);
+        ObservedValue<Double> observedHealth = extractObservedHealth(data, snapshotGameTime);
+        Double healthPercent = observedHealth.value();
         double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
         List<HappinessModifierView> modifiers = extractHappinessModifiers(data);
         boolean hasSchool = data.getColony().getServerBuildingManager().hasBuilding(
@@ -126,7 +140,8 @@ public final class CitizenPromptViewFactory {
         String playerState = extractPlayerState(speakingTo);
         var envInfo = extractEnvironmentInfo(data);
         String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
-        CategorizedRequests categorizedRequests = extractCategorizedItemRequests(data, workBuilding);
+        RequestSnapshot requestSnapshot = extractRequestSnapshot(data, workBuilding, snapshotGameTime);
+        CategorizedRequests categorizedRequests = requestSnapshot.categorized();
         List<String> activeQuests = extractActiveQuests(data);
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
         List<String> colonyConnections = extractColonyConnections(data);
@@ -143,6 +158,17 @@ public final class CitizenPromptViewFactory {
         int colonyAgeDays = data.getColony().getDay();
         ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, activityParts.category());
         List<String> recentActions = extractRecentActions(data);
+        CitizenHousingStatus housingStatus = extractHousingStatus(data, isGuard);
+        ObservedValue<CitizenEquipmentView> equipment = extractEquipment(data, snapshotGameTime);
+        BuilderActivityStatus builderActivity = extractBuilderActivity(data, workState, requestSnapshot.observation());
+        CitizenVerifiedFactsView verifiedFacts = new CitizenVerifiedFactsView(
+                snapshotGameTime,
+                observedHealth,
+                equipment,
+                housingStatus,
+                requestSnapshot.observation(),
+                builderActivity
+        );
 
         CitizenStatusView statusView = createStatusView(data.getStatus(), data);
         CitizenActivityView activity = new CitizenActivityView(
@@ -170,7 +196,7 @@ public final class CitizenPromptViewFactory {
                 new CitizenFamilyView(parents, data.getPartner() != null, childrenNames, siblingNames),
                 new CitizenWellbeingView(
                         data.getCitizenDiseaseHandler().isSick(),
-                        data.getHomeBuilding() == null && !isGuard,
+                        housingStatus == CitizenHousingStatus.HOMELESS,
                         data.getSaturation(),
                         healthPercent,
                         happiness,
@@ -209,6 +235,7 @@ public final class CitizenPromptViewFactory {
                         interestedParties
                 ),
                 activity,
+                verifiedFacts,
                 memorySnapshot
         );
     }
@@ -421,14 +448,61 @@ public final class CitizenPromptViewFactory {
         return parents;
     }
 
-    @Nullable
-    private static Double extractHealthPercent(ICitizenData data) {
+    private static ObservedValue<Double> extractObservedHealth(ICitizenData data, long gameTime) {
         var entityOpt = data.getEntity();
         if (entityOpt.isEmpty()) {
-            return null;
+            return ObservedValue.unavailable(ObservationState.UNLOADED, gameTime);
         }
         var entity = entityOpt.get();
-        return (entity.getHealth() / Math.max(1.0, entity.getMaxHealth())) * 100.0;
+        return ObservedValue.current(
+                (entity.getHealth() / Math.max(1.0, entity.getMaxHealth())) * 100.0,
+                gameTime
+        );
+    }
+
+    private static CitizenHousingStatus extractHousingStatus(ICitizenData data, boolean guard) {
+        IBuilding home = data.getHomeBuilding();
+        if (home != null) return CitizenHousingStatus.HOUSED;
+        if (guard && data.getWorkBuilding() != null) return CitizenHousingStatus.GUARD_QUARTERS;
+        if (data.getColony().getState() == ColonyState.UNLOADED) return CitizenHousingStatus.UNKNOWN;
+        return CitizenHousingStatus.HOMELESS;
+    }
+
+    private static ObservedValue<CitizenEquipmentView> extractEquipment(ICitizenData data, long gameTime) {
+        if (!(data instanceof com.minecolonies.core.colony.CitizenData concrete)) {
+            return ObservedValue.unavailable(ObservationState.UNAVAILABLE, gameTime);
+        }
+        var inventory = concrete.getInventory();
+        if (inventory == null) {
+            return ObservedValue.unavailable(ObservationState.UNAVAILABLE, gameTime);
+        }
+        List<String> armor = new ArrayList<>();
+        for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
+            ItemStack stack = inventory.getArmorInSlot(slot);
+            if (stack != null && !stack.isEmpty()) armor.add(formatStack(stack));
+        }
+        List<String> carried = new ArrayList<>();
+        int limit = Math.min(inventory.getSlots(), 36);
+        for (int i = 0; i < limit; i++) {
+            ItemStack stack = inventory.getStackInSlot(i);
+            if (stack != null && !stack.isEmpty()) carried.add(formatStack(stack));
+        }
+        return ObservedValue.current(new CitizenEquipmentView(armor, carried), gameTime);
+    }
+
+    private static String formatStack(ItemStack stack) {
+        return stack.getCount() + "x " + stack.getDisplayName().getString();
+    }
+
+    private static BuilderActivityStatus extractBuilderActivity(
+            ICitizenData data,
+            @Nullable AIWorkerState workState,
+            ObservedValue<CitizenRequestAvailabilityView> requests
+    ) {
+        boolean builder = data.getJob() != null
+                && data.getJob().getJobRegistryEntry() == ModJobs.builder.get();
+        return BuilderActivityClassifier.classify(
+                builder, data.isAsleep(), data.getJobStatus(), workState, requests);
     }
 
     private static List<HappinessModifierView> extractHappinessModifiers(ICitizenData data) {
@@ -561,32 +635,32 @@ public final class CitizenPromptViewFactory {
         return new EnvironmentInfo(description, peaceful);
     }
 
-    private static CategorizedRequests extractCategorizedItemRequests(ICitizenData data, @Nullable IBuilding workBuilding) {
+    private static RequestSnapshot extractRequestSnapshot(
+            ICitizenData data,
+            @Nullable IBuilding workBuilding,
+            long gameTime
+    ) {
         if (workBuilding == null) {
-            return CategorizedRequests.EMPTY;
+            var value = new CitizenRequestAvailabilityView(List.of(), List.of());
+            return new RequestSnapshot(ObservedValue.current(value, gameTime), CategorizedRequests.EMPTY);
         }
         Collection<IRequest<?>> openRequests = workBuilding.getOpenRequests(data.getId());
-        if (openRequests == null || openRequests.isEmpty()) {
-            return CategorizedRequests.EMPTY;
+        if (openRequests == null) {
+            return new RequestSnapshot(
+                    ObservedValue.unavailable(ObservationState.UNAVAILABLE, gameTime),
+                    CategorizedRequests.EMPTY
+            );
         }
 
-        // Terminal states — request is closed, nothing to report
         java.util.Set<RequestState> terminalStates = java.util.EnumSet.of(
-                RequestState.CANCELLED,
-                RequestState.FAILED,
-                RequestState.COMPLETED,
-                RequestState.OVERRULED,
-                RequestState.RECEIVED
+                RequestState.CANCELLED, RequestState.FAILED, RequestState.COMPLETED,
+                RequestState.OVERRULED, RequestState.RECEIVED
         );
-
-        List<String> fulfillable = new ArrayList<>();
-        List<String> blocked = new ArrayList<>();
+        List<String> assigned = new ArrayList<>();
+        List<String> waiting = new ArrayList<>();
 
         for (IRequest<?> request : openRequests) {
-            if (terminalStates.contains(request.getState())) {
-                continue;
-            }
-
+            if (terminalStates.contains(request.getState())) continue;
             String display;
             var requestable = request.getRequest();
             if (requestable instanceof Stack stackReq) {
@@ -594,20 +668,17 @@ public final class CitizenPromptViewFactory {
             } else {
                 display = request.getShortDisplayString().getString();
             }
-
-            boolean isFulfillable = request.getState().ordinal() >= RequestState.ASSIGNED.ordinal()
-                    || MumblingTopicHelper.warehouseHasStock(data, request);
-            if (isFulfillable) {
-                fulfillable.add(display);
-            } else {
-                blocked.add(display);
+            switch (request.getState()) {
+                case ASSIGNED, IN_PROGRESS, RESOLVED, FOLLOWUP_IN_PROGRESS, FINALIZING -> assigned.add(display);
+                default -> waiting.add(display);
             }
         }
-
-        return new CategorizedRequests(
-                fulfillable.isEmpty() ? null : fulfillable,
-                blocked.isEmpty() ? null : blocked
+        var value = new CitizenRequestAvailabilityView(assigned, waiting);
+        var categorized = new CategorizedRequests(
+                assigned.isEmpty() ? null : assigned,
+                waiting.isEmpty() ? null : waiting
         );
+        return new RequestSnapshot(ObservedValue.current(value, gameTime), categorized);
     }
 
     @Nullable
