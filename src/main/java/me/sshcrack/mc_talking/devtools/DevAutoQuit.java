@@ -1,26 +1,26 @@
 /*? if devtools {*/
-package me.sshcrack.mc_talking.devtools;
+/*package me.sshcrack.mc_talking.devtools;
 
 import me.sshcrack.mc_talking.McTalking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
-/*? if neoforge {*/
+/^? if neoforge {^/
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
-/*?}*/
-/*? if forge {*/
-/*import net.minecraftforge.event.TickEvent;
+/^?}^/
+/^? if forge {^/
+/^import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
-*//*?}*/
+^//^?}^/
 
-/*? if forge {*/
-/*@Mod.EventBusSubscriber(modid = "mc_talking", bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-*//*?}*/
+/^? if forge {^/
+/^@Mod.EventBusSubscriber(modid = "mc_talking", bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+^//^?}^/
 public class DevAutoQuit {
     private static boolean quitting = false;
     private static boolean worldCreationRequested = false;
@@ -31,7 +31,7 @@ public class DevAutoQuit {
     private static final int STARTUP_TIMEOUT_TICKS = 20 * 90;
     private static final int ENTER_KEY = 257;
 
-    /*? if neoforge {*/
+    /^? if neoforge {^/
     public static void init() {
         if (!isEnabled()) return;
         NeoForge.EVENT_BUS.register(new DevAutoQuit());
@@ -41,15 +41,15 @@ public class DevAutoQuit {
     public void onClientTick(ClientTickEvent.Post event) {
         tick();
     }
-    /*?}*/
+    /^?}^/
 
-    /*? if forge {*/
-    /*@SubscribeEvent
+    /^? if forge {^/
+    /^@SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         tick();
     }
-    *//*?}*/
+    ^//^?}^/
 
     private static boolean isEnabled() {
         return "true".equals(System.getProperty("mc_talking.autoQuit"));
@@ -106,4 +106,4 @@ public class DevAutoQuit {
         }
     }
 }
-/*?}*/
+*//*?}*/
