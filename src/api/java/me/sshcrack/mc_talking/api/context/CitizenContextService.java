@@ -25,6 +25,6 @@ public final class CitizenContextService {
             @NotNull AbstractEntityCitizen citizen,
             @Nullable ServerPlayer speakingPlayer
     ) {
-        return TalkingColonistsApi.services().snapshotCitizenContext(citizen, speakingPlayer);
+        return TalkingColonistsApi.services().context().snapshot(citizen, speakingPlayer);
     }
 }

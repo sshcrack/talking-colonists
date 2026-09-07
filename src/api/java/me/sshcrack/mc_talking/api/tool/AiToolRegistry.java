@@ -25,6 +25,6 @@ public final class AiToolRegistry {
             @NotNull String name,
             @NotNull AiTool tool
     ) {
-        return TalkingColonistsApi.services().registerAiTool(namespace, name, tool);
+        return TalkingColonistsApi.services().tools().register(namespace, name, tool);
     }
 }

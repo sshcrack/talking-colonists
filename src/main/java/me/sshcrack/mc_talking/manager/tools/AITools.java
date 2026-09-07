@@ -2,7 +2,7 @@ package me.sshcrack.mc_talking.manager.tools;
 
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.gemini_live_lib.gson.properties.Property;
-import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
+import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import me.sshcrack.mc_talking.api.tool.AiToolScope;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import org.jetbrains.annotations.Nullable;

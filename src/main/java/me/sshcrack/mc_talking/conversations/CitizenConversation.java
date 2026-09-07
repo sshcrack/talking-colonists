@@ -6,7 +6,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
@@ -59,6 +59,12 @@ public class CitizenConversation {
     private volatile UUID flashPlaybackTurnId;
     /** Flash/TTS uses one mixed channel; keep that channel on the moving group centroid. */
     private volatile LocationalAudioChannel locationalChannel;
+
+    /**
+     * Only used in LIVE_WEBSOCKETS mode.
+     */
+    private volatile List<LiveConversationWsClient> liveClients = List.of();
+    private volatile Runnable liveAbort = () -> { };
 
     private Consumer<ConversationState> onStateChanged;
 
@@ -120,6 +126,10 @@ public class CitizenConversation {
             UUID turnId = flashPlaybackTurnId;
             if (turnId != null) stream.cancelTurn(turnId);
             stream.close();
+        }
+        liveAbort.run();
+        for (LiveConversationWsClient client : liveClients) {
+            try { client.close(); } catch (RuntimeException ignored) { }
         }
     }
 
@@ -347,6 +357,20 @@ public class CitizenConversation {
         AtomicBoolean cleanupStarted = new AtomicBoolean(false);
         AtomicReference<LiveConversationWsClient> clientARef = new AtomicReference<>();
         AtomicReference<LiveConversationWsClient> clientBRef = new AtomicReference<>();
+        Runnable cancelLivePair = () -> {
+            if (!cleanupStarted.compareAndSet(false, true)) return;
+            LiveConversationWsClient currentA = clientARef.get();
+            LiveConversationWsClient currentB = clientBRef.get();
+            if (currentA != null) currentA.close();
+            if (currentB != null) currentB.close();
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "paired conversation cancelled");
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "paired conversation cancelled");
+        };
+        liveAbort = cancelLivePair;
+        if (cancellation.isCancelled()) {
+            cancelLivePair.run();
+            return;
+        }
 
         Runnable cancelLive = () -> {
             Runnable cleanup = () -> {
@@ -365,6 +389,8 @@ public class CitizenConversation {
             if (!cleanupStarted.compareAndSet(false, true)) return;
             cancellation.clearLiveCancellation(cancelLive);
             server.execute(() -> {
+                liveAbort = () -> { };
+                liveClients = List.of();
                 reservationA.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
                         "paired citizen conversation completed");
                 reservationB.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
@@ -422,6 +448,7 @@ public class CitizenConversation {
 
         clientA.setPeer(clientB);
         clientB.setPeer(clientA);
+        liveClients = List.of(clientA, clientB);
         if (cancellation.isCancelled()) {
             cancelLive.run();
             return;
@@ -473,22 +500,21 @@ public class CitizenConversation {
             setState(ConversationState.ENDED);
         }));
 
+        if (cancellation.isCancelled()) {
+            cancelLivePair.run();
+            return;
+        }
         try {
             clientA.connect();
             clientB.connect();
         } catch (RuntimeException e) {
             cleanupStarted.set(true);
-            cancellation.clearLiveCancellation(cancelLive);
             reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "failed to connect paired provider session");
             reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "failed to connect paired provider session");
             McTalking.LOGGER.error("[LiveConv] Failed to connect paired Gemini sessions", e);
             setState(ConversationState.ENDED);
-            return;
-        }
-        if (cancellation.isCancelled()) {
-            cancelLive.run();
             return;
         }
 
@@ -504,6 +530,10 @@ public class CitizenConversation {
         }
 
         // Kick off the dialogue from A's side
+        if (cancellation.isCancelled()) {
+            cancelLive.run();
+            return;
+        }
 
         clientA.addPromptTextAfterTalkingComplete(
                 "Start the conversation! You are talking to a fellow " + citizenDataB.getName()
@@ -517,6 +547,7 @@ public class CitizenConversation {
     // -------------------------------------------------------------------------
 
     private void performAutoConversation() {
+        if (cancellation.isCancelled()) return;
         if (TtsQuotaManager.isTtsFailed()) {
             McTalking.LOGGER.info("[Auto] TTS previously failed, skipping directly to Live WebSockets");
             performLiveWebsocketConversation();

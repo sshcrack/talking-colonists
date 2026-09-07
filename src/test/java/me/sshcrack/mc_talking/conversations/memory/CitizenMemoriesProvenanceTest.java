@@ -139,6 +139,29 @@ class CitizenMemoriesProvenanceTest {
     }
 
     @Test
+    void compactionRemovesRawFactEventEntriesButKeepsAddonIdempotency() {
+        UUID player = UUID.randomUUID();
+        CitizenMemories memory = new CitizenMemories();
+        var outcome = new AddonConfirmedOutcome(
+                "test_addon", "outcome-1", "Observed delivery", player,
+                List.of("Delivery completed"),
+                List.of(new ConfirmedRelationshipChange(
+                        player, CitizenRelationshipDimension.TRUST, 0.1f)));
+
+        assertEquals(AddonMemoryWriteResult.ADDED, memory.addConfirmedOutcome(outcome));
+        assertEquals(2, memory.getEntries().size());
+        memory.compactFactsAndEvents("The delivery was completed and remembered.");
+
+        assertTrue(memory.getFacts().isEmpty());
+        assertTrue(memory.getEvents().isEmpty());
+        assertTrue(memory.getEntries().isEmpty(), "raw provenance entries must not survive compaction");
+        assertEquals("The delivery was completed and remembered.", memory.getSummarizedMemory());
+        assertEquals(1, memory.getRelationshipChanges().size());
+        assertEquals(AddonMemoryWriteResult.DUPLICATE, memory.addConfirmedOutcome(outcome),
+                "compaction must not erase the durable addon idempotency journal");
+    }
+
+    @Test
     void citizenClaimAboutPromiseRemainsCitizenStatementNotPlayerOrConfirmedOutcome() {
         UUID citizen = UUID.randomUUID();
         CitizenMemories memory = new CitizenMemories();

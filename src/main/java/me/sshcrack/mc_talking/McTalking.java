@@ -4,6 +4,8 @@ import com.mojang.logging.LogUtils;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.listener.ColonyEventSubscriber;
 import me.sshcrack.mc_talking.manager.tools.AITools;
+import me.sshcrack.mc_talking.manager.DefaultCitizenPromptProvider;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
 /*? if forge {*/
@@ -71,6 +73,7 @@ public class McTalking {
     /*?}*/
 
     private void initialize() {
+        PromptRuntime.installDefaultProvider(new DefaultCitizenPromptProvider());
         AITools.register();
         McTalkingConfig.loadConfig();
         AiStatusPayload.registerMessages();

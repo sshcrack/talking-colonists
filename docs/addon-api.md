@@ -121,7 +121,6 @@ if (facts.healthPercent().state() == ObservationState.CURRENT) {
 
 switch (facts.housingStatus()) {
     case HOUSED -> { /* assigned residence */ }
-    case GUARD_QUARTERS -> { /* guard workplace is quarters */ }
     case HOMELESS -> { /* verified no home assignment */ }
     case UNKNOWN -> { /* do not infer either way */ }
 }

@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
+import me.sshcrack.mc_talking.internal.compat.MineColoniesCompatibilityMapper;
+
 import com.minecolonies.api.entity.citizen.Skill;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;

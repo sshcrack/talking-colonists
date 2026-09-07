@@ -7,7 +7,7 @@ import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;

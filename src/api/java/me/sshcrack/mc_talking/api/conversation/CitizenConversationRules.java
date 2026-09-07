@@ -17,7 +17,7 @@ public final class CitizenConversationRules {
             int order,
             @NotNull CitizenSpeechPolicy policy
     ) {
-        return TalkingColonistsApi.services().registerSpeechPolicy(id, order, policy);
+        return TalkingColonistsApi.services().conversationRules().registerSpeechPolicy(id, order, policy);
     }
 
     /**
@@ -28,6 +28,6 @@ public final class CitizenConversationRules {
             int order,
             @NotNull CitizenUrgencyModifier modifier
     ) {
-        return TalkingColonistsApi.services().registerUrgencyModifier(id, order, modifier);
+        return TalkingColonistsApi.services().conversationRules().registerUrgencyModifier(id, order, modifier);
     }
 }

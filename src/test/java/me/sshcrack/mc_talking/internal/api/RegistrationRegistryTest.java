@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.internal.api;
 
+import me.sshcrack.mc_talking.internal.registration.RegistrationRegistry;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;

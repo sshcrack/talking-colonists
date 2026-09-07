@@ -61,11 +61,6 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                 && view.verifiedFacts().housingStatus() == CitizenHousingStatus.HOUSED) {
             prompt.append(" | Home: ").append(view.work().home().displayName())
                     .append(" (level ").append(view.work().home().level()).append(")");
-        } else if (view.verifiedFacts().housingStatus() == CitizenHousingStatus.GUARD_QUARTERS
-                && view.work().workplace() != null) {
-            prompt.append(" | Home: ").append(view.work().workplace().displayName())
-                    .append(" (level ").append(view.work().workplace().level())
-                    .append(") — your guard post serves as your living quarters");
         }
         prompt.append("\n\n");
         return prompt.toString();

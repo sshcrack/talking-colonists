@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.internal.api;
 
+import me.sshcrack.mc_talking.internal.registration.RegistrationRegistry;
+
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;

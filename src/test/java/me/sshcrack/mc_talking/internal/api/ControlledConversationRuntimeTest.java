@@ -160,6 +160,24 @@ class ControlledConversationRuntimeTest {
     }
 
     @Test
+    void endBeforeQueuedTurnStartStillCompletesThePublishedTurn() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant speaker = hooks.add("Ada");
+        hooks.executeImmediately = false;
+        var runtime = runtime(hooks, speaker);
+
+        CompletableFuture<ControlledTurnResult> turn = runtime.requestTurn(speaker, "Speak", null);
+        runtime.end(ControlledConversationSession.EndReason.CALLER_CANCELLED);
+        assertFalse(turn.isDone(), "terminal completion is still marshalled through the configured executor");
+
+        hooks.drainExecutor();
+        assertEquals(ControlledTurnResult.Status.SESSION_ENDED, turn.join().status());
+        assertEquals(ControlledConversationSession.State.ENDED, runtime.state());
+        assertEquals(0, hooks.startCalls, "a turn ended before provider startup must never start later");
+        assertEquals(1, hooks.cancelCalls);
+    }
+
+    @Test
     void terminalFutureCompletionAndExactCancellationUseTheConfiguredExecutor() {
         FakeHooks hooks = new FakeHooks();
         FakeParticipant speaker = hooks.add("Ada");

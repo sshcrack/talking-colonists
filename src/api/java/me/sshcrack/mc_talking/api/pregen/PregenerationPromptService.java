@@ -17,6 +17,6 @@ public final class PregenerationPromptService {
             int order,
             @NotNull PregenerationPromptModifier modifier
     ) {
-        return TalkingColonistsApi.services().registerPregenerationPromptModifier(id, order, modifier);
+        return TalkingColonistsApi.services().pregeneration().registerPromptModifier(id, order, modifier);
     }
 }

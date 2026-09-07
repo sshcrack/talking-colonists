@@ -90,6 +90,14 @@ PY_ASSETS
 }
 trap cleanup EXIT
 
+INITIAL_INDEX_FINGERPRINT="$(python3 scripts/client-smoke-fingerprint.py index)"
+INITIAL_WORKTREE_FINGERPRINT="$(python3 scripts/client-smoke-fingerprint.py worktree)"
+if [ "$INITIAL_INDEX_FINGERPRINT" != "$INITIAL_WORKTREE_FINGERPRINT" ]; then
+    echo "ERROR: launch-relevant worktree content differs from the Git index." >&2
+    echo "Stage the exact launch-relevant tree before running client smoke." >&2
+    exit 1
+fi
+
 ./gradlew "Refresh active project" -Pmc_talking.devtools=true --no-daemon --max-workers=1 >/dev/null 2>&1
 
 rm -f /tmp/client-smoke-*.log
@@ -184,6 +192,13 @@ fi
 cleanup
 trap - EXIT
 
-python3 scripts/client-smoke-fingerprint.py index > .client-smoke-verified
+FINAL_INDEX_FINGERPRINT="$(python3 scripts/client-smoke-fingerprint.py index)"
+FINAL_WORKTREE_FINGERPRINT="$(python3 scripts/client-smoke-fingerprint.py worktree)"
+if [ "$FINAL_INDEX_FINGERPRINT" != "$INITIAL_INDEX_FINGERPRINT" ] \
+        || [ "$FINAL_WORKTREE_FINGERPRINT" != "$INITIAL_INDEX_FINGERPRINT" ]; then
+    echo "ERROR: launch-relevant content changed during the smoke run; refusing to certify a different tree." >&2
+    exit 1
+fi
+printf '%s\n' "$INITIAL_INDEX_FINGERPRINT" > .client-smoke-verified
 echo "Created .client-smoke-verified ($(cat .client-smoke-verified))"
 echo "All client launch smoke tests passed."

@@ -1,4 +1,6 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.tool;
+
+import me.sshcrack.mc_talking.internal.compat.MineColoniesCompatibilityMapper;
 
 import com.google.gson.JsonObject;
 import me.sshcrack.mc_talking.McTalking;
@@ -11,7 +13,6 @@ import me.sshcrack.mc_talking.api.tool.AiToolOperationStatus;
 import me.sshcrack.mc_talking.api.tool.AiToolPermission;
 import me.sshcrack.mc_talking.api.tool.AiToolScope;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.manager.MineColoniesCompatibilityMapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -164,6 +165,7 @@ public final class AiToolDispatcher {
             }
             operation = new Operation(
                     key,
+                    session.sessionId(),
                     newOperationId(),
                     registered.id(),
                     fingerprint,
@@ -221,6 +223,15 @@ public final class AiToolDispatcher {
     }
 
     private void completeCommand(Operation operation, @Nullable JsonObject result, @Nullable Throwable failure) {
+        completeCommand(operation, result, failure, true);
+    }
+
+    private void completeCommand(
+            Operation operation,
+            @Nullable JsonObject result,
+            @Nullable Throwable failure,
+            boolean allowDelivery
+    ) {
         AiToolOperationStatus status;
         String errorCode = null;
         String error = null;
@@ -257,11 +268,12 @@ public final class AiToolDispatcher {
             pruneTerminalResults();
         }
 
-        boolean delivered = operation.session.isAvailable()
+        boolean delivered = allowDelivery
+                && operation.session.isAvailable()
                 && operation.session.deliver(operationJson(operation));
         AiToolOperationOutcome outcome = new AiToolOperationOutcome(
                 operation.operationId,
-                operation.key.sessionId,
+                operation.sessionId,
                 operation.toolId,
                 operation.key.callId,
                 status,
@@ -275,7 +287,7 @@ public final class AiToolDispatcher {
             McTalking.LOGGER.error("Addon AI tool completion hook failed for operation {}", operation.operationId, callbackError);
         }
 
-        if (!operation.session.isAvailable()) {
+        if (!allowDelivery || !operation.session.isAvailable()) {
             synchronized (this) {
                 if (operations.remove(operation.key, operation)) terminalOrder.remove(operation.key);
             }
@@ -292,17 +304,26 @@ public final class AiToolDispatcher {
         }
     }
 
-    /**
-     * Drops retained terminal results for a conversation that is intentionally ending. Active
-     * commands remain until their completion stage settles so the addon completion hook still
-     * fires; their result delivery will observe the closed endpoint and will not reconnect it.
-     */
-    public synchronized void forgetSession(@NotNull UUID sessionId) {
+    /** Terminalizes all retained/running operations owned by a conversation and releases capacity. */
+    public void forgetSession(@NotNull UUID sessionId) {
         Objects.requireNonNull(sessionId, "sessionId");
-        terminalOrder.removeIf(key -> key.sessionId.equals(sessionId));
-        operations.entrySet().removeIf(entry ->
-                entry.getKey().sessionId.equals(sessionId)
-                        && entry.getValue().status != AiToolOperationStatus.ACCEPTED);
+        java.util.List<Operation> active;
+        synchronized (this) {
+            terminalOrder.removeIf(key -> {
+                Operation operation = operations.get(key);
+                return operation != null && operation.sessionId.equals(sessionId);
+            });
+            operations.entrySet().removeIf(entry ->
+                    entry.getValue().sessionId.equals(sessionId)
+                            && entry.getValue().status != AiToolOperationStatus.ACCEPTED);
+            active = operations.values().stream()
+                    .filter(operation -> operation.sessionId.equals(sessionId)
+                            && operation.status == AiToolOperationStatus.ACCEPTED)
+                    .toList();
+        }
+        for (Operation operation : active) {
+            completeCommand(operation, null, new CancellationException("Owning conversation ended"), false);
+        }
     }
 
     synchronized int activeCommandCount() {
@@ -411,11 +432,12 @@ public final class AiToolDispatcher {
         boolean deliver(@NotNull JsonObject outcome);
     }
 
-    private record CallKey(UUID sessionId, String callId) {
+    private record CallKey(UUID operationScopeId, String callId) {
     }
 
     private static final class Operation {
         private final CallKey key;
+        private final UUID sessionId;
         private final String operationId;
         private final String toolId;
         private final String fingerprint;
@@ -428,6 +450,7 @@ public final class AiToolDispatcher {
 
         private Operation(
                 CallKey key,
+                UUID sessionId,
                 String operationId,
                 String toolId,
                 String fingerprint,
@@ -435,6 +458,7 @@ public final class AiToolDispatcher {
                 SessionEndpoint session
         ) {
             this.key = key;
+            this.sessionId = sessionId;
             this.operationId = operationId;
             this.toolId = toolId;
             this.fingerprint = fingerprint;

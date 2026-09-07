@@ -11,14 +11,14 @@ public record CitizenWorkView(
         @Nullable BuildingView home,
         @Nullable BuildingView workplace,
         @NotNull List<SkillLevelView> skills,
-        @NotNull List<String> fulfillableItemRequests,
-        @NotNull List<String> blockedItemRequests,
+        @NotNull List<String> assignedOrInProgressItemRequests,
+        @NotNull List<String> waitingForResolverItemRequests,
         @NotNull List<String> activeQuests
 ) {
     public CitizenWorkView {
         skills = List.copyOf(skills);
-        fulfillableItemRequests = List.copyOf(fulfillableItemRequests);
-        blockedItemRequests = List.copyOf(blockedItemRequests);
+        assignedOrInProgressItemRequests = List.copyOf(assignedOrInProgressItemRequests);
+        waitingForResolverItemRequests = List.copyOf(waitingForResolverItemRequests);
         activeQuests = List.copyOf(activeQuests);
     }
 }

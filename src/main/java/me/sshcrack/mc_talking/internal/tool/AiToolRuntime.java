@@ -1,6 +1,9 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.tool;
+
+import me.sshcrack.mc_talking.internal.registration.RegistrationRegistry;
 
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
+import me.sshcrack.mc_talking.api.registration.NamespacedAddonId;
 import me.sshcrack.mc_talking.api.tool.AiCommandTool;
 import me.sshcrack.mc_talking.api.tool.AiQueryTool;
 import me.sshcrack.mc_talking.api.tool.AiTool;
@@ -10,12 +13,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 /** Runtime-only storage and provider-name mapping for addon AI tools. */
 public final class AiToolRuntime {
     private static final System.Logger LOGGER = System.getLogger("mc_talking-api");
-    private static final Pattern ID_PART = Pattern.compile("[a-z][a-z0-9_]{0,31}");
     private static final int MAX_PROVIDER_NAME_LENGTH = 128;
     private static final RegistrationRegistry<RegisteredTool> TOOLS = new RegistrationRegistry<>("AI tool");
 
@@ -27,8 +28,7 @@ public final class AiToolRuntime {
             @NotNull String name,
             @NotNull AiTool tool
     ) {
-        validatePart("namespace", namespace);
-        validatePart("name", name);
+        NamespacedAddonId namespacedId = new NamespacedAddonId(namespace, name);
         Objects.requireNonNull(tool, "tool");
         boolean query = tool instanceof AiQueryTool;
         boolean command = tool instanceof AiCommandTool;
@@ -41,7 +41,7 @@ public final class AiToolRuntime {
         Objects.requireNonNull(tool.scope(), "tool.scope()");
         Objects.requireNonNull(tool.permission(), "tool.permission()");
 
-        String id = namespace + ":" + name;
+        String id = namespacedId.toString();
         if (TOOLS.find(id) != null) {
             throw new IllegalArgumentException("AI tool already registered: " + id);
         }
@@ -73,13 +73,6 @@ public final class AiToolRuntime {
 
     public static @NotNull List<RegisteredTool> registeredTools() {
         return TOOLS.registrationSnapshot().stream().map(RegistrationRegistry.Entry::value).toList();
-    }
-
-    private static void validatePart(String label, String value) {
-        Objects.requireNonNull(value, label);
-        if (!ID_PART.matcher(value).matches()) {
-            throw new IllegalArgumentException(label + " must match " + ID_PART.pattern() + ": " + value);
-        }
     }
 
     public record RegisteredTool(

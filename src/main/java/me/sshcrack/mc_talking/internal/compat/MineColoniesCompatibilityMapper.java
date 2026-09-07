@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.manager;
+package me.sshcrack.mc_talking.internal.compat;
 
 import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.api.entity.citizen.Skill;
@@ -59,7 +59,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull CitizenAIState citizenState(
+    public static @NotNull CitizenAIState citizenState(
             @NotNull com.minecolonies.api.entity.ai.statemachine.states.CitizenAIState state
     ) {
         try {
@@ -69,7 +69,7 @@ public final class MineColoniesCompatibilityMapper {
         }
     }
 
-    static @NotNull AIWorkerState workerState(
+    public static @NotNull AIWorkerState workerState(
             @NotNull com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState state
     ) {
         try {
@@ -79,7 +79,7 @@ public final class MineColoniesCompatibilityMapper {
         }
     }
 
-    static @NotNull CitizenSkill skill(@NotNull Skill skill) {
+    public static @NotNull CitizenSkill skill(@NotNull Skill skill) {
         try {
             return CitizenSkill.valueOf(skill.name().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
@@ -87,11 +87,11 @@ public final class MineColoniesCompatibilityMapper {
         }
     }
 
-    static @NotNull CitizenStatusType status(@NotNull VisibleCitizenStatus status) {
+    public static @NotNull CitizenStatusType status(@NotNull VisibleCitizenStatus status) {
         return visibleStatusTranslationKey(status.getTranslationKey());
     }
 
-    static @NotNull CitizenStatusType visibleStatusTranslationKey(@NotNull String translationKey) {
+    public static @NotNull CitizenStatusType visibleStatusTranslationKey(@NotNull String translationKey) {
         return switch (translationKey) {
             case "com.minecolonies.gui.visiblestatus.working" -> CitizenStatusType.WORKING;
             case "com.minecolonies.gui.visiblestatus.sleep" -> CitizenStatusType.SLEEP;
@@ -105,7 +105,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull HappinessModifierType happinessModifier(@NotNull String id) {
+    public static @NotNull HappinessModifierType happinessModifier(@NotNull String id) {
         return switch (id) {
             case "homelessness" -> HappinessModifierType.HOMELESSNESS;
             case "unemployment" -> HappinessModifierType.UNEMPLOYMENT;
@@ -126,7 +126,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull MinimalAISubState eatingState(
+    public static @NotNull MinimalAISubState eatingState(
             @NotNull com.minecolonies.core.entity.ai.minimal.EntityAIEatTask.EatingState state
     ) {
         return switch (state.name()) {
@@ -137,12 +137,13 @@ public final class MineColoniesCompatibilityMapper {
             case "WAIT_FOR_FOOD" -> MinimalAISubState.EAT_WAITING_FOOD;
             case "GET_FOOD_YOURSELF" -> MinimalAISubState.EAT_GETTING_FOOD_SELF;
             case "GO_TO_EAT_POS" -> MinimalAISubState.EAT_GOING_TO_EAT_POS;
-            case "EAT", "DONE" -> MinimalAISubState.EAT_EATING;
+            case "EAT" -> MinimalAISubState.EAT_EATING;
+            case "DONE" -> MinimalAISubState.EAT_FINISHED;
             default -> MinimalAISubState.UNKNOWN;
         };
     }
 
-    static @NotNull MinimalAISubState sleepState(
+    public static @NotNull MinimalAISubState sleepState(
             @NotNull com.minecolonies.core.entity.ai.minimal.EntityAISleep.SleepState state
     ) {
         return switch (state.name()) {
@@ -153,7 +154,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull MinimalAISubState diseaseState(
+    public static @NotNull MinimalAISubState diseaseState(
             @NotNull com.minecolonies.core.entity.ai.minimal.EntityAISickTask.DiseaseState state
     ) {
         return switch (state.name()) {
@@ -166,7 +167,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull MinimalAISubState mourningState(
+    public static @NotNull MinimalAISubState mourningState(
             @NotNull com.minecolonies.core.entity.ai.minimal.EntityAIMournCitizen.MourningState state
     ) {
         return switch (state.name()) {
@@ -179,7 +180,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull MinimalAISubState fleeState(
+    public static @NotNull MinimalAISubState fleeState(
             @NotNull com.minecolonies.core.entity.ai.minimal.EntityAICitizenAvoidEntity.FleeStates state
     ) {
         return switch (state.name()) {
@@ -189,7 +190,7 @@ public final class MineColoniesCompatibilityMapper {
         };
     }
 
-    static @NotNull MinimalAISubState wanderState(
+    public static @NotNull MinimalAISubState wanderState(
             @NotNull com.minecolonies.core.entity.ai.minimal.EntityAICitizenWander.WanderState state
     ) {
         return switch (state.name()) {

@@ -34,6 +34,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -154,7 +155,7 @@ public class ConversationManager {
             if (closed.get() || !foregroundSessions.markActive(token, "conversation active")) return false;
             if (lifecycleStarted.compareAndSet(false, true)) {
                 foregroundSessions.snapshot(token.citizenId()).ifPresent(snapshot ->
-                        dispatchLifecycleStarted(snapshot.entity(), snapshot.kind(), snapshot.playerId()));
+                        dispatchLifecycleStarted(snapshot.entity(), snapshot.kind(), snapshot.playerId(), snapshot.sessionId(), snapshot.turnId()));
             }
             return true;
         }
@@ -211,13 +212,22 @@ public class ConversationManager {
             AbstractEntityCitizen citizen,
             ConversationKind kind
     ) {
+        return reserveAmbientForeground(citizen, kind, null, null);
+    }
+
+    private static ForegroundReservation reserveAmbientForeground(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId
+    ) {
         java.util.Objects.requireNonNull(citizen, "citizen");
         java.util.Objects.requireNonNull(kind, "kind");
         UUID citizenId = citizen.getUUID();
         backgroundSessions.cancel(citizenId);
         if (activities.isBusy(citizenId)) return null;
         var reservation = foregroundSessions.reserve(
-                citizenId, citizen, kind, ForegroundSessionRegistry.Priority.AMBIENT, null);
+                citizenId, citizen, kind, ForegroundSessionRegistry.Priority.AMBIENT, null, sessionId, turnId);
         if (!reservation.granted()) return null;
         McTalking.LOGGER.info("[ConversationManager] Reserved ambient foreground session for {} ({})", citizenId, kind);
         return new ForegroundReservation(reservation.token());
@@ -415,19 +425,41 @@ public class ConversationManager {
     private static void dispatchLifecycleStarted(
             AbstractEntityCitizen citizen,
             ConversationKind kind,
-            UUID playerId
+            @Nullable UUID playerId
+    ) {
+        dispatchLifecycleStarted(citizen, kind, playerId, null, null);
+    }
+
+    private static void dispatchLifecycleStarted(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind,
+            @Nullable UUID playerId,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId
     ) {
         dispatchLifecycleEvent(new ConversationLifecycleEvent(
-                ConversationLifecycleEvent.Phase.STARTED, kind, citizen, playerId, citizen.level().getGameTime()));
+                ConversationLifecycleEvent.Phase.STARTED, kind, citizen, playerId, sessionId, turnId,
+                citizen.level().getGameTime()));
     }
 
     private static void dispatchLifecycleEnded(
             AbstractEntityCitizen citizen,
             ConversationKind kind,
-            UUID playerId
+            @Nullable UUID playerId
+    ) {
+        dispatchLifecycleEnded(citizen, kind, playerId, null, null);
+    }
+
+    private static void dispatchLifecycleEnded(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind,
+            @Nullable UUID playerId,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId
     ) {
         dispatchLifecycleEvent(new ConversationLifecycleEvent(
-                ConversationLifecycleEvent.Phase.ENDED, kind, citizen, playerId, citizen.level().getGameTime()));
+                ConversationLifecycleEvent.Phase.ENDED, kind, citizen, playerId, sessionId, turnId,
+                citizen.level().getGameTime()));
     }
 
     private static void dispatchLifecycleEvent(ConversationLifecycleEvent event) {
@@ -450,7 +482,7 @@ public class ConversationManager {
             boolean wasActive = ended.previousState() == ForegroundSessionRegistry.State.ACTIVE
                     || ended.previousState() == ForegroundSessionRegistry.State.RECOVERING;
             if (wasActive) {
-                dispatchLifecycleEnded(snapshot.entity(), snapshot.kind(), snapshot.playerId());
+                dispatchLifecycleEnded(snapshot.entity(), snapshot.kind(), snapshot.playerId(), snapshot.sessionId(), snapshot.turnId());
                 if (snapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT
                         && snapshot.kind() != ConversationKind.CONTROLLED
                         && switch (ended.reason()) {
@@ -745,7 +777,8 @@ public class ConversationManager {
         if (!canCitizenSpeak(citizen, kind)) return false;
 
         UUID citizenId = citizen.getUUID();
-        ForegroundReservation reservation = reserveAmbientForeground(citizen, kind);
+        ForegroundReservation reservation = reserveAmbientForeground(
+                citizen, kind, promptSessionContext.sessionId(), promptSessionContext.turnId());
         if (reservation == null) {
             McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for session for citizen {}", citizenId);
             return false;

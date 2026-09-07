@@ -1,5 +1,8 @@
 package me.sshcrack.mc_talking.internal.api;
 
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
+import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
+
 import com.google.gson.JsonObject;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
 import me.sshcrack.mc_talking.api.prompt.PromptContribution;

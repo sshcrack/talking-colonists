@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.tool;
 
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;

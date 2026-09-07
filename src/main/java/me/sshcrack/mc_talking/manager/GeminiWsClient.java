@@ -13,9 +13,9 @@ import me.sshcrack.gemini_live_lib.gson.ClientMessages;
 import me.sshcrack.gemini_live_lib.gson.RealtimeInput;
 import me.sshcrack.gemini_live_lib.websocket.handshake.ServerHandshake;
 import me.sshcrack.mc_talking.ConversationManager;
-import me.sshcrack.mc_talking.internal.api.AiToolDispatcher;
-import me.sshcrack.mc_talking.internal.api.AiToolExecutionContext;
-import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
+import me.sshcrack.mc_talking.internal.tool.AiToolDispatcher;
+import me.sshcrack.mc_talking.internal.tool.AiToolExecutionContext;
+import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import me.sshcrack.mc_talking.internal.audio.PlaybackDrainCoordinator;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.McTalking;
@@ -701,6 +701,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onTurnComplete() {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
         if (suppressProviderOutput) return;
+        QuotaTracker.reportSuccess(getModelName());
         UUID turnId = ensureOutputTurn();
         generationComplete = true;
         providerTurnComplete = true;
@@ -784,7 +785,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
-        QuotaTracker.reportSuccess(getModelName());
         suppressProviderOutput = false;
         producedOutputSinceSetup = false;
         synchronized (this) {

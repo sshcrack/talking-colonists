@@ -153,6 +153,14 @@ public class CitizenMemories {
         entries.removeIf(entry -> entry.type() == MemoryEntryType.FACT || entry.type() == MemoryEntryType.EVENT);
     }
 
+    /** Replaces the raw fact/event corpus with one compacted summary without leaving stale provenance entries. */
+    public void compactFactsAndEvents(String summary) {
+        setSummarizedMemory(summary);
+        facts.clear();
+        events.clear();
+        entries.removeIf(entry -> entry.type() == MemoryEntryType.FACT || entry.type() == MemoryEntryType.EVENT);
+    }
+
     public void addRelationshipChange(@NotNull UUID targetUUID, @NotNull CitizenRelationshipDimension type, float change) {
         addRelationshipChange(targetUUID, type, change, MemoryProvenance.LEGACY_UNATTRIBUTED, null, null, null);
     }

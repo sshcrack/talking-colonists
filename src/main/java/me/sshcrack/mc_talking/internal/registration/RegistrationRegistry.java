@@ -1,6 +1,7 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.registration;
 
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
+import me.sshcrack.mc_talking.api.registration.NamespacedAddonId;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -10,12 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 
 /** Runtime-only shared registration machinery. Excluded from the developer API artifact. */
 public final class RegistrationRegistry<T> {
-    private static final Pattern NAMESPACED_ID = Pattern.compile("[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}");
-
     private final String label;
     private final Map<String, Entry<T>> entries = new LinkedHashMap<>();
 
@@ -49,11 +47,7 @@ public final class RegistrationRegistry<T> {
     }
 
     public static @NotNull String requireNamespacedId(@NotNull String id, @NotNull String label) {
-        Objects.requireNonNull(id, label);
-        if (!NAMESPACED_ID.matcher(id).matches()) {
-            throw new IllegalArgumentException(label + " must be namespaced and match " + NAMESPACED_ID.pattern() + ": " + id);
-        }
-        return id;
+        return NamespacedAddonId.require(id, label);
     }
 
     public record Entry<T>(@NotNull String id, int order, @NotNull T value) {

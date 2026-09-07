@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Gemini limits can include RPM, TPM, RPD and model-specific dimensions, and
  * the exact free-tier limits vary by project/model. We therefore do not pretend
  * that every 429 resets after one minute. Repeated failures back off
- * progressively, while any successful setup immediately resets the state.</p>
+ * progressively, while successful provider work resets the state.</p>
  */
 public final class QuotaTracker {
     private QuotaTracker() {}
@@ -30,7 +30,7 @@ public final class QuotaTracker {
         });
     }
 
-    /** Reset the progressive backoff after the model accepts a new session. */
+    /** Reset the progressive backoff after the model successfully completes provider work. */
     public static void reportSuccess(String modelName) {
         states.remove(modelName);
     }

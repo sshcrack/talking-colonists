@@ -10,7 +10,12 @@ import java.util.UUID;
 
 /**
  * Supported addon access to citizen memory without casting MineColonies data to Talking Colonists
- * mixin interfaces or mutating internal collections directly.
+ * mixin interfaces or mutating internal collections directly. Synchronous operations are marshalled
+ * to the owning Minecraft server thread before internal memory state is read or changed.
+ *
+ * <p>Low-level fact/event/relationship writes use {@link MemoryProvenance#ADDON_DIRECT_WRITE}; they
+ * are not authenticated player statements. Use {@link #confirmOutcome(ICitizenData, AddonConfirmedOutcome)}
+ * for authoritative gameplay outcomes and controlled-session transcripts for player speech.</p>
  */
 public final class CitizenMemoryService {
     private CitizenMemoryService() {
@@ -21,7 +26,7 @@ public final class CitizenMemoryService {
     }
 
     public static boolean addEvent(@NotNull ICitizenData citizen, @NotNull String event) {
-        return TalkingColonistsApi.services().addMemoryEvent(citizen, event);
+        return TalkingColonistsApi.services().memory().addEvent(citizen, event);
     }
 
     /** Removes one exact event string if present. */
@@ -30,7 +35,7 @@ public final class CitizenMemoryService {
     }
 
     public static boolean removeEvent(@NotNull ICitizenData citizen, @NotNull String event) {
-        return TalkingColonistsApi.services().removeMemoryEvent(citizen, event);
+        return TalkingColonistsApi.services().memory().removeEvent(citizen, event);
     }
 
     public static boolean addFact(@NotNull AbstractEntityCitizen citizen, @NotNull String fact) {
@@ -38,7 +43,7 @@ public final class CitizenMemoryService {
     }
 
     public static boolean addFact(@NotNull ICitizenData citizen, @NotNull String fact) {
-        return TalkingColonistsApi.services().addMemoryFact(citizen, fact);
+        return TalkingColonistsApi.services().memory().addFact(citizen, fact);
     }
 
     /** Removes one exact fact string if present. */
@@ -47,7 +52,7 @@ public final class CitizenMemoryService {
     }
 
     public static boolean removeFact(@NotNull ICitizenData citizen, @NotNull String fact) {
-        return TalkingColonistsApi.services().removeMemoryFact(citizen, fact);
+        return TalkingColonistsApi.services().memory().removeFact(citizen, fact);
     }
 
     /**
@@ -70,7 +75,7 @@ public final class CitizenMemoryService {
             @NotNull CitizenRelationshipDimension dimension,
             float delta
     ) {
-        return TalkingColonistsApi.services().addMemoryRelationshipChange(
+        return TalkingColonistsApi.services().memory().addRelationshipChange(
                 citizen, targetId, dimension, delta);
     }
 
@@ -82,7 +87,7 @@ public final class CitizenMemoryService {
             @NotNull ICitizenData citizen,
             @NotNull AddonConfirmedOutcome outcome
     ) {
-        return TalkingColonistsApi.services().confirmMemoryOutcome(citizen, outcome);
+        return TalkingColonistsApi.services().memory().confirmOutcome(citizen, outcome);
     }
 
     public static @NotNull AddonMemoryWriteResult confirmOutcome(
@@ -101,6 +106,6 @@ public final class CitizenMemoryService {
     }
 
     public static @NotNull Optional<CitizenMemorySnapshot> snapshot(@NotNull ICitizenData citizen) {
-        return TalkingColonistsApi.services().memorySnapshot(citizen);
+        return TalkingColonistsApi.services().memory().snapshot(citizen);
     }
 }

@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.tool;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
