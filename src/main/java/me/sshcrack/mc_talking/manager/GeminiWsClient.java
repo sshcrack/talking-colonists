@@ -108,7 +108,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected String currentTurnTranscript = "";
 
     private final String logPrefix;
-    private final UUID toolSessionId = UUID.randomUUID();
+    private final UUID providerToolSessionId = UUID.randomUUID();
     private final ThreadLocal<ArrayDeque<ProviderToolCall>> providerToolCalls = new ThreadLocal<>();
     protected final GeminiStream stream;
     @Nullable
@@ -413,12 +413,22 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         setup.systemInstruction = sys;
 
-        setup.tools.addAll(AITools.getEnabledTools());
+        setup.tools.addAll(AITools.getEnabledTools(tool -> allowAddonTool(tool.id())));
 
         return setup;
     }
 
     protected abstract String getSystemPrompt();
+
+    /** Session-specific addon-tool policy. Ordinary conversations allow registered tools. */
+    protected boolean allowAddonTool(String toolId) { return true; }
+
+    protected UUID toolSessionId() { return providerToolSessionId; }
+
+    protected UUID toolOperationScopeId() { return providerToolSessionId; }
+
+    @Nullable
+    protected UUID toolTurnId() { return null; }
 
     /**
      * Resolves the active player for this conversation so that generated text and transcriptions
@@ -730,6 +740,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         var action = AITools.getAction(name);
         var addonAction = AiToolRuntime.findByProviderName(name);
+        if (addonAction != null && !allowAddonTool(addonAction.id())) addonAction = null;
         if (action == null && addonAction == null) {
             McTalking.LOGGER.warn("{} Unknown function call: {}", logPrefix, name);
             var error = new JsonObject();
@@ -749,11 +760,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         JsonObject result;
         try {
             if (addonAction != null) {
-                var context = new AiToolExecutionContext(toolSessionId, this.entity, colony, activePlayer);
+                var context = new AiToolExecutionContext(toolSessionId(), toolTurnId(), this.entity, colony, activePlayer);
                 var endpoint = new AiToolDispatcher.SessionEndpoint() {
                     @Override
                     public UUID sessionId() {
-                        return toolSessionId;
+                        return toolSessionId();
+                    }
+
+                    @Override
+                    public UUID operationScopeId() {
+                        return toolOperationScopeId();
                     }
 
                     @Override
@@ -1014,7 +1030,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 gracefulEndFuture = null;
             }
         }
-        ADDON_TOOL_DISPATCHER.forgetSession(toolSessionId);
+        ADDON_TOOL_DISPATCHER.forgetSession(toolOperationScopeId());
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         try {
             super.close();

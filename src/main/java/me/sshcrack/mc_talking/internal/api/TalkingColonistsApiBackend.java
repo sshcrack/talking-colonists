@@ -10,6 +10,9 @@ import me.sshcrack.mc_talking.api.conversation.CitizenConversationHandle;
 import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
+import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
+import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
+import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.api.conversation.ConversationTranscriptEntry;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
@@ -264,9 +267,10 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     public @NotNull ControlledConversationSession createControlledSession(
             @NotNull MinecraftServer server,
             @NotNull List<AbstractEntityCitizen> participants,
-            @NotNull String agenda
+            @NotNull String agenda,
+            @NotNull ControlledConversationOptions options
     ) {
-        return new ControlledSession(server, participants, agenda);
+        return new ControlledSession(server, participants, agenda, options);
     }
 
     @Override
@@ -419,186 +423,152 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
 
     private static final class ControlledSession implements ControlledConversationSession {
         private final MinecraftServer server;
-        private final List<AbstractEntityCitizen> participants;
-        private final Map<UUID, AbstractEntityCitizen> byId;
-        private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
-        private final AtomicReference<AbstractEntityCitizen> activeSpeaker = new AtomicReference<>();
-        private final AtomicReference<CompletableFuture<AmbientLineResult>> activeFuture = new AtomicReference<>();
-        private final ArrayDeque<ConversationTranscriptEntry> transcript = new ArrayDeque<>();
-        private int transcriptChars;
-        private volatile String agenda;
+        private final ControlledConversationRuntime<AbstractEntityCitizen, ControlledAudioAnchor> runtime;
 
-        private ControlledSession(MinecraftServer server, List<AbstractEntityCitizen> participants, String agenda) {
-            if (participants.isEmpty()) throw new IllegalArgumentException("Controlled session requires participants");
+        private ControlledSession(
+                MinecraftServer server,
+                List<AbstractEntityCitizen> participants,
+                String agenda,
+                ControlledConversationOptions options
+        ) {
             this.server = java.util.Objects.requireNonNull(server, "server");
-            this.agenda = java.util.Objects.requireNonNull(agenda, "agenda");
-            LinkedHashMap<UUID, AbstractEntityCitizen> unique = new LinkedHashMap<>();
-            for (AbstractEntityCitizen participant : participants) {
-                if (participant == null) throw new IllegalArgumentException("participant must not be null");
-                if (unique.putIfAbsent(participant.getUUID(), participant) != null) {
-                    throw new IllegalArgumentException("Duplicate participant " + participant.getUUID());
-                }
-            }
-            this.byId = Map.copyOf(unique);
-            this.participants = List.copyOf(unique.values());
+            this.runtime = new ControlledConversationRuntime<>(participants, agenda, options, new ControlledHooks(server));
         }
 
         @Override
-        public @NotNull List<AbstractEntityCitizen> participants() {
-            return participants;
-        }
+        public @NotNull UUID sessionId() { return runtime.sessionId(); }
 
         @Override
-        public @NotNull State state() {
-            return state.get();
-        }
+        public @NotNull List<AbstractEntityCitizen> participants() { return runtime.participants(); }
 
         @Override
-        public void setAgenda(@NotNull String agenda) {
-            if (state.get() == State.ENDED) throw new IllegalStateException("session ended");
-            this.agenda = java.util.Objects.requireNonNull(agenda, "agenda");
-        }
+        public @NotNull State state() { return runtime.state(); }
+
+        @Override
+        public void setAgenda(@NotNull String agenda) { runtime.setAgenda(agenda); }
 
         @Override
         public void addPlayerStatement(@NotNull ServerPlayer player, @NotNull String statement) {
             java.util.Objects.requireNonNull(player, "player");
             if (statement.isBlank()) return;
-            appendTranscript(new ConversationTranscriptEntry(
+            runtime.addTranscript(new ConversationTranscriptEntry(
                     ConversationTranscriptEntry.SpeakerKind.PLAYER,
-                    player.getUUID(),
-                    player.getName().getString(),
-                    statement.trim(),
-                    player.level().getGameTime()
-            ));
+                    player.getUUID(), player.getName().getString(), statement.trim(), player.level().getGameTime()));
         }
 
         @Override
-        public @NotNull CompletableFuture<AmbientLineResult> requestTurn(
+        public @NotNull CompletableFuture<ControlledTurnResult> requestTurn(
                 @NotNull AbstractEntityCitizen speaker,
-                @NotNull String topicOrInstruction
+                @NotNull String topicOrInstruction,
+                @Nullable ControlledAudioAnchor audioAnchor
         ) {
-            java.util.Objects.requireNonNull(speaker, "speaker");
-            java.util.Objects.requireNonNull(topicOrInstruction, "topicOrInstruction");
-            if (!byId.containsKey(speaker.getUUID())) {
-                return CompletableFuture.completedFuture(AmbientLineResult.failed("speaker is not a session participant"));
-            }
-            if (!state.compareAndSet(State.OPEN, State.TURN_ACTIVE)) {
-                return CompletableFuture.completedFuture(AmbientLineResult.failed(
-                        state.get() == State.ENDED ? "session has ended" : "another speaker already has the floor"));
+            return runtime.requestTurn(speaker, topicOrInstruction, audioAnchor);
+        }
+
+        @Override
+        public boolean interruptTurn() { return runtime.interruptTurn(); }
+
+        @Override
+        public void end(@NotNull EndReason reason) { runtime.end(reason); }
+
+        @Override
+        public @NotNull List<ConversationTranscriptEntry> transcript() { return runtime.transcript(); }
+
+        @Override
+        public @NotNull String sharedTranscript() { return runtime.sharedTranscript(); }
+
+        private static final class ControlledHooks
+                implements ControlledConversationRuntime.Hooks<AbstractEntityCitizen, ControlledAudioAnchor> {
+            private final MinecraftServer server;
+
+            private ControlledHooks(MinecraftServer server) { this.server = server; }
+
+            @Override
+            public void execute(@NotNull Runnable task) {
+                if (server.isSameThread()) task.run();
+                else server.execute(task);
             }
 
-            CompletableFuture<AmbientLineResult> future = new CompletableFuture<>();
-            activeSpeaker.set(speaker);
-            activeFuture.set(future);
-            String turnAgenda = agenda;
-            String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda);
-            PromptSessionContext promptSessionContext = PromptSessionContext.withAgenda(turnAgenda);
+            @Override
+            public @NotNull UUID id(@NotNull AbstractEntityCitizen participant) { return participant.getUUID(); }
 
-            server.execute(() -> {
-                if (state.get() != State.TURN_ACTIVE || activeSpeaker.get() != speaker) {
-                    future.complete(AmbientLineResult.cancelled());
-                    return;
+            @Override
+            public @NotNull String name(@NotNull AbstractEntityCitizen participant) {
+                return participant.getName().getString();
+            }
+
+            @Override
+            public long gameTime(@NotNull AbstractEntityCitizen participant) { return participant.level().getGameTime(); }
+
+            @Override
+            public @NotNull ControlledConversationRuntime.Availability availability(
+                    @NotNull AbstractEntityCitizen participant,
+                    @Nullable ControlledAudioAnchor audioAnchor
+            ) {
+                if (participant.isRemoved() || !participant.isAlive() || participant.getCitizenData() == null) {
+                    return ControlledConversationRuntime.Availability.rejected(
+                            ControlledTurnResult.FailureReason.SPEAKER_UNLOADED,
+                            "speaker is unloaded or unavailable");
                 }
-                boolean started = ConversationManager.startAddonAmbientSession(speaker, prompt, result -> {
-                    if (result.status() == AmbientLineResult.Status.COMPLETED && !result.transcript().isBlank()) {
-                        appendTranscript(new ConversationTranscriptEntry(
-                                ConversationTranscriptEntry.SpeakerKind.CITIZEN,
-                                speaker.getUUID(),
-                                speaker.getName().getString(),
-                                result.transcript().trim(),
-                                speaker.level().getGameTime()
-                        ));
-                    }
-                    activeSpeaker.compareAndSet(speaker, null);
-                    activeFuture.compareAndSet(future, null);
-                    state.compareAndSet(State.TURN_ACTIVE, State.OPEN);
-                    future.complete(result);
-                }, promptSessionContext);
-                if (!started) {
-                    activeSpeaker.compareAndSet(speaker, null);
-                    activeFuture.compareAndSet(future, null);
-                    state.compareAndSet(State.TURN_ACTIVE, State.OPEN);
-                    future.complete(AmbientLineResult.failed("speaker is unavailable or provider capacity is exhausted"));
+                if (audioAnchor != null && participant.level().dimension() != audioAnchor.dimension()) {
+                    return ControlledConversationRuntime.Availability.rejected(
+                            ControlledTurnResult.FailureReason.UNSUPPORTED_OPERATION,
+                            "cross-dimension controlled audio anchors are not supported");
                 }
-            });
-            return future;
-        }
-
-        @Override
-        public boolean interruptTurn() {
-            if (state.get() != State.TURN_ACTIVE) return false;
-            AbstractEntityCitizen speaker = activeSpeaker.getAndSet(null);
-            CompletableFuture<AmbientLineResult> future = activeFuture.getAndSet(null);
-            if (!state.compareAndSet(State.TURN_ACTIVE, State.OPEN)) return false;
-            if (future != null) future.complete(AmbientLineResult.cancelled());
-            if (speaker != null) server.execute(() -> ConversationManager.cancelAddonAmbientSession(speaker));
-            return true;
-        }
-
-        @Override
-        public void end() {
-            State previous = state.getAndSet(State.ENDED);
-            if (previous == State.ENDED) return;
-            AbstractEntityCitizen speaker = activeSpeaker.getAndSet(null);
-            CompletableFuture<AmbientLineResult> future = activeFuture.getAndSet(null);
-            if (future != null) future.complete(AmbientLineResult.cancelled());
-            if (speaker != null) server.execute(() -> ConversationManager.cancelAddonAmbientSession(speaker));
-        }
-
-        @Override
-        public @NotNull List<ConversationTranscriptEntry> transcript() {
-            synchronized (transcript) {
-                return List.copyOf(transcript);
-            }
-        }
-
-        @Override
-        public @NotNull String sharedTranscript() {
-            synchronized (transcript) {
-                return transcript.stream()
-                        .map(entry -> entry.speakerName() + ": " + entry.text())
-                        .collect(java.util.stream.Collectors.joining("\n"));
-            }
-        }
-
-        private String buildTurnPrompt(String topicOrInstruction, String turnAgenda) {
-            String history = sharedTranscript();
-            String boundedTopic = topicOrInstruction.length() > 2_000
-                    ? topicOrInstruction.substring(0, 2_000)
-                    : topicOrInstruction;
-            return """
-                    ## CONTROLLED ADDON CONVERSATION
-                    You have explicitly been given the floor. Speak exactly one natural turn, then stop and wait.
-                    Meeting/session agenda: %s
-                    Requested topic/instruction for your turn: %s
-                    Shared transcript so far:
-                    %s
-                    Do not invent statements for other attendees and do not decide who speaks next.
-                    """.formatted(turnAgenda, boundedTopic, history.isBlank() ? "(none yet)" : history);
-        }
-
-        private void appendTranscript(ConversationTranscriptEntry entry) {
-            synchronized (transcript) {
-                int overhead = entry.speakerName().length() + 2;
-                int maxTextChars = Math.max(1, MAX_CONTROLLED_TRANSCRIPT_CHARS - overhead);
-                ConversationTranscriptEntry bounded = entry.text().length() <= maxTextChars
-                        ? entry
-                        : new ConversationTranscriptEntry(
-                                entry.speakerKind(),
-                                entry.speakerId(),
-                                entry.speakerName(),
-                                entry.text().substring(0, maxTextChars),
-                                entry.gameTimeTicks()
-                        );
-                int entryChars = overhead + bounded.text().length() + (transcript.isEmpty() ? 0 : 1);
-                while (!transcript.isEmpty() && transcriptChars + entryChars > MAX_CONTROLLED_TRANSCRIPT_CHARS) {
-                    ConversationTranscriptEntry removed = transcript.removeFirst();
-                    transcriptChars -= removed.speakerName().length() + 2 + removed.text().length();
-                    if (!transcript.isEmpty()) transcriptChars -= 1;
+                if (audioAnchor != null && server.getLevel(audioAnchor.dimension()) == null) {
+                    return ControlledConversationRuntime.Availability.rejected(
+                            ControlledTurnResult.FailureReason.SPEAKER_UNAVAILABLE,
+                            "audio-anchor dimension is not loaded");
                 }
-                if (!transcript.isEmpty()) transcriptChars += 1;
-                transcript.addLast(bounded);
-                transcriptChars += overhead + bounded.text().length();
+                if (!McTalkingConfig.hasGeminiApiKey()) {
+                    return ControlledConversationRuntime.Availability.rejected(
+                            ControlledTurnResult.FailureReason.PROVIDER_UNAVAILABLE,
+                            "Gemini provider is unavailable");
+                }
+                ConversationEligibility eligibility = ConversationManager.conversationEligibility(
+                        participant, ConversationKind.ADDON_AMBIENT);
+                if (!eligibility.eligible()) {
+                    return ControlledConversationRuntime.Availability.rejected(
+                            ControlledTurnResult.FailureReason.SPEAKER_UNAVAILABLE,
+                            eligibility.detail());
+                }
+                return ControlledConversationRuntime.Availability.ok();
+            }
+
+            @Override
+            public boolean hasCapacity() { return ConversationManager.hasLowPriorityCapacity(1); }
+
+            @Override
+            public @NotNull ControlledConversationRuntime.StartResult start(
+                    @NotNull AbstractEntityCitizen participant,
+                    @NotNull String prompt,
+                    @NotNull PromptSessionContext promptContext,
+                    @Nullable ControlledAudioAnchor audioAnchor,
+                    @NotNull Consumer<AmbientLineResult> audibleCompletion
+            ) {
+                if (!McTalkingConfig.hasGeminiApiKey()) {
+                    return ControlledConversationRuntime.StartResult.PROVIDER_UNAVAILABLE;
+                }
+                if (!ConversationManager.hasLowPriorityCapacity(1)) {
+                    return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;
+                }
+                boolean started = ConversationManager.startAddonAmbientSession(
+                        participant, prompt, audibleCompletion, promptContext, audioAnchor);
+                if (started) return ControlledConversationRuntime.StartResult.STARTED;
+                if (!ConversationManager.hasLowPriorityCapacity(1)) {
+                    return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;
+                }
+                return ControlledConversationRuntime.StartResult.SPEAKER_UNAVAILABLE;
+            }
+
+            @Override
+            public void cancel(@NotNull AbstractEntityCitizen participant) {
+                ConversationManager.cancelAddonAmbientSession(participant);
+            }
+
+            @Override
+            public boolean playerOwnsConversation(@NotNull AbstractEntityCitizen participant) {
+                return ConversationManager.getPlayerForEntity(participant.getUUID()) != null;
             }
         }
     }

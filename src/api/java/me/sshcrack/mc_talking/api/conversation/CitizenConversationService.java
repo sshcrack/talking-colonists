@@ -116,13 +116,21 @@ public final class CitizenConversationService {
         TalkingColonistsApi.services().resetAutomaticCooldown(citizen);
     }
 
-    /** Opens caller-controlled floor management for meetings/councils. */
+    /**
+     * Opens caller-controlled floor management for meetings/councils.
+     *
+     * <p>Silent participants consume no provider capacity. {@code options} defines which addon AI
+     * tools are available in each explicitly requested turn; core tools keep their normal policy.
+     * Turn completion is delivered on the Minecraft server thread after audible playback terminates.
+     * </p>
+     */
     public static @NotNull ControlledConversationSession createControlledSession(
             @NotNull MinecraftServer server,
             @NotNull List<AbstractEntityCitizen> participants,
-            @NotNull String agenda
+            @NotNull String agenda,
+            @NotNull ControlledConversationOptions options
     ) {
-        return TalkingColonistsApi.services().createControlledSession(server, participants, agenda);
+        return TalkingColonistsApi.services().createControlledSession(server, participants, agenda, options);
     }
 
     /** Creates an ordinary two-citizen autonomous conversation handle. */

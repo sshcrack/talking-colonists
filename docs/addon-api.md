@@ -479,38 +479,68 @@ The handle hides provider clients, streams, audio queues, slot ownership and tea
 
 ## Controlled meetings and councils
 
-The addon owns attendance, navigation, seats, podiums, hand raising and floor policy. Talking
-Colonists owns provider capacity, one current speaker, prompt grounding, audible completion and
-cancellation:
+The addon owns attendance, navigation, seats, hand raising and floor policy. Talking Colonists owns
+provider capacity, prompt grounding, spatial playback and cancellation. Opening a controlled session
+is cheap: silent attendees do **not** reserve a provider slot or open Live connections. Only the
+current speaker claims foreground capacity for the duration of one turn.
 
 ```java
 var meeting = CitizenConversationService.createControlledSession(
         server,
         attendees,
-        "Food supply and town defenses");
+        "Food supply and town defenses",
+        ControlledConversationOptions.allowAddonTools(Set.of("meetings:record_vote")));
 
-// Move Alice to the podium first, then request the turn.
-meeting.requestTurn(alice, "Give your view on food supply")
+// Movement remains addon-owned. Ask for the turn only after Alice reaches the podium.
+var podium = ControlledAudioAnchor.at(alice.level().dimension(), podiumCenter);
+meeting.requestTurn(alice, "Give your view on food supply", podium)
         .thenAccept(result -> {
+            // This continuation runs on the Minecraft server thread.
             if (result.completed()) {
-                // Grant the next speaker the floor.
+                // Audible playback is finished; it is now safe to grant the next speaker the floor.
+            } else {
+                // result.failureReason() distinguishes unavailable/capacity/closed/unsupported cases.
+                // Never leave external floor state waiting merely because a turn failed.
             }
         });
 
 meeting.addPlayerStatement(player, "What should we build first?");
-meeting.setAgenda("Food supply, then guard staffing");
-meeting.interruptTurn();
+meeting.setAgenda("Food supply, then guard staffing"); // affects later turns only
+meeting.interruptTurn(); // immediate barge-in/cancel; stale provider/audio callbacks are ignored
 
 for (ConversationTranscriptEntry entry : meeting.transcript()) {
-    // Structured speaker kind/id/name, text and game tick for UI/minutes/persistence.
+    // Stable speaker UUID, kind/name, text and game tick for UI/minutes/persistence.
 }
 
-meeting.end();
+meeting.end(ControlledConversationSession.EndReason.COMPLETED);
 ```
 
-Only registered participants may receive a turn and only one controlled turn is active at once.
-The transcript is bounded and speaker-attributed. Opening a meeting does not create one provider
-connection for every silent attendee.
+`meeting.sessionId()` is stable for the whole meeting. Every `ControlledTurnResult` contains that
+session ID plus a unique `turnId()`, so orchestration can reject stale work without relying on citizen
+names. Only one turn may be active. A non-participant, an unavailable/unloaded speaker, exhausted
+capacity, an already-active floor, a closed session, and an unsupported operation have typed results.
+Provider/network failures are also terminal results rather than leaked busy state.
+
+A turn future completes on the **Minecraft server thread** only after audible playback reaches its
+terminal state. Provider generation completion alone is not audible completion. `interruptTurn()`
+completes the current turn as `INTERRUPTED`, cancels playback/provider work, leaves the meeting open,
+and ignores every late completion for that turn. `end(reason)` is idempotent, cancels an active turn,
+and prevents late work from reopening the session. A direct player conversation may preempt the
+controlled speaker; that turn reports interruption and ordinary player-conversation priority remains
+unchanged.
+
+Without an audio anchor, the voice uses the citizen entity channel and follows the moving speaker.
+A `ControlledAudioAnchor` creates fixed locational audio in the speaker's current dimension, suitable
+for a podium/microphone. Cross-dimension podium routing is intentionally unsupported and returns a
+typed failure. Listener range continues to use Talking Colonists' configured citizen voice distance.
+
+Controlled sessions also snapshot `PromptSessionContext` per requested turn. Prompt contributors see
+the stable controlled `sessionId`, `turnId`, and agenda for that turn; later `setAgenda(...)` calls do
+not mutate an in-flight prompt. `ControlledConversationOptions` defines the addon-tool allow-list.
+Only allowed addon tools are advertised **and** executable for controlled turns. `AiToolContext`
+reports the same controlled `sessionId()` and `turnId()`; built-in core tools continue to enforce their
+normal core policy. Use `noAddonTools()` for meetings that should expose no addon tool surface, or
+`allAddonTools()` only when the orchestrator intentionally grants every registered addon tool.
 
 ## Pregenerated speech
 

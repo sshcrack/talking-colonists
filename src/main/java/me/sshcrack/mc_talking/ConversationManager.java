@@ -4,6 +4,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
+import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
+import me.sshcrack.mc_talking.manager.audio.ControlledTurnAudioProvider;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
@@ -657,8 +659,18 @@ public class ConversationManager {
             Consumer<AmbientLineResult> completion,
             PromptSessionContext promptSessionContext
     ) {
+        return startAddonAmbientSession(citizen, userPrompt, completion, promptSessionContext, null);
+    }
+
+    public static boolean startAddonAmbientSession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            Consumer<AmbientLineResult> completion,
+            PromptSessionContext promptSessionContext,
+            ControlledAudioAnchor audioAnchor
+    ) {
         return startLowPrioritySession(citizen, userPrompt, ConversationKind.ADDON_AMBIENT, completion,
-                promptSessionContext);
+                promptSessionContext, audioAnchor);
     }
 
     /** Cancels an addon/system ambient session without exposing its Gemini client. */
@@ -677,7 +689,7 @@ public class ConversationManager {
             String userPrompt,
             ConversationKind kind
     ) {
-        return startLowPrioritySession(citizen, userPrompt, kind, null, PromptSessionContext.empty());
+        return startLowPrioritySession(citizen, userPrompt, kind, null, PromptSessionContext.empty(), null);
     }
 
     private static boolean startLowPrioritySession(
@@ -686,7 +698,7 @@ public class ConversationManager {
             ConversationKind kind,
             Consumer<AmbientLineResult> completion
     ) {
-        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty());
+        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty(), null);
     }
 
     private static boolean startLowPrioritySession(
@@ -694,7 +706,8 @@ public class ConversationManager {
             String userPrompt,
             ConversationKind kind,
             Consumer<AmbientLineResult> completion,
-            PromptSessionContext promptSessionContext
+            PromptSessionContext promptSessionContext,
+            ControlledAudioAnchor audioAnchor
     ) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
         if (!canCitizenSpeak(citizen, kind)) return false;
@@ -708,7 +721,7 @@ public class ConversationManager {
 
         try {
             AtomicBoolean audibleCompletion = new AtomicBoolean(false);
-            CitizenWsClient client = new CitizenWsClient(citizen, c -> {
+            CitizenWsClient client = new CitizenWsClient(new ControlledTurnAudioProvider(citizen, audioAnchor), citizen, c -> {
                 String transcript = c.getSessionTranscriptSnapshot();
                 audibleCompletion.set(true);
                 runOnServerThread(citizen, () -> {

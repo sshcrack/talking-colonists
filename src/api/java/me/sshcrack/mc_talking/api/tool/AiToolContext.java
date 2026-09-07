@@ -21,6 +21,9 @@ public interface AiToolContext {
     /** Stable identity of the owning Talking Colonists conversation for this connection. */
     @NotNull UUID sessionId();
 
+    /** Controlled floor-turn identity, or null outside an addon-controlled turn. */
+    default @Nullable UUID turnId() { return null; }
+
     /** Citizen whose conversation owns this tool call. */
     @NotNull AbstractEntityCitizen citizen();
 

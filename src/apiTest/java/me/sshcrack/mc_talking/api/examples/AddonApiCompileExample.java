@@ -7,6 +7,8 @@ import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
+import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
+import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
@@ -30,6 +32,7 @@ import net.minecraft.server.level.ServerPlayer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -196,10 +199,16 @@ final class AddonApiCompileExample {
             AbstractEntityCitizen selectedSpeaker
     ) {
         ControlledConversationSession meeting = CitizenConversationService.createControlledSession(
-                server, attendees, "Discuss the colony's food supply and defenses.");
+                server, attendees, "Discuss the colony's food supply and defenses.",
+                ControlledConversationOptions.allowAddonTools(Set.of("meetings:record_vote")));
 
         // Colony Meetings owns navigation. Call requestTurn only after selectedSpeaker has arrived.
-        meeting.requestTurn(selectedSpeaker, "Give your view on the first agenda item.");
+        meeting.requestTurn(selectedSpeaker, "Give your view on the first agenda item.")
+                .thenAccept(result -> {
+                    if (!result.completed()) {
+                        // Advance/recover floor control based on result.failureReason(); never wait forever.
+                    }
+                });
         return meeting;
     }
 

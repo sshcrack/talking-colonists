@@ -42,6 +42,7 @@ than depending on manager collections, provider clients, queues, or mixin-only s
 | Polling manager/client state to learn when conversations start or end | `CitizenConversationService.registerLifecycleListener(...)` |
 | Manual busy maps / `markBusy` / `markNotBusy` | `CitizenConversationService.reserveActivity(...)` and `CitizenActivityReservation` |
 | Direct `new CitizenConversation(...)` | `createPairConversation(...)` or `createControlledSession(...)` |
+| Meetings mixins that manipulate Gemini/audio/session state | `ControlledConversationSession`, typed `ControlledTurnResult`, `ControlledAudioAnchor`, and `ControlledConversationOptions` |
 | Direct client shutdown / `endConversationWhenPossible()` | `CitizenConversationService.requestGracefulEnd(...)` |
 | Internal cooldown mutation | `CitizenConversationService.resetAutomaticCooldown(...)` |
 | Internal foreground/ambient slot inspection | `CitizenConversationService.hasAmbientCapacity(...)` and typed eligibility/start results |

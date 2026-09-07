@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.api.conversation.CitizenConversationHandle;
 import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
+import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
@@ -200,7 +201,8 @@ public final class TalkingColonistsApi {
         @NotNull ControlledConversationSession createControlledSession(
                 @NotNull MinecraftServer server,
                 @NotNull List<AbstractEntityCitizen> participants,
-                @NotNull String agenda
+                @NotNull String agenda,
+                @NotNull ControlledConversationOptions options
         );
 
         @NotNull CitizenConversationHandle createPairConversation(

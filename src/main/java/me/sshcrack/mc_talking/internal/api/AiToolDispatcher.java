@@ -146,7 +146,7 @@ public final class AiToolDispatcher {
                     "Asynchronous commands require the provider call ID for idempotency");
         }
 
-        CallKey key = new CallKey(session.sessionId(), callId);
+        CallKey key = new CallKey(session.operationScopeId(), callId);
         String fingerprint = registered.id() + "\n" + AiToolSchemaValidator.canonicalArguments(arguments);
         Operation operation;
         synchronized (this) {
@@ -398,6 +398,9 @@ public final class AiToolDispatcher {
 
     public interface SessionEndpoint {
         @NotNull UUID sessionId();
+
+        /** Scope used only for provider-call idempotency; controlled turns use their turn ID. */
+        default @NotNull UUID operationScopeId() { return sessionId(); }
 
         @NotNull AiToolContext context();
 

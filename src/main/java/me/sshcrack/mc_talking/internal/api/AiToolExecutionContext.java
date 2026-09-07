@@ -13,6 +13,7 @@ import java.util.UUID;
 /** Runtime implementation of the addon-facing authoritative tool context. */
 public record AiToolExecutionContext(
         @NotNull UUID sessionId,
+        @Nullable UUID turnId,
         @NotNull AbstractEntityCitizen citizen,
         @NotNull IColony colony,
         @Nullable ServerPlayer player

@@ -91,7 +91,16 @@ public class CitizenWsClient extends GeminiWsClient {
             @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
             PromptSessionContext promptSessionContext
     ) {
-        super(new CitizenEntityAudioProvider(entity, null), entity);
+        this(new CitizenEntityAudioProvider(entity, null), entity, onSystemConversationEnded, promptSessionContext);
+    }
+
+    public CitizenWsClient(
+            AudioProvider audioProvider,
+            AbstractEntityCitizen entity,
+            @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
+            PromptSessionContext promptSessionContext
+    ) {
+        super(audioProvider, entity);
         this.player = null;
         this.onSystemConversationEnded = onSystemConversationEnded;
         this.startedInSystemMode = true;
@@ -163,6 +172,27 @@ public class CitizenWsClient extends GeminiWsClient {
     // -------------------------------------------------------------------------
     // GeminiWsClient overrides
     // -------------------------------------------------------------------------
+
+    @Override
+    protected boolean allowAddonTool(String toolId) {
+        return promptSessionContext.allowsAddonTool(toolId);
+    }
+
+    @Override
+    protected UUID toolSessionId() {
+        return promptSessionContext.sessionId() == null ? super.toolSessionId() : promptSessionContext.sessionId();
+    }
+
+    @Override
+    protected UUID toolOperationScopeId() {
+        return promptSessionContext.turnId() == null ? super.toolOperationScopeId() : promptSessionContext.turnId();
+    }
+
+    @Override
+    @Nullable
+    protected UUID toolTurnId() {
+        return promptSessionContext.turnId();
+    }
 
     @Override
     protected String getSystemPrompt() {

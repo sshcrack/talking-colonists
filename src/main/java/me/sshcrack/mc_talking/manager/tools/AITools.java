@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.function.Predicate;
 
 /** Internal bridge between built-in tools and the public addon tool registry. */
 public class AITools {
@@ -67,6 +68,10 @@ public class AITools {
     }
 
     public static List<BidiGenerateContentSetup.Tool> getEnabledTools() {
+        return getEnabledTools(ignored -> true);
+    }
+
+    public static List<BidiGenerateContentSetup.Tool> getEnabledTools(Predicate<AiToolRuntime.RegisteredTool> addonFilter) {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
         var tool = new BidiGenerateContentSetup.Tool();
         var rawToolsDisabled = McTalkingConfig.INSTANCE.instance().disabledTools;
@@ -89,6 +94,7 @@ public class AITools {
         );
 
         for (var addon : AiToolRuntime.registeredTools()) {
+            if (!addonFilter.test(addon)) continue;
             var addonTool = addon.tool();
             if (!addonTool.isEnabled() || rawToolsDisabled.contains(addon.providerName())) continue;
             var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(

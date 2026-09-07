@@ -3,54 +3,68 @@ package me.sshcrack.mc_talking.api.conversation;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Addon-owned floor-control session for meetings, councils and ceremonies.
  *
- * <p>Talking Colonists owns provider connections, speech playback and capacity. The caller owns
- * movement/seating and calls {@link #requestTurn} only after the selected speaker has arrived.
- * At most one turn is active. The returned future completes after audible playback finishes, not
- * merely when Gemini finishes generating.</p>
+ * <p>Public calls may originate on any thread. World/provider work and terminal callback completion
+ * are marshalled to the Minecraft server thread. Silent attendees reserve no provider connection;
+ * only the active speaker consumes foreground provider capacity. Exactly one turn may be active.</p>
+ *
+ * <p>With no audio anchor, speech follows the citizen entity as it moves. A per-turn
+ * {@link ControlledAudioAnchor} fixes playback at a podium/microphone position instead.</p>
+ *
+ * <p>Per-session addon-tool authority is selected by {@link ControlledConversationOptions} when the
+ * session is created. Only allowed addon tools are advertised and executable. Tool calls receive
+ * the same {@link #sessionId()} and current turn identity through their authoritative tool context.</p>
  */
 public interface ControlledConversationSession extends AutoCloseable {
     enum State { OPEN, TURN_ACTIVE, ENDED }
+    enum EndReason { COMPLETED, CALLER_CANCELLED, PLAYER_INTERRUPTED, SERVER_SHUTDOWN }
+
+    /** Stable identity shared by all turns in this controlled session. */
+    @NotNull UUID sessionId();
 
     @NotNull List<AbstractEntityCitizen> participants();
-
     @NotNull State state();
 
-    /** Replaces the agenda/context used for subsequent turns. */
+    /** Replaces agenda/context for subsequent turns; an already-requested turn keeps its snapshot. */
     void setAgenda(@NotNull String agenda);
 
-    /** Adds a player-authored statement to the bounded shared transcript. */
+    /** Adds a player-authored statement to bounded shared history with stable UUID attribution. */
     void addPlayerStatement(@NotNull ServerPlayer player, @NotNull String statement);
 
-    /**
-     * Gives one registered participant the floor. The caller should invoke this only after its own
-     * navigation/arrival checks succeed.
-     */
-    @NotNull CompletableFuture<AmbientLineResult> requestTurn(
+    /** Requests a moving-speaker turn. The future completes only after audible playback terminates. */
+    default @NotNull CompletableFuture<ControlledTurnResult> requestTurn(
             @NotNull AbstractEntityCitizen speaker,
             @NotNull String topicOrInstruction
+    ) {
+        return requestTurn(speaker, topicOrInstruction, null);
+    }
+
+    /** Requests one turn, optionally spatialized at a fixed podium/microphone anchor. */
+    @NotNull CompletableFuture<ControlledTurnResult> requestTurn(
+            @NotNull AbstractEntityCitizen speaker,
+            @NotNull String topicOrInstruction,
+            @Nullable ControlledAudioAnchor audioAnchor
     );
 
-    /** Interrupts only the current controlled turn; the session remains open. */
+    /** Immediately cancels current playback/generation and rejects all late work for that turn. */
     boolean interruptTurn();
 
     /** Ends the session and cancels a current turn if present. Idempotent. */
-    void end();
+    void end(@NotNull EndReason reason);
 
-    /** Structured bounded transcript snapshot for addon UI, persistence, or meeting minutes. */
+    default void end() { end(EndReason.COMPLETED); }
+
     @NotNull List<ConversationTranscriptEntry> transcript();
-
-    /** Human-readable bounded shared transcript snapshot used to ground later turns. */
     @NotNull String sharedTranscript();
 
     @Override
-    default void close() {
-        end();
-    }
+    default void close() { end(EndReason.CALLER_CANCELLED); }
 }
