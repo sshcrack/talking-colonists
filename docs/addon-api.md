@@ -416,6 +416,26 @@ forgotten addon task cannot leave a citizen permanently busy. Ownership tokens e
 stale handle cannot renew/release a replacement reservation.
 
 A direct player conversation retains core takeover priority; addons never own provider slot maps.
+If a player takes over a citizen while an addon activity lease is active, core invalidates that exact
+lease before the player session starts. Calls made later through the stale addon handle cannot renew
+or release the replacement owner.
+
+## Core session ownership and recovery
+
+Provider clients, foreground/background capacity, reconnect state, and cooldown bookkeeping are
+core-owned lifecycle state. Addons observe conversations through lifecycle listeners and supported
+conversation handles; they do not maintain a second busy map or reconnect watchdog.
+
+Foreground sessions use opaque ownership tokens internally. Ambient work never evicts an active
+foreground session. A direct player conversation may preempt non-player foreground work, but it
+never evicts another direct player conversation. Delayed close callbacks from the preempted session
+are ignored once ownership changes, so they cannot clear the replacement citizen/client state.
+
+Gemini Live transport recovery is bounded and diagnostic. Transient transport/service disconnects
+may reconnect within core's recovery budget, while authentication, configuration, provider-policy,
+and quota failures terminate the owning session. Intentional local closure suppresses reconnect.
+Terminal cleanup releases the owned foreground capacity exactly once; addons should react to the
+lifecycle result instead of attempting provider recovery themselves.
 
 ## Memories
 

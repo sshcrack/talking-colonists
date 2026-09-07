@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.internal.api.AiToolDispatcher;
 import me.sshcrack.mc_talking.internal.api.AiToolExecutionContext;
 import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
+import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.config.ModalityModes;
@@ -39,13 +40,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
-    private static final int MAX_UNRECOGNIZED_CLOSE_RETRIES = 5;
     private static final int MAX_TOTAL_RECOVERY_ATTEMPTS = 6;
     private static final long MAX_RECOVERY_WINDOW_MS = TimeUnit.MINUTES.toMillis(5);
     private static final long GRACEFUL_CLOSE_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(30);
@@ -63,17 +64,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         return RECONNECT_EXECUTOR;
     }
 
-    private enum WsSessionState {
-        NEW,
-        CONNECTING,
-        SETTING_UP,
-        ACTIVE,
-        RECONNECTING,
-        CLOSED,
-        TERMINAL_ERROR,
-        INVALID_SESSION_TOKEN,
-        QUOTA_EXCEEDED
-    }
 
     /**
      * Returns the model name string for quota tracking.
@@ -81,19 +71,19 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected abstract String getModelName();
 
     private boolean hasMadeInitialConnection = false;
-    private long nextReconnectAllowedAt = 0;
-    private int reconnectAttempts = 0;
-    private int totalRecoveryAttempts = 0;
     private volatile boolean reconnectScheduled = false;
-    private volatile boolean intentionalClose = false;
-    private int unrecognizedCloseRetryCount = 0;
     private volatile boolean producedOutputSinceSetup = false;
+    private final ProviderRecoveryController recoveryController = new ProviderRecoveryController(
+            MAX_TOTAL_RECOVERY_ATTEMPTS, MAX_RECOVERY_WINDOW_MS, System::currentTimeMillis);
+    private final List<Consumer<ProviderRecoveryController.Diagnostic>> recoveryObservers =
+            Collections.synchronizedList(new ArrayList<>());
+    private final AtomicBoolean closeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean providerTerminalEventFired = new AtomicBoolean(false);
     private volatile boolean finalGenerationCompleted = false;
     private final AtomicBoolean gracefulEndRequested = new AtomicBoolean(false);
     private final AtomicBoolean gracefulEndFinished = new AtomicBoolean(false);
     @Nullable
     private ScheduledFuture<?> gracefulEndFuture;
-    private volatile WsSessionState wsSessionState = WsSessionState.NEW;
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
     protected boolean generationComplete = false;
@@ -248,67 +238,113 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     protected boolean isSessionReadyForInput() {
-        return wsSessionState == WsSessionState.ACTIVE && !this.isClosed();
+        return recoveryController.diagnostic().state() == ProviderRecoveryController.State.ACTIVE && !this.isClosed();
     }
 
-    private void setWsSessionState(WsSessionState state, String reason) {
-        if (this.wsSessionState == state) {
-            return;
+    /** Observable bounded-recovery state used by lifecycle/debug ownership code. */
+    public ProviderRecoveryController.Diagnostic getRecoveryDiagnostic() {
+        return recoveryController.diagnostic();
+    }
+
+    public void addRecoveryObserver(Consumer<ProviderRecoveryController.Diagnostic> observer) {
+        Objects.requireNonNull(observer, "observer");
+        recoveryObservers.add(observer);
+        observer.accept(recoveryController.diagnostic());
+    }
+
+    /** True only after this client has run its local close/stream cleanup exactly once. */
+    public boolean isLifecycleClosed() {
+        return closeStarted.get();
+    }
+
+    private void transitionRecovery(String reason, Runnable transition) {
+        ProviderRecoveryController.Diagnostic before = recoveryController.diagnostic();
+        transition.run();
+        ProviderRecoveryController.Diagnostic after = recoveryController.diagnostic();
+        if (before.state() != after.state() || !Objects.equals(before.detail(), after.detail())) {
+            McTalking.LOGGER.info("{} provider session {} -> {} ({})", logPrefix, before.state(), after.state(), reason);
         }
-        McTalking.LOGGER.info("{} GeminiWsClient state {} -> {} ({})", logPrefix, this.wsSessionState, state, reason);
-        this.wsSessionState = state;
+        notifyRecoveryObservers(after);
     }
 
-    private long currentReconnectBackoffMs() {
-        // 1s, 2s, 4s, 8s (cap)
-        return Math.min(8000L, 1000L << Math.min(reconnectAttempts, 3));
+    private void notifyRecoveryObservers(ProviderRecoveryController.Diagnostic diagnostic) {
+        synchronized (recoveryObservers) {
+            for (Consumer<ProviderRecoveryController.Diagnostic> observer : recoveryObservers) {
+                try {
+                    observer.accept(diagnostic);
+                } catch (RuntimeException e) {
+                    McTalking.LOGGER.warn("{} Recovery observer failed", logPrefix, e);
+                }
+            }
+        }
+    }
+
+    private ProviderRecoveryController.State recoveryState() {
+        return recoveryController.diagnostic().state();
     }
 
     private boolean canAttemptRecovery() {
-        return !intentionalClose && !QuotaTracker.isQuotaExceeded(getModelName())
-                && totalRecoveryAttempts < MAX_TOTAL_RECOVERY_ATTEMPTS
-                && System.currentTimeMillis() - sessionStartTimeMs < MAX_RECOVERY_WINDOW_MS
-                && wsSessionState != WsSessionState.TERMINAL_ERROR
-                && wsSessionState != WsSessionState.CLOSED
-                && wsSessionState != WsSessionState.QUOTA_EXCEEDED;
+        return !QuotaTracker.isQuotaExceeded(getModelName()) && recoveryController.canRecover();
     }
 
     private synchronized void ensureConnectionForQueuedInput(String source) {
-        if (!canAttemptRecovery()) {
+        if (!canAttemptRecovery()) return;
+        ProviderRecoveryController.State state = recoveryState();
+        if (this.isOpen()
+                || state == ProviderRecoveryController.State.CONNECTING
+                || state == ProviderRecoveryController.State.SETTING_UP
+                || state == ProviderRecoveryController.State.RECOVERING) {
             return;
         }
-        if (this.isOpen() || wsSessionState == WsSessionState.CONNECTING
-                || wsSessionState == WsSessionState.SETTING_UP
-                || wsSessionState == WsSessionState.RECONNECTING) {
-            return;
-        }
-
         if (!hasMadeInitialConnection) {
             McTalking.LOGGER.info("{} Starting initial websocket connection ({})", logPrefix, source);
             connect();
             return;
         }
+        scheduleRecovery(source);
+    }
 
-        long now = System.currentTimeMillis();
-        long remaining = nextReconnectAllowedAt - now;
-        if (remaining > 0) {
-            if (!reconnectScheduled) {
-                reconnectScheduled = true;
-                reconnectFuture = getReconnectExecutor().schedule(() -> {
-                    synchronized (GeminiWsClient.this) {
-                        reconnectScheduled = false;
-                        reconnectFuture = null;
-                        if (!canAttemptRecovery() || GeminiWsClient.this.isOpen()) return;
-                        McTalking.LOGGER.warn("{} Connection lost, attempting delayed reconnect...", logPrefix);
-                        reconnect();
-                    }
-                }, remaining, TimeUnit.MILLISECONDS);
-            }
-            return;
+    private synchronized boolean scheduleRecovery(String cause) {
+        if (reconnectScheduled || this.isOpen()) return true;
+
+        ProviderRecoveryController.Diagnostic before = recoveryController.diagnostic();
+        ProviderRecoveryController.RecoveryAttempt attempt = recoveryController.beginRecovery(cause);
+        ProviderRecoveryController.Diagnostic after = attempt.diagnostic();
+        if (before.state() != after.state() || !Objects.equals(before.detail(), after.detail())) {
+            McTalking.LOGGER.info("{} provider session {} -> {} ({})", logPrefix, before.state(), after.state(), cause);
+        }
+        notifyRecoveryObservers(after);
+
+        if (!attempt.allowed()) {
+            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
+            finishProviderTerminal(new RuntimeException(after.detail()));
+            return false;
         }
 
-        McTalking.LOGGER.warn("{} Connection lost, attempting to reconnect...", logPrefix);
-        reconnect();
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.RECONNECTING);
+        reconnectScheduled = true;
+        reconnectFuture = getReconnectExecutor().schedule(() -> {
+            synchronized (GeminiWsClient.this) {
+                reconnectScheduled = false;
+                reconnectFuture = null;
+                ProviderRecoveryController.Diagnostic diagnostic = recoveryController.diagnostic();
+                if (diagnostic.terminal() || recoveryController.intentionalClose() || GeminiWsClient.this.isOpen()) return;
+            }
+            try {
+                GeminiWsClient.super.reconnect();
+            } catch (RuntimeException e) {
+                McTalking.LOGGER.error("{} Provider reconnect attempt failed", logPrefix, e);
+                scheduleRecovery("reconnect exception: " + e.getClass().getSimpleName());
+            }
+        }, attempt.delayMillis(), TimeUnit.MILLISECONDS);
+        return true;
+    }
+
+    private void finishProviderTerminal(@Nullable Exception error) {
+        fireOnCloseActions();
+        if (error != null && providerTerminalEventFired.compareAndSet(false, true)) {
+            onErrorEvent(error);
+        }
     }
 
     /**
@@ -402,13 +438,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             if (shouldEndConversation) {
                 finishGracefulEnd();
             }
-        } else if (wsSessionState == WsSessionState.ACTIVE) {
+        } else if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
         }
     }
 
     protected void onConversationEnded() {
-        if (wsSessionState == WsSessionState.ACTIVE) {
+        if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
             flushPendingText();
         }
@@ -435,13 +471,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected void onGenerationStarted() {
         sentGeneratingStatus = true;
-        if (wsSessionState == WsSessionState.ACTIVE) {
+        if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
         }
     }
 
     protected void onGenerationPaused() {
-        if (wsSessionState == WsSessionState.ACTIVE) {
+        if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
             AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
         }
     }
@@ -587,7 +623,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onOpen(ServerHandshake data) {
-        setWsSessionState(WsSessionState.SETTING_UP, "websocket opened");
+        transitionRecovery("websocket opened", () -> recoveryController.markSettingUp("websocket opened"));
         super.onOpen(data);
     }
 
@@ -626,8 +662,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onSetupComplete() {
         QuotaTracker.reportSuccess(getModelName());
-        reconnectAttempts = 0;
-        unrecognizedCloseRetryCount = 0;
         producedOutputSinceSetup = false;
         synchronized (this) {
             reconnectScheduled = false;
@@ -635,9 +669,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 reconnectFuture.cancel(false);
                 reconnectFuture = null;
             }
-            nextReconnectAllowedAt = 0;
         }
-        setWsSessionState(WsSessionState.ACTIVE, "setup complete");
+        transitionRecovery("setup complete", recoveryController::setupSucceeded);
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
 
         McTalking.LOGGER.info("{} Gemini setup complete", logPrefix);
@@ -813,8 +846,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onQuotaExceeded() {
         McTalking.LOGGER.warn("{} Quota exceeded for Gemini API, please check your API key and usage limits.", logPrefix);
         QuotaTracker.reportQuotaExceeded(getModelName());
-        setWsSessionState(WsSessionState.QUOTA_EXCEEDED, "quota exceeded");
+        transitionRecovery("quota exceeded", () -> recoveryController.quotaExceeded("quota exceeded"));
         onQuotaExceededEvent("Quota exceeded for Gemini API, please check your API key and usage limits.");
+        fireOnCloseActions();
     }
 
     @Override
@@ -825,34 +859,23 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.error("{} Error in GeminiLiveClient.onClose", logPrefix, e);
         }
 
-        if (intentionalClose) {
-            setWsSessionState(WsSessionState.CLOSED, "intentional close");
-            return;
-        }
-
-        if (QuotaTracker.isQuotaExceeded(getModelName())) {
-            return;
-        }
+        if (recoveryController.intentionalClose()) return;
+        if (QuotaTracker.isQuotaExceeded(getModelName())
+                || recoveryState() == ProviderRecoveryController.State.QUOTA_EXCEEDED) return;
 
         var selectedAi = McTalkingConfig.INSTANCE.instance().currentAiModel;
         if (VoiceSelectionService.isExplicitVoiceRejection(code, reason)) {
             VoiceSelectionService.noteRejected(selectedAi, selectedVoiceName, code, reason);
             McTalking.LOGGER.warn("{} Retrying setup with a fallback voice after explicit voice rejection", logPrefix);
-            try {
-                reconnect();
-            } catch (RuntimeException e) {
-                setWsSessionState(WsSessionState.TERMINAL_ERROR, "voice fallback reconnect failed");
-                fireOnCloseActions();
-                AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-                onErrorEvent(e);
-            }
+            scheduleRecovery("explicit voice rejection");
             return;
         }
 
-        // Maybe we'll need to just reset the session token in general if more errors like this occur
-        if ((reason != null && reason.contains("BidiGenerateContent session")) || (code == 1007 && reason != null && reason.contains("invalid argument"))) {
-            McTalking.LOGGER.info("{} Session token invalidated, clearing and forcing reconnect. Can attempt recovery? {} with state {}", logPrefix, canAttemptRecovery(), wsSessionState);
-            wsSessionState = WsSessionState.INVALID_SESSION_TOKEN;
+        ProviderRecoveryController.CloseDisposition disposition =
+                ProviderRecoveryController.classifyClose(code, reason);
+
+        if (disposition == ProviderRecoveryController.CloseDisposition.SESSION_TOKEN_INVALID) {
+            McTalking.LOGGER.info("{} Session token invalidated; clearing resumable state before bounded reconnect", logPrefix);
             var mem = ((CitizenDataMemoryExtended) entity.getCitizenData()).mc_talking$getOrInitializeMemory();
             mem.setSessionToken("");
             int discardedAudio = stream.discardPendingAudio();
@@ -860,81 +883,47 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 McTalking.LOGGER.info("{} Discarded {} stale queued audio chunks before replaying invalidated session",
                         logPrefix, discardedAudio);
             }
-
-            // If a system-controlled prompt (mumbling / urgent contact) was previously
-            // submitted, re-queue it so the AI is re-prompted after the new connection
-            // establishes, rather than sitting in LISTENING state silently.
             if (lastPromptText != null) {
                 synchronized (pendingSystemText) {
-                    if (!pendingSystemText.contains(lastPromptText)) {
-                        pendingSystemText.add(lastPromptText);
-                    }
+                    if (!pendingSystemText.contains(lastPromptText)) pendingSystemText.add(lastPromptText);
                 }
             }
-
-            ensureConnectionForQueuedInput("session token invalidated");
+            scheduleRecovery("session token invalidated");
             return;
         }
 
-        if (code == 1008 && resolveActivePlayer() == null
-                && (shouldEndConversation || !producedOutputSinceSetup)) {
-            McTalking.LOGGER.warn("{} Ending idle non-player session after Gemini close 1008 instead of reconnecting", logPrefix);
-            setWsSessionState(WsSessionState.TERMINAL_ERROR, "idle non-player session aborted by provider");
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-            fireOnCloseActions();
-            return;
-        }
-
-        if (code == 1000) {
-            setWsSessionState(WsSessionState.CLOSED, "normal close");
+        if (disposition == ProviderRecoveryController.CloseDisposition.NORMAL) {
+            transitionRecovery("normal close", () -> recoveryController.closeNormal("provider close " + code + ": " + reason));
             McTalking.LOGGER.info("{} GeminiWsClient closed normally: {}", logPrefix, reason);
             fireOnCloseActions();
-        } else if (code == 1001) {
-            setWsSessionState(WsSessionState.CLOSED, "going away");
-            McTalking.LOGGER.info("{} GeminiWsClient closed (going away): {}", logPrefix, reason);
-            fireOnCloseActions();
-        } else {
-            McTalking.LOGGER.warn("{} GeminiWsClient closed: {} and code {}", logPrefix, reason, code);
-            if (unrecognizedCloseRetryCount >= MAX_UNRECOGNIZED_CLOSE_RETRIES) {
-                setWsSessionState(WsSessionState.TERMINAL_ERROR, "retry cap exceeded for close code " + code);
-                fireOnCloseActions();
-                AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-                onErrorEvent(new RuntimeException("Close with code " + code + ": " + reason));
-                return;
-            }
-
-            unrecognizedCloseRetryCount++;
-            McTalking.LOGGER.warn("{} Attempting reconnect after unrecognized close code {} (attempt {}/{})",
-                    logPrefix, code, unrecognizedCloseRetryCount, MAX_UNRECOGNIZED_CLOSE_RETRIES);
-            try {
-                ensureConnectionForQueuedInput("abnormal close code " + code + " attempt " + unrecognizedCloseRetryCount);
-            } catch (Exception e) {
-                McTalking.LOGGER.error("{} Reconnect failed after close code {}", logPrefix, code, e);
-                setWsSessionState(WsSessionState.TERMINAL_ERROR, "reconnect failed");
-                fireOnCloseActions();
-                AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-            }
+            return;
         }
+
+        if (disposition == ProviderRecoveryController.CloseDisposition.TRANSIENT) {
+            McTalking.LOGGER.warn("{} Transient provider close {}: {}; scheduling bounded recovery", logPrefix, code, reason);
+            scheduleRecovery("provider close " + code + ": " + reason);
+            return;
+        }
+
+        ProviderRecoveryController.TerminalReason terminalReason = switch (disposition) {
+            case AUTHENTICATION_FAILURE -> ProviderRecoveryController.TerminalReason.AUTHENTICATION;
+            case CONFIGURATION_FAILURE -> ProviderRecoveryController.TerminalReason.CONFIGURATION;
+            case POLICY_FAILURE -> ProviderRecoveryController.TerminalReason.PROVIDER_POLICY;
+            default -> ProviderRecoveryController.TerminalReason.PROVIDER_ERROR;
+        };
+        String detail = "provider close " + code + ": " + (reason == null ? "" : reason);
+        transitionRecovery(detail, () -> recoveryController.terminal(terminalReason, detail));
+        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
+        finishProviderTerminal(new RuntimeException(detail));
     }
 
     @Override
     public void onError(Exception ex) {
-        McTalking.LOGGER.error("{} Error in GeminiWsClient: ", logPrefix, ex);
-        if (intentionalClose || QuotaTracker.isQuotaExceeded(getModelName())) {
-            return;
-        }
-
-        ensureConnectionForQueuedInput("onError");
-        if (wsSessionState == WsSessionState.RECONNECTING
-                || wsSessionState == WsSessionState.CONNECTING
-                || wsSessionState == WsSessionState.SETTING_UP) {
-            return;
-        }
-
-        setWsSessionState(WsSessionState.TERMINAL_ERROR, "websocket error");
-        fireOnCloseActions();
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-        onErrorEvent(ex);
+        McTalking.LOGGER.error("{} Error in GeminiWsClient", logPrefix, ex);
+        ProviderRecoveryController.Diagnostic diagnostic = recoveryController.diagnostic();
+        if (recoveryController.intentionalClose() || diagnostic.terminal()
+                || QuotaTracker.isQuotaExceeded(getModelName())) return;
+        scheduleRecovery("websocket error: " + ex.getClass().getSimpleName());
     }
 
     @Override
@@ -988,28 +977,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void connect() {
-        intentionalClose = false;
+        if (recoveryController.diagnostic().terminal()) {
+            McTalking.LOGGER.debug("{} Ignoring connect() after terminal provider state {}",
+                    logPrefix, recoveryController.diagnostic().state());
+            return;
+        }
         hasMadeInitialConnection = true;
-        setWsSessionState(WsSessionState.CONNECTING, "connect()");
+        transitionRecovery("connect()", () -> recoveryController.markConnecting("connect()"));
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.CONNECTING);
         super.connect();
     }
 
     @Override
     public void reconnect() {
-        if (!canAttemptRecovery()) {
-            setWsSessionState(WsSessionState.TERMINAL_ERROR, "recovery budget exhausted");
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-            fireOnCloseActions();
-            return;
-        }
-        intentionalClose = false;
-        reconnectAttempts++;
-        totalRecoveryAttempts++;
-        nextReconnectAllowedAt = System.currentTimeMillis() + currentReconnectBackoffMs();
-        setWsSessionState(WsSessionState.RECONNECTING, "reconnect()");
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.RECONNECTING);
-        getReconnectExecutor().execute(() -> super.reconnect());
+        scheduleRecovery("explicit reconnect");
     }
 
     public void promptAudioOpus(byte[] audio) {
@@ -1018,11 +999,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         addPromptAudio(raw);
     }
 
-
     @Override
     public void close() {
+        if (!closeStarted.compareAndSet(false, true)) return;
         synchronized (this) {
-            intentionalClose = true;
+            transitionRecovery("close()", () -> recoveryController.closeIntentional("close()"));
             reconnectScheduled = false;
             if (reconnectFuture != null) {
                 reconnectFuture.cancel(false);
@@ -1032,14 +1013,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 gracefulEndFuture.cancel(false);
                 gracefulEndFuture = null;
             }
-            setWsSessionState(WsSessionState.CLOSED, "close()");
         }
         ADDON_TOOL_DISPATCHER.forgetSession(toolSessionId);
         AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
-        super.close();
-        stream.close();
-
-        fireOnCloseActions();
+        try {
+            super.close();
+        } finally {
+            stream.close();
+            fireOnCloseActions();
+        }
     }
 
     /**

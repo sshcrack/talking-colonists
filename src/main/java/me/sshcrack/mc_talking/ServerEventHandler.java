@@ -121,7 +121,7 @@ public class ServerEventHandler {
     @SubscribeEvent
     public void onPlayerLeave(EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            ConversationManager.endConversation(player.getUUID(), false);
+            ConversationManager.endConversationForDisconnect(player.getUUID());
 
             MinecraftServer server = player.getServer();
             UrgentContactHandler.onPlayerLeave(player.getUUID(), server);

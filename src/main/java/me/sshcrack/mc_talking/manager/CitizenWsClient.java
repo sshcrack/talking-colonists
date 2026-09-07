@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import me.sshcrack.mc_talking.config.AvailableAI;
@@ -67,6 +68,8 @@ public class CitizenWsClient extends GeminiWsClient {
     private final boolean startedInSystemMode;
     private final CitizenPromptView promptView;
     private final PromptSessionContext promptSessionContext;
+    /** Prevents repeated close calls from scheduling duplicate player-memory writes. */
+    private final AtomicBoolean playerMemoryCloseHandled = new AtomicBoolean(false);
 
     // -------------------------------------------------------------------------
     // Constructors
@@ -261,8 +264,8 @@ public class CitizenWsClient extends GeminiWsClient {
         super.close();
 
         if (closingPlayer == null || !McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
-        if (!startedInSystemMode) {
-            // Direct player conversation — generate memory of this interaction
+        if (!startedInSystemMode && playerMemoryCloseHandled.compareAndSet(false, true)) {
+            // Direct player conversation — generate memory exactly once for this ownership lifetime.
             triggerPlayerMemoryGeneration(closingPlayer);
         }
     }

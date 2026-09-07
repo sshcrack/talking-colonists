@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
@@ -316,12 +317,20 @@ public class CitizenConversation {
             return;
         }
 
-        // Claim both slots (low-priority) before creating any clients
-        if (!ConversationManager.claimSlot(citizenA, false) || !ConversationManager.claimSlot(citizenB, false)) {
-            // Shouldn't happen after the capacity check above, but be safe
-            ConversationManager.releaseSlot(citizenA);
-            ConversationManager.releaseSlot(citizenB);
-            McTalking.LOGGER.warn("[LiveConv] Failed to claim slots, aborting");
+        // Reserve both low-priority participants with exact ownership handles before creating clients.
+        ConversationManager.ForegroundReservation reservationA =
+                ConversationManager.reserveAmbientForeground(citizenA, ConversationKind.CITIZEN_PAIR);
+        if (reservationA == null) {
+            McTalking.LOGGER.warn("[LiveConv] Failed to reserve first participant, aborting");
+            setState(ConversationState.ENDED);
+            return;
+        }
+        ConversationManager.ForegroundReservation reservationB =
+                ConversationManager.reserveAmbientForeground(citizenB, ConversationKind.CITIZEN_PAIR);
+        if (reservationB == null) {
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "paired conversation could not reserve second participant");
+            McTalking.LOGGER.warn("[LiveConv] Failed to reserve second participant, aborting");
             setState(ConversationState.ENDED);
             return;
         }
@@ -334,32 +343,12 @@ public class CitizenConversation {
         AtomicReference<LiveConversationWsClient> clientBRef = new AtomicReference<>();
 
         Consumer<LiveConversationWsClient> onClientEnded = client -> {
-            if (!cleanupStarted.compareAndSet(false, true)) {
-                return;
-            }
-
-            // WebSocket callbacks do not necessarily run on the Minecraft server
-            // thread. End the pair together and only unregister the exact clients
-            // created by this conversation; a player takeover may already have
-            // replaced one of them in ConversationManager.
+            if (!cleanupStarted.compareAndSet(false, true)) return;
             server.execute(() -> {
-                LiveConversationWsClient expectedA = clientARef.get();
-                LiveConversationWsClient expectedB = clientBRef.get();
-
-                boolean removedA = expectedA != null
-                        && ConversationManager.unregisterExternalClient(citizenA, expectedA);
-                boolean removedB = expectedB != null
-                        && ConversationManager.unregisterExternalClient(citizenB, expectedB);
-
-                if (removedA) {
-                    if (!expectedA.isClosed()) expectedA.close();
-                    ConversationManager.recordCooldown(citizenA);
-                }
-                if (removedB) {
-                    if (!expectedB.isClosed()) expectedB.close();
-                    ConversationManager.recordCooldown(citizenB);
-                }
-
+                reservationA.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
+                        "paired citizen conversation completed");
+                reservationB.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
+                        "paired citizen conversation completed");
                 setState(ConversationState.ENDED);
             });
         };
@@ -396,17 +385,15 @@ public class CitizenConversation {
                     citizenB, viewB, sharedTurnCounter, onClientEnded, basicPromptB);
             clientBRef.set(clientB);
         } catch (RuntimeException e) {
-            // Client construction happens after both foreground slots are claimed.
-            // Release them explicitly so a failed audio/client constructor cannot
-            // permanently consume free-tier capacity. Suppress close callbacks here
-            // because the clients have not been registered in ConversationManager.
             cleanupStarted.set(true);
             LiveConversationWsClient partialA = clientARef.get();
-            if (partialA != null) {
-                try { partialA.close(); } catch (Exception ignored) { }
-            }
-            ConversationManager.releaseSlot(citizenA);
-            ConversationManager.releaseSlot(citizenB);
+            LiveConversationWsClient partialB = clientBRef.get();
+            if (partialA != null) try { partialA.close(); } catch (Exception ignored) { }
+            if (partialB != null) try { partialB.close(); } catch (Exception ignored) { }
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to construct paired provider client");
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to construct paired provider client");
             McTalking.LOGGER.error("[LiveConv] Failed to construct paired Gemini clients", e);
             setState(ConversationState.ENDED);
             return;
@@ -414,19 +401,68 @@ public class CitizenConversation {
 
         clientA.setPeer(clientB);
         clientB.setPeer(clientA);
-
         liveClients = List.of(clientA, clientB);
 
-        // Register in ConversationManager so "already busy" and slot queries work
-        ConversationManager.registerExternalClient(citizenA, clientA);
-        ConversationManager.registerExternalClient(citizenB, clientB);
+        boolean attachedA = reservationA.attachClient(clientA);
+        boolean attachedB = reservationB.attachClient(clientB);
+        if (!attachedA || !attachedB) {
+            cleanupStarted.set(true);
+            if (!attachedA && !clientA.isLifecycleClosed()) clientA.close();
+            if (!attachedB && !clientB.isLifecycleClosed()) clientB.close();
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "paired client ownership changed before attach");
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "paired client ownership changed before attach");
+            setState(ConversationState.ENDED);
+            return;
+        }
+
+        clientA.addOnCloseAction(() -> server.execute(() -> {
+            if (!cleanupStarted.compareAndSet(false, true)) return;
+            var diagnostic = clientA.getRecoveryDiagnostic();
+            reservationA.end(
+                    diagnostic.terminalReason() == me.sshcrack.mc_talking.internal.session.ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
+                            ? ForegroundSessionRegistry.TerminalReason.RECOVERY_EXHAUSTED
+                            : ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
+                    diagnostic.detail());
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
+                    "peer provider session terminated: " + diagnostic.detail());
+            setState(ConversationState.ENDED);
+        }));
+        clientB.addOnCloseAction(() -> server.execute(() -> {
+            if (!cleanupStarted.compareAndSet(false, true)) return;
+            var diagnostic = clientB.getRecoveryDiagnostic();
+            reservationB.end(
+                    diagnostic.terminalReason() == me.sshcrack.mc_talking.internal.session.ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
+                            ? ForegroundSessionRegistry.TerminalReason.RECOVERY_EXHAUSTED
+                            : ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
+                    diagnostic.detail());
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
+                    "peer provider session terminated: " + diagnostic.detail());
+            setState(ConversationState.ENDED);
+        }));
 
         try {
             clientA.connect();
             clientB.connect();
         } catch (RuntimeException e) {
+            cleanupStarted.set(true);
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to connect paired provider session");
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to connect paired provider session");
             McTalking.LOGGER.error("[LiveConv] Failed to connect paired Gemini sessions", e);
-            onClientEnded.accept(clientA);
+            setState(ConversationState.ENDED);
+            return;
+        }
+
+        if (!reservationA.activate() || !reservationB.activate()) {
+            cleanupStarted.set(true);
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "paired ownership changed before activation");
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "paired ownership changed before activation");
+            setState(ConversationState.ENDED);
             return;
         }
 

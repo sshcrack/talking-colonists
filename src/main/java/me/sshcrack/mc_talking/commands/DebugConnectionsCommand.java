@@ -61,6 +61,7 @@ public class DebugConnectionsCommand {
                         : "player";
 
                 String duration = McTalkingDebugCommand.formatDuration(client.getSessionStartTimeMs());
+                var recovery = client.getRecoveryDiagnostic();
 
                 msg.append(Component.literal("\n  §7- "))
                         .append(Component.literal(citizenName).withStyle(ChatFormatting.AQUA))
@@ -73,7 +74,13 @@ public class DebugConnectionsCommand {
                         .append(Component.literal(" - ").withStyle(ChatFormatting.GRAY))
                         .append(Component.literal(sessionType).withStyle(ChatFormatting.WHITE))
                         .append(Component.literal("] ").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal(duration).withStyle(ChatFormatting.DARK_GRAY));
+                        .append(Component.literal(duration).withStyle(ChatFormatting.DARK_GRAY))
+                        .append(Component.literal(" §8(provider: "))
+                        .append(Component.literal(recovery.state().name()).withStyle(
+                                recovery.terminal() ? ChatFormatting.RED :
+                                        recovery.state().name().equals("RECOVERING") ? ChatFormatting.YELLOW : ChatFormatting.GRAY))
+                        .append(Component.literal(", recovery=" + recovery.totalRecoveryAttempts() + ")")
+                                .withStyle(ChatFormatting.DARK_GRAY));
 
                 if (playerName != null) {
                     msg.append(Component.literal(" §8(player: "))

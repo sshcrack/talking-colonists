@@ -4,6 +4,8 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.CitizenHelper;
@@ -27,7 +29,12 @@ public class UrgentContactHandler {
     private static final long WALK_TIMEOUT_MS = 60_000L;
     private static final long REPATH_INTERVAL_MS = 1_000L;
 
-    private record WalkingTarget(UUID playerId, long startedAtMs, long lastRepathAtMs) {
+    private record WalkingTarget(
+            UUID playerId,
+            long startedAtMs,
+            long lastRepathAtMs,
+            ConversationManager.ForegroundReservation reservation
+    ) {
     }
 
     private static final Map<UUID, WalkingTarget> walkingCitizens = new HashMap<>();
@@ -96,13 +103,15 @@ public class UrgentContactHandler {
     }
 
     static boolean startWalkingUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
-        if (!ConversationManager.claimSlot(citizen, false)) {
+        ConversationManager.ForegroundReservation reservation =
+                ConversationManager.reserveAmbientForeground(citizen, ConversationKind.URGENT_CONTACT);
+        if (reservation == null) {
             McTalking.LOGGER.debug("[CitizenContact] No slot available for walking citizen {}", citizen.getUUID());
             return false;
         }
 
         long now = System.currentTimeMillis();
-        walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), now, now));
+        walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), now, now, reservation));
         AiStatusHelper.setAiStatusSynced(citizen, AiStatus.URGENT_WALKING);
         citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
 
@@ -158,7 +167,8 @@ public class UrgentContactHandler {
                         citizenName);
                 citizen.getNavigation().stop();
                 AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
-                ConversationManager.releaseSlot(citizen);
+                target.reservation().end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                        "urgent need resolved before contact");
                 it.remove();
                 continue;
             }
@@ -170,7 +180,8 @@ public class UrgentContactHandler {
                             citizen.getCitizenData().getName());
                     it.remove();
                     AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
-                    ConversationManager.releaseSlot(citizen);
+                    target.reservation().end(ForegroundSessionRegistry.TerminalReason.REPLACED,
+                            "urgent walk reached player; handing off to audible contact");
                     ConversationManager.startUrgentContact(citizen, player);
                     continue;
                 }
@@ -178,7 +189,7 @@ public class UrgentContactHandler {
 
             if (now - target.lastRepathAtMs() >= REPATH_INTERVAL_MS) {
                 citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
-                entry.setValue(new WalkingTarget(target.playerId(), target.startedAtMs(), now));
+                entry.setValue(new WalkingTarget(target.playerId(), target.startedAtMs(), now, target.reservation()));
             }
         }
     }
@@ -189,7 +200,11 @@ public class UrgentContactHandler {
             entity.getNavigation().stop();
             AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
         }
-        ConversationManager.releaseSlot(citizenId);
+        WalkingTarget target = walkingCitizens.get(citizenId);
+        if (target != null) {
+            target.reservation().end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                    "urgent walk aborted");
+        }
     }
 
     public static void checkUrgentContactAbort(ServerPlayer player) {

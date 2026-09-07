@@ -10,6 +10,11 @@ import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.internal.api.ConversationEventRuntime;
 import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
+import me.sshcrack.mc_talking.internal.session.BackgroundSessionRegistry;
+import me.sshcrack.mc_talking.internal.session.CitizenActivityRegistry;
+import me.sshcrack.mc_talking.internal.session.ConversationCooldownRegistry;
+import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
+import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
@@ -28,10 +33,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,465 +72,236 @@ import net.minecraft.core.component.DataComponents;
 public class ConversationManager {
     private ConversationManager() { /* utility class */ }
 
-    // Active AI clients keyed by citizen entity UUID
-    private static final Map<UUID, GeminiWsClient> clients = new ConcurrentHashMap<>();
-
-    // Publicly observable semantic kind for each active audible citizen session.
-    private static final Map<UUID, ConversationKind> activeConversationKinds = new ConcurrentHashMap<>();
-
-    // playerId → citizen entity the player is talking to
-    private static final Map<UUID, AbstractEntityCitizen> activeEntity = new ConcurrentHashMap<>();
-
-    // playerId → citizenId (the citizen the player is currently in conversation with)
-    private static final Map<UUID, UUID> playerConversationPartners = new ConcurrentHashMap<>();
-
-    // citizenId → playerId reverse map for O(1) getPlayerForEntity lookups
-    private static final Map<UUID, UUID> citizenToPlayer = new ConcurrentHashMap<>();
-
-    /**
-     * citizenId → System.currentTimeMillis() at which their last automatic session ended.
-     * Used to enforce the per-citizen cooldown configured in
-     * {@link me.sshcrack.mc_talking.config.McTalkingConfig#citizenCooldownSeconds}.
-     */
-    private static final Map<UUID, Long> lastSessionEndTime = new ConcurrentHashMap<>();
-
-    /**
-     * citizenId → need signature captured when the cooldown was recorded.
-     * If the citizen's current need signature differs, the cooldown is cleared
-     * so they can immediately contact about a new problem.
-     */
-    private static final Map<UUID, String> lastSessionNeedSignatures = new ConcurrentHashMap<>();
-
-    /**
-     * Insertion-ordered queue of all occupied citizen slots.
-     * The head (oldest) is the first eviction candidate.
-     *
-     * <p>This set can diverge from {@link #clients}: {@link #claimSlot} adds to
-     * {@code addedEntities} before a client is created, and {@link #registerExternalClient}
-     * adds to {@code clients} without touching this set. {@link #isCitizenBusy} checks
-     * both, so either being present is sufficient to prevent double-booking.</p>
-     */
-    private static final Set<UUID> addedEntities = new LinkedHashSet<>();
-    /** Claim timestamp used only to recover reservations that never attach a foreground client. */
-    private static final Map<UUID, Long> foregroundSlotClaimedAtNanos = new ConcurrentHashMap<>();
     private static final long ORPHAN_FOREGROUND_SLOT_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(2);
+    private static final long PREGEN_BACKGROUND_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(3);
+    private static final long COMPACTION_BACKGROUND_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(10);
 
-    /** Token-owned internal activities such as Flash/TTS generation and cached playback. */
-    private static final Map<UUID, CoreActivitySlot> coreBusyReservations = new ConcurrentHashMap<>();
+    /** Citizen sessions, busy leases, cooldowns, and background work each have one token-owned registry. */
+    private static final ForegroundSessionRegistry<AbstractEntityCitizen, GeminiWsClient> foregroundSessions =
+            new ForegroundSessionRegistry<>(
+                    () -> McTalkingConfig.INSTANCE.instance().maxConcurrentAgents,
+                    System::nanoTime,
+                    GeminiWsClient::close,
+                    GeminiWsClient::isLifecycleClosed,
+                    ConversationManager::onForegroundTerminated
+            );
+    private static final CitizenActivityRegistry activities = new CitizenActivityRegistry(System::nanoTime);
+    private static final ConversationCooldownRegistry cooldowns = new ConversationCooldownRegistry(System::currentTimeMillis);
+    private static final BackgroundSessionRegistry<GeminiLiveClient> backgroundSessions =
+            new BackgroundSessionRegistry<>(
+                    () -> McTalkingConfig.INSTANCE.instance().maxConcurrentBackground,
+                    System::nanoTime,
+                    type -> type == BackgroundSlotType.COMPACTION
+                            ? COMPACTION_BACKGROUND_TIMEOUT_NANOS
+                            : PREGEN_BACKGROUND_TIMEOUT_NANOS,
+                    GeminiLiveClient::close,
+                    GeminiLiveClient::isClosed
+            );
 
-    private static final class CoreActivitySlot {
-        final UUID token;
-        final long deadlineNanos;
-        final Runnable onTimeout;
-        final Runnable onPreempt;
-
-        CoreActivitySlot(UUID token, long deadlineNanos, Runnable onTimeout, Runnable onPreempt) {
-            this.token = token;
-            this.deadlineNanos = deadlineNanos;
-            this.onTimeout = onTimeout;
-            this.onPreempt = onPreempt;
-        }
-    }
+    /** Conversations originated by the urgent-contact walk system, for need-resolution aborts. */
+    private static final Set<UUID> urgentContactConversations = ConcurrentHashMap.newKeySet();
 
     /** Exact-ownership handle for internal non-WebSocket citizen activity. */
     public static final class CoreActivityReservation implements AutoCloseable {
-        private final UUID citizenId;
-        private final UUID token;
+        private final CitizenActivityRegistry.Token token;
         private final AtomicBoolean closed = new AtomicBoolean(false);
 
-        private CoreActivityReservation(UUID citizenId, UUID token) {
-            this.citizenId = citizenId;
+        private CoreActivityReservation(CitizenActivityRegistry.Token token) {
             this.token = token;
         }
 
         @Override
         public void close() {
             if (!closed.compareAndSet(false, true)) return;
-            releaseCoreActivity(citizenId, token);
+            activities.release(token.citizenId(), token.ownershipId(), token.ownerKind());
         }
     }
 
-    /** Addon-owned non-conversation activity leases keyed by citizen and opaque token. */
-    private static final Map<UUID, AddonActivitySlot> addonBusyReservations = new ConcurrentHashMap<>();
+    /** Exact token-owned foreground capacity/client reservation used by core conversation flows. */
+    public static final class ForegroundReservation implements AutoCloseable {
+        private final ForegroundSessionRegistry.Token token;
+        private final AtomicBoolean closed = new AtomicBoolean(false);
+        private final AtomicBoolean lifecycleStarted = new AtomicBoolean(false);
 
-    private static final class AddonActivitySlot {
-        final UUID token;
-        long deadlineNanos;
-
-        AddonActivitySlot(UUID token, long deadlineNanos) {
+        private ForegroundReservation(ForegroundSessionRegistry.Token token) {
             this.token = token;
-            this.deadlineNanos = deadlineNanos;
+        }
+
+        public UUID citizenId() {
+            return token.citizenId();
+        }
+
+        public boolean attachClient(GeminiWsClient client) {
+            if (closed.get()) {
+                client.close();
+                return false;
+            }
+            if (!foregroundSessions.attachClient(token, client)) return false;
+            client.addRecoveryObserver(diagnostic -> {
+                if (!lifecycleStarted.get() || !foregroundSessions.isCurrent(token)) return;
+                if (diagnostic.state() == ProviderRecoveryController.State.RECOVERING) {
+                    foregroundSessions.markRecovering(token, diagnostic.totalRecoveryAttempts(), diagnostic.detail());
+                } else if (diagnostic.state() == ProviderRecoveryController.State.ACTIVE) {
+                    foregroundSessions.markActive(token, diagnostic.detail());
+                }
+            });
+            return true;
+        }
+
+        public boolean activate() {
+            if (closed.get() || !foregroundSessions.markActive(token, "conversation active")) return false;
+            if (lifecycleStarted.compareAndSet(false, true)) {
+                foregroundSessions.snapshot(token.citizenId()).ifPresent(snapshot ->
+                        dispatchLifecycleStarted(snapshot.entity(), snapshot.kind(), snapshot.playerId()));
+            }
+            return true;
+        }
+
+        public boolean isCurrent() {
+            return !closed.get() && foregroundSessions.isCurrent(token);
+        }
+
+        public boolean end(ForegroundSessionRegistry.TerminalReason reason, String detail) {
+            closed.set(true);
+            return foregroundSessions.end(token, reason, detail);
+        }
+
+        @Override
+        public void close() {
+            end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "foreground reservation closed");
         }
     }
 
-    /**
-     * Citizen UUIDs whose active conversation originated from the urgent-contact
-     * walk-to-player system. Only these conversations should be auto-aborted by
-     * {@link me.sshcrack.mc_talking.ServerEventHandler#checkUrgentContactAbort}
-     * when the citizen's needs are resolved.
-     */
-    private static final Set<UUID> urgentContactConversations = ConcurrentHashMap.newKeySet();
-
-    // ---- Background pool (configured cheap/current Live model) ----
-    private static final long PREGEN_BACKGROUND_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(3);
-    private static final long COMPACTION_BACKGROUND_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(10);
-    private static final Map<UUID, BackgroundSlot> backgroundSlots = new LinkedHashMap<>();
-
-    private static final class BackgroundSlot {
-        final UUID token;
-        final BackgroundSlotType type;
-        final long deadlineNanos;
-        GeminiLiveClient client;
-
-        BackgroundSlot(UUID token, BackgroundSlotType type, long deadlineNanos) {
-            this.token = token;
-            this.type = type;
-            this.deadlineNanos = deadlineNanos;
-        }
-    }
-
-    /**
-     * Ownership handle for one background task. Cleanup is token-scoped so a delayed callback
-     * from an evicted task can never close a newer task for the same citizen.
-     */
+    /** Ownership handle for one bounded background task. */
     public static final class BackgroundReservation implements AutoCloseable {
-        private final UUID citizenId;
-        private final UUID token;
+        private final BackgroundSessionRegistry.Token token;
         private final AtomicBoolean closed = new AtomicBoolean(false);
 
-        private BackgroundReservation(UUID citizenId, UUID token) {
-            this.citizenId = citizenId;
+        private BackgroundReservation(BackgroundSessionRegistry.Token token) {
             this.token = token;
         }
 
         public boolean attachClient(GeminiLiveClient client) {
             if (closed.get()) {
-                closeQuietly(client, "late background client", citizenId);
+                closeQuietly(client, "late background client", token.citizenId());
                 return false;
             }
-            return registerBackgroundClient(citizenId, token, client);
+            return backgroundSessions.attach(token, client);
         }
 
         public boolean isActive() {
-            return !closed.get() && isBackgroundReservationActive(citizenId, token);
+            return !closed.get() && backgroundSessions.isActive(token);
         }
 
         @Override
         public void close() {
             if (!closed.compareAndSet(false, true)) return;
-            releaseBackgroundSlot(citizenId, token);
+            backgroundSessions.release(token);
         }
     }
 
     // -------------------------------------------------------------------------
-    // Slot management (priority-aware, synchronized)
+    // Token-owned foreground/background reservations
     // -------------------------------------------------------------------------
 
-    /**
-     * Tries to claim one agent slot for {@code entityId}.
-     *
-     * <ul>
-     *   <li><b>High-priority</b> ({@code isPlayerConversation=true}): evicts the
-     *       oldest non-player session when at capacity, but never another player.</li>
-     *   <li><b>Low-priority</b> ({@code isPlayerConversation=false}): succeeds
-     *       only when a slot is genuinely free. Ambient speech never evicts an
-     *       existing conversation, because doing so can cut audible speech off
-     *       mid-sentence.</li>
-     * </ul>
-     *
-     * @return {@code true} if the slot was granted
-     */
-    public static synchronized boolean claimSlot(AbstractEntityCitizen citizen, boolean isPlayerConversation) {
-        UUID entityId = citizen.getUUID();
-
-        // Foreground interactions always take precedence over invisible background
-        // work such as greeting pregeneration or memory compaction. Keeping both
-        // alive wastes free-tier quota and can make the citizen appear unavailable.
-        if (backgroundSlots.containsKey(entityId)) {
-            cancelBackgroundSlot(entityId, "foreground interaction started");
-        }
-
-        if (addedEntities.contains(entityId)) return true; // already registered
-
-        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
-
-        if (addedEntities.size() < max) {
-            addedEntities.add(entityId);
-            foregroundSlotClaimedAtNanos.put(entityId, System.nanoTime());
-            McTalking.LOGGER.info("[ConversationManager] Reserved slot for entity {} (Player: {})", entityId, isPlayerConversation);
-            return true;
-        }
-
-        if (!isPlayerConversation) {
-            return false;
-        }
-
-        // Player conversations may preempt the oldest non-player slot.
-        UUID victim = findEvictableNonPlayerSlot();
-
-        if (victim == null) {
-            // Every slot belongs to a player conversation. Never terminate somebody
-            // else's live conversation merely to admit a newer request.
-            return false;
-        }
-
-        addedEntities.remove(victim);
-        foregroundSlotClaimedAtNanos.remove(victim);
-
-        evict(victim);
-        addedEntities.add(entityId);
-        foregroundSlotClaimedAtNanos.put(entityId, System.nanoTime());
-        McTalking.LOGGER.info("[ConversationManager] Reserved slot for entity {} after eviction (Player: {})", entityId, isPlayerConversation);
-        return true;
+    /** Reserves one low-priority foreground session. Ambient work never evicts active work. */
+    public static ForegroundReservation reserveAmbientForeground(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind
+    ) {
+        java.util.Objects.requireNonNull(citizen, "citizen");
+        java.util.Objects.requireNonNull(kind, "kind");
+        UUID citizenId = citizen.getUUID();
+        backgroundSessions.cancel(citizenId);
+        if (activities.isBusy(citizenId)) return null;
+        var reservation = foregroundSessions.reserve(
+                citizenId, citizen, kind, ForegroundSessionRegistry.Priority.AMBIENT, null);
+        if (!reservation.granted()) return null;
+        McTalking.LOGGER.info("[ConversationManager] Reserved ambient foreground session for {} ({})", citizenId, kind);
+        return new ForegroundReservation(reservation.token());
     }
 
-    /**
-     * Releases the slot for {@code entityId} without closing its client.
-     * Use when the client is already closed externally.
-     */
-    public static synchronized void releaseSlot(AbstractEntityCitizen citizen) {
-        releaseSlot(citizen.getUUID());
+    private static ForegroundReservation reservePlayerForeground(
+            AbstractEntityCitizen citizen,
+            UUID playerId
+    ) {
+        UUID citizenId = citizen.getUUID();
+        backgroundSessions.cancel(citizenId);
+        var reservation = foregroundSessions.reserve(
+                citizenId, citizen, ConversationKind.PLAYER, ForegroundSessionRegistry.Priority.PLAYER, playerId);
+        if (!reservation.granted()) return null;
+        McTalking.LOGGER.info("[ConversationManager] Reserved player foreground session for {} / {}", citizenId, playerId);
+        return new ForegroundReservation(reservation.token());
     }
 
-    public static synchronized void releaseSlot(UUID entityId) {
-        urgentContactConversations.remove(entityId);
-        foregroundSlotClaimedAtNanos.remove(entityId);
-        if (addedEntities.remove(entityId)) {
-            McTalking.LOGGER.info("[ConversationManager] Freed slot for entity {}", entityId);
-        }
+    public static boolean hasLowPriorityCapacity(int slotsNeeded) {
+        return foregroundSessions.hasLowPriorityCapacity(slotsNeeded);
     }
 
-    /**
-     * Registers a client that was created externally (e.g. a
-     * {@link me.sshcrack.mc_talking.conversations.LiveConversationWsClient})
-     * in the client map. The slot must already have been claimed via
-     * {@link #claimSlot}.
-     */
-    public static synchronized void registerExternalClient(AbstractEntityCitizen citizen, GeminiWsClient client) {
-        clients.put(citizen.getUUID(), client);
-        markConversationStarted(citizen, ConversationKind.CITIZEN_PAIR, null);
+    public static boolean hasFreeCapacity(int slotsNeeded) {
+        return foregroundSessions.hasLowPriorityCapacity(slotsNeeded);
     }
 
-    /**
-     * Removes an externally-created client from the map and releases its slot.
-     * Does <em>not</em> close the client.
-     */
-    public static synchronized void unregisterExternalClient(AbstractEntityCitizen citizen) {
-        if (clients.remove(citizen.getUUID()) != null) {
-            markConversationEnded(citizen, ConversationKind.CITIZEN_PAIR, null);
-        }
-        releaseSlot(citizen);
+    public static boolean hasFreeBackgroundCapacity(int slotsNeeded) {
+        backgroundSessions.purge();
+        return backgroundSessions.hasCapacity(slotsNeeded);
     }
 
-    /**
-     * Removes an externally-created client only if it is still the currently
-     * registered client for that citizen. This prevents delayed cleanup from an
-     * old citizen-to-citizen session from releasing a newer player conversation.
-     *
-     * @return true when the expected client was removed and its slot released
-     */
-    public static synchronized boolean unregisterExternalClient(
-            AbstractEntityCitizen citizen, GeminiWsClient expectedClient) {
-        if (!clients.remove(citizen.getUUID(), expectedClient)) {
-            return false;
-        }
-        markConversationEnded(citizen, ConversationKind.CITIZEN_PAIR, null);
-        releaseSlot(citizen);
-        return true;
+    public static int getUsedBackgroundSlots() {
+        backgroundSessions.purge();
+        return backgroundSessions.size();
     }
 
-    /**
-     * Returns {@code true} if at least {@code slotsNeeded} slots are genuinely
-     * free for low-priority work. Existing conversations are not counted as
-     * capacity merely because they would be technically evictable.
-     */
-    public static synchronized boolean hasLowPriorityCapacity(int slotsNeeded) {
-        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
-        int free = max - addedEntities.size();
-        return free >= slotsNeeded;
-    }
-
-
-    /**
-     * Returns {@code true} if at least {@code slotsNeeded} slots can be granted
-     *
-     */
-    public static synchronized boolean hasFreeCapacity(int slotsNeeded) {
-        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentAgents;
-        int free = max - addedEntities.size();
-        return free >= slotsNeeded;
-    }
-
-    // ---- Background pool methods ----
-
-    public static synchronized boolean hasFreeBackgroundCapacity(int slotsNeeded) {
-        if (slotsNeeded < 1) throw new IllegalArgumentException("slotsNeeded must be positive");
-        purgeStaleBackgroundSlots();
-        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
-        return (max - backgroundSlots.size()) >= slotsNeeded;
-    }
-
-    public static synchronized int getUsedBackgroundSlots() {
-        purgeStaleBackgroundSlots();
-        return backgroundSlots.size();
-    }
-
-    public static synchronized int getMaxBackgroundSlots() {
+    public static int getMaxBackgroundSlots() {
         return McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
     }
 
-    /**
-     * Reserves one background slot and returns its ownership handle, or {@code null} when no slot
-     * is available. Compaction may evict the oldest pregeneration task, preserving the existing
-     * background-priority rule.
-     */
-    public static synchronized BackgroundReservation reserveBackgroundSlot(
+    public static BackgroundReservation reserveBackgroundSlot(
             AbstractEntityCitizen citizen,
             BackgroundSlotType type
     ) {
-        purgeStaleBackgroundSlots();
+        var token = backgroundSessions.reserve(citizen.getUUID(), type);
+        if (token == null) return null;
+        McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", citizen.getUUID(), type);
+        return new BackgroundReservation(token);
+    }
 
-        UUID id = citizen.getUUID();
-        if (backgroundSlots.containsKey(id)) return null;
-
-        int max = McTalkingConfig.INSTANCE.instance().maxConcurrentBackground;
-        if (backgroundSlots.size() >= max && type == BackgroundSlotType.COMPACTION) {
-            UUID victim = null;
-            for (Map.Entry<UUID, BackgroundSlot> entry : backgroundSlots.entrySet()) {
-                if (entry.getValue().type == BackgroundSlotType.PREGEN) {
-                    victim = entry.getKey();
-                    break;
-                }
-            }
-            if (victim != null) {
-                cancelBackgroundSlot(victim, "evicted for memory compaction");
-                McTalking.LOGGER.info("[ConversationManager] Evicted pregen bg slot {} for compaction {}", victim, id);
-            }
+    public static boolean cancelBackgroundSlot(UUID entityId, String reason) {
+        boolean cancelled = backgroundSessions.cancel(entityId);
+        if (cancelled) {
+            McTalking.LOGGER.info("[ConversationManager] Released background slot for {} ({})", entityId, reason);
         }
-
-        if (backgroundSlots.size() >= max) return null;
-
-        UUID token = UUID.randomUUID();
-        long timeout = type == BackgroundSlotType.COMPACTION
-                ? COMPACTION_BACKGROUND_TIMEOUT_NANOS
-                : PREGEN_BACKGROUND_TIMEOUT_NANOS;
-        backgroundSlots.put(id, new BackgroundSlot(token, type, System.nanoTime() + timeout));
-        McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", id, type);
-        return new BackgroundReservation(id, token);
+        return cancelled;
     }
 
-    /** Cancels whichever background task currently belongs to this citizen. */
-    public static synchronized boolean cancelBackgroundSlot(UUID entityId, String reason) {
-        BackgroundSlot slot = backgroundSlots.remove(entityId);
-        if (slot == null) return false;
-        closeQuietly(slot.client, reason, entityId);
-        McTalking.LOGGER.info("[ConversationManager] Released background slot for {} ({})", entityId, reason);
-        return true;
-    }
-
-    private static synchronized boolean registerBackgroundClient(UUID entityId, UUID token, GeminiLiveClient client) {
-        java.util.Objects.requireNonNull(client, "client");
-        BackgroundSlot slot = backgroundSlots.get(entityId);
-        if (slot == null || !slot.token.equals(token)) {
-            closeQuietly(client, "background reservation no longer owned", entityId);
-            return false;
-        }
-        if (slot.client != null && slot.client != client) {
-            closeQuietly(client, "duplicate background client registration", entityId);
-            return false;
-        }
-        slot.client = client;
-        return true;
-    }
-
-    private static synchronized boolean isBackgroundReservationActive(UUID entityId, UUID token) {
-        BackgroundSlot slot = backgroundSlots.get(entityId);
-        return slot != null && slot.token.equals(token);
-    }
-
-    private static synchronized boolean releaseBackgroundSlot(UUID entityId, UUID token) {
-        BackgroundSlot slot = backgroundSlots.get(entityId);
-        if (slot == null || !slot.token.equals(token)) return false;
-        backgroundSlots.remove(entityId);
-        closeQuietly(slot.client, "background task completed", entityId);
-        return true;
-    }
-
-    /** Runs bounded lifecycle cleanup independent of whether addon/core work requests new slots. */
+    /** Runs bounded lifecycle cleanup independent of new slot requests. */
     public static void tickMaintenance() {
-        purgeStaleBackgroundSlots();
-        purgeOrphanForegroundSlots();
-        purgeExpiredAddonActivities();
-        for (Runnable timeoutAction : purgeExpiredCoreActivities()) {
+        for (BackgroundSessionRegistry.Expired expired : backgroundSessions.purge()) {
+            if (expired.deadlineExceeded()) {
+                McTalking.LOGGER.warn("[ConversationManager] Background {} session for {} exceeded its deadline",
+                        expired.type(), expired.citizenId());
+            }
+        }
+
+        int startupTimeouts = foregroundSessions.purgeStartupTimeouts(ORPHAN_FOREGROUND_SLOT_TIMEOUT_NANOS);
+        if (startupTimeouts > 0) {
+            McTalking.LOGGER.warn("[ConversationManager] Recovered {} foreground startup reservation(s) after timeout", startupTimeouts);
+        }
+
+        for (var snapshot : foregroundSessions.snapshots()) {
+            AbstractEntityCitizen entity = snapshot.entity();
+            if (!entity.isAlive() || entity.isRemoved()) {
+                foregroundSessions.end(snapshot.token(), ForegroundSessionRegistry.TerminalReason.ENTITY_UNAVAILABLE,
+                        "citizen unloaded, removed, or died");
+            }
+        }
+
+        for (Runnable timeoutAction : activities.purgeExpired()) {
             try {
                 timeoutAction.run();
             } catch (Throwable t) {
                 McTalking.LOGGER.error("[ConversationManager] Core activity timeout cleanup failed", t);
             }
-        }
-    }
-
-    private static synchronized void purgeExpiredAddonActivities() {
-        long now = System.nanoTime();
-        var iterator = addonBusyReservations.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<UUID, AddonActivitySlot> entry = iterator.next();
-            if (now < entry.getValue().deadlineNanos) continue;
-            iterator.remove();
-            McTalking.LOGGER.warn("[ConversationManager] Recovered expired addon activity lease for {}", entry.getKey());
-        }
-    }
-
-    private static synchronized List<Runnable> purgeExpiredCoreActivities() {
-        long now = System.nanoTime();
-        List<Runnable> timeoutActions = new ArrayList<>();
-        var iterator = coreBusyReservations.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<UUID, CoreActivitySlot> entry = iterator.next();
-            CoreActivitySlot slot = entry.getValue();
-            if (now < slot.deadlineNanos) continue;
-            iterator.remove();
-            timeoutActions.add(slot.onTimeout);
-            McTalking.LOGGER.warn("[ConversationManager] Recovered timed-out core activity for {}", entry.getKey());
-        }
-        return timeoutActions;
-    }
-
-    private static synchronized void purgeStaleBackgroundSlots() {
-        long now = System.nanoTime();
-        var iterator = backgroundSlots.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<UUID, BackgroundSlot> entry = iterator.next();
-            UUID id = entry.getKey();
-            BackgroundSlot slot = entry.getValue();
-            boolean closed = slot.client != null && slot.client.isClosed();
-            boolean expired = now >= slot.deadlineNanos;
-            if (!closed && !expired) continue;
-
-            iterator.remove();
-            if (expired && !closed) {
-                McTalking.LOGGER.warn("[ConversationManager] Background {} session for {} exceeded its deadline; closing it",
-                        slot.type, id);
-                closeQuietly(slot.client, "background session deadline exceeded", id);
-            } else {
-                McTalking.LOGGER.debug("[ConversationManager] Purged closed background slot for {}", id);
-            }
-        }
-    }
-
-    private static synchronized void purgeOrphanForegroundSlots() {
-        long now = System.nanoTime();
-        var iterator = addedEntities.iterator();
-        while (iterator.hasNext()) {
-            UUID id = iterator.next();
-            Long claimedAt = foregroundSlotClaimedAtNanos.get(id);
-            if (claimedAt == null || now - claimedAt < ORPHAN_FOREGROUND_SLOT_TIMEOUT_NANOS) continue;
-            if (clients.containsKey(id) || citizenToPlayer.containsKey(id)) continue;
-
-            iterator.remove();
-            foregroundSlotClaimedAtNanos.remove(id);
-            urgentContactConversations.remove(id);
-            McTalking.LOGGER.warn("[ConversationManager] Recovered orphan foreground slot for {} after timeout", id);
         }
     }
 
@@ -542,78 +314,35 @@ public class ConversationManager {
         }
     }
 
-    /**
-     * The oldest non-player entity in the queue that can be evicted, or {@code null}.
-     */
-    private static UUID findEvictableNonPlayerSlot() {
-        for (UUID id : addedEntities) {
-            if (getPlayerForEntity(id) == null) return id;
-        }
-        return null;
-    }
-
-    /**
-     * Closes and removes the client for {@code entityId}.
-     */
-    private static void evict(UUID entityId) {
-        if (entityId == null) return;
-
-        UUID playerId = getPlayerForEntity(entityId);
-        if (playerId != null) {
-            // Re-add entityId because endConversation -> releaseSlot will remove it.
-            // This keeps the slot reserved (counted) during the tear-down sequence.
-            addedEntities.add(entityId);
-            endConversation(playerId, false);
-            return;
-        }
-
-        GeminiWsClient client = clients.remove(entityId);
-        if (client != null) client.close();
-        McTalking.LOGGER.info("[ConversationManager] Evicted slot for entity {} to make room", entityId);
-    }
-
     // -------------------------------------------------------------------------
     // Debug / inspection accessors
     // -------------------------------------------------------------------------
 
-    /**
-     * Returns an unmodifiable view of all active AI clients (citizen UUID → client).
-     */
     public static Map<UUID, GeminiWsClient> getClients() {
-        return Collections.unmodifiableMap(clients);
+        return foregroundSessions.clientsSnapshot();
     }
 
-    /**
-     * Returns an unmodifiable view of the citizen→player reverse mapping.
-     */
     public static Map<UUID, UUID> getCitizenToPlayer() {
-        return Collections.unmodifiableMap(citizenToPlayer);
+        return foregroundSessions.citizenToPlayerSnapshot();
     }
 
-    /**
-     * Returns an unmodifiable view of the player→citizen mapping.
-     */
     public static Map<UUID, UUID> getPlayerConversationPartners() {
-        return Collections.unmodifiableMap(playerConversationPartners);
+        return foregroundSessions.playerToCitizenSnapshot();
     }
 
-    /**
-     * Returns an unmodifiable view of the last session end times.
-     */
     public static Map<UUID, Long> getLastSessionEndTimes() {
-        return Collections.unmodifiableMap(lastSessionEndTime);
+        return cooldowns.endTimesSnapshot();
+    }
+
+    public static List<ForegroundSessionRegistry.TerminalDiagnostic> getForegroundTerminalHistory() {
+        return foregroundSessions.terminalHistory();
     }
 
     // -------------------------------------------------------------------------
-    // "Already busy" check
+    // Busy ownership and cooldowns
     // -------------------------------------------------------------------------
 
-    /**
-     * Claims a token-owned internal activity without consuming a Gemini foreground slot.
-     * Timed-out reservations are removed by {@link #tickMaintenance()} and invoke the supplied
-     * timeout callback after ownership has been released.
-     */
-    public static synchronized CoreActivityReservation reserveCoreActivity(
+    public static CoreActivityReservation reserveCoreActivity(
             AbstractEntityCitizen citizen,
             long timeout,
             TimeUnit unit,
@@ -627,194 +356,158 @@ public class ConversationManager {
         if (timeout <= 0) throw new IllegalArgumentException("timeout must be positive");
 
         UUID citizenId = citizen.getUUID();
-        if (clients.containsKey(citizenId) || addedEntities.contains(citizenId)
-                || coreBusyReservations.containsKey(citizenId) || addonBusyReservations.containsKey(citizenId)) {
-            return null;
-        }
-
-        UUID token = UUID.randomUUID();
-        long timeoutNanos = unit.toNanos(timeout);
-        long now = System.nanoTime();
-        long deadline = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
-        coreBusyReservations.put(citizenId, new CoreActivitySlot(token, deadline, onTimeout, onPreempt));
-        return new CoreActivityReservation(citizenId, token);
+        CitizenActivityRegistry.Token token = activities.reserveCore(
+                citizenId, foregroundSessions.isBusy(citizenId), unit.toNanos(timeout), onTimeout, onPreempt);
+        return token == null ? null : new CoreActivityReservation(token);
     }
 
-    private static boolean releaseCoreActivity(UUID citizenId, UUID token) {
-        CoreActivitySlot current = coreBusyReservations.get(citizenId);
-        return current != null && current.token.equals(token)
-                && coreBusyReservations.remove(citizenId, current);
+    private static Runnable removeActivityForPlayerPreemption(UUID citizenId) {
+        return activities.preemptForPlayer(citizenId);
     }
 
-    /**
-     * Removes the currently-owned internal activity before a player takeover and returns the
-     * matching preemption callback. Removal happens before the callback runs, so cleanup caused by
-     * the old activity cannot affect a replacement reservation.
-     */
-    private static synchronized Runnable removeCoreActivityForPreemption(UUID citizenId) {
-        CoreActivitySlot slot = coreBusyReservations.remove(citizenId);
-        return slot == null ? null : slot.onPreempt;
-    }
-
-    /**
-     * Returns {@code true} when the citizen already has any kind of active
-     * session: mumbling, player conversation, or citizen-to-citizen conversation.
-     * Use this before starting any new session to avoid duplicates.
-     */
-    public static synchronized boolean isCitizenBusy(AbstractEntityCitizen citizen) {
-        purgeExpiredAddonActivities();
+    public static boolean isCitizenBusy(AbstractEntityCitizen citizen) {
         UUID id = citizen.getUUID();
-        // Background work is intentionally omitted. It does not consume the
-        // citizen's attention and claimSlot() cancels it if foreground speech starts.
-        return clients.containsKey(id) || addedEntities.contains(id) || coreBusyReservations.containsKey(id)
-                || addonBusyReservations.containsKey(id);
+        return foregroundSessions.isBusy(id) || activities.isBusy(id);
     }
 
-    /** Claims an addon-owned non-conversation activity lease with token-scoped ownership. */
-    public static synchronized boolean claimAddonActivity(
-            AbstractEntityCitizen citizen,
-            UUID token,
-            long timeoutNanos
-    ) {
-        if (timeoutNanos <= 0) throw new IllegalArgumentException("timeoutNanos must be positive");
-        purgeExpiredAddonActivities();
-        UUID citizenId = citizen.getUUID();
-        if (clients.containsKey(citizenId) || addedEntities.contains(citizenId)
-                || coreBusyReservations.containsKey(citizenId) || addonBusyReservations.containsKey(citizenId)) {
-            return false;
-        }
-        addonBusyReservations.put(citizenId, new AddonActivitySlot(token, deadlineFromNow(timeoutNanos)));
-        return true;
+    public static boolean claimAddonActivity(AbstractEntityCitizen citizen, UUID token, long timeoutNanos) {
+        return activities.reserveAddon(citizen.getUUID(), token, foregroundSessions.isBusy(citizen.getUUID()), timeoutNanos);
     }
 
-    /** Renews exactly the addon activity lease identified by {@code token}. */
-    public static synchronized boolean renewAddonActivity(UUID citizenId, UUID token, long timeoutNanos) {
-        if (timeoutNanos <= 0) throw new IllegalArgumentException("timeoutNanos must be positive");
-        purgeExpiredAddonActivities();
-        AddonActivitySlot current = addonBusyReservations.get(citizenId);
-        if (current == null || !current.token.equals(token)) return false;
-        current.deadlineNanos = deadlineFromNow(timeoutNanos);
-        return true;
+    public static boolean renewAddonActivity(UUID citizenId, UUID token, long timeoutNanos) {
+        return activities.renewAddon(citizenId, token, timeoutNanos);
     }
 
-    /** Returns whether this exact addon activity lease is still owned and unexpired. */
-    public static synchronized boolean isAddonActivityActive(UUID citizenId, UUID token) {
-        purgeExpiredAddonActivities();
-        AddonActivitySlot current = addonBusyReservations.get(citizenId);
-        return current != null && current.token.equals(token);
+    public static boolean isAddonActivityActive(UUID citizenId, UUID token) {
+        return activities.isActive(citizenId, token, CitizenActivityRegistry.OwnerKind.ADDON);
     }
 
-    /** Releases exactly the addon activity lease identified by {@code token}. */
-    public static synchronized boolean releaseAddonActivity(UUID citizenId, UUID token) {
-        AddonActivitySlot current = addonBusyReservations.get(citizenId);
-        return current != null && current.token.equals(token)
-                && addonBusyReservations.remove(citizenId, current);
+    public static boolean releaseAddonActivity(UUID citizenId, UUID token) {
+        return activities.release(citizenId, token, CitizenActivityRegistry.OwnerKind.ADDON);
     }
 
-    private static long deadlineFromNow(long timeoutNanos) {
-        long now = System.nanoTime();
-        return timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
-    }
-
-    /** Requests the active citizen session to finish its current audible turn and close. */
     public static boolean requestGracefulEnd(AbstractEntityCitizen citizen) {
-        GeminiWsClient client = clients.get(citizen.getUUID());
+        GeminiWsClient client = foregroundSessions.client(citizen.getUUID());
         if (client == null) return false;
         client.endConversationWhenPossible();
         return true;
     }
 
-    /**
-     * Records that the citizen's automatic session just ended, starting their cooldown timer.
-     * Call this whenever a mumbling or citizen-to-citizen session concludes naturally
-     * (not when a session is evicted to make room for a player).
-     */
     public static void recordCooldown(AbstractEntityCitizen citizen) {
-        lastSessionEndTime.put(citizen.getUUID(), System.currentTimeMillis());
-        lastSessionNeedSignatures.put(citizen.getUUID(), computeNeedSignature(citizen));
+        cooldowns.record(citizen.getUUID(), computeNeedSignature(citizen));
     }
 
-    /**
-     * Returns {@code true} if the citizen is still within their cooldown period and
-     * should not be selected for a new automatic (mumble / citizen-to-citizen) session.
-     *
-     * <p>If the citizen's current needs differ from when the cooldown was recorded,
-     * the cooldown is cleared so they can immediately contact about the new problem.</p>
-     */
     public static boolean isCitizenOnCooldown(AbstractEntityCitizen citizen) {
-        UUID citizenId = citizen.getUUID();
-        Long lastEnd = lastSessionEndTime.get(citizenId);
-        if (lastEnd == null) return false;
-
-        // Check if the citizen's needs have changed since cooldown was recorded
-        String prevSignature = lastSessionNeedSignatures.get(citizenId);
-        String currentSignature = computeNeedSignature(citizen);
-        if (prevSignature != null && !prevSignature.equals(currentSignature)) {
-            lastSessionEndTime.remove(citizenId);
-            lastSessionNeedSignatures.remove(citizenId);
-            return false;
-        }
-
         long cooldownMs = McTalkingConfig.INSTANCE.instance().citizenCooldownSeconds * 1000L;
-        return (System.currentTimeMillis() - lastEnd) < cooldownMs;
+        return cooldowns.isActive(citizen.getUUID(), computeNeedSignature(citizen), cooldownMs);
     }
 
-    /**
-     * ONLY used when a debug command is invoked that explicitly tells to remove the cooldown.
-     * @param citizen the citizen to remove the cooldown for
-     */
     public static void forceRemoveCooldown(AbstractEntityCitizen citizen) {
-        UUID id = citizen.getUUID();
-        lastSessionEndTime.remove(id);
-        lastSessionNeedSignatures.remove(id);
+        cooldowns.reset(citizen.getUUID());
     }
 
-    /**
-     * Computes a signature string representing the citizen's current urgent needs.
-     * If this signature changes between sessions, the cooldown is cleared so the
-     * citizen can immediately contact about a new problem.
-     */
     public static String computeNeedSignature(AbstractEntityCitizen citizen) {
         return CitizenNeedAssessor.computeNeedSignature(citizen);
     }
 
-    private static void markConversationStarted(
+    private static void dispatchLifecycleStarted(
             AbstractEntityCitizen citizen,
             ConversationKind kind,
             UUID playerId
     ) {
-        activeConversationKinds.put(citizen.getUUID(), kind);
         dispatchLifecycleEvent(new ConversationLifecycleEvent(
-                ConversationLifecycleEvent.Phase.STARTED,
-                kind,
-                citizen,
-                playerId,
-                citizen.level().getGameTime()
-        ));
+                ConversationLifecycleEvent.Phase.STARTED, kind, citizen, playerId, citizen.level().getGameTime()));
+    }
+
+    private static void dispatchLifecycleEnded(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind,
+            UUID playerId
+    ) {
+        dispatchLifecycleEvent(new ConversationLifecycleEvent(
+                ConversationLifecycleEvent.Phase.ENDED, kind, citizen, playerId, citizen.level().getGameTime()));
     }
 
     private static void dispatchLifecycleEvent(ConversationLifecycleEvent event) {
         MinecraftServer server = event.citizen().level().getServer();
-        if (server != null) {
+        if (server != null && !server.isSameThread()) {
             server.execute(() -> ConversationEventRuntime.emit(event));
         } else {
             ConversationEventRuntime.emit(event);
         }
     }
 
-    private static void markConversationEnded(
-            AbstractEntityCitizen citizen,
-            ConversationKind expectedKind,
-            UUID playerId
+    private static void onForegroundTerminated(
+            ForegroundSessionRegistry.EndedSession<AbstractEntityCitizen, GeminiWsClient> ended
     ) {
-        if (!activeConversationKinds.remove(citizen.getUUID(), expectedKind)) return;
-        dispatchLifecycleEvent(new ConversationLifecycleEvent(
-                ConversationLifecycleEvent.Phase.ENDED,
-                expectedKind,
-                citizen,
-                playerId,
-                citizen.level().getGameTime()
-        ));
+        var snapshot = ended.snapshot();
+        urgentContactConversations.remove(snapshot.token().citizenId());
+        // Provider callbacks may arrive off-thread. Lifecycle dispatch, need inspection for cooldown,
+        // inventory/status cleanup, and every other Minecraft-world read happen on the server thread.
+        runOnServerThread(snapshot.entity(), () -> {
+            boolean wasActive = ended.previousState() == ForegroundSessionRegistry.State.ACTIVE
+                    || ended.previousState() == ForegroundSessionRegistry.State.RECOVERING;
+            if (wasActive) {
+                dispatchLifecycleEnded(snapshot.entity(), snapshot.kind(), snapshot.playerId());
+                if (snapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT
+                        && switch (ended.reason()) {
+                            case COMPLETED, CANCELLED, PROVIDER_FAILURE, RECOVERY_EXHAUSTED -> true;
+                            default -> false;
+                        }) {
+                    recordCooldown(snapshot.entity());
+                }
+            }
+
+            if (snapshot.playerId() != null) {
+                schedulePlayerPresentationCleanup(snapshot.entity(), snapshot.playerId(), false);
+            }
+        });
+    }
+
+    private static ForegroundSessionRegistry.TerminalReason providerTerminalReason(GeminiWsClient client) {
+        return switch (client.getRecoveryDiagnostic().terminalReason()) {
+            case RECOVERY_EXHAUSTED -> ForegroundSessionRegistry.TerminalReason.RECOVERY_EXHAUSTED;
+            case NORMAL_CLOSE -> ForegroundSessionRegistry.TerminalReason.COMPLETED;
+            case INTENTIONAL_CLOSE -> ForegroundSessionRegistry.TerminalReason.CANCELLED;
+            default -> ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE;
+        };
+    }
+
+    private static void runOnServerThread(AbstractEntityCitizen citizen, Runnable action) {
+        MinecraftServer server = citizen.level().getServer();
+        if (server != null && !server.isSameThread()) server.execute(action);
+        else action.run();
+    }
+
+    private static void schedulePlayerPresentationCleanup(
+            AbstractEntityCitizen entity,
+            UUID playerId,
+            boolean sendMessage
+    ) {
+        runOnServerThread(entity, () -> {
+            if (!entity.isAlive()) return;
+            MinecraftServer server = entity.level().getServer();
+            if (server == null) return;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) return;
+
+            for (ItemStack item : player.getInventory().items) {
+                if (item.getItem() instanceof CitizenTalkingDevice) {
+                    /*? if forge {*/
+                    /*CompoundTag tag = item.getOrCreateTag();
+                    tag.putInt("CustomModelData", 0);
+                    *//*?}*/
+                    /*? if neoforge {*/
+                    item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
+                    /*?}*/
+                }
+            }
+            AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
+            if (sendMessage) {
+                player.sendSystemMessage(Component.translatable("mc_talking.too_far")
+                        .withStyle(ChatFormatting.YELLOW));
+            }
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -889,7 +582,7 @@ public class ConversationManager {
         boolean started = startLowPrioritySession(citizen,
                 MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()),
                 ConversationKind.URGENT_CONTACT);
-        if (started) {
+        if (started && getActiveConversationKind(citizen.getUUID()) == ConversationKind.URGENT_CONTACT) {
             urgentContactConversations.add(citizen.getUUID());
         }
         return started;
@@ -928,7 +621,7 @@ public class ConversationManager {
      *   <li>API key must be configured.</li>
      *   <li>{@link #canCitizenSpeak} must return {@code true} (subsumes busy,
      *       cooldown, sleeping, and visitor checks).</li>
-     *   <li>A low-priority slot must be available via {@link #claimSlot}.</li>
+     *   <li>A low-priority foreground reservation must be available.</li>
      * </ul>
      * <p>Silently returns without throwing if any guard fails.</p>
      *
@@ -970,11 +663,13 @@ public class ConversationManager {
 
     /** Cancels an addon/system ambient session without exposing its Gemini client. */
     public static boolean cancelAddonAmbientSession(AbstractEntityCitizen citizen) {
-        if (getPlayerForEntity(citizen.getUUID()) != null) return false;
-        GeminiWsClient client = clients.get(citizen.getUUID());
-        if (!(client instanceof CitizenWsClient cws) || !cws.isMumbling()) return false;
-        cws.close();
-        return true;
+        UUID citizenId = citizen.getUUID();
+        if (foregroundSessions.playerForCitizen(citizenId) != null) return false;
+        GeminiWsClient client = foregroundSessions.client(citizenId);
+        ForegroundSessionRegistry.Token token = foregroundSessions.token(citizenId);
+        if (token == null || !(client instanceof CitizenWsClient cws) || !cws.isMumbling()) return false;
+        return foregroundSessions.end(token, ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                "ambient session cancelled");
     }
 
     private static boolean startLowPrioritySession(
@@ -1005,53 +700,48 @@ public class ConversationManager {
         if (!canCitizenSpeak(citizen, kind)) return false;
 
         UUID citizenId = citizen.getUUID();
-
-        if (!claimSlot(citizen, false)) {
+        ForegroundReservation reservation = reserveAmbientForeground(citizen, kind);
+        if (reservation == null) {
             McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for session for citizen {}", citizenId);
             return false;
         }
 
         try {
             AtomicBoolean audibleCompletion = new AtomicBoolean(false);
-            final CitizenWsClient[] holder = new CitizenWsClient[1];
-            var client = new CitizenWsClient(citizen, c -> {
+            CitizenWsClient client = new CitizenWsClient(citizen, c -> {
                 String transcript = c.getSessionTranscriptSnapshot();
                 audibleCompletion.set(true);
-                c.close();
-                if (completion != null) {
-                    var server = citizen.level().getServer();
-                    Runnable notify = () -> completion.accept(AmbientLineResult.completed(transcript));
-                    if (server != null && !server.isSameThread()) server.execute(notify);
-                    else notify.run();
-                }
+                runOnServerThread(citizen, () -> {
+                    if (!reservation.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
+                            "ambient audible turn completed")) return;
+                    if (completion != null) completion.accept(AmbientLineResult.completed(transcript));
+                });
             }, promptSessionContext);
-            holder[0] = client;
-            client.addOnCloseAction(() -> {
-                var server = citizen.level().getServer();
-                Runnable cleanup = () -> {
-                    boolean removed = false;
-                    synchronized (ConversationManager.class) {
-                        if (clients.get(citizenId) == holder[0]) {
-                            clients.remove(citizenId);
-                            releaseSlot(citizen);
-                            recordCooldown(citizen);
-                            removed = true;
-                        }
-                    }
-                    if (removed) markConversationEnded(citizen, kind, null);
-                    if (completion != null && !audibleCompletion.get()) {
-                        completion.accept(AmbientLineResult.failed("ambient session closed before audible completion"));
-                    }
-                };
-                if (server != null && !server.isSameThread()) server.execute(cleanup);
-                else cleanup.run();
-            });
+
+            if (!reservation.attachClient(client)) {
+                reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                        "foreground ownership changed before client attach");
+                return false;
+            }
+
+            client.addOnCloseAction(() -> runOnServerThread(citizen, () -> {
+                var diagnostic = client.getRecoveryDiagnostic();
+                boolean ended = reservation.end(providerTerminalReason(client), diagnostic.detail());
+                if (ended && completion != null && !audibleCompletion.get()) {
+                    completion.accept(AmbientLineResult.failed(diagnostic.detail()));
+                }
+            }));
+
+            if (!reservation.activate()) {
+                reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                        "foreground ownership changed before activation");
+                return false;
+            }
             client.addPromptTextAfterTalkingComplete(userPrompt);
-            clients.put(citizenId, client);
-            markConversationStarted(citizen, kind, null);
             return true;
         } catch (RuntimeException e) {
-            releaseSlot(citizen);
+            reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to start low-priority provider session: " + e.getClass().getSimpleName());
             McTalking.LOGGER.error("[ConversationManager] Failed to start low-priority session for {}", citizenId, e);
             return false;
         }
@@ -1078,13 +768,10 @@ public class ConversationManager {
      */
     public static ConversationStartResult startPlayerConversationDetailed(ServerPlayer player, AbstractEntityCitizen citizen) {
         if (!McTalkingConfig.hasGeminiApiKey()) {
-            player.sendSystemMessage(
-                    Component.translatable("mc_talking.no_key")
-                            .withStyle(ChatFormatting.RED));
+            player.sendSystemMessage(Component.translatable("mc_talking.no_key").withStyle(ChatFormatting.RED));
             return ConversationStartResult.rejected(
                     ConversationStartResult.Status.PROVIDER_UNAVAILABLE,
-                    "Gemini API key/provider is unavailable"
-            );
+                    "Gemini API key/provider is unavailable");
         }
 
         ConversationEligibility eligibility = conversationEligibility(citizen, ConversationKind.PLAYER);
@@ -1101,111 +788,103 @@ public class ConversationManager {
         UUID playerId = player.getUUID();
         UUID citizenId = citizen.getUUID();
 
-        UUID existingPlayerId = citizenToPlayer.get(citizenId);
+        UUID existingPlayerId = foregroundSessions.playerForCitizen(citizenId);
         if (existingPlayerId != null && !existingPlayerId.equals(playerId)) {
-            // Check the requested citizen before tearing down the caller's current
-            // conversation. A failed switch must leave the old conversation intact.
-            player.sendSystemMessage(Component.translatable("mc_talking.citizen_in_use")
-                    .withStyle(ChatFormatting.YELLOW));
+            player.sendSystemMessage(Component.translatable("mc_talking.citizen_in_use").withStyle(ChatFormatting.YELLOW));
             return ConversationStartResult.rejected(
                     ConversationStartResult.Status.IN_USE_BY_OTHER_PLAYER,
-                    "citizen is already in a direct conversation with another player"
-            );
+                    "citizen is already in a direct conversation with another player");
         }
 
-        UUID currentCitizenId = playerConversationPartners.get(playerId);
+        UUID currentCitizenId = foregroundSessions.citizenForPlayer(playerId);
         if (currentCitizenId != null && !currentCitizenId.equals(citizenId)) {
-            // A player can only own one direct conversation. Tear the old one down
-            // now that the requested target has passed its ownership check.
             endConversation(playerId, false);
         }
 
-        activeEntity.put(playerId, citizen);
-        citizenToPlayer.put(citizenId, playerId);
+        GeminiWsClient existingClient = foregroundSessions.client(citizenId);
+        ForegroundSessionRegistry.Token existingToken = foregroundSessions.token(citizenId);
+        var existingSnapshot = foregroundSessions.snapshot(citizenId).orElse(null);
 
-        GeminiWsClient existingClient = clients.get(citizenId);
-
-        if (existingClient instanceof CitizenWsClient cws && cws.isMumbling()) {
-            // Reuse the ambient connection, but surface a clean lifecycle transition.
-            ConversationKind previousKind = activeConversationKinds.get(citizenId);
-            if (previousKind != null && previousKind != ConversationKind.PLAYER) {
-                markConversationEnded(citizen, previousKind, null);
+        if (existingClient instanceof CitizenWsClient cws && cws.isMumbling()
+                && existingToken != null && existingSnapshot != null
+                && existingSnapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT) {
+            var promoted = foregroundSessions.promoteToPlayer(existingToken, playerId, ConversationKind.PLAYER);
+            if (promoted.isEmpty()) {
+                return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
+                        "ambient session ownership changed during player takeover");
             }
+            dispatchLifecycleEnded(citizen, promoted.get().before().kind(), null);
             cws.transitionToPlayer(player);
-        } else {
-            // If the citizen is busy via a token-owned non-WebSocket activity (e.g. Flash/TTS
-            // or cached playback), release that exact ownership before running its preemption
-            // callback. Delayed cleanup from it can no longer disturb the player session.
-            Runnable preemptActivity = removeCoreActivityForPreemption(citizenId);
-            if (preemptActivity != null) {
-                try {
-                    preemptActivity.run();
-                } catch (Throwable t) {
-                    McTalking.LOGGER.error("Failed to preempt core activity for {}", citizenId, t);
-                }
-            }
+            urgentContactConversations.remove(citizenId);
+            dispatchLifecycleStarted(citizen, ConversationKind.PLAYER, playerId);
+            return ConversationStartResult.startedResult();
+        }
 
-            // Close any non-player session that is occupying this citizen's slot
-            if (existingClient != null) {
-                ConversationKind previousKind = activeConversationKinds.get(citizenId);
-                if (previousKind != null && previousKind != ConversationKind.PLAYER) {
-                    markConversationEnded(citizen, previousKind, null);
-                }
-                existingClient.close();
-                clients.remove(citizenId);
-                // slot stays in addedEntities; claimSlot will see it already present
-            }
-
-            // High-priority claim may evict ambient work, but never another player.
-            if (!claimSlot(citizen, true)) {
-                activeEntity.remove(playerId);
-                citizenToPlayer.remove(citizenId, playerId);
-                player.sendSystemMessage(Component.translatable("mc_talking.capacity_reached")
-                        .withStyle(ChatFormatting.YELLOW));
-                return ConversationStartResult.rejected(
-                        ConversationStartResult.Status.CAPACITY_EXHAUSTED,
-                        "all foreground slots are occupied by player conversations"
-                );
-            }
-
-            final CitizenWsClient ws;
+        Runnable preemptActivity = removeActivityForPlayerPreemption(citizenId);
+        if (preemptActivity != null) {
             try {
-                ws = new CitizenWsClient(
-                        new CitizenEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
-                        citizen, player);
-            } catch (RuntimeException e) {
-                releaseSlot(citizen);
-                activeEntity.remove(playerId);
-                citizenToPlayer.remove(citizenId, playerId);
-                McTalking.LOGGER.error("Failed to construct Gemini client for player conversation with {}", citizenId, e);
-                return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED, "failed to construct provider session");
-            }
-
-            clients.put(citizenId, ws);
-
-            // Eagerly connect so the WebSocket is already establishing when the first
-            // input arrives.  ensureConnectionForQueuedInput() in GeminiWsClient also
-            // handles the initial-connection path (via hasMadeInitialConnection), so a
-            // lazy approach would also work — but eager connect reduces first-input latency.
-            McTalking.LOGGER.info("Starting initial websocket connection from outer...");
-            try {
-                ws.connect();
-            } catch (RuntimeException e) {
-                clients.remove(citizenId, ws);
-                releaseSlot(citizen);
-                activeEntity.remove(playerId);
-                citizenToPlayer.remove(citizenId, playerId);
-                try { ws.close(); } catch (Exception ignored) { }
-                McTalking.LOGGER.error("Failed to connect Gemini client for player conversation with {}", citizenId, e);
-                return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED, "failed to connect provider session");
+                preemptActivity.run();
+            } catch (Throwable t) {
+                McTalking.LOGGER.error("Failed to preempt core activity for {}", citizenId, t);
             }
         }
 
-        playerConversationPartners.put(playerId, citizenId);
+        if (existingToken != null) {
+            foregroundSessions.end(existingToken, ForegroundSessionRegistry.TerminalReason.REPLACED,
+                    "replaced by direct player conversation");
+        }
+
+        ForegroundReservation reservation = reservePlayerForeground(citizen, playerId);
+        if (reservation == null) {
+            player.sendSystemMessage(Component.translatable("mc_talking.capacity_reached").withStyle(ChatFormatting.YELLOW));
+            return ConversationStartResult.rejected(
+                    ConversationStartResult.Status.CAPACITY_EXHAUSTED,
+                    "all foreground slots are occupied by player conversations");
+        }
+
+        final CitizenWsClient ws;
+        try {
+            ws = new CitizenWsClient(
+                    new CitizenEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
+                    citizen, player);
+        } catch (RuntimeException e) {
+            reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to construct provider session");
+            McTalking.LOGGER.error("Failed to construct Gemini client for player conversation with {}", citizenId, e);
+            return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
+                    "failed to construct provider session");
+        }
+
+        if (!reservation.attachClient(ws)) {
+            reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "foreground ownership changed before player client attach");
+            return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
+                    "player conversation ownership changed during startup");
+        }
+
+        ws.addOnCloseAction(() -> runOnServerThread(citizen, () -> {
+            var diagnostic = ws.getRecoveryDiagnostic();
+            reservation.end(providerTerminalReason(ws), diagnostic.detail());
+        }));
+
+        McTalking.LOGGER.info("Starting initial websocket connection from outer...");
+        try {
+            ws.connect();
+        } catch (RuntimeException e) {
+            reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "failed to connect provider session");
+            McTalking.LOGGER.error("Failed to connect Gemini client for player conversation with {}", citizenId, e);
+            return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
+                    "failed to connect provider session");
+        }
+
+        if (!reservation.activate()) {
+            reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+                    "foreground ownership changed before player activation");
+            return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
+                    "player conversation ownership changed during activation");
+        }
         urgentContactConversations.remove(citizenId);
-        if (activeConversationKinds.get(citizenId) != ConversationKind.PLAYER) {
-            markConversationStarted(citizen, ConversationKind.PLAYER, playerId);
-        }
         return ConversationStartResult.startedResult();
     }
 
@@ -1213,54 +892,27 @@ public class ConversationManager {
         return startPlayerConversationDetailed(player, citizen).started();
     }
 
-    /**
-     * Ends a conversation for a specific player.
-     *
-     * @param playerId    The player's UUID
-     * @param sendMessage Whether to send a "too far" message to the player
-     */
     public static void endConversation(UUID playerId, boolean sendMessage) {
-        UUID citizenId = playerConversationPartners.remove(playerId);
+        endConversation(playerId, sendMessage, ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                "player conversation ended");
+    }
+
+    public static void endConversationForDisconnect(UUID playerId) {
+        endConversation(playerId, false, ForegroundSessionRegistry.TerminalReason.PLAYER_DISCONNECTED,
+                "player disconnected");
+    }
+
+    private static void endConversation(
+            UUID playerId,
+            boolean sendMessage,
+            ForegroundSessionRegistry.TerminalReason reason,
+            String detail
+    ) {
+        UUID citizenId = foregroundSessions.citizenForPlayer(playerId);
         if (citizenId == null) return;
-
-        urgentContactConversations.remove(citizenId);
-        citizenToPlayer.remove(citizenId);
-        GeminiWsClient client = clients.remove(citizenId);
-        if (client != null) client.close();
-
-        AbstractEntityCitizen entity = activeEntity.remove(playerId);
-        if (entity != null) {
-            markConversationEnded(entity, ConversationKind.PLAYER, playerId);
-            releaseSlot(entity);
-        } else {
-            activeConversationKinds.remove(citizenId, ConversationKind.PLAYER);
-        }
-        if (entity != null && entity.isAlive()) {
-            var server = entity.level().getServer();
-            if (server == null)
-                return;
-
-            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-            if (player != null) {
-                for (ItemStack item : player.getInventory().items) {
-                    if (item.getItem() instanceof CitizenTalkingDevice) {
-                        /*? if forge {*/
-                        /*CompoundTag tag = item.getOrCreateTag();
-                        tag.putInt("CustomModelData", 0);
-                        *//*?}*/
-                        /*? if neoforge {*/
-                        item.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
-                        /*?}*/
-                    }
-                }
-
-                AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
-                if (sendMessage) {
-                    player.sendSystemMessage(Component.translatable("mc_talking.too_far")
-                            .withStyle(ChatFormatting.YELLOW));
-                }
-            }
-        }
+        AbstractEntityCitizen entity = foregroundSessions.entityForPlayer(playerId);
+        if (!foregroundSessions.endPlayer(playerId, reason, detail)) return;
+        if (sendMessage && entity != null) schedulePlayerPresentationCleanup(entity, playerId, true);
     }
 
     // -------------------------------------------------------------------------
@@ -1268,61 +920,44 @@ public class ConversationManager {
     // -------------------------------------------------------------------------
 
     public static boolean isPlayerInConversation(UUID playerId) {
-        return playerConversationPartners.containsKey(playerId);
+        return foregroundSessions.citizenForPlayer(playerId) != null;
     }
 
     public static GeminiWsClient getClientForEntity(UUID entityId) {
-        return clients.get(entityId);
+        return foregroundSessions.client(entityId);
     }
 
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {
-        return activeEntity.get(playerId);
+        return foregroundSessions.entityForPlayer(playerId);
     }
 
-    /**
-     * @return {@code true} if the given citizen's conversation originated from
-     * the urgent-contact walk-to-player system
-     */
     public static boolean isUrgentConversation(UUID citizenId) {
         return urgentContactConversations.contains(citizenId);
     }
 
-    /**
-     * Returns the player UUID that is actively conversing with the given citizen, or {@code null}.
-     */
     public static UUID getPlayerForEntity(UUID entityId) {
-        return citizenToPlayer.get(entityId);
+        return foregroundSessions.playerForCitizen(entityId);
     }
 
     public static ConversationKind getActiveConversationKind(UUID entityId) {
-        return activeConversationKinds.get(entityId);
+        return foregroundSessions.kind(entityId);
     }
 
     public static void cleanup() {
-        for (GeminiWsClient client : clients.values()) {
+        foregroundSessions.shutdown();
+        backgroundSessions.shutdown();
+        for (Runnable cleanup : activities.shutdown()) {
             try {
-                client.close();
-            } catch (Exception e) {
-                McTalking.LOGGER.error("Error closing client during cleanup", e);
+                cleanup.run();
+            } catch (Throwable t) {
+                McTalking.LOGGER.error("Error running activity cleanup during shutdown", t);
             }
         }
-        for (BackgroundSlot slot : backgroundSlots.values()) {
-            closeQuietly(slot.client, "server shutdown", null);
-        }
-        clients.clear();
-        activeConversationKinds.clear();
-        activeEntity.clear();
-        playerConversationPartners.clear();
-        citizenToPlayer.clear();
-        addedEntities.clear();
-        foregroundSlotClaimedAtNanos.clear();
-        backgroundSlots.clear();
-        coreBusyReservations.clear();
-        addonBusyReservations.clear();
-        lastSessionEndTime.clear();
-        lastSessionNeedSignatures.clear();
+        urgentContactConversations.clear();
+        cooldowns.clear();
         QuotaTracker.clear();
         me.sshcrack.mc_talking.manager.VoiceSelectionService.clear();
         GeminiWsClient.shutdownExecutor();
     }
+
 }

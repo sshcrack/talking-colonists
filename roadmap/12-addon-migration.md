@@ -40,7 +40,7 @@ blocker and retain the distinction between composite success and release readine
   `f270362aca847726087213c623508ad0a65354c1` and Voyager at
   `6666432ec94e58089635dfe8ea3cc6967b59f12f`. No public Colony Meetings repository
   was found; its integration remains based on the supplied design feedback.
-- `docs/colonist-errands-migration.md` inventories every reviewed Errands mixin plus
+- `docs/addon-migration.md` maps the reviewed legacy integration patterns plus
   direct/reflection access into Talking Colonists and maps each to a public API, a
   core fix, or a remaining gap. `ItemAssistantHammerMixin` and `BlockHutTavernMixin`
   target MineColonies itself and therefore cannot be replaced by a Talking Colonists
