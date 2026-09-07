@@ -19,7 +19,7 @@ public final class CitizenConversationService {
     }
 
     public static boolean isBusy(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.services().isBusy(citizen);
+        return TalkingColonistsApi.services().conversations().isBusy(citizen);
     }
 
     /** Detailed speech eligibility without starting a provider session. */
@@ -27,7 +27,7 @@ public final class CitizenConversationService {
             @NotNull AbstractEntityCitizen citizen,
             @NotNull ConversationKind kind
     ) {
-        return TalkingColonistsApi.services().conversationEligibility(citizen, kind);
+        return TalkingColonistsApi.services().conversations().eligibility(citizen, kind);
     }
 
     /** Convenience equivalent to {@code eligibility(citizen, kind).eligible()}. */
@@ -40,7 +40,7 @@ public final class CitizenConversationService {
             @NotNull ServerPlayer player,
             @NotNull AbstractEntityCitizen citizen
     ) {
-        return TalkingColonistsApi.services().startPlayerConversation(player, citizen);
+        return TalkingColonistsApi.services().conversations().startPlayerConversation(player, citizen);
     }
 
     /**
@@ -52,7 +52,7 @@ public final class CitizenConversationService {
             @NotNull AbstractEntityCitizen citizen,
             @NotNull String promptDirective
     ) {
-        return TalkingColonistsApi.services().requestAmbientLine(citizen, promptDirective);
+        return TalkingColonistsApi.services().conversations().requestAmbientLine(citizen, promptDirective);
     }
 
     /** Observes core-managed audible conversation starts/ends without mixins or manager access. */
@@ -61,37 +61,37 @@ public final class CitizenConversationService {
             int order,
             @NotNull ConversationLifecycleListener listener
     ) {
-        return TalkingColonistsApi.services().registerConversationLifecycleListener(id, order, listener);
+        return TalkingColonistsApi.services().conversations().registerLifecycleListener(id, order, listener);
     }
 
     /** Returns the active Talking Colonists conversation kind for this citizen, if any. */
     public static @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.services().activeConversationKind(citizen);
+        return TalkingColonistsApi.services().conversations().activeKind(citizen);
     }
 
     /** Returns the player currently speaking directly to this citizen, if any. */
     public static @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.services().activePlayerId(citizen);
+        return TalkingColonistsApi.services().conversations().activePlayerId(citizen);
     }
 
     /** Returns whether the player currently owns a direct Talking Colonists conversation. */
     public static boolean isPlayerInConversation(@NotNull ServerPlayer player) {
-        return TalkingColonistsApi.services().isPlayerInConversation(player);
+        return TalkingColonistsApi.services().conversations().isPlayerInConversation(player);
     }
 
     /** Returns true only for genuinely free low-priority provider capacity. */
     public static boolean hasAmbientCapacity(int slotsNeeded) {
-        return TalkingColonistsApi.services().hasAmbientCapacity(slotsNeeded);
+        return TalkingColonistsApi.services().conversations().hasAmbientCapacity(slotsNeeded);
     }
 
     /** Returns whether any online player in the same dimension is within {@code range} blocks. */
     public static boolean hasPlayerNearby(@NotNull AbstractEntityCitizen citizen, double range) {
-        return TalkingColonistsApi.services().hasPlayerNearby(citizen, range);
+        return TalkingColonistsApi.services().conversations().hasPlayerNearby(citizen, range);
     }
 
     /** Requests the active citizen session to finish audible playback and close. */
     public static boolean requestGracefulEnd(@NotNull AbstractEntityCitizen citizen) {
-        return TalkingColonistsApi.services().requestGracefulEnd(citizen);
+        return TalkingColonistsApi.services().conversations().requestGracefulEnd(citizen);
     }
 
     /** Reserves a citizen for addon gameplay with a ten-minute renewable safety lease. */
@@ -108,12 +108,12 @@ public final class CitizenConversationService {
             @NotNull String ownerId,
             @NotNull Duration timeout
     ) {
-        return TalkingColonistsApi.services().reserveActivity(citizen, ownerId, timeout);
+        return TalkingColonistsApi.services().conversations().reserveActivity(citizen, ownerId, timeout);
     }
 
     /** Clears only the automatic-conversation cooldown. */
     public static void resetAutomaticCooldown(@NotNull AbstractEntityCitizen citizen) {
-        TalkingColonistsApi.services().resetAutomaticCooldown(citizen);
+        TalkingColonistsApi.services().conversations().resetAutomaticCooldown(citizen);
     }
 
     /**
@@ -130,7 +130,7 @@ public final class CitizenConversationService {
             @NotNull String agenda,
             @NotNull ControlledConversationOptions options
     ) {
-        return TalkingColonistsApi.services().createControlledSession(server, participants, agenda, options);
+        return TalkingColonistsApi.services().conversations().createControlledSession(server, participants, agenda, options);
     }
 
     /** Creates an ordinary two-citizen autonomous conversation handle. */
@@ -139,6 +139,6 @@ public final class CitizenConversationService {
             @NotNull AbstractEntityCitizen first,
             @NotNull AbstractEntityCitizen second
     ) {
-        return TalkingColonistsApi.services().createPairConversation(server, first, second);
+        return TalkingColonistsApi.services().conversations().createPairConversation(server, first, second);
     }
 }

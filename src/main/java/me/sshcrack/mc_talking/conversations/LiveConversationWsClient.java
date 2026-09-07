@@ -3,7 +3,7 @@ package me.sshcrack.mc_talking.conversations;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;

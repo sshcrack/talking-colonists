@@ -134,6 +134,25 @@ class ForegroundSessionRegistryTest {
     }
 
     @Test
+    void controlledReservationCarriesStableSessionAndTurnIdentityIntoLifecycleSnapshot() {
+        var registry = registry(new AtomicInteger(1), new AtomicLong(), new ArrayList<>());
+        UUID citizen = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        UUID turnId = UUID.randomUUID();
+
+        var reservation = registry.reserve(
+                citizen, "controlled", ConversationKind.CONTROLLED,
+                ForegroundSessionRegistry.Priority.AMBIENT, null, sessionId, turnId);
+
+        assertTrue(reservation.granted());
+        assertEquals(sessionId, reservation.snapshot().sessionId());
+        assertEquals(turnId, reservation.snapshot().turnId());
+        var current = registry.snapshot(citizen).orElseThrow();
+        assertEquals(sessionId, current.sessionId());
+        assertEquals(turnId, current.turnId());
+    }
+
+    @Test
     void shutdownReleasesEveryClientOnceAndRecordsTerminalDiagnostics() {
         AtomicInteger capacity = new AtomicInteger(2);
         AtomicLong clock = new AtomicLong(10);

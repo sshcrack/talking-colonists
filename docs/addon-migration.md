@@ -219,16 +219,23 @@ an addon watchdog that reaps core-owned sessions.
 ## Memory migration
 
 Use `CitizenMemoryService` for facts, events, relationship changes, and immutable snapshots. Structured
-snapshot data includes relationships, broadcasts, and rumors.
+snapshot data includes relationships, broadcasts, and rumors. Low-level `addFact`/`addEvent` writes
+are intentionally unattributed addon-direct memories; do not use them to assert a player's promise or
+other authenticated player statement. Record player speech through the controlled-session transcript,
+and persist gameplay facts only after the addon has authoritatively observed the outcome.
 
 ```java
-CitizenMemoryService.addFact(citizen, "The player promised to repair the bakery.");
-CitizenMemoryService.addRelationshipChange(
-        citizen,
+CitizenMemoryService.confirmOutcome(citizen, new AddonConfirmedOutcome(
+        "my_addon",
+        "bakery_repair_" + repairJobId,
+        "The player completed the bakery repair.",
         player.getUUID(),
-        CitizenRelationshipDimension.TRUST,
-        0.15,
-        "The player kept a promise");
+        List.of("The bakery was repaired as agreed."),
+        List.of(new ConfirmedRelationshipChange(
+                player.getUUID(),
+                CitizenRelationshipDimension.TRUST,
+                0.15f))
+));
 ```
 
 Prompt text assembled from memory is presentation logic and should not be parsed as a data format.
@@ -257,7 +264,7 @@ A typical meeting addon should:
 1. Select/move attendees using its own gameplay logic.
 2. Create a controlled session with the participants and agenda.
 3. Call `requestTurn(...)` for the selected speaker.
-4. Advance the floor after the returned `AmbientLineResult` reports completion.
+4. Advance the floor after the returned `ControlledTurnResult` reports completion.
 5. Add authenticated player statements with `addPlayerStatement(...)` when needed.
 6. Read `transcript()` for structured speaker attribution.
 7. Close/end the session when the meeting finishes.

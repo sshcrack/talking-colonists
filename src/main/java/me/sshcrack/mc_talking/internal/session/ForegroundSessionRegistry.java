@@ -68,6 +68,8 @@ public final class ForegroundSessionRegistry<E, C> {
             ConversationKind kind,
             Priority priority,
             @Nullable UUID playerId,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId,
             State state,
             long reservedAtNanos,
             int recoveryAttempts,
@@ -146,12 +148,30 @@ public final class ForegroundSessionRegistry<E, C> {
             Priority priority,
             @Nullable UUID playerId
     ) {
+        return reserve(citizenId, entity, kind, priority, playerId, null, null);
+    }
+
+    public Reservation<E> reserve(
+            UUID citizenId,
+            E entity,
+            ConversationKind kind,
+            Priority priority,
+            @Nullable UUID playerId,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId
+    ) {
         Objects.requireNonNull(citizenId, "citizenId");
         Objects.requireNonNull(entity, "entity");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(priority, "priority");
         if ((priority == Priority.PLAYER) != (playerId != null)) {
             throw new IllegalArgumentException("Player priority requires a playerId and ambient priority forbids one");
+        }
+        if ((sessionId == null) != (turnId == null)) {
+            throw new IllegalArgumentException("sessionId and turnId must be supplied together");
+        }
+        if (kind == ConversationKind.CONTROLLED && sessionId == null) {
+            throw new IllegalArgumentException("controlled foreground sessions require sessionId and turnId");
         }
 
         EndedSession<E, C> evicted = null;
@@ -180,7 +200,7 @@ public final class ForegroundSessionRegistry<E, C> {
             }
 
             Token token = new Token(citizenId, UUID.randomUUID());
-            Entry<E, C> entry = new Entry<>(token, entity, kind, priority, playerId, nanoClock.getAsLong());
+            Entry<E, C> entry = new Entry<>(token, entity, kind, priority, playerId, sessionId, turnId, nanoClock.getAsLong());
             sessions.put(citizenId, entry);
             if (playerId != null) playerToCitizen.put(playerId, citizenId);
             result = Reservation.granted(token, snapshotLocked(entry));
@@ -438,6 +458,8 @@ public final class ForegroundSessionRegistry<E, C> {
                 entry.kind,
                 entry.priority,
                 entry.playerId,
+                entry.sessionId,
+                entry.turnId,
                 entry.state,
                 entry.reservedAtNanos,
                 entry.recoveryAttempts,
@@ -470,6 +492,8 @@ public final class ForegroundSessionRegistry<E, C> {
         ConversationKind kind;
         Priority priority;
         @Nullable UUID playerId;
+        @Nullable final UUID sessionId;
+        @Nullable final UUID turnId;
         final long reservedAtNanos;
         State state = State.RESERVED;
         @Nullable C client;
@@ -477,12 +501,14 @@ public final class ForegroundSessionRegistry<E, C> {
         String diagnostic = "reserved";
 
         Entry(Token token, E entity, ConversationKind kind, Priority priority,
-              @Nullable UUID playerId, long reservedAtNanos) {
+              @Nullable UUID playerId, @Nullable UUID sessionId, @Nullable UUID turnId, long reservedAtNanos) {
             this.token = token;
             this.entity = entity;
             this.kind = kind;
             this.priority = priority;
             this.playerId = playerId;
+            this.sessionId = sessionId;
+            this.turnId = turnId;
             this.reservedAtNanos = reservedAtNanos;
         }
     }

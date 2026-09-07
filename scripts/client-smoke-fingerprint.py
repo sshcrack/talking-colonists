@@ -45,7 +45,9 @@ def tracked_paths(ref: str | None) -> list[str]:
 
 
 def worktree_entries() -> list[tuple[str, bytes]]:
-    tracked = tracked_paths(None)
+    # Include both index- and HEAD-tracked paths so staged deletions with an unstaged
+    # worktree copy cannot disappear from the worktree fingerprint.
+    tracked = sorted(set(tracked_paths(None) + tracked_paths("HEAD")))
     untracked_raw = git("ls-files", "--others", "--exclude-standard", "-z")
     untracked = [p.decode() for p in untracked_raw.split(b"\0") if p and relevant(p.decode())]
     entries: list[tuple[str, bytes]] = []

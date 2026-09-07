@@ -18,7 +18,6 @@ final class VerifiedFactPromptRenderer {
 
         switch (verified.housingStatus()) {
             case HOUSED -> out.append("- Housing: currently assigned a home. Do not claim to be homeless.\n");
-            case GUARD_QUARTERS -> out.append("- Housing: your guard workplace serves as your quarters; do not claim to be homeless.\n");
             case HOMELESS -> out.append("- Housing: currently no home is assigned.\n");
             case UNKNOWN -> out.append("- Housing: current assignment could not be verified; do not infer housed or homeless.\n");
         }

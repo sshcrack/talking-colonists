@@ -51,6 +51,7 @@ final class AIStateDescriber {
             case EAT_GETTING_FOOD_SELF -> "Too impatient to wait for the cook, grabbing food directly.";
             case EAT_GOING_TO_EAT_POS -> "Looking for a place to sit down and eat.";
             case EAT_EATING -> context != null ? "Eating a meal at " + context + "." : "Eating a meal.";
+            case EAT_FINISHED -> "Finished eating and returning to normal activity.";
 
             case SLEEP_WALKING_TO_BED -> context != null
                     ? "Walking to " + context + " to sleep for the night."

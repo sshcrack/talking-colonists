@@ -1,4 +1,4 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.tool;
 
 import com.google.gson.JsonObject;
 import com.minecolonies.api.colony.IColony;
@@ -252,6 +252,82 @@ class AiToolDispatcherTest {
     }
 
     @Test
+    void controlledCommandCompletionKeepsSessionIdentitySeparateFromTurnScope() {
+        AtomicReference<AiToolOperationOutcome> observed = new AtomicReference<>();
+        AiCommandTool command = new AiCommandTool() {
+            @Override
+            public String description() { return "identity"; }
+
+            @Override
+            public CompletionStage<JsonObject> executeCommand(AiToolContext context, JsonObject parameters) {
+                return CompletableFuture.completedFuture(json("ok", true));
+            }
+
+            @Override
+            public void onCompletion(AiToolOperationOutcome outcome) { observed.set(outcome); }
+        };
+        var registered = registered("identity", command);
+        AiToolDispatcher dispatcher = dispatcher(registered, () -> true, (context, permission) -> true);
+        UUID sessionId = UUID.randomUUID();
+        UUID turnId = UUID.randomUUID();
+        FakeContext context = new FakeContext(sessionId, UUID.randomUUID());
+        FakeSession session = new FakeSession(sessionId, turnId, context);
+
+        JsonObject response = dispatcher.dispatch("controlled-call", registered.providerName(), null, session);
+
+        assertEquals("completed", response.get("status").getAsString());
+        assertEquals(sessionId, observed.get().sessionId());
+        assertNotEquals(turnId, observed.get().sessionId());
+        assertEquals("controlled-call", observed.get().callId());
+    }
+
+    @Test
+    void forgettingSessionCancelsStalledCommandAndReleasesCapacityExactlyOnce() {
+        List<CompletableFuture<JsonObject>> completions = new ArrayList<>();
+        AtomicInteger completionCallbacks = new AtomicInteger();
+        AtomicReference<AiToolOperationOutcome> firstOutcome = new AtomicReference<>();
+        AiCommandTool command = new AiCommandTool() {
+            @Override
+            public String description() { return "stalled"; }
+
+            @Override
+            public CompletionStage<JsonObject> executeCommand(AiToolContext context, JsonObject parameters) {
+                CompletableFuture<JsonObject> future = new CompletableFuture<>();
+                completions.add(future);
+                return future;
+            }
+
+            @Override
+            public void onCompletion(AiToolOperationOutcome outcome) {
+                if (completionCallbacks.getAndIncrement() == 0) firstOutcome.set(outcome);
+            }
+        };
+        var registered = registered("stalled", command);
+        AiToolDispatcher dispatcher = new AiToolDispatcher(
+                1, 2, providerName -> registered, ignored -> true, (context, permission) -> true);
+        UUID sessionId = UUID.randomUUID();
+        FakeContext context = new FakeContext(sessionId, UUID.randomUUID());
+        FakeSession session = new FakeSession(sessionId, context);
+
+        assertEquals("accepted", dispatcher.dispatch("first", registered.providerName(), null, session)
+                .get("status").getAsString());
+        assertEquals(1, dispatcher.activeCommandCount());
+
+        dispatcher.forgetSession(sessionId);
+        assertEquals(0, dispatcher.activeCommandCount());
+        assertEquals(1, completionCallbacks.get());
+        assertEquals("CANCELLED", firstOutcome.get().status().name());
+        assertFalse(firstOutcome.get().deliveredToSession());
+        assertTrue(session.deliveries.isEmpty());
+
+        completions.get(0).complete(json("late", true));
+        assertEquals(1, completionCallbacks.get(), "late stage completion must not notify twice");
+        assertEquals("accepted", dispatcher.dispatch("second", registered.providerName(), null, session)
+                .get("status").getAsString());
+        assertEquals(1, dispatcher.activeCommandCount());
+    }
+
+    @Test
     void commandCapacityRejectsWithoutStartingExtraSideEffects() {
         AtomicInteger starts = new AtomicInteger();
         AiCommandTool command = new AiCommandTool() {
@@ -319,18 +395,29 @@ class AiToolDispatcherTest {
 
     private static final class FakeSession implements AiToolDispatcher.SessionEndpoint {
         private final UUID sessionId;
+        private final UUID operationScopeId;
         private final FakeContext context;
         private final AtomicBoolean available = new AtomicBoolean(true);
         private final List<JsonObject> deliveries = new ArrayList<>();
 
         private FakeSession(UUID sessionId, FakeContext context) {
+            this(sessionId, sessionId, context);
+        }
+
+        private FakeSession(UUID sessionId, UUID operationScopeId, FakeContext context) {
             this.sessionId = sessionId;
+            this.operationScopeId = operationScopeId;
             this.context = context;
         }
 
         @Override
         public @NotNull UUID sessionId() {
             return sessionId;
+        }
+
+        @Override
+        public @NotNull UUID operationScopeId() {
+            return operationScopeId;
         }
 
         @Override

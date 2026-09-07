@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.manager.VoiceSelectionService;
 import me.sshcrack.mc_talking.util.AudioHelper;
@@ -111,7 +111,6 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public void onSetupComplete() {
-        QuotaTracker.reportSuccess(modelName);
         var input = new RealtimeInput();
         input.text = promptText;
         send(ClientMessages.input(input));
@@ -147,6 +146,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
         completed = true;
         byte[] audioData = audioBuffer.toByteArray();
         if (audioData.length > 0) {
+            QuotaTracker.reportSuccess(modelName);
             onComplete.accept(new AudioChunk(audioData, TARGET_SAMPLE_RATE));
         } else {
             McTalking.LOGGER.warn("Pregeneration completed without producing audio");

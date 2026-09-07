@@ -4,7 +4,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;

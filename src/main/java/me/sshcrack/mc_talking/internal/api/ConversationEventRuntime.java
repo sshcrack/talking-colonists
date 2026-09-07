@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.internal.api;
 
+import me.sshcrack.mc_talking.internal.registration.RegistrationRegistry;
+
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleListener;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;

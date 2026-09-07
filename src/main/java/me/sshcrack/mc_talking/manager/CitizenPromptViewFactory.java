@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
+import me.sshcrack.mc_talking.internal.compat.MineColoniesCompatibilityMapper;
+
 import com.minecolonies.api.colony.ColonyState;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
@@ -158,7 +160,7 @@ public final class CitizenPromptViewFactory {
         int colonyAgeDays = data.getColony().getDay();
         ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, activityParts.category());
         List<String> recentActions = extractRecentActions(data);
-        CitizenHousingStatus housingStatus = extractHousingStatus(data, isGuard);
+        CitizenHousingStatus housingStatus = extractHousingStatus(data);
         ObservedValue<CitizenEquipmentView> equipment = extractEquipment(data, snapshotGameTime);
         BuilderActivityStatus builderActivity = extractBuilderActivity(data, workState, requestSnapshot.observation());
         CitizenVerifiedFactsView verifiedFacts = new CitizenVerifiedFactsView(
@@ -460,10 +462,9 @@ public final class CitizenPromptViewFactory {
         );
     }
 
-    private static CitizenHousingStatus extractHousingStatus(ICitizenData data, boolean guard) {
+    private static CitizenHousingStatus extractHousingStatus(ICitizenData data) {
         IBuilding home = data.getHomeBuilding();
         if (home != null) return CitizenHousingStatus.HOUSED;
-        if (guard && data.getWorkBuilding() != null) return CitizenHousingStatus.GUARD_QUARTERS;
         if (data.getColony().getState() == ColonyState.UNLOADED) return CitizenHousingStatus.UNKNOWN;
         return CitizenHousingStatus.HOMELESS;
     }

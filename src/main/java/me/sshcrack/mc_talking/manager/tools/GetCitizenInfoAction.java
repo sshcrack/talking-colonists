@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
 import org.jetbrains.annotations.NotNull;
 

@@ -59,9 +59,7 @@ public class GeminiStream implements Supplier<short[]> {
         return turnGate.beginDrain(turnId, () -> {
             // Seal the producer side before moving the tail into playback so a racing late
             // provider chunk cannot sneak in behind the final flush.
-            if (!incomingData.isEmpty()) {
-                processBufferedData(lastSampleRate, true);
-            }
+            processBufferedData(lastSampleRate, true);
         });
     }
 
@@ -101,7 +99,8 @@ public class GeminiStream implements Supplier<short[]> {
 
         synchronized (incomingData) {
             if (incomingData.isEmpty()) {
-                return false;
+                return flushed && remainingSamples.length > 0
+                        && processAudioSamples(new short[0], true);
             }
 
             // Combine all buffered chunks into a single array
@@ -269,7 +268,9 @@ public class GeminiStream implements Supplier<short[]> {
         // Queue is empty — pause playback and notify the client. A draining turn becomes
         // terminal here; cancelled turns remain cancelled and cannot be resurrected.
         isPreBuffering = true;
-        turnGate.completeDrainedTurn();
+        if (remainingSamples.length == 0 && incomingData.isEmpty() && totalBufferedBytes == 0) {
+            turnGate.completeDrainedTurn();
+        }
         if (onPause != null) {
             onPause.run();
         }

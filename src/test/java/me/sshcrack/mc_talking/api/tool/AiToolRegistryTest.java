@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
-import me.sshcrack.mc_talking.internal.api.AiToolRuntime;
+import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import org.junit.jupiter.api.Test;
 
 class AiToolRegistryTest {

@@ -20,7 +20,7 @@ public final class CitizenPromptService {
             int priority,
             @NotNull CitizenPromptProvider provider
     ) {
-        return TalkingColonistsApi.services().registerPromptProvider(id, priority, provider);
+        return TalkingColonistsApi.services().prompts().registerProvider(id, priority, provider);
     }
 
     /**
@@ -35,6 +35,6 @@ public final class CitizenPromptService {
             int order,
             @NotNull CitizenPromptContributor contributor
     ) {
-        return TalkingColonistsApi.services().registerPromptContributor(id, order, contributor);
+        return TalkingColonistsApi.services().prompts().registerContributor(id, order, contributor);
     }
 }

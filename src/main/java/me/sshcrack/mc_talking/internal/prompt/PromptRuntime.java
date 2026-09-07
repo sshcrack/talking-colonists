@@ -1,4 +1,6 @@
-package me.sshcrack.mc_talking.internal.api;
+package me.sshcrack.mc_talking.internal.prompt;
+
+import me.sshcrack.mc_talking.internal.registration.RegistrationRegistry;
 
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptContributor;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
@@ -21,6 +23,7 @@ public final class PromptRuntime {
             new RegistrationRegistry<>("Prompt provider");
     private static final RegistrationRegistry<CitizenPromptContributor> CONTRIBUTORS =
             new RegistrationRegistry<>("Prompt contributor");
+    private static volatile CitizenPromptProvider defaultProvider;
 
     private PromptRuntime() {
     }
@@ -35,11 +38,16 @@ public final class PromptRuntime {
         return registration;
     }
 
+    public static void installDefaultProvider(@NotNull CitizenPromptProvider provider) {
+        defaultProvider = java.util.Objects.requireNonNull(provider, "provider");
+    }
+
     public static @NotNull CitizenPromptProvider getProvider() {
         var ordered = PROVIDERS.orderedSnapshot();
-        return ordered.isEmpty()
-                ? TalkingColonistsApiBackend.INSTANCE.defaultPromptProvider()
-                : ordered.get(ordered.size() - 1).value();
+        if (!ordered.isEmpty()) return ordered.get(ordered.size() - 1).value();
+        CitizenPromptProvider fallback = defaultProvider;
+        if (fallback == null) throw new IllegalStateException("Default prompt provider is not installed");
+        return fallback;
     }
 
     public static @NotNull AddonRegistration registerContributor(

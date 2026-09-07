@@ -6,7 +6,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
-import me.sshcrack.mc_talking.internal.api.PromptRuntime;
+import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
@@ -63,7 +63,8 @@ public class CitizenConversation {
     /**
      * Only used in LIVE_WEBSOCKETS mode.
      */
-    private List<LiveConversationWsClient> liveClients;
+    private volatile List<LiveConversationWsClient> liveClients = List.of();
+    private volatile Runnable liveAbort = () -> { };
 
     private Consumer<ConversationState> onStateChanged;
 
@@ -104,6 +105,7 @@ public class CitizenConversation {
      * The conversation state will be updated via the {@link #setOnStateChanged} callback.
      */
     public void performConversation() {
+        if (aborted) return;
         switch (mode) {
             case AUTO -> performAutoConversation();
             case FLASH_TTS -> performFlashTtsConversation();
@@ -128,6 +130,10 @@ public class CitizenConversation {
             if (turnId != null) stream.cancelTurn(turnId);
             stream.close();
         }
+        liveAbort.run();
+        for (LiveConversationWsClient client : liveClients) {
+            try { client.close(); } catch (RuntimeException ignored) { }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -143,6 +149,7 @@ public class CitizenConversation {
             server.execute(() -> performFlashTtsConversation(fallback));
             return;
         }
+        if (aborted) return;
 
         // Guard: all participants must be able to speak
         for (AbstractEntityCitizen p : participants) {
@@ -264,7 +271,7 @@ public class CitizenConversation {
             } catch (ConversationGenerationException e) {
                 McTalking.LOGGER.error("Failed to generate Flash/TTS conversation: {}, cause: {}",
                         e.getMessage(), e.getCause() != null ? e.getCause().getMessage() : "none");
-                if (fallback != null) {
+                if (fallback != null && !aborted) {
                     fallbackTriggered = true;
                     McTalking.LOGGER.info("[Auto] Flash/TTS failed, falling back to Live WebSockets");
                     if (stream != null) {
@@ -305,6 +312,7 @@ public class CitizenConversation {
             server.execute(this::performLiveWebsocketConversation);
             return;
         }
+        if (aborted) return;
         if (participants.size() < 2) {
             McTalking.LOGGER.warn("[LiveConv] Need at least 2 participants, got {}. Aborting.", participants.size());
             setState(ConversationState.ENDED);
@@ -352,10 +360,26 @@ public class CitizenConversation {
         AtomicBoolean cleanupStarted = new AtomicBoolean(false);
         AtomicReference<LiveConversationWsClient> clientARef = new AtomicReference<>();
         AtomicReference<LiveConversationWsClient> clientBRef = new AtomicReference<>();
+        Runnable cancelLivePair = () -> {
+            if (!cleanupStarted.compareAndSet(false, true)) return;
+            LiveConversationWsClient currentA = clientARef.get();
+            LiveConversationWsClient currentB = clientBRef.get();
+            if (currentA != null) currentA.close();
+            if (currentB != null) currentB.close();
+            reservationA.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "paired conversation cancelled");
+            reservationB.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "paired conversation cancelled");
+        };
+        liveAbort = cancelLivePair;
+        if (aborted) {
+            cancelLivePair.run();
+            return;
+        }
 
         Consumer<LiveConversationWsClient> onClientEnded = client -> {
             if (!cleanupStarted.compareAndSet(false, true)) return;
             server.execute(() -> {
+                liveAbort = () -> { };
+                liveClients = List.of();
                 reservationA.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
                         "paired citizen conversation completed");
                 reservationB.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
@@ -413,6 +437,10 @@ public class CitizenConversation {
         clientA.setPeer(clientB);
         clientB.setPeer(clientA);
         liveClients = List.of(clientA, clientB);
+        if (aborted) {
+            cancelLivePair.run();
+            return;
+        }
 
         boolean attachedA = reservationA.attachClient(clientA);
         boolean attachedB = reservationB.attachClient(clientB);
@@ -453,6 +481,10 @@ public class CitizenConversation {
             setState(ConversationState.ENDED);
         }));
 
+        if (aborted) {
+            cancelLivePair.run();
+            return;
+        }
         try {
             clientA.connect();
             clientB.connect();
@@ -478,6 +510,10 @@ public class CitizenConversation {
         }
 
         // Kick off the dialogue from A's side
+        if (aborted) {
+            cancelLivePair.run();
+            return;
+        }
 
         clientA.addPromptTextAfterTalkingComplete(
                 "Start the conversation! You are talking to a fellow " + citizenDataB.getName()
@@ -491,6 +527,7 @@ public class CitizenConversation {
     // -------------------------------------------------------------------------
 
     private void performAutoConversation() {
+        if (aborted) return;
         if (TtsQuotaManager.isTtsFailed()) {
             McTalking.LOGGER.info("[Auto] TTS previously failed, skipping directly to Live WebSockets");
             performLiveWebsocketConversation();

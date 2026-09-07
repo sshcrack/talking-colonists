@@ -131,6 +131,28 @@ fun Project.configureAddonApi() {
                         leakingSources.joinToString { it.relativeTo(rootProject.projectDir).path }
                 )
             }
+
+            // The examples intentionally retain the Minecraft/MineColonies compile classpath, but
+            // the published API must never acquire provider/transport/UI runtime signatures merely
+            // because those implementation dependencies happen to be present there.
+            val forbiddenExternalPrefixes = listOf(
+                "me/sshcrack/gemini_live_lib/",
+                "com/google/genai/",
+                "de/maxhenkel/voicechat/",
+                "dev/isxander/yacl3/"
+            )
+            val leakingExternalClasses = archive.matching {
+                include("me/sshcrack/mc_talking/api/**/*.class")
+            }.files.filter { file ->
+                val constantPoolText = file.readBytes().toString(Charsets.ISO_8859_1)
+                forbiddenExternalPrefixes.any(constantPoolText::contains)
+            }
+            if (leakingExternalClasses.isNotEmpty()) {
+                throw GradleException(
+                    "API bytecode references forbidden provider/runtime dependencies: " +
+                        leakingExternalClasses.joinToString { it.name }
+                )
+            }
         }
     }
 

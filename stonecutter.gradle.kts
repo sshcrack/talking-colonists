@@ -92,7 +92,8 @@ stonecutter parameters {
 subprojects {
     tasks.matching { it.name.startsWith("publish") }.configureEach {
         doFirst {
-            val libraryDir = file("../gemini-live-library")
+            val libraryDir = System.getenv("GEMINI_LIVE_LIBRARY_DIR")?.let(rootProject::file)
+                ?: rootProject.file("../gemini-live-library")
             val confirmed = project.findProperty("geminiPublished") == "true"
                 || System.getenv("GEMINI_PUBLISHED") == "true"
 

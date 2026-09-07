@@ -62,6 +62,7 @@ final class ControlledConversationRuntime<P, A> {
     private final ControlledConversationOptions options;
     private final List<P> participants;
     private final Map<UUID, P> byId;
+    private final Object transitionLock = new Object();
     private final AtomicReference<ControlledConversationSession.State> state =
             new AtomicReference<>(ControlledConversationSession.State.OPEN);
     private final AtomicReference<ActiveTurn<P>> activeTurn = new AtomicReference<>();
@@ -94,13 +95,17 @@ final class ControlledConversationRuntime<P, A> {
     @NotNull ControlledConversationSession.State state() { return state.get(); }
 
     void setAgenda(@NotNull String agenda) {
-        if (state.get() == ControlledConversationSession.State.ENDED) throw new IllegalStateException("session ended");
-        this.agenda = Objects.requireNonNull(agenda, "agenda");
+        synchronized (transitionLock) {
+            if (state.get() == ControlledConversationSession.State.ENDED) throw new IllegalStateException("session ended");
+            this.agenda = Objects.requireNonNull(agenda, "agenda");
+        }
     }
 
     void addTranscript(@NotNull ConversationTranscriptEntry entry) {
-        if (state.get() == ControlledConversationSession.State.ENDED) throw new IllegalStateException("session ended");
-        appendTranscript(entry);
+        synchronized (transitionLock) {
+            if (state.get() == ControlledConversationSession.State.ENDED) throw new IllegalStateException("session ended");
+            appendTranscript(entry);
+        }
     }
 
     @NotNull CompletableFuture<ControlledTurnResult> requestTurn(@NotNull P speaker,
@@ -121,16 +126,19 @@ final class ControlledConversationRuntime<P, A> {
         if (participants.size() < 2) {
             throw new IllegalStateException("Autonomous discussion requires at least two participants");
         }
-        if (state.get() == ControlledConversationSession.State.ENDED) {
-            throw new IllegalStateException("session ended");
-        }
-        if (state.get() != ControlledConversationSession.State.OPEN || activeTurn.get() != null) {
-            throw new IllegalStateException("cannot delegate automatic floor while a turn is active");
-        }
-
-        AutomaticDiscussion discussion = new AutomaticDiscussion(policy);
-        if (!automaticDiscussion.compareAndSet(null, discussion)) {
-            throw new IllegalStateException("automatic floor is already delegated");
+        AutomaticDiscussion discussion;
+        synchronized (transitionLock) {
+            if (state.get() == ControlledConversationSession.State.ENDED) {
+                throw new IllegalStateException("session ended");
+            }
+            if (state.get() != ControlledConversationSession.State.OPEN || activeTurn.get() != null) {
+                throw new IllegalStateException("cannot delegate automatic floor while a turn is active");
+            }
+            if (automaticDiscussion.get() != null) {
+                throw new IllegalStateException("automatic floor is already delegated");
+            }
+            discussion = new AutomaticDiscussion(policy);
+            automaticDiscussion.set(discussion);
         }
         hooks.execute(discussion::start);
         return discussion;
@@ -151,29 +159,36 @@ final class ControlledConversationRuntime<P, A> {
                     sessionId, turnId, ControlledTurnResult.FailureReason.SPEAKER_NOT_PARTICIPANT,
                     "speaker is not a session participant"));
         }
-        if (state.get() == ControlledConversationSession.State.ENDED) {
-            return completeOnExecutor(ControlledTurnResult.sessionEnded(sessionId, turnId, "session has ended"));
+        CompletableFuture<ControlledTurnResult> future;
+        ActiveTurn<P> turn;
+        String turnAgenda;
+        synchronized (transitionLock) {
+            if (state.get() == ControlledConversationSession.State.ENDED) {
+                return completeOnExecutor(ControlledTurnResult.sessionEnded(sessionId, turnId, "session has ended"));
+            }
+            if (state.get() != ControlledConversationSession.State.OPEN || activeTurn.get() != null) {
+                return completeOnExecutor(ControlledTurnResult.rejected(
+                        sessionId, turnId, ControlledTurnResult.FailureReason.TURN_ALREADY_ACTIVE,
+                        "another speaker already has the floor"));
+            }
+            future = new CompletableFuture<>();
+            turn = new ActiveTurn<>(turnId, speaker, future, automatic, responseTokenLimit);
+            activeTurn.set(turn);
+            state.set(ControlledConversationSession.State.TURN_ACTIVE);
+            turnAgenda = agenda;
         }
-        if (!state.compareAndSet(ControlledConversationSession.State.OPEN,
-                                 ControlledConversationSession.State.TURN_ACTIVE)) {
-            return completeOnExecutor(ControlledTurnResult.rejected(
-                    sessionId, turnId, ControlledTurnResult.FailureReason.TURN_ALREADY_ACTIVE,
-                    "another speaker already has the floor"));
-        }
-
-        CompletableFuture<ControlledTurnResult> future = new CompletableFuture<>();
-        ActiveTurn<P> turn = new ActiveTurn<>(turnId, speaker, future, automatic, responseTokenLimit);
-        activeTurn.set(turn);
-        String turnAgenda = agenda;
         hooks.execute(() -> startTurn(turn, topicOrInstruction, turnAgenda, audioAnchor));
         return future;
     }
 
     boolean interruptTurn() {
-        ActiveTurn<P> turn = activeTurn.get();
-        if (turn == null || !activeTurn.compareAndSet(turn, null)) return false;
-        state.compareAndSet(ControlledConversationSession.State.TURN_ACTIVE,
-                            ControlledConversationSession.State.OPEN);
+        ActiveTurn<P> turn;
+        synchronized (transitionLock) {
+            turn = activeTurn.get();
+            if (turn == null || state.get() != ControlledConversationSession.State.TURN_ACTIVE) return false;
+            activeTurn.set(null);
+            state.set(ControlledConversationSession.State.OPEN);
+        }
         hooks.execute(() -> {
             ControlledTurnResult result = ControlledTurnResult.interrupted(sessionId, turn.turnId());
             turn.future().complete(result);
@@ -185,10 +200,14 @@ final class ControlledConversationRuntime<P, A> {
 
     void end(@NotNull ControlledConversationSession.EndReason reason) {
         Objects.requireNonNull(reason, "reason");
-        ControlledConversationSession.State previous = state.getAndSet(ControlledConversationSession.State.ENDED);
-        if (previous == ControlledConversationSession.State.ENDED) return;
-        AutomaticDiscussion automatic = automaticDiscussion.getAndSet(null);
-        ActiveTurn<P> turn = activeTurn.getAndSet(null);
+        AutomaticDiscussion automatic;
+        ActiveTurn<P> turn;
+        synchronized (transitionLock) {
+            if (state.get() == ControlledConversationSession.State.ENDED) return;
+            state.set(ControlledConversationSession.State.ENDED);
+            automatic = automaticDiscussion.getAndSet(null);
+            turn = activeTurn.getAndSet(null);
+        }
         if (automatic != null || turn != null) {
             hooks.execute(() -> {
                 if (automatic != null) automatic.terminateForSessionEnd();
@@ -279,15 +298,19 @@ final class ControlledConversationRuntime<P, A> {
     }
 
     private boolean isCurrent(ActiveTurn<P> turn) {
-        return state.get() == ControlledConversationSession.State.TURN_ACTIVE
-                && activeTurn.get() == turn && !turn.future().isDone();
+        synchronized (transitionLock) {
+            return state.get() == ControlledConversationSession.State.TURN_ACTIVE
+                    && activeTurn.get() == turn && !turn.future().isDone();
+        }
     }
 
     private void finish(ActiveTurn<P> turn, ControlledTurnResult result) {
-        if (!activeTurn.compareAndSet(turn, null)) return;
-        if (state.get() != ControlledConversationSession.State.ENDED) {
-            state.compareAndSet(ControlledConversationSession.State.TURN_ACTIVE,
-                                ControlledConversationSession.State.OPEN);
+        synchronized (transitionLock) {
+            if (activeTurn.get() != turn) return;
+            activeTurn.set(null);
+            if (state.get() != ControlledConversationSession.State.ENDED) {
+                state.set(ControlledConversationSession.State.OPEN);
+            }
         }
         turn.future().complete(result);
         notifyTurnTerminal(turn, result);
