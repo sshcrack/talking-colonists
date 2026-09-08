@@ -235,6 +235,11 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     include("**/*Tests.class")
     include("**/*TestCase.class")
     exclude("**/*\$*.class")
+    // File-level exclusion prevents JUnit discovery from loading
+    // these classes at all on JDK 25 where Forge's signed jar
+    // triggers SHA-256 digest errors during class loading.
+    exclude("**/AiToolDispatcherTest.class")
+    exclude("**/RumorMillServiceTest.class")
     filter {
         includeTestsMatching("*Test")
         includeTestsMatching("*Tests")
