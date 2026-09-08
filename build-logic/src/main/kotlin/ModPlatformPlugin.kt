@@ -4,6 +4,7 @@ import dev.kikugie.fletching_table.extension.FletchingTableExtension
 import dev.kikugie.stonecutter.StonecutterExperimentalAPI
 import dev.kikugie.stonecutter.build.StonecutterBuildExtension
 import org.gradle.api.DefaultTask
+import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.dsl.RepositoryHandler
@@ -15,7 +16,10 @@ import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.testing.Test
 import org.gradle.internal.extensions.stdlib.toDefaultLowerCase
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.*
 import org.gradle.language.jvm.tasks.ProcessResources
@@ -108,7 +112,7 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 		configureIdea()
 		configureProcessResources(ctx)
 		configureJava(ctx)
-		configureTestTasks()
+		configureTestTasks(ctx)
 		registerBuildAndCollectTask(ctx)
 
 		configureModPublishing(ctx)
@@ -187,8 +191,18 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 		}
 	}
 
-	private fun Project.configureTestTasks() {
-		tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+	private fun Project.configureTestTasks(ctx: Context) {
+		val javaToolchains = extensions.getByType<JavaToolchainService>()
+		tasks.withType<Test>().configureEach {
+			if (ctx.javaVersion == JavaVersion.VERSION_17) {
+				// Forge 1.20.1's remapped development JAR retains upstream
+				// signatures. Its JUnit runtime must match the Java 17 toolchain
+				// used to produce that development environment; newer runtimes
+				// reject the altered signed entries during class loading.
+				javaLauncher.set(javaToolchains.launcherFor {
+					languageVersion.set(JavaLanguageVersion.of(17))
+				})
+			}
 			useJUnitPlatform()
 			// Restrict which class files are treated as test candidates. The
 			// separate "addonApiExamples" source tree contains compile-only
@@ -205,13 +219,6 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 				includeTestsMatching("*TestCase")
 				excludeTestsMatching("*\$*")
 			}
-			// Forge 47.x jars are signed. After Loom/Mixin re-mapping their
-			// manifests no longer match, so JarVerifier throws "SHA-256 digest
-			// error" when loading IForge* classes during JUnit discovery. This
-			// security-property overlay applies only to the test JVM. A normal
-			// system property cannot override jdk.jar.disabledAlgorithms.
-			val testSecurityProperties = rootProject.file("gradle/test-security.properties")
-			jvmArgs("-Djava.security.properties=${testSecurityProperties.absolutePath}")
 		}
 	}
 
