@@ -108,6 +108,7 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 		configureIdea()
 		configureProcessResources(ctx)
 		configureJava(ctx)
+		configureTestTasks()
 		registerBuildAndCollectTask(ctx)
 
 		configureModPublishing(ctx)
@@ -183,6 +184,30 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 		extensions.configure<FletchingTableExtension> {
 			mixins.create("main") { mixin("default", "${ctx.modId}.mixins.json") }
 			j52j.register("main") { extension("json", "**/*.json5") }
+		}
+	}
+
+	private fun Project.configureTestTasks() {
+		tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+			useJUnitPlatform()
+			// Restrict JUnit discovery to actual test classes. This prevents the
+			// engine from attempting to load helper classes, compile-only addon
+			// examples, or inner context stubs as standalone tests. Those classes
+			// legitimately reference Forge/MineColonies types whose signed jars
+			// fail SHA-256 verification on JDK 25 after re-obfuscation.
+			filter {
+				includeTestsMatching("*Test")
+				includeTestsMatching("*Tests")
+				includeTestsMatching("*TestCase")
+				// Exclude inner classes that are test helpers, not tests themselves.
+				excludeTestsMatching("*\$*")
+			}
+			// Forge 47.x jars are signed. After Loom/Mixin re-mapping their
+			// manifests no longer match, so JDK 25's JarVerifier throws
+			// "SHA-256 digest error" when loading IForge* classes during
+			// JUnit discovery. Disable verification for the test JVM only.
+			jvmArgs("-Djdk.security.allowWeakRoot=true")
+			systemProperty("jdk.jar.disabledAlgorithms", "")
 		}
 	}
 

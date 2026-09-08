@@ -221,6 +221,14 @@ dependencies {
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     useJUnitPlatform()
+    filter {
+        includeTestsMatching("*Test")
+        includeTestsMatching("*Tests")
+        includeTestsMatching("*TestCase")
+        excludeTestsMatching("*\$*")
+    }
+    jvmArgs("-Djdk.security.allowWeakRoot=true")
+    systemProperty("jdk.jar.disabledAlgorithms", "")
 }
 
 tasks.named("createMinecraftArtifacts") {
