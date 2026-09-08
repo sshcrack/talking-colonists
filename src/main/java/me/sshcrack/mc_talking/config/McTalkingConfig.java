@@ -71,6 +71,21 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, text messages from mumbling and citizen-to-citizen conversations will also be sent to nearby players in chat.")
     public boolean sendMumblingAndConversationsToChat = false;
 
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "Show small animated speech bubbles above nearby citizens on this client.")
+    public boolean showConversationBubbles = true;
+
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "Show conversation feedback when looking at a citizen on this client.")
+    public boolean showConversationHint = true;
+
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "Keep conversation icons static and disable added conversation gestures on this client.")
+    public boolean reducedConversationMotion = false;
+
     // Colony Statistics Mentions
     @AutoGen(category = "citizens")
     @TickBox

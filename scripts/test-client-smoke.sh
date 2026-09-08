@@ -8,6 +8,12 @@ TIMEOUT_SECONDS="${CLIENT_SMOKE_TIMEOUT_SECONDS:-240}"
 METADATA_ONLY_ASSETS="${CLIENT_SMOKE_METADATA_ONLY_ASSETS:-0}"
 CRASH_PATTERN='---- Minecraft Crash Report ----|Crash report saved to:|Reported exception thrown!|Minecraft crashed!|Exception in thread "Render thread"|ModLoadingException|Failed to create mod instance|Failed to wait for future Mod Construction|NoClassDefFoundError: me/sshcrack/mc_talking/|Failed to complete lifecycle event|Loading errors encountered|There was an error during the .* event phase|MC_TALKING_AUTOQUIT_FAILURE:'
 
+# All dependencies may already be cached while a Maven host is unavailable.
+GRADLE_NETWORK_ARGS=()
+if [ "${CLIENT_SMOKE_OFFLINE:-0}" = "1" ]; then
+    GRADLE_NETWORK_ARGS+=(--offline)
+fi
+
 DISPLAY_PREFIX=()
 if [ -z "${DISPLAY:-}" ]; then
     if command -v xvfb-run >/dev/null 2>&1; then
@@ -38,7 +44,7 @@ cleanup_process_group() {
 }
 
 cleanup() {
-    ./gradlew "Refresh active project" >/dev/null 2>&1 || true
+    ./gradlew "${GRADLE_NETWORK_ARGS[@]}" "Refresh active project" >/dev/null 2>&1 || true
 }
 
 prepare_metadata_only_assets() {
@@ -50,7 +56,7 @@ prepare_metadata_only_assets() {
     local properties="$ROOT_DIR/versions/$version/build/moddev/minecraft_assets.properties"
 
     echo "[$version] metadata-only asset fallback enabled"
-    ./gradlew ":$version:createMinecraftArtifacts" \
+    ./gradlew "${GRADLE_NETWORK_ARGS[@]}" ":$version:createMinecraftArtifacts" \
         -Pmc_talking.devtools=true \
         --no-daemon \
         --max-workers=1 >/dev/null
@@ -98,7 +104,7 @@ if [ "$INITIAL_INDEX_FINGERPRINT" != "$INITIAL_WORKTREE_FINGERPRINT" ]; then
     exit 1
 fi
 
-./gradlew "Refresh active project" -Pmc_talking.devtools=true --no-daemon --max-workers=1 >/dev/null 2>&1
+./gradlew "${GRADLE_NETWORK_ARGS[@]}" "Refresh active project" -Pmc_talking.devtools=true --no-daemon --max-workers=1 >/dev/null 2>&1
 
 rm -f /tmp/client-smoke-*.log
 FAILED=0
@@ -128,7 +134,7 @@ for VERSION in $VERSIONS; do
     fi
 
     echo "[$VERSION] launching -> $LOG_FILE"
-    setsid "${DISPLAY_PREFIX[@]}" ./gradlew ":$VERSION:runClientAutoQuit" \
+    setsid "${DISPLAY_PREFIX[@]}" ./gradlew "${GRADLE_NETWORK_ARGS[@]}" ":$VERSION:runClientAutoQuit" \
         "${EXTRA_GRADLE_ARGS[@]}" \
         -Pmc_talking.devtools=true \
         -Pmc_talking.forceCreateWorld=true \

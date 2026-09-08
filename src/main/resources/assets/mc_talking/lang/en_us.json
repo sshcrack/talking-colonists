@@ -276,5 +276,21 @@
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks": "Memory Compaction Interval (ticks)",
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks.desc": "How often the server checks for memory compaction candidates. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.memoryCompactionThreshold": "Memory Compaction Threshold",
-  "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen."
+  "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen.",
+
+  "mc_talking.conversation_hint.talking": "Speaking",
+  "mc_talking.conversation_hint.listening": "Listening for speech",
+  "mc_talking.conversation_hint.thinking": "Thinking about a reply…",
+  "mc_talking.conversation_hint.connecting": "Starting conversation…",
+  "mc_talking.conversation_hint.reconnecting": "Reconnecting · Please wait",
+  "mc_talking.conversation_hint.in_conversation": "In a conversation",
+  "mc_talking.conversation_hint.error": "Conversation failed · Try again",
+  "mc_talking.conversation_hint.quota_exceeded": "Voice limit reached · Try again later",
+  "mc_talking.conversation_hint.urgent_walking": "On the way to a conversation",
+  "yacl3.config.mc_talking:config.showConversationBubbles": "Speech bubbles",
+  "yacl3.config.mc_talking:config.showConversationBubbles.desc": "Show small conversation icons above nearby visible citizens.",
+  "yacl3.config.mc_talking:config.showConversationHint": "Conversation hint",
+  "yacl3.config.mc_talking:config.showConversationHint.desc": "Show readable conversation feedback when looking at a citizen.",
+  "yacl3.config.mc_talking:config.reducedConversationMotion": "Reduce conversation motion",
+  "yacl3.config.mc_talking:config.reducedConversationMotion.desc": "Keep speech icons static and turn off added head and hand gestures."
 }

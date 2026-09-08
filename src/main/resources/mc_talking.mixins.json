@@ -30,5 +30,8 @@
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "client": [
+    "CitizenConversationAnimationMixin"
+  ]
 }

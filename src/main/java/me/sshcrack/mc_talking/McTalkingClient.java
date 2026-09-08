@@ -2,13 +2,13 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractCivilianEntity;
 import me.sshcrack.mc_talking.network.AiStatus;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import me.sshcrack.mc_talking.client.ConversationPresentation;
 /*? if forge {*/
 /*import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.level.LevelEvent;
-import net.minecraftforge.client.event.RenderNameTagEvent;
+import net.minecraftforge.client.event.RenderLivingEvent;
+import net.minecraftforge.client.event.RenderGuiEvent;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 *//*?}*/
@@ -17,7 +17,9 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.client.event.RenderNameTagEvent;
+import net.neoforged.neoforge.client.event.RenderLivingEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
 /*?}*/
@@ -47,7 +49,11 @@ public class McTalkingClient {
      * @param status   The AI status to set
      */
     public static void updateAiStatus(UUID entityId, AiStatus status) {
-        aiStatus.put(entityId, status);
+        if (status == AiStatus.NONE) {
+            aiStatus.remove(entityId);
+        } else {
+            aiStatus.put(entityId, status);
+        }
     }
 
 
@@ -73,41 +79,43 @@ public class McTalkingClient {
     /*? if neoforge {*/
     public void onDisconnect(LevelEvent.Unload event) {
     /*?}*/
-        aiStatus.clear();
+        if (event.getLevel().isClientSide()) aiStatus.clear();
     }
 
-    /**
-     * Event handler for rendering entity name tags.
-     * Adds AI status indicators to citizen name tags.
-     *
-     * @param event The render name tag event
-     */
+    public static AiStatus getAiStatus(UUID entityId) {
+        return aiStatus.getOrDefault(entityId, AiStatus.NONE);
+    }
+
     @SubscribeEvent
     /*? if forge {*/
-    /*public static void onRenderName(RenderNameTagEvent event) {
+    /*public static void onEntityLeave(EntityLeaveLevelEvent event) {
     *//*?}*/
     /*? if neoforge {*/
-    public void onRenderName(RenderNameTagEvent event) {
+    public void onEntityLeave(EntityLeaveLevelEvent event) {
     /*?}*/
-        var entity = event.getEntity();
-        var minecraft = Minecraft.getInstance();
+        if (event.getLevel().isClientSide()) aiStatus.remove(event.getEntity().getUUID());
+    }
 
-        if (!(entity instanceof AbstractCivilianEntity citizen)) {
-            return;
+    @SubscribeEvent
+    /*? if forge {*/
+    /*public static void onRenderCitizen(RenderLivingEvent.Post<?, ?> event) {
+    *//*?}*/
+    /*? if neoforge {*/
+    public void onRenderCitizen(RenderLivingEvent.Post<?, ?> event) {
+    /*?}*/
+        if (event.getEntity() instanceof AbstractCivilianEntity citizen) {
+            ConversationPresentation.renderBubble(citizen, event.getPoseStack(),
+                    event.getMultiBufferSource(), event.getPartialTick());
         }
+    }
 
-        if (minecraft.player == null || entity.isInvisibleTo(minecraft.player))
-            return;
-
-        var status = aiStatus.get(citizen.getUUID());
-        if (status == null || status == AiStatus.NONE)
-            return;
-
-        var text = Component.literal(" (")
-                .append(Component.translatable("mc_talking.ai_status." + status.name().toLowerCase()))
-                .append(Component.literal(")"))
-                .withStyle(ChatFormatting.GRAY);
-
-        event.setContent(event.getContent().copy().append(text));
+    @SubscribeEvent
+    /*? if forge {*/
+    /*public static void onRenderGui(RenderGuiEvent.Post event) {
+    *//*?}*/
+    /*? if neoforge {*/
+    public void onRenderGui(RenderGuiEvent.Post event) {
+    /*?}*/
+        ConversationPresentation.renderFocusHint(event.getGuiGraphics());
     }
 }

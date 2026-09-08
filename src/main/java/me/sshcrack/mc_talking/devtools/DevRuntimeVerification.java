@@ -65,6 +65,9 @@ public final class DevRuntimeVerification {
                     return entity;
                 }).get(10, TimeUnit.SECONDS);
 
+                // Keep the player and citizen on solid ground throughout the microphone test.
+                DevConversationVisualVerification.prepare(server, citizen);
+
                 ambient = server.submit(() -> {
                     var client = new ProbeClient(citizen, provider.uri());
                     var reservation = ConversationManager.reserveAmbientForeground(citizen, ConversationKind.URGENT_CONTACT);
@@ -136,6 +139,7 @@ public final class DevRuntimeVerification {
 
                 server.submit(() -> ConversationManager.endConversation(player.getUUID(), false)).get(5, TimeUnit.SECONDS);
                 require(playerClient.isLifecycleClosed(), "player cancellation cleanup");
+                DevConversationVisualVerification.verify(server, citizen);
                 McTalking.LOGGER.info("MC_TALKING_RUNTIME_SUCCESS:citizen,prompt,queued-input,audio,reconnect,microphone-turn,padding-response,cleanup");
             } catch (Exception error) {
                 throw new IllegalStateException("In-world conversation verification failed", error);
