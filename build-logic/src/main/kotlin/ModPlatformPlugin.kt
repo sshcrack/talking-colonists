@@ -206,11 +206,12 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 				excludeTestsMatching("*\$*")
 			}
 			// Forge 47.x jars are signed. After Loom/Mixin re-mapping their
-			// manifests no longer match, so JDK 25's JarVerifier throws
-			// "SHA-256 digest error" when loading IForge* classes during
-			// JUnit discovery. Disable verification for the test JVM only.
-			jvmArgs("-Djdk.security.allowWeakRoot=true")
-			systemProperty("jdk.jar.disabledAlgorithms", "")
+			// manifests no longer match, so JarVerifier throws "SHA-256 digest
+			// error" when loading IForge* classes during JUnit discovery. This
+			// security-property overlay applies only to the test JVM. A normal
+			// system property cannot override jdk.jar.disabledAlgorithms.
+			val testSecurityProperties = rootProject.file("gradle/test-security.properties")
+			jvmArgs("-Djava.security.properties=${testSecurityProperties.absolutePath}")
 		}
 	}
 
