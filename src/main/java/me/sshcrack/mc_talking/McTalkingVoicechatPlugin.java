@@ -6,6 +6,8 @@ import de.maxhenkel.voicechat.api.VoicechatPlugin;
 import de.maxhenkel.voicechat.api.VoicechatServerApi;
 import de.maxhenkel.voicechat.api.VolumeCategory;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
+import de.maxhenkel.voicechat.api.events.ClientReceiveSoundEvent;
+import me.sshcrack.mc_talking.internal.audio.SpeechEnvelope;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.PlayerDisconnectedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
@@ -61,6 +63,8 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
     @Override
     public void registerEvents(EventRegistration registration) {
+        registration.registerEvent(ClientReceiveSoundEvent.EntitySound.class, event ->
+                SpeechEnvelope.accept(event.getEntityId(), event.getRawAudio()));
         registration.registerEvent(MicrophonePacketEvent.class, this::handleMicPacket);
         registration.registerEvent(PlayerDisconnectedEvent.class, this::onPlayerDisconnected);
         registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStarted);

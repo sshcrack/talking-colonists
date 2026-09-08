@@ -139,6 +139,16 @@ public class CitizenTalkingDevice extends Item {
     }
 
     @Override
+    public net.minecraft.world.InteractionResultHolder<ItemStack> use(Level level, Player player,
+            net.minecraft.world.InteractionHand hand) {
+        if (!level.isClientSide() && ConversationManager.isPlayerInConversation(player.getUUID())) {
+            ConversationManager.endConversation(player.getUUID(), false);
+            player.displayClientMessage(Component.translatable("mc_talking.conversation_ended"), true);
+        }
+        return net.minecraft.world.InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide());
+    }
+
+    @Override
     public boolean onLeftClickEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull Entity entity) {
         if (!(entity instanceof AbstractEntityCitizen citizen)) {
             return false; // Allow normal attack behavior for non-citizens
@@ -158,7 +168,14 @@ public class CitizenTalkingDevice extends Item {
         }
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
-        UUID playerId = serverPlayer.getUUID();        // Check if API key is set
+        UUID playerId = serverPlayer.getUUID();
+        LivingEntity current = ConversationManager.getActiveEntityForPlayer(playerId);
+        if (current != null && current.getUUID().equals(citizen.getUUID())) {
+            ConversationManager.endConversation(playerId, false);
+            player.displayClientMessage(Component.translatable("mc_talking.conversation_ended"), true);
+            return true;
+        }
+        // Check if API key is set
         if (!McTalkingConfig.hasGeminiApiKey()) {
             serverPlayer.sendSystemMessage(
                     Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
@@ -191,14 +208,6 @@ public class CitizenTalkingDevice extends Item {
                             .withStyle(ChatFormatting.RED)
             );
 
-            return true;
-        }
-
-        // If there was a previously focused entity, remove its glowing effect
-        LivingEntity previousEntity = ConversationManager.getActiveEntityForPlayer(playerId);
-        if (previousEntity != null && previousEntity.getUUID().equals(citizen.getUUID())) {
-            citizen.getNavigation().stop();
-            citizen.getLookControl().setLookAt(player);
             return true;
         }
 

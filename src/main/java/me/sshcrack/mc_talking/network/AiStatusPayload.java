@@ -22,9 +22,9 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.UUID;
 
-public record AiStatusPayload(UUID citizen, AiStatus status) /*? if neoforge {*/ implements CustomPacketPayload/*?}*/ {
+public record AiStatusPayload(UUID citizen, AiStatus status, UUID partner) /*? if neoforge {*/ implements CustomPacketPayload/*?}*/ {
     /*? if forge {*/
-    /*public static final String PROTOCOL_VERSION = "1";
+    /*public static final String PROTOCOL_VERSION = "2";
     public static final ResourceLocation CHANNEL_ID = new ResourceLocation(McTalking.MODID, "ai_status");
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             CHANNEL_ID,
@@ -42,6 +42,8 @@ public record AiStatusPayload(UUID citizen, AiStatus status) /*? if neoforge {*/
             AiStatusPayload::citizen,
             AiStatus.STREAM_CODEC,
             AiStatusPayload::status,
+            UUIDUtil.STREAM_CODEC,
+            AiStatusPayload::partner,
             AiStatusPayload::new
     );
     /*?}*/
@@ -50,14 +52,15 @@ public record AiStatusPayload(UUID citizen, AiStatus status) /*? if neoforge {*/
     /*public static void encode(AiStatusPayload msg, FriendlyByteBuf buf) {
         buf.writeUUID(msg.citizen);
         buf.writeEnum(msg.status);
+        buf.writeUUID(msg.partner);
     }
 
     public static AiStatusPayload decode(FriendlyByteBuf buf) {
-        return new AiStatusPayload(buf.readUUID(), buf.readEnum(AiStatus.class));
+        return new AiStatusPayload(buf.readUUID(), buf.readEnum(AiStatus.class), buf.readUUID());
     }
 
     public static void handle(AiStatusPayload msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> me.sshcrack.mc_talking.McTalkingClient.updateAiStatus(msg.citizen, msg.status));
+        ctx.get().enqueueWork(() -> me.sshcrack.mc_talking.McTalkingClient.updateConversation(msg.citizen, msg.status, msg.partner));
         ctx.get().setPacketHandled(true);
     }
 

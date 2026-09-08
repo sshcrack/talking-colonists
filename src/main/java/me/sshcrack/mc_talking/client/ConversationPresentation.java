@@ -63,22 +63,37 @@ public final class ConversationPresentation {
                 || !(mc.hitResult instanceof EntityHitResult hit)
                 || !(hit.getEntity() instanceof AbstractCivilianEntity citizen) || !visible(mc, citizen)) return;
         AiStatus status = McTalkingClient.getAiStatus(citizen.getUUID());
-        if (status == AiStatus.NONE) return;
-        Component hint = Component.translatable("mc_talking.conversation_hint." + status.name().toLowerCase(Locale.ROOT));
+        boolean device = mc.player.getMainHandItem().getItem() instanceof me.sshcrack.mc_talking.item.CitizenTalkingDevice;
+        boolean own = mc.player.getUUID().equals(McTalkingClient.getConversationPartner(citizen.getUUID()));
+        if (status == AiStatus.NONE && !device) return;
+        Component hint;
+        if (status == AiStatus.NONE) {
+            hint = Component.translatable("mc_talking.conversation_hint.start", mc.options.keyAttack.getTranslatedKeyMessage());
+        } else if (own && status == AiStatus.TALKING) {
+            hint = Component.translatable("mc_talking.conversation_hint.interrupt");
+        } else if (own && status == AiStatus.LISTENING) {
+            hint = Component.translatable("mc_talking.conversation_hint.your_turn");
+        } else {
+            hint = Component.translatable("mc_talking.conversation_hint." + status.name().toLowerCase(Locale.ROOT));
+        }
+        if (own && device) hint = hint.copy().append("\n").append(Component.translatable(
+                "mc_talking.conversation_hint.end", mc.options.keyAttack.getTranslatedKeyMessage()));
         int maxWidth = Math.max(80, Math.min(260, graphics.guiWidth() - 40));
-        var lines = mc.font.split(hint, maxWidth - 30);
+        int textInset = 36;
+        int rightPadding = 12;
+        var lines = mc.font.split(hint, maxWidth - textInset - rightPadding);
         int width = Math.min(maxWidth, Math.max(100,
-                lines.stream().mapToInt(mc.font::width).max().orElse(0) + 30));
+                lines.stream().mapToInt(mc.font::width).max().orElse(0) + textInset + rightPadding));
         int height = Math.max(28, lines.size() * 10 + 12);
         int x = (graphics.guiWidth() - width) / 2;
         int y = Math.max(6, graphics.guiHeight() - 62 - height);
         graphics.fill(x, y, x + width, y + height, 0xDC17212B);
         graphics.fill(x, y, x + 2, y + height, accent(status));
         float time = McTalkingConfig.INSTANCE.instance().reducedConversationMotion ? 0 : citizen.tickCount;
-        pixels((x1, y1, x2, y2, color) -> graphics.fill(x + 7 + x1, y + 5 + y1,
-                x + 7 + x2, y + 5 + y2, color), status, time);
+        pixels((x1, y1, x2, y2, color) -> graphics.fill(x + 12 + x1, y + 5 + y1,
+                x + 12 + x2, y + 5 + y2, color), status, time);
         for (int i = 0; i < lines.size(); i++) {
-            graphics.drawString(mc.font, lines.get(i), x + 30, y + 7 + i * 10, PAPER, false);
+            graphics.drawString(mc.font, lines.get(i), x + textInset, y + 7 + i * 10, PAPER, false);
         }
     }
 

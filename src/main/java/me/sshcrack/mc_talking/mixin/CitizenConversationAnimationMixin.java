@@ -29,6 +29,15 @@ public abstract class CitizenConversationAnimationMixin extends HumanoidModel<Ab
                 || citizen.getRenderMetadata().contains("working")) return;
         AiStatus status = McTalkingClient.getAiStatus(citizen.getUUID());
         if (status == AiStatus.NONE) return;
+        java.util.UUID partnerId = McTalkingClient.getConversationPartner(citizen.getUUID());
+        var partner = partnerId == null ? null : citizen.level().getPlayerByUUID(partnerId);
+        if (partner != null && limbSwingAmount < 0.1F && citizen.distanceToSqr(partner) < 64) {
+            double dx = partner.getX() - citizen.getX();
+            double dz = partner.getZ() - citizen.getZ();
+            float target = (float) (Math.atan2(dz, dx) * 180 / Math.PI - 90) - citizen.yBodyRot;
+            target = net.minecraft.util.Mth.clamp(net.minecraft.util.Mth.wrapDegrees(target), -55, 55);
+            head.yRot += (target * ((float) Math.PI / 180) - head.yRot) * 0.35F;
+        }
         float phase = age + (citizen.getId() % 17) * 3;
         if (status == AiStatus.TALKING) {
             head.xRot += (float) Math.sin(phase * 0.48) * 0.045F;

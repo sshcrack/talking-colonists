@@ -86,9 +86,9 @@ public class McTalking {
 
     /*? if neoforge {*/
     public void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        final var registrar = event.registrar("1");
+        final var registrar = event.registrar("2");
         registrar.playToClient(AiStatusPayload.TYPE, AiStatusPayload.STREAM_CODEC, new DirectionalPayloadHandler<>(
-                (payload, ctx) -> ctx.enqueueWork(() -> McTalkingClient.updateAiStatus(payload.citizen(), payload.status())),
+                (payload, ctx) -> ctx.enqueueWork(() -> McTalkingClient.updateConversation(payload.citizen(), payload.status(), payload.partner())),
                 (a, b) -> {
                 }
         ));

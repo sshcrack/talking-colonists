@@ -1,0 +1,9 @@
+# Optional subtitles and recent dialogue
+
+Work in `/home/hendrik/Documents/java/minecraft/talking-colonists`. Read `AGENTS.md` and inspect the current implementation before making changes. Preserve unrelated working-tree changes. Implement this feature through completion, with focused regression tests and both supported builds. Run every Minecraft client in a virtual display: `DISPLAY= CLIENT_SMOKE_OFFLINE=1 bash scripts/test-client-smoke.sh` (stage intended runtime changes first, then stage the generated verification marker). Keep the existing mouth rendering, conversation gestures, and partner-aware presentation intact. Follow the existing configuration/translation conventions. Do not publish or send Discord messages. Report behavior changes, validation, and remaining limitations.
+
+Add optional subtitles for spoken citizen dialogue and a small recent-dialogue view. Inspect the current transcript events and audio/session identities; use final provider transcripts, not guessed text or speech generated a second time. Begin with `manager`, `conversations`, network payloads, and `client/ConversationPresentation.java`.
+
+Show speaker identity, readable wrapping, and a bounded history. Associate text with the matching citizen/session; handle interruption and reconnect without duplicating old lines. Restrict delivery to intended recipients and nearby audible participants. Respect hidden GUI, chat focus, existing HUD positioning, and client subtitle configuration. Preserve ownership-aware listening feedback. Store no permanent transcript by default.
+
+Acceptance: verify two speakers, interrupted output, duplicate final transcript events, reconnect, leaving range, and world disconnect. Include both-loader screenshots from a virtual display and focused tests for transcript ordering/retention. Explain any timing limits imposed by the provider.

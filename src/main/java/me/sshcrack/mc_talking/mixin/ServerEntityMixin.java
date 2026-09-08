@@ -33,15 +33,35 @@ public class ServerEntityMixin {
     /*? if neoforge {*/
     @Unique
     private static void mc_talking$sendToPlayersTrackingEntity(LivingEntity entity, AiStatus packet) {
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(entity, new AiStatusPayload(entity.getUUID(), packet));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntity(entity, new AiStatusPayload(entity.getUUID(), packet, mc_talking$partner(entity)));
     }
     /*?} */
     /*? if forge {*/
     /*@Unique
     private static void mc_talking$sendToPlayersTrackingEntity(LivingEntity entity, AiStatus packet) {
-        AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), new AiStatusPayload(entity.getUUID(), packet));
+        AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY.with(() -> entity), new AiStatusPayload(entity.getUUID(), packet, mc_talking$partner(entity)));
     }
     *//*?}*/
+
+    @Unique private java.util.UUID mc_talking$lastPartner = new java.util.UUID(0, 0);
+
+    @Unique
+    private static java.util.UUID mc_talking$partner(Entity entity) {
+        var partner = me.sshcrack.mc_talking.ConversationManager.getPlayerForEntity(entity.getUUID());
+        return partner == null ? new java.util.UUID(0, 0) : partner;
+    }
+
+    @Inject(method = "addPairing", at = @At("RETURN"))
+    private void mc_talking$initialPresentation(net.minecraft.server.level.ServerPlayer player, CallbackInfo ci) {
+        if (!(entity instanceof AbstractEntityCitizen citizen)) return;
+        var payload = new AiStatusPayload(citizen.getUUID(),
+                ((AbstractEntityCitizenAiStatusProvider) citizen).mc_talking$getAiStatus(), mc_talking$partner(citizen));
+        /*? if neoforge {*/
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, payload);
+        /*?} else {*/
+        /*AiStatusPayload.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), payload);
+        *//*?}*/
+    }
 
     @Inject(method = "sendChanges", at = @At("HEAD"))
     private void mc_talking$sendAiStatusUpdates(CallbackInfo ci) {
@@ -54,7 +74,7 @@ public class ServerEntityMixin {
         }
 
         var provider = (AbstractEntityCitizenAiStatusProvider) citizen;
-        if (!provider.mc_talking$isStatusDirty()) {
+        if (!provider.mc_talking$isStatusDirty() && mc_talking$lastPartner.equals(mc_talking$partner(citizen))) {
             return;
         }
 
@@ -62,6 +82,7 @@ public class ServerEntityMixin {
 
         McTalking.LOGGER.info("Citizen {} has dirty AI status {}, sending update to clients", citizen.getCitizenData().getName(), provider.mc_talking$getAiStatus());
         mc_talking$sendToPlayersTrackingEntity(citizen, provider.mc_talking$getAiStatus());
+        mc_talking$lastPartner = mc_talking$partner(citizen);
         provider.mc_talking$markStatusClean();
     }
 }

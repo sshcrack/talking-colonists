@@ -79,8 +79,22 @@ public class McTalkingClient {
     /*? if neoforge {*/
     public void onDisconnect(LevelEvent.Unload event) {
     /*?}*/
-        if (event.getLevel().isClientSide()) aiStatus.clear();
+        if (event.getLevel().isClientSide()) {
+            aiStatus.clear();
+            partners.clear();
+            me.sshcrack.mc_talking.internal.audio.SpeechEnvelope.clear();
+        }
     }
+
+    private static final java.util.Map<UUID, UUID> partners = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void updateConversation(UUID citizen, AiStatus status, UUID partner) {
+        updateAiStatus(citizen, status);
+        if (partner.equals(new UUID(0, 0))) partners.remove(citizen);
+        else partners.put(citizen, partner);
+    }
+
+    public static UUID getConversationPartner(UUID citizen) { return partners.get(citizen); }
 
     public static AiStatus getAiStatus(UUID entityId) {
         return aiStatus.getOrDefault(entityId, AiStatus.NONE);
@@ -93,7 +107,11 @@ public class McTalkingClient {
     /*? if neoforge {*/
     public void onEntityLeave(EntityLeaveLevelEvent event) {
     /*?}*/
-        if (event.getLevel().isClientSide()) aiStatus.remove(event.getEntity().getUUID());
+        if (event.getLevel().isClientSide()) {
+            aiStatus.remove(event.getEntity().getUUID());
+            partners.remove(event.getEntity().getUUID());
+            me.sshcrack.mc_talking.internal.audio.SpeechEnvelope.remove(event.getEntity().getUUID());
+        }
     }
 
     @SubscribeEvent

@@ -5,7 +5,7 @@
   "item.mc_talking.talking_device": "Citizen Communication Device",
   "item.mc_talking.conversation_creator": "Conversation Creator",
   "item.mc_talking.mumbling_trigger_device": "Mumbling Trigger Device",
-  "item.mc_talking.talking_device.tooltip": "Left-click on a citizen to start talking with them",
+  "item.mc_talking.talking_device.tooltip": "Left-click a citizen to start talking; click them again to end. Right-click the air to end from a distance.",
   "mc_talking.configuration.gemini_key": "Gemini Key",
   "mc_talking.configuration.respond_in_group": "Reply when in group",
   "mc_talking.configuration.max_concurrent_agents": "Maximum concurrent agents",
@@ -292,5 +292,12 @@
   "yacl3.config.mc_talking:config.showConversationHint": "Conversation hint",
   "yacl3.config.mc_talking:config.showConversationHint.desc": "Show readable conversation feedback when looking at a citizen.",
   "yacl3.config.mc_talking:config.reducedConversationMotion": "Reduce conversation motion",
-  "yacl3.config.mc_talking:config.reducedConversationMotion.desc": "Keep speech icons static and turn off added head and hand gestures."
+  "yacl3.config.mc_talking:config.reducedConversationMotion.desc": "Keep speech icons static and turn off mouth movement and added head and hand gestures.",
+  "mc_talking.conversation_hint.start": "%s · Start a conversation",
+  "mc_talking.conversation_hint.your_turn": "Your turn · Listening to you",
+  "mc_talking.conversation_hint.end": "%s again · End conversation",
+  "mc_talking.conversation_ended": "Conversation ended",
+  "yacl3.config.mc_talking:config.showConversationMouths": "Moving mouths",
+  "yacl3.config.mc_talking:config.showConversationMouths.desc": "Animate built-in adult citizen mouths with received voice audio. Custom skins and helmets retain their original faces.",
+  "mc_talking.conversation_hint.interrupt": "Speaking · Speak to interrupt"
 }

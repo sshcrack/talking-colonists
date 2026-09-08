@@ -117,6 +117,12 @@ public final class DevRuntimeVerification {
                     require(routed == playerProbe, "participation-gated real microphone route");
                 }).get(5, TimeUnit.SECONDS);
 
+                long partnerDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (!player.getUUID().equals(me.sshcrack.mc_talking.McTalkingClient.getConversationPartner(citizen.getUUID()))
+                        && System.nanoTime() < partnerDeadline) Thread.sleep(50);
+                require(player.getUUID().equals(me.sshcrack.mc_talking.McTalkingClient.getConversationPartner(citizen.getUUID())),
+                        "foreground ownership reached client");
+
                 short[] speechFrame = new short[960];
                 for (int i = 0; i < speechFrame.length; i++) {
                     speechFrame[i] = (short) Math.round(Math.sin(2.0 * Math.PI * 440.0 * i / 48_000.0) * 6_000.0);
@@ -139,6 +145,11 @@ public final class DevRuntimeVerification {
 
                 server.submit(() -> ConversationManager.endConversation(player.getUUID(), false)).get(5, TimeUnit.SECONDS);
                 require(playerClient.isLifecycleClosed(), "player cancellation cleanup");
+                long clearDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (me.sshcrack.mc_talking.McTalkingClient.getConversationPartner(citizen.getUUID()) != null
+                        && System.nanoTime() < clearDeadline) Thread.sleep(50);
+                require(me.sshcrack.mc_talking.McTalkingClient.getConversationPartner(citizen.getUUID()) == null,
+                        "ended foreground ownership cleared on client");
                 DevConversationVisualVerification.verify(server, citizen);
                 McTalking.LOGGER.info("MC_TALKING_RUNTIME_SUCCESS:citizen,prompt,queued-input,audio,reconnect,microphone-turn,padding-response,cleanup");
             } catch (Exception error) {

@@ -62,17 +62,21 @@ public final class DevConversationVisualVerification {
         if (citizen == null) throw new IllegalStateException("Fixture citizen never reached client");
         AbstractEntityCitizen clientCitizen = citizen;
         boolean hideGui = mc.options.hideGui;
+        int originalFov = mc.options.fov().get();
         boolean reduced = McTalkingConfig.INSTANCE.instance().reducedConversationMotion;
         boolean bubbles = McTalkingConfig.INSTANCE.instance().showConversationBubbles;
+        boolean mouths = McTalkingConfig.INSTANCE.instance().showConversationMouths;
         boolean hint = McTalkingConfig.INSTANCE.instance().showConversationHint;
         try {
             mc.submit(() -> {
                 McTalkingConfig.INSTANCE.instance().reducedConversationMotion = false;
                 McTalkingConfig.INSTANCE.instance().showConversationBubbles = true;
                 McTalkingConfig.INSTANCE.instance().showConversationHint = true;
+                McTalkingConfig.INSTANCE.instance().showConversationMouths = true;
                 mc.player.setYRot(180);
                 mc.player.setXRot(0);
                 mc.options.hideGui = false;
+                mc.options.fov().set(40);
             }).get(5, TimeUnit.SECONDS);
             Thread.sleep(750);
             mc.submit(() -> verifyPoseReset(mc, clientCitizen)).get(5, TimeUnit.SECONDS);
@@ -83,21 +87,37 @@ public final class DevConversationVisualVerification {
                     Thread.sleep(50);
                 }
                 require(McTalkingClient.getAiStatus(clientCitizen.getUUID()) == status, "synced " + status);
-                Thread.sleep(500);
+                mc.submit(() -> {
+                    // Controlled visual fixture: the packet ownership path is checked separately.
+                    McTalkingClient.updateConversation(clientCitizen.getUUID(), status, mc.player.getUUID());
+                    mc.options.hideGui = status == AiStatus.TALKING;
+                    mc.options.fov().set(status == AiStatus.TALKING ? 40 : 55);
+                }).get(5, TimeUnit.SECONDS);
+                for (int frame = 0; frame < 30; frame++) {
+                    if (status == AiStatus.TALKING) me.sshcrack.mc_talking.internal.audio.SpeechEnvelope.accept(
+                            clientCitizen.getUUID(), new short[]{8000, -8000});
+                    Thread.sleep(20);
+                }
                 CompletableFuture<Void> saved = new CompletableFuture<>();
                 mc.execute(() -> Screenshot.grab(new File("/tmp/colonist-redesign"),
                         "conversation-" + net.minecraft.SharedConstants.getCurrentVersion().getName() + "-" + status.name().toLowerCase(java.util.Locale.ROOT) + ".png",
                         mc.getMainRenderTarget(), message -> saved.complete(null)));
                 saved.get(5, TimeUnit.SECONDS);
             }
+            Thread.sleep(200);
+            require(me.sshcrack.mc_talking.internal.audio.SpeechEnvelope.opening(clientCitizen.getUUID()) == 0,
+                    "mouth closes after playback stops");
             server.submit(() -> AiStatusHelper.setAiStatusOnServerThread(serverCitizen, AiStatus.NONE)).get(5, TimeUnit.SECONDS);
             McTalking.LOGGER.info("MC_TALKING_VISUAL_SUCCESS:poses,reset,reduced-motion,synced-states,screenshots");
         } finally {
             mc.submit(() -> {
                 mc.options.hideGui = hideGui;
+                mc.options.fov().set(originalFov);
+                McTalkingClient.updateConversation(clientCitizen.getUUID(), AiStatus.NONE, new java.util.UUID(0, 0));
                 McTalkingConfig.INSTANCE.instance().reducedConversationMotion = reduced;
                 McTalkingConfig.INSTANCE.instance().showConversationBubbles = bubbles;
                 McTalkingConfig.INSTANCE.instance().showConversationHint = hint;
+                McTalkingConfig.INSTANCE.instance().showConversationMouths = mouths;
             }).get(5, TimeUnit.SECONDS);
         }
     }

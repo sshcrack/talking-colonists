@@ -86,6 +86,11 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Keep conversation icons static and disable added conversation gestures on this client.")
     public boolean reducedConversationMotion = false;
 
+    @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "Animate built-in adult citizen mouths from received voice audio on this client.")
+    public boolean showConversationMouths = true;
+
     // Colony Statistics Mentions
     @AutoGen(category = "citizens")
     @TickBox

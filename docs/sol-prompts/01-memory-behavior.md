@@ -1,0 +1,9 @@
+# Memories that affect behavior
+
+Work in `/home/hendrik/Documents/java/minecraft/talking-colonists`. Read `AGENTS.md` and inspect the current implementation before making changes. Preserve unrelated working-tree changes. Implement this feature through completion, with focused regression tests and both supported builds. Run every Minecraft client in a virtual display: `DISPLAY= CLIENT_SMOKE_OFFLINE=1 bash scripts/test-client-smoke.sh` (stage intended runtime changes first, then stage the generated verification marker). Keep the existing mouth rendering, conversation gestures, and partner-aware presentation intact. Follow the existing configuration/translation conventions. Do not publish or send Discord messages. Report behavior changes, validation, and remaining limitations.
+
+Make remembered interactions influence later citizen behavior, beyond adding facts to a prompt. Start with `conversations/memory`, `internal/session`, and existing citizen tool/action scheduling. Trace how memories are stored, selected, expired, and used before choosing an implementation.
+
+Implement one bounded vertical slice: a citizen remembers a player agreeing to help with an existing request, recognizes whether that request was fulfilled from authoritative colony state, and later acknowledges the result. Represent uncertain promises separately from verified outcomes. Preserve citizen and player identity, expiry, save/load, and deletion semantics. Use existing memory and request APIs; avoid a parallel storage system. Do not let generated prose directly mutate colony state or bypass action eligibility. Keep unrelated gossip from creating player commitments.
+
+Acceptance: test a fulfilled commitment, an unfulfilled commitment, a request removed for another reason, save/load, and two players with different commitments. Demonstrate the behavior with fixtures without a live paid provider. Expose any new behavior as a configurable option with clear defaults.
