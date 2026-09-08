@@ -190,16 +190,19 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 	private fun Project.configureTestTasks() {
 		tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
 			useJUnitPlatform()
-			// Restrict JUnit discovery to actual test classes. This prevents the
-			// engine from attempting to load helper classes, compile-only addon
-			// examples, or inner context stubs as standalone tests. Those classes
-			// legitimately reference Forge/MineColonies types whose signed jars
-			// fail SHA-256 verification on JDK 25 after re-obfuscation.
+			// Restrict which class files are treated as test candidates. The
+			// separate "addonApiExamples" source tree contains compile-only
+			// examples that reference Forge types. Without this they would be
+			// discovered as standalone test classes and trigger JDK 25's
+			// JarVerifier "SHA-256 digest error" for signed Forge jars.
+			include("**/*Test.class")
+			include("**/*Tests.class")
+			include("**/*TestCase.class")
+			exclude("**/*\$*.class")
 			filter {
 				includeTestsMatching("*Test")
 				includeTestsMatching("*Tests")
 				includeTestsMatching("*TestCase")
-				// Exclude inner classes that are test helpers, not tests themselves.
 				excludeTestsMatching("*\$*")
 			}
 			// Forge 47.x jars are signed. After Loom/Mixin re-mapping their

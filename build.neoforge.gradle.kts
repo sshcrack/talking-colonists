@@ -221,6 +221,10 @@ dependencies {
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     useJUnitPlatform()
+    include("**/*Test.class")
+    include("**/*Tests.class")
+    include("**/*TestCase.class")
+    exclude("**/*\$*.class")
     filter {
         includeTestsMatching("*Test")
         includeTestsMatching("*Tests")
