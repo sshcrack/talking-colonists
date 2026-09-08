@@ -7,6 +7,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
@@ -136,6 +137,20 @@ public class RumorMillService {
         // No unheard rumors — promote a first-hand event to a new rumor and
         // remove it from the events list to prevent the same event being
         // rumorized twice.  The event is now reflected in receivedRumors.
+        String content = takeFirstHandEvent(sourceMem);
+        if (content == null) return null;
+        String originatorName = source.getCitizenData().getName();
+        String id = UUID.randomUUID().toString();
+
+        Rumor newRumor = new Rumor(id, originatorName, content);
+        sourceMem.addRumor(newRumor);
+        targetMem.addRumor(newRumor);
+        return newRumor;
+    }
+
+    /** Consume one firsthand recollection before promoting it into the rumor collection. */
+    @Nullable
+    static String takeFirstHandEvent(CitizenMemories sourceMem) {
         List<String> events = sourceMem.getEvents();
         List<Integer> firstHandIndices = new ArrayList<>();
         for (int idx = 0; idx < events.size(); idx++) {
@@ -146,13 +161,9 @@ public class RumorMillService {
         if (firstHandIndices.isEmpty()) return null;
 
         int pickIdx = firstHandIndices.get(ThreadLocalRandom.current().nextInt(firstHandIndices.size()));
-        String content = events.remove(pickIdx);
-        String originatorName = source.getCitizenData().getName();
-        String id = UUID.randomUUID().toString();
-
-        Rumor newRumor = new Rumor(id, originatorName, content);
-        sourceMem.addRumor(newRumor);
-        targetMem.addRumor(newRumor);
-        return newRumor;
+        String content = events.get(pickIdx);
+        // getEvents() is a snapshot. Mutate the owner so its provenance entries and
+        // pending compaction validation stay consistent with the event collection.
+        return sourceMem.removeEvent(content) ? content : null;
     }
 }
