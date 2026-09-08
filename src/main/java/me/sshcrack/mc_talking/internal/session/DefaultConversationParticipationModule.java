@@ -53,6 +53,11 @@ public final class DefaultConversationParticipationModule implements Conversatio
     }
 
     @Override
+    public synchronized void inputAwaitingResponse(ForegroundSessionRegistry.Token token, boolean active) {
+        mutate(token, facts -> facts.awaitingProviderResponse = active);
+    }
+
+    @Override
     public synchronized void urgentWalking(ForegroundSessionRegistry.Token token, boolean active) {
         mutate(token, facts -> facts.urgentWalking = active);
     }
@@ -108,6 +113,7 @@ public final class DefaultConversationParticipationModule implements Conversatio
         if (facts.audibleActivity == AudibleActivity.TALKING) return AiStatus.TALKING;
         if (facts.providerReadiness == ProviderReadiness.RECOVERING) return AiStatus.RECONNECTING;
         if (facts.providerReadiness == ProviderReadiness.CONNECTING) return AiStatus.CONNECTING;
+        if (facts.awaitingProviderResponse) return AiStatus.THINKING;
         if (facts.audibleActivity == AudibleActivity.THINKING) return AiStatus.THINKING;
         if (facts.urgentWalking) return AiStatus.URGENT_WALKING;
         if (facts.providerReadiness == ProviderReadiness.READY && directPlayerId != null) return AiStatus.LISTENING;
@@ -117,6 +123,7 @@ public final class DefaultConversationParticipationModule implements Conversatio
     private static final class Facts {
         ProviderReadiness providerReadiness = ProviderReadiness.NOT_READY;
         AudibleActivity audibleActivity = AudibleActivity.IDLE;
+        boolean awaitingProviderResponse;
         boolean urgentWalking;
         AiStatus failure;
     }

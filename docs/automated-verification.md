@@ -25,7 +25,13 @@ A title screen is insufficient. Success requires entering a world, creating a re
 MineColonies citizen, constructing its prompt/tools, playing queued text/audio output,
 recovering from an injected provider disconnect, verifying post-reconnect playback,
 and releasing foreground ownership. It also verifies the public addon status query.
-Both `MC_TALKING_RUNTIME_SUCCESS` and `MC_TALKING_AUTOQUIT_SUCCESS:world` are required.
+The local-provider fixture additionally promotes an ambient session into a player-owned
+session, encodes a synthetic 48 kHz frame through Simple Voice Chat Opus, routes it
+through the participation-gated live client, waits for session-owned generated padding,
+and returns the response only after that padding arrives. This exercises the real
+orchestration path without a microphone device or Gemini credential and catches padding
+that continues after response startup. Both `MC_TALKING_RUNTIME_SUCCESS` and
+`MC_TALKING_AUTOQUIT_SUCCESS:world` are required.
 Failure logs are retained under `/tmp/client-smoke-*.log`.
 
 ## Optional real Gemini check
@@ -62,8 +68,11 @@ These workflow changes have been validated locally, not run on GitHub in this ta
 ## What this does not prove
 
 This is materially stronger than launch-only smoke testing, but it does not prove
-microphone/device routing, every gameplay/tool action, every addon combination, model
-answer quality, quota availability, or long-running multiplayer behavior. The real
-Gemini test covers the library protocol; the in-world mod test injects a local provider.
-Keep a short manual audio/device check for releases until hardware-loopback coverage
-is available. No Windows handoff is necessary for the automated checks above.
+physical microphone capture/device routing, acoustic speech-threshold quality, every
+gameplay/tool action, every addon combination, model answer quality, quota availability,
+or long-running multiplayer behavior. The in-world microphone reproduction uses real
+Simple Voice Chat Opus encode/decode and the mod's orchestration path, but its waveform
+and provider are deterministic fakes. The separate live Gemini check covers provider
+protocol behavior without a physical microphone. Keep a short manual audio/device and
+real conversational barge-in check for releases until hardware-loopback coverage is
+available. No Windows handoff is necessary for the automated checks above.

@@ -150,6 +150,23 @@ class ConversationParticipationModuleTest {
         assertTrue(harness.participation.canClearAfterCompletion(disconnected.token()));
     }
 
+
+    @Test
+    void closedMicrophoneTurnShowsBoundedThinkingThenReturnsToListening() {
+        Harness harness = new Harness();
+        UUID player = UUID.randomUUID();
+        var direct = harness.reservePlayer(UUID.randomUUID(), player);
+        harness.participation.providerReady(direct.token());
+        assertEquals(AiStatus.LISTENING, harness.presentation(direct.token()));
+
+        harness.participation.inputAwaitingResponse(direct.token(), true);
+        assertEquals(AiStatus.THINKING, harness.presentation(direct.token()));
+        assertTrue(harness.participation.canRouteInput(direct.token(), player));
+
+        harness.participation.inputAwaitingResponse(direct.token(), false);
+        assertEquals(AiStatus.LISTENING, harness.presentation(direct.token()));
+    }
+
     private static final class Harness {
         final ForegroundSessionRegistry<String, FakeClient> registry;
         final DefaultConversationParticipationModule participation;

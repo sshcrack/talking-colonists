@@ -59,4 +59,25 @@ class ProviderInputBufferTest {
         buffer.submit("late callback", () -> true, sent::add);
         assertEquals(List.of("attribution", "audio"), sent);
     }
+    @Test
+    void recoveryPreservesValidOrderingButDropsStaleMicrophoneFrames() {
+        var buffer = new ProviderInputBuffer();
+        var now = new java.util.concurrent.atomic.AtomicLong();
+        var ready = new AtomicBoolean(false);
+        var sent = new ArrayList<String>();
+
+        buffer.submit("speech-1", 100, now::get, ready::get, sent::add);
+        now.set(40);
+        buffer.submit("speech-2", 100, now::get, ready::get, sent::add);
+        buffer.submit("attribution", Long.MAX_VALUE, now::get, ready::get, sent::add);
+        assertEquals(3, buffer.size());
+
+        now.set(120);
+        ready.set(true);
+        ProviderInputBuffer.DrainResult result = buffer.flush(ready::get, sent::add, now::get);
+        assertEquals(1, result.droppedExpired());
+        assertEquals(List.of("speech-2", "attribution"), sent);
+        assertEquals(0, result.remaining());
+    }
+
 }

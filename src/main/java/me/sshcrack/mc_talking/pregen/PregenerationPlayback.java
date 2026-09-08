@@ -2,10 +2,12 @@ package me.sshcrack.mc_talking.pregen;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
+import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.internal.audio.PcmSpeechDetector;
 import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -16,6 +18,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 /** Playback and interruption owner for cached/pregenerated citizen speech. */
 public final class PregenerationPlayback {
@@ -74,6 +78,7 @@ public final class PregenerationPlayback {
         int packets;
         long lastPacketMs;
         long startedAtMs;
+        OpusDecoder decoder;
     }
 
     public static boolean hasActivePlayback() {
@@ -93,6 +98,23 @@ public final class PregenerationPlayback {
      * A short debounce prevents coughs/noise from killing a clip, and a clip gets two
      * seconds to begin before deliberate speech can interrupt it.
      */
+    public static void onPlayerOpusPacket(ServerPlayer player, byte[] opusData) {
+        if (ACTIVE_PREGENERATED_PLAYBACK.isEmpty()) return;
+        if (player == null || opusData == null || opusData.length == 0 || vcApi == null) return;
+        VoiceBurst burst = PLAYER_VOICE_BURSTS.computeIfAbsent(player.getUUID(), ignored -> new VoiceBurst());
+        short[] decoded;
+        synchronized (burst) {
+            if (burst.decoder == null || burst.decoder.isClosed()) burst.decoder = vcApi.createDecoder();
+            if (burst.decoder == null) return;
+            try {
+                decoded = burst.decoder.decode(opusData);
+            } catch (RuntimeException error) {
+                return;
+            }
+        }
+        onPlayerVoicePacket(player, PcmSpeechDetector.isSpeechCandidate(decoded));
+    }
+
     public static void onPlayerVoicePacket(ServerPlayer player, boolean hasVoiceActivity) {
         if (player == null || !hasVoiceActivity) return;
 
@@ -125,6 +147,15 @@ public final class PregenerationPlayback {
             } catch (Throwable ignored) {
                 entry.stop("invalid playback participant");
             }
+        }
+    }
+
+    public static void onPlayerDisconnected(UUID playerId) {
+        VoiceBurst burst = PLAYER_VOICE_BURSTS.remove(playerId);
+        if (burst == null) return;
+        synchronized (burst) {
+            closeDecoder(burst.decoder);
+            burst.decoder = null;
         }
     }
 
@@ -194,6 +225,17 @@ public final class PregenerationPlayback {
             entry.stop("server shutdown");
         }
         ACTIVE_PREGENERATED_PLAYBACK.clear();
+        for (VoiceBurst burst : PLAYER_VOICE_BURSTS.values()) {
+            synchronized (burst) {
+                closeDecoder(burst.decoder);
+                burst.decoder = null;
+            }
+        }
         PLAYER_VOICE_BURSTS.clear();
+    }
+
+    private static void closeDecoder(OpusDecoder decoder) {
+        if (decoder == null || decoder.isClosed()) return;
+        try { decoder.close(); } catch (Exception ignored) { }
     }
 }

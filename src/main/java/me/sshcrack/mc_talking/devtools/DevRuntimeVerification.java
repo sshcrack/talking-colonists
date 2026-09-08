@@ -10,10 +10,12 @@ import me.sshcrack.gemini_live_lib.websocket.handshake.ClientHandshake;
 import me.sshcrack.gemini_live_lib.websocket.server.WebSocketServer;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
+import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -86,17 +89,54 @@ public final class DevRuntimeVerification {
                 require(server.submit(() -> CitizenConversationService.providerStatus(citizen).isEmpty())
                         .get(5, TimeUnit.SECONDS), "addon provider cleanup");
 
+                provider.enableMicrophoneMode();
                 playerClient = server.submit(() -> {
-                    var client = new ProbeClient(citizen, provider.uri(), server.getPlayerList().getPlayers().get(0));
-                    // Exercises real audio conversion and queue-before-setup using the player client.
-                    client.addPromptAudio(new short[4800]);
+                    var client = new ProbeClient(citizen, provider.uri());
+                    var reservation = ConversationManager.reserveAmbientForeground(citizen, ConversationKind.URGENT_CONTACT);
+                    require(reservation != null && reservation.attachClient(client), "microphone reproduction reservation");
+                    client.addOnCloseAction(reservation::close);
+                    require(reservation.activate(), "microphone reproduction activation");
+                    // Drive setup through the same queued-input/connection path used by normal
+                    // ambient sessions. The local provider ignores this setup-only text in
+                    // microphone mode and waits for real Opus-derived audio/padding below.
+                    client.addPromptTextImmediate("Prepare for direct microphone verification.");
                     return client;
                 }).get(10, TimeUnit.SECONDS);
-                require("Verified speech.".equals(playerClient.heard.poll(10, TimeUnit.SECONDS)), "player audio turn");
+                require(playerClient.ready.poll(5, TimeUnit.SECONDS) != null, "microphone reproduction provider setup");
+
                 var playerProbe = playerClient;
-                server.submit(() -> { playerProbe.close(); }).get(5, TimeUnit.SECONDS);
+                ServerPlayer player = server.getPlayerList().getPlayers().get(0);
+                server.submit(() -> {
+                    McTalkingConfig.INSTANCE.instance().geminiApiKey = "local-runtime-verification";
+                    var result = ConversationManager.startPlayerConversationDetailed(player, citizen);
+                    require(result.started(), "ambient-to-player promotion for microphone reproduction");
+                    GeminiWsClient routed = ConversationManager.getReadyInputClientForPlayer(player.getUUID());
+                    require(routed == playerProbe, "participation-gated real microphone route");
+                }).get(5, TimeUnit.SECONDS);
+
+                short[] speechFrame = new short[960];
+                for (int i = 0; i < speechFrame.length; i++) {
+                    speechFrame[i] = (short) Math.round(Math.sin(2.0 * Math.PI * 440.0 * i / 48_000.0) * 6_000.0);
+                }
+                var encoder = McTalkingVoicechatPlugin.vcApi.createEncoder();
+                try {
+                    byte[] opus = encoder.encode(speechFrame);
+                    require(playerClient.acceptMicrophoneOpus(opus), "decoded microphone speech classification");
+                    require(playerClient.acceptMicrophoneOpus(opus), "sustained microphone speech classification");
+                } finally {
+                    encoder.close();
+                }
+
+                require(provider.paddingObserved.await(5, TimeUnit.SECONDS), "session-owned generated padding reached provider");
+                require("Verified speech.".equals(playerClient.heard.poll(10, TimeUnit.SECONDS)),
+                        "provider response after microphone pause/padding");
+                Thread.sleep(150L);
+                require(provider.paddingAfterResponse.get() <= 1,
+                        "padding stopped when provider response began instead of interrupting playback");
+
+                server.submit(() -> ConversationManager.endConversation(player.getUUID(), false)).get(5, TimeUnit.SECONDS);
                 require(playerClient.isLifecycleClosed(), "player cancellation cleanup");
-                McTalking.LOGGER.info("MC_TALKING_RUNTIME_SUCCESS:citizen,prompt,queued-input,audio,reconnect,cleanup");
+                McTalking.LOGGER.info("MC_TALKING_RUNTIME_SUCCESS:citizen,prompt,queued-input,audio,reconnect,microphone-turn,padding-response,cleanup");
             } catch (Exception error) {
                 throw new IllegalStateException("In-world conversation verification failed", error);
             } finally {
@@ -130,6 +170,10 @@ public final class DevRuntimeVerification {
 
     private static final class LocalProvider extends WebSocketServer implements AutoCloseable {
         private final CompletableFuture<Void> started = new CompletableFuture<>();
+        private final AtomicBoolean microphoneMode = new AtomicBoolean(false);
+        private final AtomicBoolean microphoneResponseSent = new AtomicBoolean(false);
+        final java.util.concurrent.CountDownLatch paddingObserved = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.atomic.AtomicInteger paddingAfterResponse = new java.util.concurrent.atomic.AtomicInteger();
         LocalProvider() throws Exception {
             super(new InetSocketAddress("127.0.0.1", 0), 1);
             setDaemon(true);
@@ -137,6 +181,7 @@ public final class DevRuntimeVerification {
             started.get(5, TimeUnit.SECONDS);
         }
         URI uri() { return URI.create("ws://127.0.0.1:" + getPort()); }
+        void enableMicrophoneMode() { microphoneMode.set(true); }
         @Override public void onStart() { started.complete(null); }
         @Override public void onOpen(WebSocket socket, ClientHandshake handshake) { }
         @Override public void onClose(WebSocket socket, int code, String reason, boolean remote) { }
@@ -147,13 +192,39 @@ public final class DevRuntimeVerification {
                 var setup = message.getAsJsonObject("setup");
                 require(setup.has("systemInstruction") && setup.has("tools"), "real citizen prompt/tools construction");
                 socket.send("{\"setupComplete\":{}}".getBytes(StandardCharsets.UTF_8));
-            } else if (message.has("realtime_input") || message.has("realtimeInput")) {
-                String audio = Base64.getEncoder().encodeToString(new byte[4800]);
-                socket.send("{\"serverContent\":{\"modelTurn\":{\"parts\":[{\"inlineData\":{"
-                        + "\"mimeType\":\"audio/pcm;rate=24000\",\"data\":\"" + audio + "\"}}]},"
-                        + "\"outputTranscription\":{\"text\":\"Verified speech.\"},"
-                        + "\"generationComplete\":true,\"turnComplete\":true}}");
+                return;
             }
+            if (!message.has("realtime_input") && !message.has("realtimeInput")) return;
+            var input = message.has("realtime_input")
+                    ? message.getAsJsonObject("realtime_input")
+                    : message.getAsJsonObject("realtimeInput");
+
+            if (microphoneMode.get()) {
+                if (!input.has("audio")) return; // takeover attribution stays ordered but does not synthesize a reply
+                byte[] pcm = Base64.getDecoder().decode(input.getAsJsonObject("audio").get("data").getAsString());
+                boolean generatedPadding = true;
+                for (byte value : pcm) {
+                    if (value != 0) {
+                        generatedPadding = false;
+                        break;
+                    }
+                }
+                if (!generatedPadding) return;
+                paddingObserved.countDown();
+                if (microphoneResponseSent.compareAndSet(false, true)) sendVerifiedResponse(socket);
+                else paddingAfterResponse.incrementAndGet();
+                return;
+            }
+
+            sendVerifiedResponse(socket);
+        }
+
+        private static void sendVerifiedResponse(WebSocket socket) {
+            String audio = Base64.getEncoder().encodeToString(new byte[4800]);
+            socket.send("{\"serverContent\":{\"modelTurn\":{\"parts\":[{\"inlineData\":{"
+                    + "\"mimeType\":\"audio/pcm;rate=24000\",\"data\":\"" + audio + "\"}}]},"
+                    + "\"outputTranscription\":{\"text\":\"Verified speech.\"},"
+                    + "\"generationComplete\":true,\"turnComplete\":true}}");
         }
         @Override public void close() throws InterruptedException { stop(1000); }
     }

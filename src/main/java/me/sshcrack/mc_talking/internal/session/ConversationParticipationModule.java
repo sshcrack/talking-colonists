@@ -46,6 +46,8 @@ public interface ConversationParticipationModule {
 
     void playbackIdle(ForegroundSessionRegistry.Token token);
 
+    void inputAwaitingResponse(ForegroundSessionRegistry.Token token, boolean active);
+
     void urgentWalking(ForegroundSessionRegistry.Token token, boolean active);
 
     void failure(ForegroundSessionRegistry.Token token, AiStatus status);

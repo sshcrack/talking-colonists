@@ -5,6 +5,7 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Minecraft-facing adapter for the pure participation module.
@@ -56,6 +57,21 @@ public final class MinecraftConversationParticipationAdapter {
     public void playbackIdle() {
         module.playbackIdle(token);
         refresh();
+    }
+
+    public void inputAwaitingResponse(boolean active) {
+        module.inputAwaitingResponse(token, active);
+        refresh();
+    }
+
+    /** Exact foreground ownership identity used by microphone-turn delayed work. */
+    public UUID ownershipId() {
+        return token.ownershipId();
+    }
+
+    /** Revalidates this adapter's foreground owner before a delayed provider/audio side effect. */
+    public boolean isCurrent() {
+        return module.presentationIfCurrent(token).isPresent();
     }
 
     public void urgentWalking(boolean active) {

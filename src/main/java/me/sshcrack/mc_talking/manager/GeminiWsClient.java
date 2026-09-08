@@ -16,6 +16,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.internal.tool.AiToolDispatcher;
 import me.sshcrack.mc_talking.internal.tool.AiToolExecutionContext;
 import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
+import me.sshcrack.mc_talking.internal.audio.MicrophoneTurnModule;
 import me.sshcrack.mc_talking.internal.audio.PlaybackDrainCoordinator;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.internal.session.ProviderInputBuffer;
@@ -56,6 +57,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private static final long GRACEFUL_CLOSE_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(30);
     private static final AiToolDispatcher ADDON_TOOL_DISPATCHER = new AiToolDispatcher();
     private static volatile ScheduledExecutorService RECONNECT_EXECUTOR;
+    private static volatile ScheduledExecutorService MICROPHONE_EXECUTOR;
+    private static final long MICROPHONE_INPUT_MAX_QUEUE_NANOS = TimeUnit.MILLISECONDS.toNanos(2500);
+    private static final long GENERATED_PADDING_MAX_QUEUE_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
 
     private static synchronized ScheduledExecutorService getReconnectExecutor() {
         if (RECONNECT_EXECUTOR == null || RECONNECT_EXECUTOR.isShutdown() || RECONNECT_EXECUTOR.isTerminated()) {
@@ -66,6 +70,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             });
         }
         return RECONNECT_EXECUTOR;
+    }
+
+    private static synchronized ScheduledExecutorService getMicrophoneExecutor() {
+        if (MICROPHONE_EXECUTOR == null || MICROPHONE_EXECUTOR.isShutdown() || MICROPHONE_EXECUTOR.isTerminated()) {
+            MICROPHONE_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "mc_talking_microphone_turns");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return MICROPHONE_EXECUTOR;
     }
 
 
@@ -132,6 +147,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final AtomicBoolean closeActionsFired = new AtomicBoolean(false);
     @Nullable
     private volatile MinecraftConversationParticipationAdapter conversationParticipation;
+    @Nullable
+    private volatile MicrophoneTurnModule microphoneTurns;
 
     private final long sessionStartTimeMs = System.currentTimeMillis();
 
@@ -206,6 +223,75 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             throw new IllegalStateException("Conversation participation is already bound");
         }
         conversationParticipation = participation;
+        if (microphoneTurns == null) {
+            microphoneTurns = createMicrophoneTurnModule(participation);
+        }
+    }
+
+    private MicrophoneTurnModule createMicrophoneTurnModule(MinecraftConversationParticipationAdapter participation) {
+        UUID sessionId = participation.ownershipId();
+        return new MicrophoneTurnModule(
+                sessionId,
+                System::nanoTime,
+                (task, delayNanos) -> {
+                    ScheduledFuture<?> future = getMicrophoneExecutor().schedule(task, delayNanos, TimeUnit.NANOSECONDS);
+                    return () -> future.cancel(false);
+                },
+                new MicrophoneTurnModule.ProviderAdapter() {
+                    @Override
+                    public void acceptAudio(
+                            UUID expectedSessionId,
+                            @Nullable UUID turnId,
+                            MicrophoneTurnModule.InputKind kind,
+                            short[] pcm
+                    ) {
+                        if (!sessionId.equals(expectedSessionId) || closeStarted.get() || !participation.isCurrent()) return;
+                        if (kind == MicrophoneTurnModule.InputKind.GENERATED_PADDING && !isSessionReadyForInput()) return;
+                        if (kind != MicrophoneTurnModule.InputKind.GENERATED_PADDING) {
+                            onBeforePlayerMicrophoneInput(kind);
+                        }
+                        submitPcmInput(pcm, kind);
+                    }
+
+                    @Override
+                    public boolean cancelPlayback(UUID expectedSessionId, UUID turnId) {
+                        if (!sessionId.equals(expectedSessionId) || closeStarted.get() || !participation.isCurrent()) return false;
+                        boolean cancelled = interruptCurrentOutputForBargeIn();
+                        if (cancelled) presentationIdle();
+                        return cancelled;
+                    }
+
+                    @Override
+                    public void waitingForResponse(UUID expectedSessionId, UUID turnId, boolean waiting) {
+                        if (!sessionId.equals(expectedSessionId) || closeStarted.get() || !participation.isCurrent()) return;
+                        participation.inputAwaitingResponse(waiting);
+                    }
+
+                    @Override
+                    public void diagnostic(MicrophoneTurnModule.Diagnostic diagnostic) {
+                        logMicrophoneDiagnostic(diagnostic);
+                    }
+                }
+        );
+    }
+
+    protected void onBeforePlayerMicrophoneInput(MicrophoneTurnModule.InputKind kind) {
+        // no-op by default; CitizenWsClient uses this seam for takeover context injection
+    }
+
+    private void logMicrophoneDiagnostic(MicrophoneTurnModule.Diagnostic diagnostic) {
+        String turn = diagnostic.turnId() == null ? "none" : diagnostic.turnId().toString();
+        switch (diagnostic.event()) {
+            case INPUT_ACCEPTED, PROVIDER_INPUT_OBSERVED -> McTalking.LOGGER.debug(
+                    "{} microphone session={} turn={} event={} source={}",
+                    logPrefix, diagnostic.sessionId(), turn, diagnostic.event(), diagnostic.inputKind());
+            case RESPONSE_TIMEOUT -> McTalking.LOGGER.warn(
+                    "{} microphone session={} turn={} provider response timeout; returning to truthful ready state",
+                    logPrefix, diagnostic.sessionId(), turn);
+            default -> McTalking.LOGGER.info(
+                    "{} microphone session={} turn={} event={} source={}",
+                    logPrefix, diagnostic.sessionId(), turn, diagnostic.event(), diagnostic.inputKind());
+        }
     }
 
     public void addOnCloseAction(Runnable action) {
@@ -312,18 +398,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (turnId != null) stream.flushAudio(turnId);
     }
 
-    private void interruptCurrentOutputForBargeIn() {
+    private boolean interruptCurrentOutputForBargeIn() {
         UUID turnId = currentOutputTurn();
-        if (turnId == null) return;
+        if (turnId == null) return false;
         boolean providerAlreadyFinished;
         synchronized (this) {
-            if (!turnId.equals(outputTurnId)) return;
+            if (!turnId.equals(outputTurnId)) return false;
             outputTurnInterrupted = true;
             pendingAudibleTranscriptTurnId = null;
             pendingAudibleTranscript = null;
             providerAlreadyFinished = providerTurnComplete;
         }
-        stream.cancelTurn(turnId);
+        boolean cancelled = stream.cancelTurn(turnId);
 
         // If Gemini had already completed generation, there will be no later interruption/turn
         // completion event to retire this local playback identity. Retire it now so the user's
@@ -333,6 +419,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             onConversationEnded();
             gracefulPlaybackClose.onPlaybackDrained();
         }
+        return cancelled;
     }
 
     private void invalidateCurrentOutputTurn() {
@@ -728,6 +815,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onGeneratedText(String text) {
         if (finalGenerationCompleted || suppressProviderOutput) return;
+        microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
         ensureOutputTurn();
         producedOutputSinceSetup = true;
         var hasTextEnabled = getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO;
@@ -738,8 +826,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     @Override
+    public void onInputTranscription(String transcription) {
+        microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.INPUT_OBSERVED);
+    }
+
+    @Override
     public void onOutputTranscription(String transcription) {
         if (finalGenerationCompleted || suppressProviderOutput) return;
+        microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
         ensureOutputTurn();
         producedOutputSinceSetup = true;
         currentTurnTranscript += transcription;
@@ -749,6 +843,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onTurnComplete() {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
         if (suppressProviderOutput) return;
+        microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.TURN_COMPLETED);
         QuotaTracker.reportSuccess(getModelName());
         UUID turnId = ensureOutputTurn();
         generationComplete = true;
@@ -804,6 +899,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.debug("{} Dropping audio outside the active provider turn", logPrefix);
             return;
         }
+        microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
         producedOutputSinceSetup = true;
         UUID turnId = ensureOutputTurn();
         var isJustStarted = stream.addGeminiPcmWithPitch(turnId, data, sampleRate);
@@ -824,13 +920,32 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private void submitInput(String frame) {
+        submitInput(frame, Long.MAX_VALUE);
+    }
+
+    private void submitInput(String frame, long maxQueueAgeNanos) {
         if (closeStarted.get() || recoveryController.diagnostic().terminal()) return;
         try {
-            pendingInput.submit(frame, this::isSessionReadyForInput, this::send);
+            ProviderInputBuffer.DrainResult result = pendingInput.submit(
+                    frame,
+                    maxQueueAgeNanos,
+                    System::nanoTime,
+                    this::isSessionReadyForInput,
+                    this::send
+            );
+            if (result.droppedExpired() > 0) {
+                McTalking.LOGGER.warn("{} Dropped {} stale queued provider input frame(s)",
+                        logPrefix, result.droppedExpired());
+            }
         } catch (RuntimeException error) {
             onError(error);
         }
         ensureConnectionForQueuedInput("queued input");
+    }
+
+    private void microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress progress) {
+        MicrophoneTurnModule turns = microphoneTurns;
+        if (turns != null) turns.providerProgress(progress);
     }
 
     @Override
@@ -850,7 +965,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         McTalking.LOGGER.info("{} Gemini setup complete", logPrefix);
         try {
-            pendingInput.flush(this::isSessionReadyForInput, this::send);
+            ProviderInputBuffer.DrainResult result = pendingInput.flush(
+                    this::isSessionReadyForInput, this::send, System::nanoTime);
+            if (result.droppedExpired() > 0) {
+                McTalking.LOGGER.warn("{} Dropped {} stale queued provider input frame(s) after setup",
+                        logPrefix, result.droppedExpired());
+            }
         } catch (RuntimeException error) {
             onError(error);
         }
@@ -1024,6 +1144,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.error("{} Error in GeminiLiveClient.onClose", logPrefix, e);
         }
 
+        MicrophoneTurnModule turns = microphoneTurns;
+        if (turns != null) turns.providerDisconnected();
+
         if (recoveryController.intentionalClose()) return;
         if (QuotaTracker.isQuotaExceeded(getModelName())
                 || recoveryState() == ProviderRecoveryController.State.QUOTA_EXCEEDED) return;
@@ -1122,18 +1245,20 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void addPromptAudio(short[] audio) {
-        // Stop local playback immediately; provider automatic VAD receives the same input and
-        // remains authoritative for provider-side interruption context.
-        interruptCurrentOutputForBargeIn();
+        // Generic provider audio is intentionally non-interrupting. Real microphone packets must
+        // enter through acceptMicrophoneOpus(), where decoded PCM and turn ownership decide barge-in.
+        submitPcmInput(audio, MicrophoneTurnModule.InputKind.QUIET_MICROPHONE);
+    }
+
+    private void submitPcmInput(short[] audio, MicrophoneTurnModule.InputKind kind) {
+        if (audio == null || audio.length == 0 || vcApi == null) return;
         var input = new RealtimeInput();
         var byteAudio = vcApi.getAudioConverter().shortsToBytes(audio);
         input.audio = new RealtimeInput.Blob("audio/pcm;rate=48000", byteAudio);
-
-        if (sentGeneratingStatus)
-            onGenerationPaused();
-
-
-        submitInput(ClientMessages.input(input));
+        long maxAge = kind == MicrophoneTurnModule.InputKind.GENERATED_PADDING
+                ? GENERATED_PADDING_MAX_QUEUE_NANOS
+                : MICROPHONE_INPUT_MAX_QUEUE_NANOS;
+        submitInput(ClientMessages.input(input), maxAge);
     }
 
     /**
@@ -1180,15 +1305,23 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         scheduleRecovery("explicit reconnect");
     }
 
-    public void promptAudioOpus(byte[] audio) {
-        if (decoder == null) return;
-        var raw = decoder.decode(audio);
-        addPromptAudio(raw);
+    /** Decodes one Simple Voice Chat packet and feeds the session-owned microphone-turn module. */
+    public boolean acceptMicrophoneOpus(byte[] audio) {
+        if (decoder == null || audio == null || audio.length == 0) return false;
+        short[] raw = decoder.decode(audio);
+        MicrophoneTurnModule turns = microphoneTurns;
+        if (turns == null) {
+            McTalking.LOGGER.warn("{} Dropping microphone packet without bound foreground participation", logPrefix);
+            return false;
+        }
+        return turns.acceptMicrophone(raw);
     }
 
     @Override
     public void close() {
         if (!closeStarted.compareAndSet(false, true)) return;
+        MicrophoneTurnModule turns = microphoneTurns;
+        if (turns != null) turns.close();
         pendingInput.close();
         pendingTextAfterTalking.clear();
         synchronized (this) {
@@ -1220,14 +1353,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     public static void shutdownExecutor() {
-        if (RECONNECT_EXECUTOR == null) return;
-        RECONNECT_EXECUTOR.shutdown();
+        shutdownExecutor(RECONNECT_EXECUTOR);
+        shutdownExecutor(MICROPHONE_EXECUTOR);
+    }
+
+    private static void shutdownExecutor(@Nullable ScheduledExecutorService executor) {
+        if (executor == null) return;
+        executor.shutdown();
         try {
-            if (!RECONNECT_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-                RECONNECT_EXECUTOR.shutdownNow();
-            }
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) executor.shutdownNow();
         } catch (InterruptedException e) {
-            RECONNECT_EXECUTOR.shutdownNow();
+            executor.shutdownNow();
             Thread.currentThread().interrupt();
         }
     }
