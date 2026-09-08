@@ -6,8 +6,6 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
-import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.CitizenHelper;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
 import net.minecraft.server.MinecraftServer;
@@ -112,7 +110,7 @@ public class UrgentContactHandler {
 
         long now = System.currentTimeMillis();
         walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), now, now, reservation));
-        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.URGENT_WALKING);
+        reservation.markUrgentWalking();
         citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
 
         McTalking.LOGGER.info("[CitizenContact] Citizen {} walking to player {}",
@@ -166,7 +164,6 @@ public class UrgentContactHandler {
                 McTalking.LOGGER.info("[CitizenContact] Citizen {} — urgent need resolved, aborting walk",
                         citizenName);
                 citizen.getNavigation().stop();
-                AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
                 target.reservation().end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
                         "urgent need resolved before contact");
                 it.remove();
@@ -179,7 +176,6 @@ public class UrgentContactHandler {
                     McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
                             citizen.getCitizenData().getName());
                     it.remove();
-                    AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
                     target.reservation().end(ForegroundSessionRegistry.TerminalReason.REPLACED,
                             "urgent walk reached player; handing off to audible contact");
                     ConversationManager.startUrgentContact(citizen, player);
@@ -198,7 +194,6 @@ public class UrgentContactHandler {
         AbstractEntityCitizen entity = CitizenHelper.findCitizen(server, citizenId);
         if (entity != null && entity.isAlive()) {
             entity.getNavigation().stop();
-            AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
         }
         WalkingTarget target = walkingCitizens.get(citizenId);
         if (target != null) {

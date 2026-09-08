@@ -144,16 +144,12 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         boolean hasVoiceActivity = hasVoiceActivity(opusData);
         PregenerationPlayback.onPlayerVoicePacket(player, hasVoiceActivity);
 
-        LivingEntity entity = ConversationManager.getActiveEntityForPlayer(player.getUUID());
-        if (entity == null) {
-            return;
-        }
-
-        var manager = ConversationManager.getClientForEntity(entity.getUUID());
+        var manager = ConversationManager.getReadyInputClientForPlayer(player.getUUID());
         if (manager == null) {
             return;
         }
 
+        LivingEntity entity = manager.getEntity();
         UUID entityId = entity.getUUID();
         long currentTime = System.currentTimeMillis();
 

@@ -16,6 +16,12 @@ public repository.
 
 Do not package `mc_talking-api` into the addon JAR and do not ask players to install it separately.
 
+## Conversation participation presentation
+
+There is no source-level API migration for the conversation-participation change. The behavioral contract is stricter: provider readiness and player participation are separate facts. An addon UI must not treat a ready provider as meaning that a citizen is listening to a player. Use the supported direct-player association (`activePlayerId(...)` where appropriate) together with provider status when presenting that capability. One-sided ambient and controlled sessions can have a ready provider without accepting player microphone input.
+
+Core now applies the same rule to its name-tag status and microphone router, and stale callbacks from a replaced foreground owner are ignored at server-thread presentation time. Addons should continue to observe lifecycle/provider snapshots rather than maintaining a parallel ownership map. See [conversation-participation.md](conversation-participation.md).
+
 ## General migration rule
 
 When an addon previously reached into a Talking Colonists implementation class, migrate to the

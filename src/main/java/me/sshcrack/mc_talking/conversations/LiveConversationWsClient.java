@@ -9,7 +9,6 @@ import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
@@ -146,14 +145,14 @@ public class LiveConversationWsClient extends GeminiWsClient {
     @Override
     protected void onQuotaExceededEvent(String message) {
         McTalking.LOGGER.warn("[LiveConvWs] Quota exceeded for {}: {}", citizen.getCitizenData().getName(), message);
-        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.QUOTA_EXCEEDED);
+        presentationFailure(AiStatus.QUOTA_EXCEEDED);
         notifyEnded();
     }
 
     @Override
     protected void onErrorEvent(Exception ex) {
         McTalking.LOGGER.error("[LiveConvWs] Error for {}", citizen.getCitizenData().getName(), ex);
-        AiStatusHelper.setAiStatusSynced(citizen, AiStatus.ERROR);
+        presentationFailure(AiStatus.ERROR);
         notifyEnded();
     }
 

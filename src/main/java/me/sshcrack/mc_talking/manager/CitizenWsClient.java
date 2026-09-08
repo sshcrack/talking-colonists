@@ -12,7 +12,6 @@ import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGener
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
 import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
@@ -42,7 +41,7 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 public class CitizenWsClient extends GeminiWsClient {
 
     @Nullable
-    private ServerPlayer player;
+    private volatile ServerPlayer player;
 
     /**
      * Callback invoked at the end of each mumbling turn; {@code null} once in player mode.
@@ -155,6 +154,12 @@ public class CitizenWsClient extends GeminiWsClient {
      */
     public boolean isMumbling() {
         return player == null;
+    }
+
+    /** True only after this client has been associated with this exact direct player. */
+    public boolean isAssociatedWithPlayer(UUID playerId) {
+        ServerPlayer current = player;
+        return current != null && current.getUUID().equals(playerId);
     }
 
     /** Controlled turns are system-mode sessions but must be preempted, never promoted in-place. */
@@ -309,12 +314,12 @@ public class CitizenWsClient extends GeminiWsClient {
     protected void onQuotaExceededEvent(String message) {
         if (player != null) {
             Objects.requireNonNull(player.getServer()).execute(() -> {
-                AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.QUOTA_EXCEEDED);
+                presentationFailure(AiStatus.QUOTA_EXCEEDED);
                 if (player.hasPermissions(4))
                     player.sendSystemMessage(Component.literal(message));
             });
         } else {
-            AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.QUOTA_EXCEEDED);
+            presentationFailure(AiStatus.QUOTA_EXCEEDED);
         }
     }
 
@@ -322,7 +327,7 @@ public class CitizenWsClient extends GeminiWsClient {
     protected void onErrorEvent(Exception ex) {
         if (player != null) {
             Objects.requireNonNull(player.getServer()).execute(() -> {
-                AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
+                presentationFailure(AiStatus.ERROR);
                 McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);
                 if (player.hasPermissions(4) && McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers)
                     player.sendSystemMessage(Component.literal(
@@ -330,7 +335,7 @@ public class CitizenWsClient extends GeminiWsClient {
             });
         } else {
             McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);
-            AiStatusHelper.setAiStatusOnServerThread(getEntity(), AiStatus.ERROR);
+            presentationFailure(AiStatus.ERROR);
         }
     }
 

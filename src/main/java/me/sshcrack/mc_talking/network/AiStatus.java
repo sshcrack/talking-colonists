@@ -13,6 +13,7 @@ public enum AiStatus {
     QUOTA_EXCEEDED,
     TALKING,
     IN_CONVERSATION,
+    /** A direct player owns the current session and its provider is ready for that player's microphone. */
     LISTENING,
     NONE,
     CONNECTING,

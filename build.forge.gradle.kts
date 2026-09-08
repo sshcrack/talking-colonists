@@ -150,9 +150,16 @@ repositories {
         url = uri("https://modmaven.dev")
     }
 
-    maven {
-        name = "sshcrackRepositoryReleases"
-        url = uri("https://maven.sshcrack.me/releases")
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "sshcrackRepositoryReleases"
+                url = uri("https://maven.sshcrack.me/releases")
+            }
+        }
+        filter {
+            includeGroup("me.sshcrack")
+        }
     }
 
     maven("https://maven.isxander.dev/releases") {

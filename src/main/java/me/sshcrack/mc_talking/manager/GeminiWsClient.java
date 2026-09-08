@@ -19,6 +19,7 @@ import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import me.sshcrack.mc_talking.internal.audio.PlaybackDrainCoordinator;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.internal.session.ProviderInputBuffer;
+import me.sshcrack.mc_talking.internal.session.MinecraftConversationParticipationAdapter;
 import me.sshcrack.mc_talking.internal.session.ServerThreadGate;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
@@ -28,7 +29,6 @@ import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
@@ -130,6 +130,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private final List<String> pendingTextAfterTalking = Collections.synchronizedList(new ArrayList<>());
     private final List<Runnable> onCloseActions = Collections.synchronizedList(new ArrayList<>());
     private final AtomicBoolean closeActionsFired = new AtomicBoolean(false);
+    @Nullable
+    private volatile MinecraftConversationParticipationAdapter conversationParticipation;
 
     private final long sessionStartTimeMs = System.currentTimeMillis();
 
@@ -198,6 +200,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         this.lastStatus = lastStatus;
     }
 
+    public synchronized void bindConversationParticipation(MinecraftConversationParticipationAdapter participation) {
+        Objects.requireNonNull(participation, "participation");
+        if (conversationParticipation != null && conversationParticipation != participation) {
+            throw new IllegalStateException("Conversation participation is already bound");
+        }
+        conversationParticipation = participation;
+    }
+
     public void addOnCloseAction(Runnable action) {
         onCloseActions.add(action);
     }
@@ -217,6 +227,41 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
             onCloseActions.clear();
         }
+    }
+
+    private void presentationProviderConnecting() {
+        var participation = conversationParticipation;
+        if (participation != null) participation.providerConnecting();
+    }
+
+    private void presentationProviderReady() {
+        var participation = conversationParticipation;
+        if (participation != null) participation.providerReady();
+    }
+
+    private void presentationProviderRecovering() {
+        var participation = conversationParticipation;
+        if (participation != null) participation.providerRecovering();
+    }
+
+    private void presentationThinking() {
+        var participation = conversationParticipation;
+        if (participation != null) participation.playbackThinking();
+    }
+
+    private void presentationTalking() {
+        var participation = conversationParticipation;
+        if (participation != null) participation.playbackTalking();
+    }
+
+    private void presentationIdle() {
+        var participation = conversationParticipation;
+        if (participation != null) participation.playbackIdle();
+    }
+
+    protected final void presentationFailure(AiStatus status) {
+        var participation = conversationParticipation;
+        if (participation != null) participation.failure(status);
     }
 
     public void endConversationWhenPossible() {
@@ -420,12 +465,11 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         notifyRecoveryObservers(after);
 
         if (!attempt.allowed()) {
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
             finishProviderTerminal(new RuntimeException(after.detail()));
             return false;
         }
 
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.RECONNECTING);
+        presentationProviderRecovering();
         reconnectScheduled = true;
         reconnectFuture = getReconnectExecutor().schedule(() -> {
             synchronized (GeminiWsClient.this) {
@@ -559,13 +603,16 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             onConversationEnded();
             gracefulPlaybackClose.onPlaybackDrained();
         } else if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+            presentationThinking();
         }
     }
 
     protected void onConversationEnded() {
+        // Audible playback has drained regardless of provider transport state. Keep that fact
+        // independent from readiness so a disconnect during buffered speech cannot leave TALKING
+        // stuck after the local stream becomes silent.
+        presentationIdle();
         if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
             flushPendingText();
         }
     }
@@ -591,13 +638,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     protected void onGenerationStarted() {
         sentGeneratingStatus = true;
         if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.TALKING);
+            presentationTalking();
         }
     }
 
     protected void onGenerationPaused() {
         if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
-            AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.THINKING);
+            presentationThinking();
         }
     }
 
@@ -799,7 +846,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
         }
         transitionRecovery("setup complete", recoveryController::setupSucceeded);
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.LISTENING);
+        presentationProviderReady();
 
         McTalking.LOGGER.info("{} Gemini setup complete", logPrefix);
         try {
@@ -1013,6 +1060,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             suppressProviderOutput = true;
             int discardedAudio = stream.discardPendingAudio();
             invalidateCurrentOutputTurn();
+            presentationIdle();
             if (discardedAudio > 0) {
                 McTalking.LOGGER.info("{} Discarded {} stale queued audio chunks before replaying invalidated session",
                         logPrefix, discardedAudio);
@@ -1047,7 +1095,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         };
         String detail = "provider close " + code + ": " + (reason == null ? "" : reason);
         transitionRecovery(detail, () -> recoveryController.terminal(terminalReason, detail));
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         finishProviderTerminal(new RuntimeException(detail));
     }
 
@@ -1056,7 +1103,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.error("{} {} result=terminal", logPrefix, detail);
         transitionRecovery(detail, () -> recoveryController.terminal(
                 ProviderRecoveryController.TerminalReason.CONFIGURATION, detail));
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         finishProviderTerminal(error);
         close();
     }
@@ -1125,7 +1171,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
         hasMadeInitialConnection = true;
         transitionRecovery("connect()", () -> recoveryController.markConnecting("connect()"));
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.CONNECTING);
+        presentationProviderConnecting();
         super.connect();
     }
 
@@ -1156,7 +1202,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         gracefulPlaybackClose.cancel();
         invalidateCurrentOutputTurn();
         ADDON_TOOL_DISPATCHER.forgetSession(toolOperationScopeId());
-        AiStatusHelper.setAiStatusSynced(getEntity(), AiStatus.NONE);
         try {
             super.close();
         } finally {

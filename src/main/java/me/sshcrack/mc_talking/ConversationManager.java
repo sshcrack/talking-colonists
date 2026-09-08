@@ -15,7 +15,10 @@ import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.internal.session.BackgroundSessionRegistry;
 import me.sshcrack.mc_talking.internal.session.CitizenActivityRegistry;
 import me.sshcrack.mc_talking.internal.session.ConversationCooldownRegistry;
+import me.sshcrack.mc_talking.internal.session.ConversationParticipationModule;
+import me.sshcrack.mc_talking.internal.session.DefaultConversationParticipationModule;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
+import me.sshcrack.mc_talking.internal.session.MinecraftConversationParticipationAdapter;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -24,8 +27,6 @@ import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
-import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.util.AiStatusHelper;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
@@ -88,6 +89,13 @@ public class ConversationManager {
                     GeminiWsClient::isLifecycleClosed,
                     ConversationManager::onForegroundTerminated
             );
+    private static final ConversationParticipationModule conversationParticipation =
+            new DefaultConversationParticipationModule(citizenId -> foregroundSessions.snapshot(citizenId)
+                    .map(snapshot -> new ConversationParticipationModule.Ownership(
+                            snapshot.token(), snapshot.playerId()))
+                    .orElse(null));
+    private static final Map<UUID, MinecraftConversationParticipationAdapter> participationAdapters =
+            new ConcurrentHashMap<>();
     private static final CitizenActivityRegistry activities = new CitizenActivityRegistry(System::nanoTime);
     private static final ConversationCooldownRegistry cooldowns = new ConversationCooldownRegistry(System::currentTimeMillis);
     private static final BackgroundSessionRegistry<GeminiLiveClient> backgroundSessions =
@@ -123,11 +131,16 @@ public class ConversationManager {
     /** Exact token-owned foreground capacity/client reservation used by core conversation flows. */
     public static final class ForegroundReservation implements AutoCloseable {
         private final ForegroundSessionRegistry.Token token;
+        private final MinecraftConversationParticipationAdapter participation;
         private final AtomicBoolean closed = new AtomicBoolean(false);
         private final AtomicBoolean lifecycleStarted = new AtomicBoolean(false);
 
-        private ForegroundReservation(ForegroundSessionRegistry.Token token) {
+        private ForegroundReservation(
+                ForegroundSessionRegistry.Token token,
+                MinecraftConversationParticipationAdapter participation
+        ) {
             this.token = token;
+            this.participation = participation;
         }
 
         public UUID citizenId() {
@@ -135,6 +148,9 @@ public class ConversationManager {
         }
 
         public boolean attachClient(GeminiWsClient client) {
+            // Bind ownership before any rejection path can close the client. A late rejected close
+            // must not fall back to an unowned NONE write that could erase a replacement session.
+            client.bindConversationParticipation(participation);
             if (closed.get()) {
                 client.close();
                 return false;
@@ -162,6 +178,10 @@ public class ConversationManager {
 
         public boolean isCurrent() {
             return !closed.get() && foregroundSessions.isCurrent(token);
+        }
+
+        public void markUrgentWalking() {
+            participation.urgentWalking(true);
         }
 
         public boolean end(ForegroundSessionRegistry.TerminalReason reason, String detail) {
@@ -230,7 +250,7 @@ public class ConversationManager {
                 citizenId, citizen, kind, ForegroundSessionRegistry.Priority.AMBIENT, null, sessionId, turnId);
         if (!reservation.granted()) return null;
         McTalking.LOGGER.info("[ConversationManager] Reserved ambient foreground session for {} ({})", citizenId, kind);
-        return new ForegroundReservation(reservation.token());
+        return new ForegroundReservation(reservation.token(), registerParticipation(citizen, reservation.token()));
     }
 
     private static ForegroundReservation reservePlayerForeground(
@@ -243,7 +263,17 @@ public class ConversationManager {
                 citizenId, citizen, ConversationKind.PLAYER, ForegroundSessionRegistry.Priority.PLAYER, playerId);
         if (!reservation.granted()) return null;
         McTalking.LOGGER.info("[ConversationManager] Reserved player foreground session for {} / {}", citizenId, playerId);
-        return new ForegroundReservation(reservation.token());
+        return new ForegroundReservation(reservation.token(), registerParticipation(citizen, reservation.token()));
+    }
+
+    private static MinecraftConversationParticipationAdapter registerParticipation(
+            AbstractEntityCitizen citizen,
+            ForegroundSessionRegistry.Token token
+    ) {
+        conversationParticipation.register(token);
+        var adapter = new MinecraftConversationParticipationAdapter(citizen, token, conversationParticipation);
+        participationAdapters.put(token.ownershipId(), adapter);
+        return adapter;
     }
 
     public static boolean hasLowPriorityCapacity(int slotsNeeded) {
@@ -476,6 +506,8 @@ public class ConversationManager {
     ) {
         var snapshot = ended.snapshot();
         urgentContactConversations.remove(snapshot.token().citizenId());
+        var participation = participationAdapters.remove(snapshot.token().ownershipId());
+        if (participation != null) participation.complete();
         // Provider callbacks may arrive off-thread. Lifecycle dispatch, need inspection for cooldown,
         // inventory/status cleanup, and every other Minecraft-world read happen on the server thread.
         runOnServerThread(snapshot.entity(), () -> {
@@ -537,7 +569,6 @@ public class ConversationManager {
                     /*?}*/
                 }
             }
-            AiStatusHelper.setAiStatusSynced(entity, AiStatus.NONE);
             if (sendMessage) {
                 player.sendSystemMessage(Component.translatable("mc_talking.too_far")
                         .withStyle(ChatFormatting.YELLOW));
@@ -899,6 +930,8 @@ public class ConversationManager {
             }
             dispatchLifecycleEnded(citizen, promoted.get().before().kind(), null);
             cws.transitionToPlayer(player);
+            var participation = participationAdapters.get(existingToken.ownershipId());
+            if (participation != null) participation.refresh();
             urgentContactConversations.remove(citizenId);
             dispatchLifecycleStarted(citizen, ConversationKind.PLAYER, playerId);
             return ConversationStartResult.startedResult();
@@ -1012,6 +1045,29 @@ public class ConversationManager {
 
     public static GeminiWsClient getClientForEntity(UUID entityId) {
         return foregroundSessions.client(entityId);
+    }
+
+    /**
+     * Returns the exact current direct-player client only while its provider can accept microphone input.
+     * Participation display and microphone routing therefore use the same token/player/readiness facts.
+     */
+    @Nullable
+    public static GeminiWsClient getReadyInputClientForPlayer(UUID playerId) {
+        UUID citizenId = foregroundSessions.citizenForPlayer(playerId);
+        if (citizenId == null) return null;
+        ForegroundSessionRegistry.Token token = foregroundSessions.token(citizenId);
+        if (token == null || !conversationParticipation.canRouteInput(token, playerId)) return null;
+        GeminiWsClient client = foregroundSessions.client(citizenId);
+        if (client == null || client.isLifecycleClosed()) return null;
+        if (client instanceof CitizenWsClient citizenClient
+                && !citizenClient.isAssociatedWithPlayer(playerId)) return null;
+        // The registry/client reads are individually synchronized, not one composite operation.
+        // Revalidate the exact token after retrieving the client so takeover/replacement cannot
+        // route a packet to a newer provider that has not reached readiness yet.
+        if (!foregroundSessions.isCurrent(token) || !conversationParticipation.canRouteInput(token, playerId)) {
+            return null;
+        }
+        return client;
     }
 
     public static AbstractEntityCitizen getActiveEntityForPlayer(UUID playerId) {

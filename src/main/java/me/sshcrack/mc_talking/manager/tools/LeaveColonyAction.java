@@ -10,8 +10,6 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.core.colony.buildings.modules.TavernBuildingModule;
 import com.minecolonies.core.colony.interactionhandling.RecruitmentInteraction;
-import me.sshcrack.mc_talking.network.AiStatus;
-import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.core.BlockPos;
 /*? if neoforge {*/
 import net.minecraft.core.component.DataComponents;
@@ -84,7 +82,6 @@ public class LeaveColonyAction extends PlayerFunctionAction {
         client.addOnCloseAction(() -> {
             if (level.getServer() != null) {
                 level.getServer().execute(() -> {
-                    AiStatusHelper.setAiStatusSynced(citizen, AiStatus.NONE);
 
         // First, serialize all citizen data to NBT
         /*? if forge {*/
