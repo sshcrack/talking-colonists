@@ -20,6 +20,7 @@ import me.sshcrack.mc_talking.internal.session.DefaultConversationParticipationM
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.internal.session.MinecraftConversationParticipationAdapter;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
+import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
@@ -39,7 +40,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -109,8 +109,6 @@ public class ConversationManager {
                     GeminiLiveClient::isClosed
             );
 
-    /** Conversations originated by the urgent-contact walk system, for need-resolution aborts. */
-    private static final Set<UUID> urgentContactConversations = ConcurrentHashMap.newKeySet();
 
     /** Exact-ownership handle for internal non-WebSocket citizen activity. */
     public static final class CoreActivityReservation implements AutoCloseable {
@@ -180,8 +178,8 @@ public class ConversationManager {
             return !closed.get() && foregroundSessions.isCurrent(token);
         }
 
-        public void markUrgentWalking() {
-            participation.urgentWalking(true);
+        public void markUrgentWalking(boolean active) {
+            participation.urgentWalking(active);
         }
 
         public boolean end(ForegroundSessionRegistry.TerminalReason reason, String detail) {
@@ -505,7 +503,6 @@ public class ConversationManager {
             ForegroundSessionRegistry.EndedSession<AbstractEntityCitizen, GeminiWsClient> ended
     ) {
         var snapshot = ended.snapshot();
-        urgentContactConversations.remove(snapshot.token().citizenId());
         var participation = participationAdapters.remove(snapshot.token().ownershipId());
         if (participation != null) participation.complete();
         // Provider callbacks may arrive off-thread. Lifecycle dispatch, need inspection for cooldown,
@@ -635,26 +632,6 @@ public class ConversationManager {
     }
 
     /**
-     * Starts a citizen speaking urgently to a nearby player when the citizen has pressing needs
-     * (low-priority, spatial audio — the player hears it positionally and can choose to respond
-     * by using the Citizen Communication Device).
-     *
-     * <p>The prompt instructs the citizen to address the player by name rather than muttering
-     * to themselves, distinguishing this from ordinary mumbling. Silently returns if the citizen
-     * is already busy, on cooldown, or no low-priority slot is available.</p>
-     */
-    public static boolean startUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
-        if (!McTalkingConfig.hasGeminiApiKey()) return false;
-        boolean started = startLowPrioritySession(citizen,
-                MumblingTopicHelper.buildUrgentContactPrompt(citizen, player.getName().getString()),
-                ConversationKind.URGENT_CONTACT);
-        if (started && getActiveConversationKind(citizen.getUUID()) == ConversationKind.URGENT_CONTACT) {
-            urgentContactConversations.add(citizen.getUUID());
-        }
-        return started;
-    }
-
-    /**
      * Starts a low-priority, one-sided AI voice session for {@code citizen}.
      *
      * <h4>How it works under the hood</h4>
@@ -776,6 +753,76 @@ public class ConversationManager {
         if (token == null || !(client instanceof CitizenWsClient cws) || !cws.isMumbling()) return false;
         return foregroundSessions.end(token, ForegroundSessionRegistry.TerminalReason.CANCELLED,
                 "ambient session cancelled");
+    }
+
+    /**
+     * Starts the one-sided urgent announcement on an already-owned urgent-contact reservation.
+     *
+     * <p>The caller owns the reservation lifecycle. This method attaches/activates the provider
+     * and reports audible/provider completion, but deliberately does not end the reservation. That
+     * lets the urgent-contact lifecycle decide completion versus cancellation and lets an in-place
+     * player promotion retain the exact same foreground token.</p>
+     */
+    public static boolean startUrgentAnnouncement(
+            ForegroundReservation reservation,
+            AbstractEntityCitizen citizen,
+            String originPlayerName,
+            Consumer<AmbientLineResult> completion
+    ) {
+        java.util.Objects.requireNonNull(reservation, "reservation");
+        java.util.Objects.requireNonNull(citizen, "citizen");
+        java.util.Objects.requireNonNull(originPlayerName, "originPlayerName");
+        java.util.Objects.requireNonNull(completion, "completion");
+        if (!McTalkingConfig.hasGeminiApiKey()
+                || !reservation.citizenId().equals(citizen.getUUID())
+                || !reservation.isCurrent()) {
+            return false;
+        }
+
+        AtomicBoolean startupCommitted = new AtomicBoolean(false);
+        AtomicBoolean completionDelivered = new AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicReference<AmbientLineResult> earlyResult =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        Consumer<AmbientLineResult> report = result -> runOnServerThread(citizen, () -> {
+            if (!startupCommitted.get()) {
+                earlyResult.compareAndSet(null, result);
+                return;
+            }
+            if (completionDelivered.compareAndSet(false, true)) completion.accept(result);
+        });
+
+        try {
+            CitizenWsClient client = new CitizenWsClient(
+                    new ControlledTurnAudioProvider(citizen, null),
+                    citizen,
+                    c -> report.accept(AmbientLineResult.completed(c.getSessionTranscriptSnapshot())),
+                    PromptSessionContext.empty(),
+                    null
+            );
+
+            if (!reservation.attachClient(client)) return false;
+
+            client.addOnCloseAction(() -> {
+                var diagnostic = client.getRecoveryDiagnostic();
+                report.accept(client.isPlayerTakeoverPending()
+                        ? AmbientLineResult.cancelled("player conversation preempted urgent announcement")
+                        : AmbientLineResult.failed(diagnostic.detail()));
+            });
+
+            if (!reservation.activate()) return false;
+            client.addPromptTextAfterTalkingComplete(
+                    MumblingTopicHelper.buildUrgentContactPrompt(citizen, originPlayerName));
+
+            startupCommitted.set(true);
+            AmbientLineResult early = earlyResult.getAndSet(null);
+            if (early != null) report.accept(early);
+            return true;
+        } catch (RuntimeException e) {
+            McTalking.LOGGER.error("[ConversationManager] Failed to start urgent announcement for {}",
+                    citizen.getUUID(), e);
+            return false;
+        }
     }
 
     private static boolean startLowPrioritySession(
@@ -932,7 +979,7 @@ public class ConversationManager {
             cws.transitionToPlayer(player);
             var participation = participationAdapters.get(existingToken.ownershipId());
             if (participation != null) participation.refresh();
-            urgentContactConversations.remove(citizenId);
+            UrgentContactHandler.onPlayerTakeover(citizen, player);
             dispatchLifecycleStarted(citizen, ConversationKind.PLAYER, playerId);
             return ConversationStartResult.startedResult();
         }
@@ -1004,7 +1051,7 @@ public class ConversationManager {
             return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
                     "player conversation ownership changed during activation");
         }
-        urgentContactConversations.remove(citizenId);
+        UrgentContactHandler.onPlayerTakeover(citizen, player);
         return ConversationStartResult.startedResult();
     }
 
@@ -1074,10 +1121,6 @@ public class ConversationManager {
         return foregroundSessions.entityForPlayer(playerId);
     }
 
-    public static boolean isUrgentConversation(UUID citizenId) {
-        return urgentContactConversations.contains(citizenId);
-    }
-
     public static UUID getPlayerForEntity(UUID entityId) {
         return foregroundSessions.playerForCitizen(entityId);
     }
@@ -1096,7 +1139,6 @@ public class ConversationManager {
                 McTalking.LOGGER.error("Error running activity cleanup during shutdown", t);
             }
         }
-        urgentContactConversations.clear();
         cooldowns.clear();
         QuotaTracker.clear();
         me.sshcrack.mc_talking.manager.VoiceSelectionService.clear();

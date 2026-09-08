@@ -94,9 +94,9 @@ public class ServerEventHandler {
 
         MinecraftServer server = event.getServer();
         TalkingColonistsApiBackend.onServerStopping(server);
+        UrgentContactHandler.onServerStop(server);
         ConversationManager.cleanup();
 
-        UrgentContactHandler.onServerStop(server);
         CasualGreetingHandler.onServerStop();
         PlayerHeatmapTracker.clear();
     }
@@ -138,6 +138,7 @@ public class ServerEventHandler {
         // Reap timed-out background/foreground reservations even when no feature-specific
         // interval fires or no players are online. This keeps lifecycle ownership in core.
         ConversationManager.tickMaintenance();
+        UrgentContactHandler.tick(server);
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);
         boolean doMumblingCheck = (tickCounter % McTalkingConfig.INSTANCE.instance().mumblingCheckIntervalTicks == 0);
@@ -180,9 +181,6 @@ public class ServerEventHandler {
                 trackCitizenProximityHeatmap(citizens, processedGreetingPairs);
                 trackPlayerCitizenHeatmap(player, citizens);
                 checkConversationDistance(player);
-                if (McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
-                    UrgentContactHandler.checkUrgentContactAbort(player);
-                }
             }
 
             AbstractEntityCitizen talkingCitizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
@@ -216,9 +214,6 @@ public class ServerEventHandler {
             }
         }
 
-        if (doDistanceCheck && McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer) {
-            UrgentContactHandler.updateWalkingCitizens(server);
-        }
 
         if (doRandomConvCheck) {
             RandomConversationHandler.checkForRandomConversations(server);

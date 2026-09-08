@@ -3,54 +3,48 @@ package me.sshcrack.mc_talking.handler;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
-import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
-import me.sshcrack.mc_talking.util.CitizenHelper;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.session.UrgentContactLifecycleModule;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Handles citizens with urgent needs who walk to the player and initiate contact.
+ * Minecraft entry points for citizen-initiated urgent contact.
+ *
+ * <p>Journey state itself lives in {@link UrgentContactLifecycleModule}; this handler only chooses
+ * candidates, adapts Minecraft objects, and preserves the existing per-player automatic-contact
+ * cooldown policy.</p>
  */
 public class UrgentContactHandler {
     private UrgentContactHandler() {
     }
 
-    private static final long WALK_TIMEOUT_MS = 60_000L;
-    private static final long REPATH_INTERVAL_MS = 1_000L;
+    private static final UrgentContactLifecycleModule lifecycle = new UrgentContactLifecycleModule(
+            System::nanoTime,
+            new UrgentContactLifecycleModule.Timing(
+                    TimeUnit.SECONDS.toNanos(60),
+                    TimeUnit.SECONDS.toNanos(1)
+            )
+    );
 
-    private record WalkingTarget(
-            UUID playerId,
-            long startedAtMs,
-            long lastRepathAtMs,
-            ConversationManager.ForegroundReservation reservation
+    public static void checkForCitizenInitiatedContact(
+            ServerPlayer player,
+            List<AbstractEntityCitizen> citizens,
+            Set<UUID> contactedThisInterval
     ) {
-    }
-
-    private static final Map<UUID, WalkingTarget> walkingCitizens = new HashMap<>();
-
-    private static final Map<UUID, Long> lastPlayerUrgentContactTimes = new HashMap<>();
-
-    public static void checkForCitizenInitiatedContact(ServerPlayer player,
-                                                        List<AbstractEntityCitizen> citizens,
-                                                        Set<UUID> contactedThisInterval) {
-        if (!McTalkingConfig.hasGeminiApiKey())
-            return;
+        if (!McTalkingConfig.hasGeminiApiKey()) return;
 
         int playerCooldownSecs = McTalkingConfig.INSTANCE.instance().playerUrgentContactCooldownSeconds;
-        if (playerCooldownSecs > 0) {
-            Long lastContact = lastPlayerUrgentContactTimes.get(player.getUUID());
-            if (lastContact != null && (System.currentTimeMillis() - lastContact) / 1000L < playerCooldownSecs) {
-                return;
-            }
+        if (playerCooldownSecs > 0 && lifecycle.isPlayerOnCooldown(
+                player.getUUID(), TimeUnit.SECONDS.toNanos(playerCooldownSecs))) {
+            return;
         }
 
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
@@ -63,19 +57,18 @@ public class UrgentContactHandler {
             contactCitizens = player.level().getEntitiesOfClass(AbstractEntityCitizen.class, wideAabb);
         }
 
+        MinecraftServer server = player.getServer();
+        if (server == null) return;
+        MinecraftUrgentContactAdapter adapter = new MinecraftUrgentContactAdapter(server);
+
         for (AbstractEntityCitizen citizen : contactCitizens) {
-            if (!ConversationManager.canCitizenSpeak(citizen))
-                continue;
-            if (citizen.getCitizenData() == null)
-                continue;
-            if (walkingCitizens.containsKey(citizen.getUUID()))
-                continue;
-            if (!contactedThisInterval.add(citizen.getUUID()))
-                continue;
+            if (!ConversationManager.canCitizenSpeak(citizen, ConversationKind.URGENT_CONTACT)) continue;
+            if (citizen.getCitizenData() == null) continue;
+            if (lifecycle.isActive(citizen.getUUID())) continue;
+            if (!contactedThisInterval.add(citizen.getUUID())) continue;
 
             double urgencyWeight = CitizenNeedAssessor.calculateUrgencyWeight(citizen);
-            if (urgencyWeight <= 0)
-                continue;
+            if (urgencyWeight <= 0) continue;
 
             if (Math.random() < baseChance * urgencyWeight) {
                 McTalking.LOGGER.info("[CitizenContact] Citizen {} initiating {} with player {}",
@@ -83,13 +76,16 @@ public class UrgentContactHandler {
                         walkToPlayer ? "walk-to-player" : "contact",
                         player.getName().getString());
 
-                boolean started = walkToPlayer
-                        ? startWalkingUrgentContact(citizen, player)
-                        : ConversationManager.startUrgentContact(citizen, player);
-                if (started) {
-                    // Only consume the per-player cooldown if an interaction actually
-                    // started. A full free-tier slot pool should not suppress retries.
-                    lastPlayerUrgentContactTimes.put(player.getUUID(), System.currentTimeMillis());
+                UrgentContactLifecycleModule.StartResult result = walkToPlayer
+                        ? lifecycle.startWalking(citizen.getUUID(), player.getUUID(), adapter,
+                        terminal -> logTerminal(citizen.getUUID(), terminal))
+                        : lifecycle.startAnnouncement(citizen.getUUID(), player.getUUID(), adapter,
+                        terminal -> logTerminal(citizen.getUUID(), terminal));
+                if (result.started()) {
+                    // Preserve the previous automatic-contact cooldown behavior: a successful walk
+                    // reservation consumes it immediately, while an immediate announcement startup
+                    // failure does not. This also prevents arrival/startup failures from retry-looping.
+                    lifecycle.recordPlayerContact(player.getUUID());
                     break;
                 }
             }
@@ -97,142 +93,43 @@ public class UrgentContactHandler {
     }
 
     public static boolean triggerWalkToPlayer(AbstractEntityCitizen citizen, ServerPlayer player) {
-        return startWalkingUrgentContact(citizen, player);
+        MinecraftServer server = player.getServer();
+        if (server == null) return false;
+        var result = lifecycle.startWalking(
+                citizen.getUUID(), player.getUUID(), new MinecraftUrgentContactAdapter(server),
+                terminal -> logTerminal(citizen.getUUID(), terminal));
+        return result.started();
     }
 
-    static boolean startWalkingUrgentContact(AbstractEntityCitizen citizen, ServerPlayer player) {
-        ConversationManager.ForegroundReservation reservation =
-                ConversationManager.reserveAmbientForeground(citizen, ConversationKind.URGENT_CONTACT);
-        if (reservation == null) {
-            McTalking.LOGGER.debug("[CitizenContact] No slot available for walking citizen {}", citizen.getUUID());
-            return false;
-        }
-
-        long now = System.currentTimeMillis();
-        walkingCitizens.put(citizen.getUUID(), new WalkingTarget(player.getUUID(), now, now, reservation));
-        reservation.markUrgentWalking();
-        citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
-
-        McTalking.LOGGER.info("[CitizenContact] Citizen {} walking to player {}",
-                citizen.getCitizenData().getName(), player.getName().getString());
-        return true;
+    /** Advances walking, announcement cancellation, invalidation, and ownership handoff checks. */
+    public static void tick(MinecraftServer server) {
+        lifecycle.tick(new MinecraftUrgentContactAdapter(server));
     }
 
-    public static void updateWalkingCitizens(MinecraftServer server) {
-        long now = System.currentTimeMillis();
-        var it = walkingCitizens.entrySet().iterator();
-        while (it.hasNext()) {
-            var entry = it.next();
-            UUID citizenId = entry.getKey();
-            WalkingTarget target = entry.getValue();
-
-            if (now - target.startedAtMs() >= WALK_TIMEOUT_MS) {
-                McTalking.LOGGER.warn("[CitizenContact] Citizen {} did not reach the player within {}s; aborting walk",
-                        citizenId, WALK_TIMEOUT_MS / 1000L);
-                abortWalking(citizenId, server);
-                it.remove();
-                continue;
-            }
-
-            var player = server.getPlayerList().getPlayer(target.playerId());
-            if (player == null || !player.isAlive()) {
-                abortWalking(citizenId, server);
-                it.remove();
-                continue;
-            }
-
-            AbstractEntityCitizen citizen = CitizenHelper.findCitizen(server, citizenId);
-            if (citizen == null || !citizen.isAlive()) {
-                abortWalking(citizenId, server);
-                it.remove();
-                continue;
-            }
-
-            if (ConversationManager.getPlayerForEntity(citizenId) != null) {
-                McTalking.LOGGER.info("[CitizenContact] Citizen {} picked up for player conversation, aborting walk",
-                        citizen.getCitizenData().getName());
-                citizen.getNavigation().stop();
-                // The new player session owns the AI status now; do not overwrite
-                // LISTENING/IN_CONVERSATION with NONE from the old walk state.
-                it.remove();
-                continue;
-            }
-
-            var urgencyData = citizen.getCitizenData();
-            if (CitizenNeedAssessor.calculateUrgencyWeight(citizen) <= 0) {
-                String citizenName = urgencyData != null ? urgencyData.getName() : "unknown";
-                McTalking.LOGGER.info("[CitizenContact] Citizen {} — urgent need resolved, aborting walk",
-                        citizenName);
-                citizen.getNavigation().stop();
-                target.reservation().end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
-                        "urgent need resolved before contact");
-                it.remove();
-                continue;
-            }
-
-            if (citizen.level() == player.level()) {
-                double voiceRange = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
-                if (citizen.distanceToSqr(player) <= voiceRange * voiceRange) {
-                    McTalking.LOGGER.info("[CitizenContact] Citizen {} reached player, starting urgent contact",
-                            citizen.getCitizenData().getName());
-                    it.remove();
-                    target.reservation().end(ForegroundSessionRegistry.TerminalReason.REPLACED,
-                            "urgent walk reached player; handing off to audible contact");
-                    ConversationManager.startUrgentContact(citizen, player);
-                    continue;
-                }
-            }
-
-            if (now - target.lastRepathAtMs() >= REPATH_INTERVAL_MS) {
-                citizen.getNavigation().moveTo(player, McTalkingConfig.CITIZEN_URGENT_WALK_SPEED);
-                entry.setValue(new WalkingTarget(target.playerId(), target.startedAtMs(), now, target.reservation()));
-            }
-        }
-    }
-
-    public static void abortWalking(UUID citizenId, MinecraftServer server) {
-        AbstractEntityCitizen entity = CitizenHelper.findCitizen(server, citizenId);
-        if (entity != null && entity.isAlive()) {
-            entity.getNavigation().stop();
-        }
-        WalkingTarget target = walkingCitizens.get(citizenId);
-        if (target != null) {
-            target.reservation().end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
-                    "urgent walk aborted");
-        }
-    }
-
-    public static void checkUrgentContactAbort(ServerPlayer player) {
-        AbstractEntityCitizen citizen = ConversationManager.getActiveEntityForPlayer(player.getUUID());
-        if (citizen == null || citizen.getCitizenData() == null)
-            return;
-
-        if (!ConversationManager.isUrgentConversation(citizen.getUUID()))
-            return;
-
-        if (CitizenNeedAssessor.calculateUrgencyWeight(citizen) <= 0) {
-            McTalking.LOGGER.info("[CitizenContact] Urgent need resolved during conversation for citizen {}",
-                    citizen.getCitizenData().getName());
-            ConversationManager.endConversation(player.getUUID(), false);
-        }
+    /** Called only after a normal direct conversation has successfully taken responsibility. */
+    public static void onPlayerTakeover(AbstractEntityCitizen citizen, ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) return;
+        lifecycle.onPlayerTakeover(citizen.getUUID(), player.getUUID(), new MinecraftUrgentContactAdapter(server));
     }
 
     public static void onPlayerLeave(UUID playerId, MinecraftServer server) {
-        walkingCitizens.entrySet().removeIf(entry -> {
-            if (entry.getValue().playerId().equals(playerId)) {
-                abortWalking(entry.getKey(), server);
-                return true;
-            }
-            return false;
-        });
-        lastPlayerUrgentContactTimes.remove(playerId);
+        if (server == null) return;
+        lifecycle.onPlayerDeparture(playerId, new MinecraftUrgentContactAdapter(server));
     }
 
     public static void onServerStop(MinecraftServer server) {
-        for (UUID citizenId : walkingCitizens.keySet()) {
-            abortWalking(citizenId, server);
+        lifecycle.shutdown(new MinecraftUrgentContactAdapter(server));
+    }
+
+    private static void logTerminal(UUID citizenId, UrgentContactLifecycleModule.TerminalContact terminal) {
+        switch (terminal.outcome()) {
+            case COMPLETED, TAKEN_OVER -> McTalking.LOGGER.info(
+                    "[CitizenContact] Citizen {} contact {} ended: {} ({})",
+                    citizenId, terminal.contactId(), terminal.outcome(), terminal.detail());
+            default -> McTalking.LOGGER.debug(
+                    "[CitizenContact] Citizen {} contact {} ended: {} ({})",
+                    citizenId, terminal.contactId(), terminal.outcome(), terminal.detail());
         }
-        walkingCitizens.clear();
-        lastPlayerUrgentContactTimes.clear();
     }
 }
