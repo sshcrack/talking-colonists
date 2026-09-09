@@ -10,7 +10,18 @@ max_sessions = 4
 [image]
 apt_packages = [
   "openjdk-21-jdk-headless",
+  "xauth",
+  "xvfb",
 ]
+
+[image.prepare]
+gradle_tasks = [
+  "help",
+  ":1.20.1-forge:downloadAssets",
+  ":1.21.1-neoforge:downloadAssets",
+]
+timeout_secs = 1800
+ttl_secs = 604800
 
 [env]
 GRADLE_USER_HOME = "/cache/gradle"
