@@ -684,6 +684,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         return Objects.requireNonNull(entity.level().getServer()).getPlayerList().getPlayer(playerUUID);
     }
 
+    /** Player authority used for addon tools; subclasses may authenticate a player without enabling live input. */
+    @Nullable
+    protected ServerPlayer resolveAuthenticatedToolPlayer() {
+        return resolveActivePlayer();
+    }
+
     protected void onStreamPause() {
         UUID turnId = currentOutputTurn();
         if (turnId != null && providerTurnComplete && completeAudibleTurn(turnId)) {
@@ -1023,7 +1029,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         JsonObject result;
         try {
             if (addonAction != null) {
-                var context = new AiToolExecutionContext(toolSessionId(), toolTurnId(), this.entity, colony, activePlayer);
+                var context = new AiToolExecutionContext(
+                        toolSessionId(), toolTurnId(), this.entity, colony, resolveAuthenticatedToolPlayer());
                 var endpoint = new AiToolDispatcher.SessionEndpoint() {
                     @Override
                     public UUID sessionId() {

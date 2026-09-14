@@ -356,6 +356,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             java.util.Objects.requireNonNull(statement, "statement");
             if (statement.isBlank()) return;
             if (runtime.state() == State.ENDED) throw new IllegalStateException("session ended");
+            runtime.bindAuthenticatedPlayer(player.getUUID());
             Runnable append = () -> {
                 if (runtime.state() == State.ENDED) return;
                 runtime.addTranscript(new ConversationTranscriptEntry(
@@ -463,6 +464,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                     @NotNull AbstractEntityCitizen participant,
                     @NotNull String prompt,
                     @NotNull PromptSessionContext promptContext,
+                    @Nullable UUID authenticatedPlayerId,
                     @Nullable ControlledAudioAnchor audioAnchor,
                     int maxOutputTokens,
                     @NotNull Consumer<AmbientLineResult> audibleCompletion
@@ -473,8 +475,11 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;
                 }
+                ServerPlayer authenticatedPlayer = authenticatedPlayerId == null
+                        ? null
+                        : server.getPlayerList().getPlayer(authenticatedPlayerId);
                 boolean started = ConversationManager.startControlledAmbientSession(
-                        participant, prompt, audibleCompletion, promptContext, audioAnchor, maxOutputTokens);
+                        participant, prompt, audibleCompletion, promptContext, authenticatedPlayer, audioAnchor, maxOutputTokens);
                 if (started) return ControlledConversationRuntime.StartResult.STARTED;
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;

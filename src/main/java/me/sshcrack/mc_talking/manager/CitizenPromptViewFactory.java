@@ -105,6 +105,15 @@ public final class CitizenPromptViewFactory {
     }
 
     public static CitizenPromptView create(ICitizenData data, @NotNull Map<UUID, String> interestedParties, @Nullable ServerPlayer speakingTo) {
+        return create(data, interestedParties, speakingTo, speakingTo == null ? null : speakingTo.getUUID());
+    }
+
+    public static CitizenPromptView create(
+            ICitizenData data,
+            @NotNull Map<UUID, String> interestedParties,
+            @Nullable ServerPlayer speakingTo,
+            @Nullable UUID contextPlayerId
+    ) {
         String jobName = extractJobName(data);
         long snapshotGameTime = data.getColony().getWorld() == null ? -1L : data.getColony().getWorld().getGameTime();
         List<String> parents = extractParents(data);
@@ -191,6 +200,8 @@ public final class CitizenPromptViewFactory {
         );
 
         return new CitizenPromptSnapshot(
+                data.getUUID(),
+                contextPlayerId,
                 new CitizenIdentityView(
                         data.getName(), data.isChild(), data.isFemale(), isGuard,
                         personalityView, customPersonalityText

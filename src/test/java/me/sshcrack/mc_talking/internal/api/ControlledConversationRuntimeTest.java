@@ -237,6 +237,39 @@ class ControlledConversationRuntimeTest {
     }
 
     @Test
+    void authenticatedPlayerBindingIsCarriedIntoTheControlledProviderTurn() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant speaker = hooks.add("Ada");
+        UUID playerId = UUID.randomUUID();
+        var runtime = new ControlledConversationRuntime<>(List.of(speaker), "Agenda",
+                ControlledConversationOptions.allAddonTools(), hooks);
+
+        runtime.bindAuthenticatedPlayer(playerId);
+        runtime.requestTurn(speaker, "Follow the player's order", null);
+
+        assertEquals(playerId, hooks.lastAuthenticatedPlayerId);
+    }
+
+    @Test
+    void controlledTurnSnapshotsAuthenticatedPlayerBeforeQueuedProviderStartup() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant speaker = hooks.add("Ada");
+        UUID firstPlayer = UUID.randomUUID();
+        UUID laterPlayer = UUID.randomUUID();
+        hooks.executeImmediately = false;
+        var runtime = new ControlledConversationRuntime<>(List.of(speaker), "Agenda",
+                ControlledConversationOptions.allAddonTools(), hooks);
+
+        runtime.bindAuthenticatedPlayer(firstPlayer);
+        runtime.requestTurn(speaker, "First order", null);
+        runtime.bindAuthenticatedPlayer(laterPlayer);
+        hooks.drainExecutor();
+
+        assertEquals(firstPlayer, hooks.lastAuthenticatedPlayerId,
+                "an in-flight turn must keep the player authority it was requested with");
+    }
+
+    @Test
     void autonomousDiscussionUsesFairSingleProviderTurnsAndStopsAtTurnLimit() {
         FakeHooks hooks = new FakeHooks();
         FakeParticipant a = hooks.add("Ada");
@@ -429,6 +462,7 @@ class ControlledConversationRuntimeTest {
         private final List<String> startedSpeakers = new ArrayList<>();
         private String lastPrompt;
         private PromptSessionContext lastContext;
+        private UUID lastAuthenticatedPlayerId;
         private FakeAnchor lastAnchor;
         private int lastMaxOutputTokens;
         private Consumer<AmbientLineResult> currentCompletion;
@@ -474,6 +508,7 @@ class ControlledConversationRuntimeTest {
                 FakeParticipant participant,
                 String prompt,
                 PromptSessionContext promptContext,
+                UUID authenticatedPlayerId,
                 FakeAnchor audioAnchor,
                 int maxOutputTokens,
                 Consumer<AmbientLineResult> audibleCompletion
@@ -484,6 +519,7 @@ class ControlledConversationRuntimeTest {
             startedSpeakers.add(participant.name());
             lastPrompt = prompt;
             lastContext = promptContext;
+            lastAuthenticatedPlayerId = authenticatedPlayerId;
             lastAnchor = audioAnchor;
             lastMaxOutputTokens = maxOutputTokens;
             assertNull(currentCompletion, "only one fake provider turn may be active");

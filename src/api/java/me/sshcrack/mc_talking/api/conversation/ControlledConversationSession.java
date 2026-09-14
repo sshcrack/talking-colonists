@@ -36,7 +36,12 @@ public interface ControlledConversationSession extends AutoCloseable {
     /** Replaces agenda/context for subsequent turns; an already-requested turn keeps its snapshot. */
     void setAgenda(@NotNull String agenda);
 
-    /** Adds a player-authored statement to bounded shared history with stable UUID attribution. */
+    /**
+     * Adds a player-authored statement to bounded shared history with stable UUID attribution.
+     * The supplied online player also becomes the authenticated player authority for subsequently
+     * requested turns. This enables allowed {@code PLAYER_CONVERSATION} addon tools without turning
+     * the controlled session into a live microphone conversation or advertising listening state.
+     */
     void addPlayerStatement(@NotNull ServerPlayer player, @NotNull String statement);
 
     /** Requests a moving-speaker turn. The future completes only after audible playback terminates. */

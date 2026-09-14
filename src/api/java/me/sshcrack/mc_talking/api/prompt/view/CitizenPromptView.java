@@ -4,6 +4,8 @@ import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.UUID;
+
 /**
  * Read-only snapshot of the core context Talking Colonists has assembled for a citizen prompt.
  *
@@ -13,6 +15,12 @@ import org.jetbrains.annotations.Nullable;
  * constructor becoming part of the binary compatibility contract.</p>
  */
 public interface CitizenPromptView {
+    /** Stable MineColonies citizen UUID represented by this snapshot. */
+    @NotNull UUID citizenId();
+
+    /** Authoritative contextual player UUID, or null when this prompt has no player authority/context. */
+    @Nullable UUID playerId();
+
     @NotNull CitizenIdentityView identity();
 
     @NotNull CitizenFamilyView family();

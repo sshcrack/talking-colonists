@@ -44,8 +44,10 @@ public interface AiToolContext {
     }
 
     /**
-     * Returns the authenticated initiating player or throws when the tool was called outside a
-     * direct player conversation. Prefer {@link AiToolScope#PLAYER_CONVERSATION} for such tools.
+     * Returns the authenticated initiating player or throws when the tool was called without player
+     * authority. Controlled addon turns can carry this authority after an authenticated player
+     * statement without becoming live microphone conversations. Prefer
+     * {@link AiToolScope#PLAYER_CONVERSATION} for such tools.
      */
     default @NotNull ServerPlayer requirePlayer() {
         ServerPlayer player = player();

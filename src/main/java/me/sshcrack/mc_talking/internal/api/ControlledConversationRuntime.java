@@ -36,6 +36,7 @@ final class ControlledConversationRuntime<P, A> {
         boolean hasCapacity();
         @NotNull StartResult start(@NotNull P participant, @NotNull String prompt,
                                    @NotNull PromptSessionContext promptContext,
+                                   @Nullable UUID authenticatedPlayerId,
                                    @Nullable A audioAnchor,
                                    int maxOutputTokens,
                                    @NotNull Consumer<AmbientLineResult> audibleCompletion);
@@ -70,6 +71,7 @@ final class ControlledConversationRuntime<P, A> {
     private final ArrayDeque<ConversationTranscriptEntry> transcript = new ArrayDeque<>();
     private int transcriptChars;
     private volatile String agenda;
+    @Nullable private UUID authenticatedPlayerId;
 
     ControlledConversationRuntime(@NotNull List<P> participants, @NotNull String agenda,
                                   @NotNull ControlledConversationOptions options,
@@ -105,6 +107,13 @@ final class ControlledConversationRuntime<P, A> {
         synchronized (transitionLock) {
             if (state.get() == ControlledConversationSession.State.ENDED) throw new IllegalStateException("session ended");
             appendTranscript(entry);
+        }
+    }
+
+    void bindAuthenticatedPlayer(@NotNull UUID playerId) {
+        synchronized (transitionLock) {
+            if (state.get() == ControlledConversationSession.State.ENDED) throw new IllegalStateException("session ended");
+            authenticatedPlayerId = Objects.requireNonNull(playerId, "playerId");
         }
     }
 
@@ -172,7 +181,7 @@ final class ControlledConversationRuntime<P, A> {
                         "another speaker already has the floor"));
             }
             future = new CompletableFuture<>();
-            turn = new ActiveTurn<>(turnId, speaker, future, automatic, responseTokenLimit);
+            turn = new ActiveTurn<>(turnId, speaker, future, automatic, responseTokenLimit, authenticatedPlayerId);
             activeTurn.set(turn);
             state.set(ControlledConversationSession.State.TURN_ACTIVE);
             turnAgenda = agenda;
@@ -250,7 +259,7 @@ final class ControlledConversationRuntime<P, A> {
                     ControlledTurnResult.FailureReason.CAPACITY_EXHAUSTED, "provider capacity is exhausted"));
             return;
         }
-        StartResult started = hooks.start(turn.speaker(), prompt, promptContext, audioAnchor,
+        StartResult started = hooks.start(turn.speaker(), prompt, promptContext, turn.authenticatedPlayerId(), audioAnchor,
                 turn.responseTokenLimit(), result -> hooks.execute(() -> completeAudibly(turn, result)));
         if (started == StartResult.STARTED || !isCurrent(turn)) return;
         ControlledTurnResult.FailureReason reason = switch (started) {
@@ -557,5 +566,6 @@ final class ControlledConversationRuntime<P, A> {
 
     private record ActiveTurn<P>(@NotNull UUID turnId, @NotNull P speaker,
                                  @NotNull CompletableFuture<ControlledTurnResult> future,
-                                 boolean automatic, int responseTokenLimit) { }
+                                 boolean automatic, int responseTokenLimit,
+                                 @Nullable UUID authenticatedPlayerId) { }
 }

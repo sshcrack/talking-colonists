@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.api.registration.NamespacedAddonId;
 import me.sshcrack.mc_talking.api.tool.AiCommandTool;
 import me.sshcrack.mc_talking.api.tool.AiQueryTool;
 import me.sshcrack.mc_talking.api.tool.AiTool;
+import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
 import me.sshcrack.mc_talking.api.tool.AiToolParameter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -17,7 +18,6 @@ import java.util.Objects;
 /** Runtime-only storage and provider-name mapping for addon AI tools. */
 public final class AiToolRuntime {
     private static final System.Logger LOGGER = System.getLogger("mc_talking-api");
-    private static final int MAX_PROVIDER_NAME_LENGTH = 128;
     private static final RegistrationRegistry<RegisteredTool> TOOLS = new RegistrationRegistry<>("AI tool");
 
     private AiToolRuntime() {
@@ -46,10 +46,7 @@ public final class AiToolRuntime {
             throw new IllegalArgumentException("AI tool already registered: " + id);
         }
 
-        String providerName = "tc_" + namespace.length() + "_" + namespace + "_" + name;
-        if (providerName.length() > MAX_PROVIDER_NAME_LENGTH) {
-            throw new IllegalArgumentException("Tool provider name is too long after namespacing: " + id);
-        }
+        String providerName = AiToolRegistry.providerName(namespace, name);
         if (findByProviderName(providerName) != null) {
             throw new IllegalStateException("Provider tool-name collision for " + id);
         }

@@ -13,8 +13,12 @@ import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.UUID;
+
 /** Internal immutable implementation of the addon-facing prompt snapshot interface. */
 record CitizenPromptSnapshot(
+        @NotNull UUID citizenId,
+        @Nullable UUID playerId,
         @NotNull CitizenIdentityView identity,
         @NotNull CitizenFamilyView family,
         @NotNull CitizenWellbeingView wellbeing,

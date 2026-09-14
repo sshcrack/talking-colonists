@@ -88,12 +88,18 @@ a stable firewall between addon code and MineColonies patch-level API churn.
 ```java
 CitizenPromptView snapshot = CitizenContextService.snapshot(citizen, player);
 
+UUID citizenId = snapshot.citizenId();
+UUID playerId = snapshot.playerId(); // nullable when no player context is attached
 String name = snapshot.identity().name();
 String job = snapshot.work().jobName();
 CitizenActivityCategory category = snapshot.activity().category();
 AIWorkerState exactWorkState = snapshot.activity().workState();
 String activityText = snapshot.activity().description();
 ```
+
+Top-level `citizenId()` always identifies the citizen represented by the snapshot. `playerId()` is the
+authoritative contextual/authenticated player UUID when one exists, including controlled turns bound
+by `addPlayerStatement(...)`; it is `null` for NPC/system-only prompt contexts.
 
 The groups are:
 
@@ -293,6 +299,17 @@ var command = AiToolRegistry.register("my_addon", "come_here", new AiCommandTool
 });
 ```
 
+### Provider-facing tool names
+
+Registration and allow-lists continue to use the stable public `namespace:name` ID. If prompt text or a
+tool description must mention the exact function name Gemini sees, derive it through the public helper
+instead of duplicating the encoding scheme:
+
+```java
+String providerName = AiToolRegistry.providerName("errands", "take_job");
+// tc_7_errands_take_job
+```
+
 ### Validation and authority
 
 `AiToolParameter` is Talking Colonists-owned and provider-neutral. The root schema must be an
@@ -305,7 +322,9 @@ or other authority field.
 the citizen's server-side colony, and the authenticated initiating player when one exists. Never
 use a player UUID, rank, or session ID from model JSON as authorization. `authenticatedPlayerId()`
 and `requirePlayer()` derive from the conversation instead. NPC/system sessions have no implicit
-player authority.
+player authority. In a controlled session, `addPlayerStatement(serverPlayer, ...)` explicitly binds
+that real online player as authority for turns requested afterward; this does **not** enable microphone
+input, listening presentation, or player-only built-in tools.
 
 For common colony mutations, declare an `AiToolPermission`. Core maps that stable API value to the
 current MineColonies permission and calls `colony.getPermissions().hasPermission(...)` at execution
@@ -686,9 +705,13 @@ Controlled sessions also snapshot `PromptSessionContext` per requested turn. Pro
 the stable controlled `sessionId`, `turnId`, and agenda for that turn; later `setAgenda(...)` calls do
 not mutate an in-flight prompt. `ControlledConversationOptions` defines the addon-tool allow-list.
 Only allowed addon tools are advertised **and** executable for controlled turns. `AiToolContext`
-reports the same controlled `sessionId()` and `turnId()`; built-in core tools continue to enforce their
-normal core policy. Use `noAddonTools()` for meetings that should expose no addon tool surface, or
-`allAddonTools()` only when the orchestrator intentionally grants every registered addon tool.
+reports the same controlled `sessionId()` and `turnId()`. Calling `addPlayerStatement(player, ...)`
+binds that player as authoritative for subsequently requested turns, so allowed
+`PLAYER_CONVERSATION` addon tools can execute with normal permission checks. The binding is snapshotted
+when a turn is requested. It does not convert the controlled session into a live player conversation;
+built-in core tools continue to enforce their normal direct-conversation policy. Use `noAddonTools()`
+for meetings that should expose no addon tool surface, or `allAddonTools()` only when the orchestrator
+intentionally grants every registered addon tool.
 
 ## Pregenerated speech
 

@@ -47,6 +47,8 @@ final class AddonApiCompileExample {
             Predicate<AbstractEntityCitizen> onMilitaryDuty
     ) {
         List<AutoCloseable> registrations = new ArrayList<>();
+        String comeHereProviderName = AiToolRegistry.providerName("example_addon", "come_here");
+        if (comeHereProviderName.isBlank()) throw new IllegalStateException("provider name must not be blank");
 
         registrations.add(AiToolRegistry.register("example_addon", "current_destination", new AiQueryTool() {
             @Override
@@ -116,6 +118,8 @@ final class AddonApiCompileExample {
                                 "example_addon:verified_state",
                                 "Verified addon state",
                                 "Current addon context for " + context.view().identity().name()
+                                        + " (citizen=" + context.view().citizenId()
+                                        + ", player=" + context.view().playerId() + ")"
                                         + "; core activity=" + context.view().activity().category()))
                         : List.of()));
 

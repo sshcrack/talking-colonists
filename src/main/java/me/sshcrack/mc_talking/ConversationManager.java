@@ -720,12 +720,13 @@ public class ConversationManager {
             String userPrompt,
             Consumer<AmbientLineResult> completion,
             PromptSessionContext promptSessionContext,
+            @Nullable ServerPlayer authenticatedToolPlayer,
             ControlledAudioAnchor audioAnchor,
             int maxOutputTokens
     ) {
         if (maxOutputTokens < 0) throw new IllegalArgumentException("maxOutputTokens must not be negative");
         return startLowPrioritySession(citizen, userPrompt, ConversationKind.CONTROLLED, completion,
-                promptSessionContext, audioAnchor, maxOutputTokens == 0 ? null : maxOutputTokens);
+                promptSessionContext, audioAnchor, maxOutputTokens == 0 ? null : maxOutputTokens, authenticatedToolPlayer);
     }
 
     /** Cancels only the exact controlled turn identity; stale cancellation cannot kill a replacement turn. */
@@ -851,6 +852,20 @@ public class ConversationManager {
             ControlledAudioAnchor audioAnchor,
             Integer maxOutputTokens
     ) {
+        return startLowPrioritySession(citizen, userPrompt, kind, completion, promptSessionContext,
+                audioAnchor, maxOutputTokens, null);
+    }
+
+    private static boolean startLowPrioritySession(
+            AbstractEntityCitizen citizen,
+            String userPrompt,
+            ConversationKind kind,
+            Consumer<AmbientLineResult> completion,
+            PromptSessionContext promptSessionContext,
+            ControlledAudioAnchor audioAnchor,
+            Integer maxOutputTokens,
+            @Nullable ServerPlayer authenticatedToolPlayer
+    ) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
         if (!canCitizenSpeak(citizen, kind)) return false;
 
@@ -875,7 +890,7 @@ public class ConversationManager {
                         completion.accept(AmbientLineResult.completed(transcript));
                     }
                 });
-            }, promptSessionContext, maxOutputTokens);
+            }, promptSessionContext, maxOutputTokens, authenticatedToolPlayer);
 
             if (!reservation.attachClient(client)) {
                 reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
