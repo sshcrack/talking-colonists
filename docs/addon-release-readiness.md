@@ -5,13 +5,13 @@ not a compatibility claim for any external addon release.
 
 ## Compatibility baseline
 
-Talking Colonists `2.0.0` exposes addon API generation `2` (`TalkingColonistsApi.API_MAJOR_VERSION`).
+Talking Colonists `2.0.0-beta.1` exposes addon API generation `2` (`TalkingColonistsApi.API_MAJOR_VERSION`).
 The supported game/loader targets in this repository are:
 
 | Minecraft | Loader baseline | MineColonies compile baseline | Addon API artifact coordinate |
 | --- | --- | --- | --- |
-| `1.21.1` | NeoForge `21.1.213` | `1.1.1305-1.21.1-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-1.21.1-neoforge` |
-| `1.20.1` | Forge `47.2.0` | `1.20.1-1.1.1218-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-1.20.1-forge` |
+| `1.21.1` | NeoForge `21.1.213` | `1.1.1305-1.21.1-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-beta.1-1.21.1-neoforge` |
+| `1.20.1` | Forge `47.2.0` | `1.20.1-1.1.1218-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-beta.1-1.20.1-forge` |
 
 The normal Talking Colonists runtime currently requires Gemini Live Library `>=2.4.0,<3.0.0` through
 its loader metadata. The upper bound is intentional: a future Gemini Live Library 3.x release may
@@ -25,16 +25,20 @@ its Talking Colonists boundary. No legacy API adapters are provided.
 
 ## External addon compatibility
 
-The migration audit is pinned to Colonist Errands commit
-`f270362aca847726087213c623508ad0a65354c1` (GPL-3.0). That revision still targets Talking Colonists
-1.7-era implementation classes, mixins, reflection, and duck interfaces. It has **not** been migrated
-and compiled against API generation 2 in this repository, so this release must not advertise a
-compatible Colonist Errands version yet.
+Colonist Errands `3.0.0-alpha.3` has been externally tested against Talking Colonists
+`2.0.0-beta.1`. The addon binary was built against `2.0.0-alpha.2` and loaded unchanged against
+`beta.1`; all 42 addon tools registered, controlled turns authenticated a real player through
+`addPlayerStatement(...)`, player-scoped tools completed without `unauthorized`, and real colony data
+was returned through the provider. The same testing also identified the detached `FakePlayer` harness
+case hardened in this beta: loader-provided fake players are valid controlled test actors even though
+they are absent from `PlayerList`.
 
-Voyager was reviewed at `6666432ec94e58089635dfe8ea3cc6967b59f12f`; its Talking Colonists
-integration at that point is mediated through Colonist Errands. No public Colony Meetings source was
-available for compatibility testing; the Meetings documentation is an integration contract/example,
-not a tested third-party release claim.
+This is useful binary/runtime compatibility evidence, but it does not replace this repository's own
+API-jar compile checks or loader smoke tests. Voyager was previously reviewed at
+`6666432ec94e58089635dfe8ea3cc6967b59f12f`; its Talking Colonists integration at that point was
+mediated through Colonist Errands. No public Colony Meetings source was available for compatibility
+testing; the Meetings documentation remains an integration contract/example rather than a tested
+third-party release claim.
 
 ## Automated evidence
 

@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * Composable addon prompt extension. Contributors receive immutable prompt/session snapshots already
- * gathered by Talking Colonists; they should not read or mutate the Minecraft world from callbacks.
+ * gathered by Talking Colonists. Callbacks may run off the Minecraft server thread (including during
+ * provider setup), so they must not read or mutate the live Minecraft world directly.
  */
 @FunctionalInterface
 public interface CitizenPromptContributor {

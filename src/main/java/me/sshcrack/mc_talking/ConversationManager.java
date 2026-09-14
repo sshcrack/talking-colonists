@@ -720,13 +720,15 @@ public class ConversationManager {
             String userPrompt,
             Consumer<AmbientLineResult> completion,
             PromptSessionContext promptSessionContext,
-            @Nullable ServerPlayer authenticatedToolPlayer,
+            @Nullable UUID authenticatedToolPlayerId,
+            @Nullable ServerPlayer boundToolPlayer,
             ControlledAudioAnchor audioAnchor,
             int maxOutputTokens
     ) {
         if (maxOutputTokens < 0) throw new IllegalArgumentException("maxOutputTokens must not be negative");
         return startLowPrioritySession(citizen, userPrompt, ConversationKind.CONTROLLED, completion,
-                promptSessionContext, audioAnchor, maxOutputTokens == 0 ? null : maxOutputTokens, authenticatedToolPlayer);
+                promptSessionContext, audioAnchor, maxOutputTokens == 0 ? null : maxOutputTokens,
+                authenticatedToolPlayerId, boundToolPlayer);
     }
 
     /** Cancels only the exact controlled turn identity; stale cancellation cannot kill a replacement turn. */
@@ -840,7 +842,8 @@ public class ConversationManager {
             ConversationKind kind,
             Consumer<AmbientLineResult> completion
     ) {
-        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty(), null, null);
+        return startLowPrioritySession(citizen, userPrompt, kind, completion, PromptSessionContext.empty(),
+                null, null, null, null);
     }
 
     private static boolean startLowPrioritySession(
@@ -853,7 +856,7 @@ public class ConversationManager {
             Integer maxOutputTokens
     ) {
         return startLowPrioritySession(citizen, userPrompt, kind, completion, promptSessionContext,
-                audioAnchor, maxOutputTokens, null);
+                audioAnchor, maxOutputTokens, null, null);
     }
 
     private static boolean startLowPrioritySession(
@@ -864,7 +867,8 @@ public class ConversationManager {
             PromptSessionContext promptSessionContext,
             ControlledAudioAnchor audioAnchor,
             Integer maxOutputTokens,
-            @Nullable ServerPlayer authenticatedToolPlayer
+            @Nullable UUID authenticatedToolPlayerId,
+            @Nullable ServerPlayer boundToolPlayer
     ) {
         if (!McTalkingConfig.hasGeminiApiKey()) return false;
         if (!canCitizenSpeak(citizen, kind)) return false;
@@ -890,7 +894,7 @@ public class ConversationManager {
                         completion.accept(AmbientLineResult.completed(transcript));
                     }
                 });
-            }, promptSessionContext, maxOutputTokens, authenticatedToolPlayer);
+            }, promptSessionContext, maxOutputTokens, authenticatedToolPlayerId, boundToolPlayer);
 
             if (!reservation.attachClient(client)) {
                 reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,

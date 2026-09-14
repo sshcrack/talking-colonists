@@ -30,6 +30,7 @@ public interface ControlledConversationSession extends AutoCloseable {
     /** Stable identity shared by all turns in this controlled session. */
     @NotNull UUID sessionId();
 
+    /** Immutable participant snapshot in caller-supplied order. */
     @NotNull List<AbstractEntityCitizen> participants();
     @NotNull State state();
 
@@ -38,8 +39,11 @@ public interface ControlledConversationSession extends AutoCloseable {
 
     /**
      * Adds a player-authored statement to bounded shared history with stable UUID attribution.
-     * The supplied online player also becomes the authenticated player authority for subsequently
-     * requested turns. This enables allowed {@code PLAYER_CONVERSATION} addon tools without turning
+     * The supplied player also becomes the authenticated player authority for subsequently requested
+     * turns. Real players are re-resolved by UUID when a tool executes, so a reconnect uses the current
+     * server player and a disconnected player cannot execute against a stale entity. Loader-provided
+     * fake players remain usable as explicit automation/test actors even though they are not in the
+     * online player list. This enables allowed {@code PLAYER_CONVERSATION} addon tools without turning
      * the controlled session into a live microphone conversation or advertising listening state.
      */
     void addPlayerStatement(@NotNull ServerPlayer player, @NotNull String statement);
@@ -77,7 +81,10 @@ public interface ControlledConversationSession extends AutoCloseable {
 
     default void end() { end(EndReason.COMPLETED); }
 
+    /** Immutable bounded transcript snapshot. */
     @NotNull List<ConversationTranscriptEntry> transcript();
+
+    /** Human-readable rendering of the same bounded shared transcript. */
     @NotNull String sharedTranscript();
 
     @Override

@@ -7,6 +7,8 @@ import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.internal.audio.MicrophoneTurnModule;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
+import me.sshcrack.mc_talking.internal.compat.FakePlayerCompatibility;
+import me.sshcrack.mc_talking.internal.tool.AuthenticatedActorResolver;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -42,9 +44,13 @@ public class CitizenWsClient extends GeminiWsClient {
     @Nullable
     private volatile ServerPlayer player;
 
-    /** Authoritative player for addon-tool permission checks; does not imply live microphone participation. */
+    /** Stable authority identity for addon-tool permission checks; does not imply live microphone participation. */
     @Nullable
-    private volatile ServerPlayer authenticatedToolPlayer;
+    private volatile UUID authenticatedToolPlayerId;
+
+    /** Detached fallback is intentionally retained only for loader-provided fake players used by automation. */
+    @Nullable
+    private volatile ServerPlayer detachedAuthenticatedToolPlayer;
 
     /**
      * Callback invoked at the end of each mumbling turn; {@code null} once in player mode.
@@ -116,7 +122,7 @@ public class CitizenWsClient extends GeminiWsClient {
             PromptSessionContext promptSessionContext,
             @Nullable Integer maxOutputTokens
     ) {
-        this(audioProvider, entity, onSystemConversationEnded, promptSessionContext, maxOutputTokens, null);
+        this(audioProvider, entity, onSystemConversationEnded, promptSessionContext, maxOutputTokens, null, null);
     }
 
     public CitizenWsClient(
@@ -125,21 +131,22 @@ public class CitizenWsClient extends GeminiWsClient {
             @Nullable Consumer<CitizenWsClient> onSystemConversationEnded,
             PromptSessionContext promptSessionContext,
             @Nullable Integer maxOutputTokens,
-            @Nullable ServerPlayer authenticatedToolPlayer
+            @Nullable UUID authenticatedToolPlayerId,
+            @Nullable ServerPlayer boundToolPlayer
     ) {
         super(audioProvider, entity);
         if (maxOutputTokens != null && maxOutputTokens <= 0) {
             throw new IllegalArgumentException("maxOutputTokens must be positive when supplied");
         }
         this.player = null;
-        this.authenticatedToolPlayer = authenticatedToolPlayer;
+        this.authenticatedToolPlayerId = authenticatedToolPlayerId;
+        this.detachedAuthenticatedToolPlayer = detachedFallback(authenticatedToolPlayerId, boundToolPlayer);
         this.onSystemConversationEnded = onSystemConversationEnded;
         this.startedInSystemMode = true;
         this.promptSessionContext = Objects.requireNonNull(promptSessionContext, "promptSessionContext");
         this.maxOutputTokens = maxOutputTokens;
         this.promptView = CitizenPromptViewFactory.create(
-                entity.getCitizenData(), Map.of(), null,
-                authenticatedToolPlayer == null ? null : authenticatedToolPlayer.getUUID());
+                entity.getCitizenData(), Map.of(), null, authenticatedToolPlayerId);
     }
 
     /**
@@ -152,7 +159,8 @@ public class CitizenWsClient extends GeminiWsClient {
     public CitizenWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity, @Nullable ServerPlayer player) {
         super(audioProvider, entity);
         this.player = player;
-        this.authenticatedToolPlayer = player;
+        this.authenticatedToolPlayerId = player == null ? null : player.getUUID();
+        this.detachedAuthenticatedToolPlayer = null;
         this.onSystemConversationEnded = null;
         this.startedInSystemMode = false;
         this.promptSessionContext = PromptSessionContext.empty();
@@ -213,7 +221,8 @@ public class CitizenWsClient extends GeminiWsClient {
             throw new IllegalStateException("Controlled turns cannot be promoted into player conversations");
         }
         this.player = player;
-        this.authenticatedToolPlayer = player;
+        this.authenticatedToolPlayerId = player == null ? null : player.getUUID();
+        this.detachedAuthenticatedToolPlayer = null;
         this.onSystemConversationEnded = null;
         this.playerInputStarted = false;
         this.lastAnnouncedPlayerId = null;
@@ -317,15 +326,28 @@ public class CitizenWsClient extends GeminiWsClient {
     @Override
     @Nullable
     protected ServerPlayer resolveAuthenticatedToolPlayer() {
-        ServerPlayer authenticated = authenticatedToolPlayer;
-        if (authenticated != null) {
+        UUID playerId = authenticatedToolPlayerId;
+        if (playerId != null) {
             var server = getEntity().level().getServer();
-            if (server != null) {
-                ServerPlayer online = server.getPlayerList().getPlayer(authenticated.getUUID());
-                if (online != null) return online;
-            }
+            ServerPlayer detached = detachedAuthenticatedToolPlayer;
+            if (detached != null && !playerId.equals(detached.getUUID())) detached = null;
+            ServerPlayer safeDetached = detached;
+            return AuthenticatedActorResolver.resolve(
+                    playerId,
+                    id -> server == null ? null : server.getPlayerList().getPlayer(id),
+                    safeDetached);
         }
         return resolveActivePlayer();
+    }
+
+    @Nullable
+    private static ServerPlayer detachedFallback(
+            @Nullable UUID authenticatedPlayerId,
+            @Nullable ServerPlayer boundPlayer
+    ) {
+        if (authenticatedPlayerId == null || boundPlayer == null
+                || !authenticatedPlayerId.equals(boundPlayer.getUUID())) return null;
+        return FakePlayerCompatibility.isFakePlayer(boundPlayer) ? boundPlayer : null;
     }
 
     @Override

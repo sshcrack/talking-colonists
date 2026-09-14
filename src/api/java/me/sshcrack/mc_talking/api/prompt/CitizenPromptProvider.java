@@ -9,7 +9,9 @@ import org.jetbrains.annotations.NotNull;
  *
  * <p>Most addons should contribute context with {@link CitizenPromptService#registerContributor}
  * instead. Provider replacement exists for integrations that intentionally own the full prompt.
- * The supplied {@link CitizenPromptView} is read-only and implemented by Talking Colonists.</p>
+ * The supplied {@link CitizenPromptView} is read-only and implemented by Talking Colonists. Provider
+ * callbacks may run off the Minecraft server thread, so implementations must use only the supplied
+ * snapshot or their own thread-safe state rather than reading/mutating the live world.</p>
  */
 public interface CitizenPromptProvider {
     @NotNull String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson);

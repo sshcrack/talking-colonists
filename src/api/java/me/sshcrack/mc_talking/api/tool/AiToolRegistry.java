@@ -5,6 +5,8 @@ import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import me.sshcrack.mc_talking.api.registration.NamespacedAddonId;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
+
 /**
  * Registry for addon-provided AI tools.
  *
@@ -24,7 +26,12 @@ public final class AiToolRegistry {
      * public namespaced addon ID.
      */
     public static @NotNull String providerName(@NotNull String addonId, @NotNull String tool) {
-        NamespacedAddonId id = new NamespacedAddonId(addonId, tool);
+        return providerName(new NamespacedAddonId(addonId, tool));
+    }
+
+    /** Returns the exact provider-facing function name for an already-validated addon tool ID. */
+    public static @NotNull String providerName(@NotNull NamespacedAddonId id) {
+        Objects.requireNonNull(id, "id");
         String providerName = "tc_" + id.namespace().length() + "_" + id.namespace() + "_" + id.name();
         if (providerName.length() > MAX_PROVIDER_NAME_LENGTH) {
             throw new IllegalArgumentException("Tool provider name is too long after namespacing: " + id);
@@ -43,5 +50,14 @@ public final class AiToolRegistry {
             @NotNull AiTool tool
     ) {
         return TalkingColonistsApi.services().tools().register(namespace, name, tool);
+    }
+
+    /** Registers one addon tool using an already-validated namespaced ID. */
+    public static @NotNull AddonRegistration register(
+            @NotNull NamespacedAddonId id,
+            @NotNull AiTool tool
+    ) {
+        Objects.requireNonNull(id, "id");
+        return register(id.namespace(), id.name(), tool);
     }
 }

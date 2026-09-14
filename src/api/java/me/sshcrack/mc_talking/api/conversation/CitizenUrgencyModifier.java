@@ -6,8 +6,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Adjusts the built-in urgent-contact weight using addon-owned state.
  *
- * <p>Modifiers run deterministically in registration order. Return zero to suppress an urgent
- * contact. Negative and non-finite results are rejected by core.</p>
+ * <p>Modifiers run synchronously on the Minecraft server thread in deterministic registration order.
+ * They should be fast and side-effect free. Return zero to suppress an urgent contact. Negative and
+ * non-finite results are rejected by core.</p>
  */
 @FunctionalInterface
 public interface CitizenUrgencyModifier {

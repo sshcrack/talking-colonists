@@ -41,10 +41,10 @@ dependencies {
 }
 ```
 
-For example, API generation 2 for Talking Colonists `2.0.0`, Minecraft `1.21.1`, NeoForge uses:
+For example, the current API generation 2 beta for Talking Colonists `2.0.0-beta.1`, Minecraft `1.21.1`, NeoForge uses:
 
 ```kotlin
-compileOnly("me.sshcrack:mc_talking-api:2.0.0-1.21.1-neoforge")
+compileOnly("me.sshcrack:mc_talking-api:2.0.0-beta.1-1.21.1-neoforge")
 ```
 
 The API artifact uses the same version tuple as the normal published mod artifact. Always choose the
@@ -307,6 +307,8 @@ instead of duplicating the encoding scheme:
 
 ```java
 String providerName = AiToolRegistry.providerName("errands", "take_job");
+// Or, when you already have a validated ID:
+String sameName = AiToolRegistry.providerName(new NamespacedAddonId("errands", "take_job"));
 // tc_7_errands_take_job
 ```
 
@@ -323,8 +325,10 @@ the citizen's server-side colony, and the authenticated initiating player when o
 use a player UUID, rank, or session ID from model JSON as authorization. `authenticatedPlayerId()`
 and `requirePlayer()` derive from the conversation instead. NPC/system sessions have no implicit
 player authority. In a controlled session, `addPlayerStatement(serverPlayer, ...)` explicitly binds
-that real online player as authority for turns requested afterward; this does **not** enable microphone
-input, listening presentation, or player-only built-in tools.
+that server-side player as authority for turns requested afterward. Real players are refreshed from
+the current online player list at execution time, while loader-provided fake players remain valid
+automation actors; this does **not** enable microphone input, listening presentation, or player-only
+built-in tools.
 
 For common colony mutations, declare an `AiToolPermission`. Core maps that stable API value to the
 current MineColonies permission and calls `colony.getPermissions().hasPermission(...)` at execution
@@ -707,11 +711,16 @@ not mutate an in-flight prompt. `ControlledConversationOptions` defines the addo
 Only allowed addon tools are advertised **and** executable for controlled turns. `AiToolContext`
 reports the same controlled `sessionId()` and `turnId()`. Calling `addPlayerStatement(player, ...)`
 binds that player as authoritative for subsequently requested turns, so allowed
-`PLAYER_CONVERSATION` addon tools can execute with normal permission checks. The binding is snapshotted
-when a turn is requested. It does not convert the controlled session into a live player conversation;
-built-in core tools continue to enforce their normal direct-conversation policy. Use `noAddonTools()`
-for meetings that should expose no addon tool surface, or `allAddonTools()` only when the orchestrator
-intentionally grants every registered addon tool.
+`PLAYER_CONVERSATION` addon tools can execute with normal permission checks. The authority UUID is
+snapshotted when a turn is requested. At each tool call, a real player is re-resolved through the
+server's current player list: reconnecting therefore picks up the replacement `ServerPlayer`, while a
+currently disconnected real player is not allowed to execute against a stale entity object.
+Loader-provided `FakePlayer` instances are deliberately retained as detached automation/test actors,
+because those valid server-side players are not inserted into the online player list. This binding does
+not convert the controlled session into a live player conversation; built-in core tools continue to
+enforce their normal direct-conversation policy. Use `noAddonTools()` for meetings that should expose
+no addon tool surface, or `allAddonTools()` only when the orchestrator intentionally grants every
+registered addon tool.
 
 ## Pregenerated speech
 

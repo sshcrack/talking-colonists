@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
+import me.sshcrack.mc_talking.api.registration.NamespacedAddonId;
 import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +40,19 @@ class AiToolRegistryTest {
         }
         assertTrue(registration.isClosed());
         assertNull(AiToolRuntime.findById("colonist_errands:come_here"));
+    }
+
+
+    @Test
+    void alreadyValidatedIdCanBeRegisteredDirectly() {
+        NamespacedAddonId id = new NamespacedAddonId("addon", "validated");
+        var registration = AiToolRegistry.register(id, dummy());
+        try {
+            assertEquals(id.toString(), registration.id());
+            assertEquals(AiToolRegistry.providerName(id), AiToolRuntime.findById(id.toString()).providerName());
+        } finally {
+            registration.close();
+        }
     }
 
     @Test

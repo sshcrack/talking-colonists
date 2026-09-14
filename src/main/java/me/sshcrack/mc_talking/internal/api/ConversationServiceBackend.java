@@ -38,6 +38,7 @@ import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.conversations.memory.MemorySnapshotFactory;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
+import me.sshcrack.mc_talking.internal.compat.FakePlayerCompatibility;
 import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
@@ -326,6 +327,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
 
     private static final class ControlledSession implements ControlledConversationSession {
         private final MinecraftServer server;
+        private final ControlledHooks hooks;
         private final ControlledConversationRuntime<AbstractEntityCitizen, ControlledAudioAnchor> runtime;
 
         private ControlledSession(
@@ -335,7 +337,8 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                 ControlledConversationOptions options
         ) {
             this.server = java.util.Objects.requireNonNull(server, "server");
-            this.runtime = new ControlledConversationRuntime<>(participants, agenda, options, new ControlledHooks(server));
+            this.hooks = new ControlledHooks(server);
+            this.runtime = new ControlledConversationRuntime<>(participants, agenda, options, hooks);
         }
 
         @Override
@@ -356,6 +359,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             java.util.Objects.requireNonNull(statement, "statement");
             if (statement.isBlank()) return;
             if (runtime.state() == State.ENDED) throw new IllegalStateException("session ended");
+            hooks.bindAuthenticatedPlayer(player);
             runtime.bindAuthenticatedPlayer(player.getUUID());
             Runnable append = () -> {
                 if (runtime.state() == State.ENDED) return;
@@ -401,8 +405,17 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
         private static final class ControlledHooks
                 implements ControlledConversationRuntime.Hooks<AbstractEntityCitizen, ControlledAudioAnchor> {
             private final MinecraftServer server;
+            private final Map<UUID, ServerPlayer> detachedPlayers = new ConcurrentHashMap<>();
 
             private ControlledHooks(MinecraftServer server) { this.server = server; }
+
+            private void bindAuthenticatedPlayer(@NotNull ServerPlayer player) {
+                if (FakePlayerCompatibility.isFakePlayer(player)) {
+                    detachedPlayers.put(player.getUUID(), player);
+                } else {
+                    detachedPlayers.remove(player.getUUID());
+                }
+            }
 
             @Override
             public void execute(@NotNull Runnable task) {
@@ -475,11 +488,12 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;
                 }
-                ServerPlayer authenticatedPlayer = authenticatedPlayerId == null
+                ServerPlayer boundPlayer = authenticatedPlayerId == null
                         ? null
-                        : server.getPlayerList().getPlayer(authenticatedPlayerId);
+                        : detachedPlayers.get(authenticatedPlayerId);
                 boolean started = ConversationManager.startControlledAmbientSession(
-                        participant, prompt, audibleCompletion, promptContext, authenticatedPlayer, audioAnchor, maxOutputTokens);
+                        participant, prompt, audibleCompletion, promptContext, authenticatedPlayerId, boundPlayer,
+                        audioAnchor, maxOutputTokens);
                 if (started) return ControlledConversationRuntime.StartResult.STARTED;
                 if (!ConversationManager.hasLowPriorityCapacity(1)) {
                     return ControlledConversationRuntime.StartResult.CAPACITY_EXHAUSTED;

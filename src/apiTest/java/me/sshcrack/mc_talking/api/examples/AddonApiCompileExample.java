@@ -27,6 +27,7 @@ import me.sshcrack.mc_talking.api.tool.AiToolParameter;
 import me.sshcrack.mc_talking.api.tool.AiToolPermission;
 import me.sshcrack.mc_talking.api.tool.AiToolRegistry;
 import me.sshcrack.mc_talking.api.tool.AiToolScope;
+import me.sshcrack.mc_talking.api.registration.NamespacedAddonId;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.time.Duration;
@@ -47,7 +48,8 @@ final class AddonApiCompileExample {
             Predicate<AbstractEntityCitizen> onMilitaryDuty
     ) {
         List<AutoCloseable> registrations = new ArrayList<>();
-        String comeHereProviderName = AiToolRegistry.providerName("example_addon", "come_here");
+        NamespacedAddonId comeHereId = new NamespacedAddonId("example_addon", "come_here");
+        String comeHereProviderName = AiToolRegistry.providerName(comeHereId);
         if (comeHereProviderName.isBlank()) throw new IllegalStateException("provider name must not be blank");
 
         registrations.add(AiToolRegistry.register("example_addon", "current_destination", new AiQueryTool() {
@@ -70,7 +72,7 @@ final class AddonApiCompileExample {
             }
         }));
 
-        registrations.add(AiToolRegistry.register("example_addon", "come_here", new AiCommandTool() {
+        registrations.add(AiToolRegistry.register(comeHereId, new AiCommandTool() {
             @Override
             public String description() {
                 return "Ask this citizen to come to the player.";
