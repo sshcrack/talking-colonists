@@ -1,5 +1,8 @@
 # Reliable conversations and addon integration roadmap
 
+> Tasks 01–11 are complete and 12 is partial. The next roadmap — API gaps, quality of life,
+> and addon ideas — is in [2.1/README.md](2.1/README.md).
+
 This roadmap implements the recommendations arising from Colonist Errands and
 Colony Meetings feedback. It is an implementation queue, not a record of shipped
 features. All tasks start pending. Complete one task by giving an agent its prompt

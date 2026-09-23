@@ -1,0 +1,300 @@
+# Track A — API gaps
+
+Analysis of `src/api` (API generation 2, 2.0.0-beta.2) against the addon ideas in
+[addons.md](addons.md). Paths are relative to `src/api/java/me/sshcrack/mc_talking/api/` for the
+API and `src/main/java/me/sshcrack/mc_talking/` for the runtime.
+
+## What already exists
+
+| Need | Supported by |
+| --- | --- |
+| Inject facts into prompts | `prompt/CitizenPromptService.registerContributor` |
+| Addon tools with permission checks | `tool/AiToolRegistry`, `AiToolContext` |
+| Read/write citizen memory, confirmed outcomes | `memory/CitizenMemoryService` |
+| Read broadcasts and rumors a citizen knows | `CitizenMemorySnapshot.broadcasts()/rumors()` |
+| Start a player conversation | `CitizenConversationService.startPlayerConversation(player, citizen)` |
+| One audible line from a citizen | `CitizenConversationService.requestAmbientLine` |
+| Meetings: turns, agenda, player statements, transcript | `ControlledConversationSession` |
+| Automatic group discussion | `AutonomousDiscussionHandle/Policy` |
+| Reserve citizens for addon gameplay | `CitizenConversationService.reserveActivity` |
+| Speech and urgency policies | `CitizenConversationRules` |
+| Conversation start/end observation | `ConversationLifecycleListener` (STARTED/ENDED only) |
+
+## Gap summary
+
+| Task | Gap | Evidence | Unblocks | Size |
+| --- | --- | --- | --- | --- |
+| A0 | Addons cannot detect which 2.x features a runtime has | `TalkingColonistsApi` has only `API_MAJOR_VERSION = 2` | every addon targeting 2.1 | S |
+| A1 | Broadcasts can be read but not created | only `InitiateBroadcastAction` (AI tool) creates `ColonyBroadcast`; no API | X1, X2, X3 | M |
+| A2 | Colony events are internal | `util/ColonyEventBuffer` is not exposed; no listener | X2, X3, X7 | M |
+| A3 | No text-only in-character generation | every speech API is audible (`requestAmbientLine`, sessions) | X1, X2, X3, X4, X7, X8, X10 | M |
+| A4 | No typed player input into a live conversation | no chat handler; `addPlayerStatement` exists only on controlled sessions | Q10, X10, X11 | M |
+| A5 | No per-utterance events outside controlled sessions | lifecycle events carry no text; `GeminiWsClient.onInputTranscription/onOutputTranscription` are internal | X3, X7, X9, X10 | M |
+| A6 | Player conversations cannot be scoped by an addon | `startPlayerConversation(player, citizen)` takes no context or tool allow-list | A4, X5, X7, X10, X11 | S |
+| A7 | No quota or capacity view for scheduling costly work | `config/QuotaTracker` is internal; only `hasAmbientCapacity` is public | X2, X6, L1 | S |
+| A8 | Visitors cannot speak | `ConversationManager.java:596` rejects `VisitorCitizen` | X5 | M |
+| A9 | Multi-colony controlled sessions are undefined | no documented or tested behaviour for mixed-colony attendees | X8 | S |
+| A10 | No speech-to-text without a citizen | microphone audio only flows into citizen sessions | X1 (voice loudspeaker) | L |
+| A11 | 2.1 docs, examples, and release | — | publishing addons against 2.1 | S |
+
+---
+
+## A0 — API feature detection
+
+**Depends on:** — · **Size:** S · **Wave:** 0
+
+### Agent prompt
+
+Add additive feature detection so addons compiled against API 2.1 can run on 2.0 runtimes and
+degrade gracefully. Add `TalkingColonistsApi.API_MINOR_VERSION` and a
+`TalkingColonistsApi.supports(ApiFeature)` query backed by the runtime. `ApiFeature` is an enum with
+one constant per Track A task (`BROADCAST_PUBLISHING`, `COLONY_EVENTS`, `TEXT_GENERATION`, …); each
+task flips its constant on when it lands. Calling an unsupported feature's entry point must fail
+with a documented `UnsupportedOperationException` rather than a `NoSuchMethodError`.
+
+### Acceptance
+
+- `supports` returns false for every feature on a runtime that predates it (simulate with a fake
+  `Services` implementation in tests).
+- `docs/addon-api.md` shows the detection pattern; an `apiTest` example compiles for both loaders.
+
+---
+
+## A1 — Broadcast and news publishing
+
+**Depends on:** A0 · **Size:** M · **Wave:** 1
+
+### Agent prompt
+
+Expose creation of colony broadcasts, which today only the `initiate_broadcast` AI tool can do.
+Add `CitizenMemoryService.publishBroadcast(IColony, BroadcastRequest)` returning a typed result.
+`BroadcastRequest` carries message, source (player UUID, addon namespace, or block position),
+scope (`COLONY_IMMEDIATE` — every citizen learns it now; `PROPAGATE_FROM` — spreads from a citizen
+or position through `BroadcastPropagationService`), optional expiry, and whether nearby citizens
+may announce it aloud. Add `retractBroadcast(id)`. Reuse `ColonyBroadcast` and the existing
+propagation, voicing, and prompt-inclusion limits; do not create a second system.
+
+Record provenance through the existing `MemoryProvenance` so prompts can say "the notice board
+says…" rather than attributing it to a player. Bound message length and per-colony publish rate.
+
+### Acceptance
+
+- Tests cover both scopes, retraction, expiry, rate limits, provenance, and persistence across
+  save/load; the AI tool path routes through the same runtime.
+- A broadcast published with `COLONY_IMMEDIATE` appears in every citizen's next prompt snapshot.
+
+---
+
+## A2 — Colony event feed
+
+**Depends on:** A0 · **Size:** M · **Wave:** 1
+
+### Agent prompt
+
+Expose `util/ColonyEventBuffer` through a public `ColonyEventService`: `recent(colony, maxAge)`
+returning immutable typed views, `registerListener(id, order, listener)` for newly recorded
+events (delivered on the server thread), and `record(colony, AddonColonyEvent)` so addons can add
+namespaced events such as "election won". Addon events must appear in prompts under the existing
+lifecycle-event duration setting and must be distinguishable from core events. Keep the buffer's
+bounds; addon events count against a separate per-namespace budget.
+
+### Acceptance
+
+- Tests cover listener ordering, exceptions in one listener not affecting others, addon event
+  bounds, persistence, and prompt inclusion.
+
+---
+
+## A3 — Text-only in-character generation
+
+**Depends on:** A0 · **Size:** M · **Wave:** 1
+
+### Agent prompt
+
+Add `CitizenTextService.generate(citizen, TextRequest)` returning
+`CompletableFuture<TextResult>`. The request carries a directive, optional max length, optional
+JSON schema for structured output (reuse the structured-output support from roadmap task 02),
+and a purpose tag used for logging and quota accounting. Use the citizen's normal prompt snapshot
+(including contributors and the configured response language) and the Flash model. Run on the
+background capacity pool, respect `QuotaTracker`, and return typed failures (`QUOTA`,
+`NO_CAPACITY`, `INVALID_OUTPUT`, `CANCELLED`). Add a colony-voice variant with no single citizen
+(for newspapers and notice replies) that uses the colony prompt view only.
+
+### Acceptance
+
+- Tests use fake transport: plain text, structured JSON with validation failure, quota
+  exhaustion, cancellation, and language instruction present in the request.
+- Generated text never triggers audio or occupies a foreground slot.
+
+---
+
+## A4 — Player text input into conversations
+
+**Depends on:** A0, A6 · **Size:** M · **Wave:** 2
+
+### Agent prompt
+
+Add `CitizenConversationService.sendPlayerText(player, citizen, text)` which delivers typed text
+into that player's active conversation as a user turn (Live sessions accept text parts) and
+records it in the transcript with player provenance. Also add `addContext(player, citizen, note)`
+for addon-originated system notes during a live player conversation (for example "the player just
+handed you the deed"). Enforce the authenticated player (never the model), length limits, and a
+rate limit. Q10 builds the chat UX on top of this.
+
+### Acceptance
+
+- Tests: text reaches the provider as a user turn, is attributed to the right player, is rejected
+  for a different player's conversation, and counts toward memory extraction.
+
+---
+
+## A5 — Conversation utterance events
+
+**Depends on:** A0 · **Size:** M · **Wave:** 2
+
+### Agent prompt
+
+Extend lifecycle observation with an `UTTERANCE` event for every conversation kind: speaker kind
+(player, citizen, system), speaker id, final transcript text, session id, turn id, and whether
+the text came from transcription or typed input. Source it from the existing
+`onInputTranscription` / `onOutputTranscription` callbacks and the Flash+TTS script path. Emit
+only finalised utterances (not partial transcription chunks) on the server thread. Document that
+transcription is best-effort and must not be treated as proof for irreversible gameplay; addons
+should confirm through their own tools.
+
+### Acceptance
+
+- Tests with fake transport cover player and citizen utterances in player, pair, and controlled
+  sessions, no duplicates for chunked transcription, and no events after a session ends.
+
+---
+
+## A6 — Player conversation start options
+
+**Depends on:** A0 · **Size:** S · **Wave:** 1
+
+### Agent prompt
+
+Add `startPlayerConversation(player, citizen, PlayerConversationOptions)` where options carry a
+session agenda/context (via `PromptSessionContext`), an addon tool allow-list (same semantics as
+`ControlledConversationOptions`), a purpose tag visible in lifecycle events, and whether normal
+memory extraction runs. Addons use it to open "quest giver", "judge", or "tour guide"
+conversations without replacing global prompts. Session context must not leak into later
+conversations.
+
+### Acceptance
+
+- Tests: context appears only in that session; tool allow-list is enforced at execution time;
+  default overload behaves exactly as today.
+
+---
+
+## A7 — Capacity and quota status
+
+**Depends on:** A0, Q2 · **Size:** S · **Wave:** 2
+
+### Agent prompt
+
+Expose a read-only `ProviderBudgetService`: foreground and background slots in use / available,
+per-model quota state (`OK`, `EXHAUSTED_UNTIL(time)`, `UNKNOWN`) from `QuotaTracker`, and TTS quota
+from `TtsQuotaManager`. Add a listener for quota state changes. Addons use this to schedule
+expensive work (nightly newspaper, campfire nights) and to show honest "citizens are tired" UI.
+
+### Acceptance
+
+- Tests cover state transitions, listener delivery, and that the view is immutable.
+
+---
+
+## A8 — Visitor speakers
+
+**Depends on:** A0 · **Size:** M · **Wave:** 1
+
+### Agent prompt
+
+Allow `VisitorCitizen` entities as conversation participants behind an opt-in speech policy
+(default off for core ambient chatter). Build a visitor prompt view from `IVisitorData`: name,
+skills, recruitment cost, time in the tavern, no job/home/family. Visitors have no persistent
+citizen memory; keep a bounded short-term memory that migrates to citizen memory if they are
+recruited. Update `ConversationEligibility` so the `VISITOR` rejection only applies when no
+policy allows visitors. Keep the talking device's current visitor message unless a policy allows it.
+
+### Acceptance
+
+- Tests: visitors rejected by default; allowed with a registered policy; recruited visitor keeps
+  its short-term memory; prompt view contains no citizen-only fields.
+
+---
+
+## A9 — Cross-colony controlled sessions
+
+**Depends on:** A0 · **Size:** S · **Wave:** 1
+
+### Agent prompt
+
+Define and test controlled sessions whose attendees belong to different colonies. Each speaker
+keeps its own colony prompt view; add each other colony's name and the diplomatic relation
+(already used by the colony connection prompt) to the session context. Decide and document which
+colony's tools and permissions apply to a turn (the speaker's). Reject attendees in different
+dimensions with a typed failure.
+
+### Acceptance
+
+- Tests: mixed-colony session runs turns with correct per-speaker context; tool permissions follow
+  the speaker's colony; cross-dimension attendees are rejected.
+
+---
+
+## A10 — Player speech capture
+
+**Depends on:** A0 · **Size:** L · **Wave:** 2
+
+### Agent prompt
+
+Add `PlayerSpeechService.capture(player, maxDuration)` returning
+`CompletableFuture<SpeechCaptureResult>` with the transcript of what the player says through
+Simple Voice Chat, without any citizen. Reuse `MicrophoneTurnModule` and `PcmSpeechDetector` for
+end-of-speech detection, and a text-only transcription request. Require an explicit player
+action to start capture (never always-on), show a client indicator while capturing, bound
+duration, and respect quota. Used by a loudspeaker/microphone item.
+
+### Acceptance
+
+- Tests with fake audio: speech → transcript, silence timeout, cancellation, player disconnect.
+- Manual in-world check recorded: capture indicator visible, no audio captured after the end.
+
+---
+
+## A11 — API 2.1 documentation and release
+
+**Depends on:** A1–A10 · **Size:** S · **Wave:** 3
+
+### Agent prompt
+
+Update `docs/addon-api.md` and `docs/addon-migration.md` for every 2.1 addition, add an `apiTest`
+example per feature, bump `API_MINOR_VERSION`, publish the developer API artifact, and write
+release notes that list each feature with its `ApiFeature` constant. Tasks that did not land are
+listed as unsupported rather than hidden.
+
+### Acceptance
+
+- `./gradlew buildAndCollect` and all `apiTest` examples pass on both loaders; the published API
+  artifact matches the runtime.
+
+---
+
+## L1 — AI backend interface (exploratory)
+
+**Depends on:** A3, A7 · **Size:** XL · **Wave:** 3 · **Issue:** #131
+
+### Agent prompt
+
+Investigate an internal backend interface covering Live audio sessions, Flash text, and TTS so a
+local backend (for example Whisper + a local LLM + Piper) could be added later, as an addon or
+in core. Produce a design document with the minimum interface, which features degrade without
+Live audio (barge-in, voice consistency), and the migration cost. Do not implement a local
+backend in this task.
+
+### Acceptance
+
+- Design document merged under `docs/`; #131 updated with the outcome.
