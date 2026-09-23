@@ -19,7 +19,8 @@ public record AmbientLineResult(
         COOLDOWN,
         BUSY,
         ADDON_POLICY_VETO,
-        CAPACITY_EXHAUSTED
+        CAPACITY_EXHAUSTED,
+        BUDGET_EXCEEDED
     }
 
     public boolean completed() {

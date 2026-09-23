@@ -177,6 +177,12 @@ public final class PregenerationPlayback {
             return false;
         }
 
+        if (!ConversationManager.trySpendAmbientSpeechBudget(citizen)) {
+            ACTIVE_PREGENERATED_PLAYBACK.remove(citizenId, entry);
+            activity.close();
+            return false;
+        }
+
         AtomicBoolean cleanedUp = entry.cleaned;
         Runnable cleanup = () -> {
             if (!cleanedUp.compareAndSet(false, true)) return;

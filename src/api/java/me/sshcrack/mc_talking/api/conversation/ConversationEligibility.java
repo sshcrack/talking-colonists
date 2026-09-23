@@ -10,7 +10,8 @@ public record ConversationEligibility(@NotNull Status status, @NotNull String de
         VISITOR,
         COOLDOWN,
         BUSY,
-        ADDON_POLICY_VETO
+        ADDON_POLICY_VETO,
+        BUDGET_EXCEEDED
     }
 
     public boolean eligible() {

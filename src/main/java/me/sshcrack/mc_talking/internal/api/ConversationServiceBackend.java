@@ -274,6 +274,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             case COOLDOWN -> AmbientLineResult.RejectionReason.COOLDOWN;
             case BUSY -> AmbientLineResult.RejectionReason.BUSY;
             case ADDON_POLICY_VETO -> AmbientLineResult.RejectionReason.ADDON_POLICY_VETO;
+            case BUDGET_EXCEEDED -> AmbientLineResult.RejectionReason.BUDGET_EXCEEDED;
             case ELIGIBLE -> throw new IllegalArgumentException("ELIGIBLE is not a rejection");
         };
     }

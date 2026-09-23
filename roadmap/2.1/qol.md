@@ -141,6 +141,74 @@ Urgent contacts and player-started conversations are exempt.
 - Tests with a fake clock: budget enforced across handlers; exempt kinds unaffected; config
   change applies without restart. `en_us.json` updated.
 
+### Implementation record — 2026-09-24
+
+- Added `internal.session.AmbientSpeechBudgetRegistry`, a pure-Java rolling-window per-player
+  budget tracker (`LongSupplier` clock, no Minecraft dependency). `hasCapacity` is a read-only
+  peek; `tryConsume` atomically checks and records for every listener at once, and records
+  nothing at all if any single listener is already over budget — a line heard by two players is
+  never partially charged against the one who still had room.
+- Enforcement lives in two places in `ConversationManager`, both reused rather than duplicated
+  per handler:
+  - `conversationEligibility(citizen, kind)` — the one eligibility gate every ambient/pregenerated
+    path already calls (`CasualGreetingHandler`, `CitizenMumblingHandler`,
+    `RandomConversationHandler`, `RumorMillService`, `BroadcastPropagationService`,
+    `PregenerationPlayback`, `CitizenConversation`, the addon `ConversationService`) — now also
+    reports `BUDGET_EXCEEDED` via a **read-only peek** (`hasAmbientSpeechBudgetCapacity`) for every
+    `ConversationKind` except `PLAYER`, `URGENT_CONTACT`, and `CONTROLLED`. It stays read-only here
+    on purpose: several handlers (`CitizenMumblingHandler`, `CasualGreetingHandler`,
+    `RandomConversationHandler`) call this speculatively while scanning many candidate citizens per
+    tick, and only one candidate (if any) actually ends up speaking — consuming budget on every
+    scanned candidate would drain a player's budget almost instantly and reject lines that never
+    would have stacked up.
+  - `ConversationManager.trySpendAmbientSpeechBudget(citizen[, other])` — the single point that
+    actually **spends** budget, atomically, called exactly once per genuine "about to speak" commit:
+    inside `startLowPrioritySession` right after the low-priority foreground slot is reserved
+    (covers mumbling, voiced rumors, voiced broadcasts, generic/addon ambient lines —
+    `ADDON_AMBIENT`), inside `PregenerationPlayback.playAudioIfPossible` right after the core
+    activity reservation is granted (covers pregenerated citizen-to-citizen and player greetings —
+    `PREGENERATED`), and inside `CitizenConversation.performConversation()` — the single entry
+    point for every citizen-to-citizen pair conversation regardless of trigger (`RandomConversationHandler`,
+    the talking-device pair creator, or the addon pair API) or pipeline (Flash/TTS, Live
+    WebSockets, or a Live fallback after Flash fails) — charged once per conversation start against
+    the union of both participants' listeners, not once per turn.
+- "Hears" = players in the same dimension within a new `ambientSpeechBudgetHearingRange` (default
+  16 blocks) of the speaking citizen (or, for a pair conversation, either citizen). A line is
+  skipped entirely — not queued or delayed — if any player in that set is already at their
+  per-window limit; this is the simplest guarantee to reason about (a player never hears more than
+  the configured max per window, independent of how many other players are also in earshot).
+- Exempt kinds: `PLAYER` (direct player conversations), `URGENT_CONTACT` (citizens proactively
+  seeking help never funnel through the checked paths anyway — `startUrgentAnnouncement` attaches
+  to a caller-owned reservation without going through `startLowPrioritySession`), and `CONTROLLED`
+  (addon-driven controlled/meeting turns).
+- New config (`McTalkingConfig`, group `ambient_speech_budget`, `en_us.json` updated):
+  `enableAmbientSpeechBudget` (default `true`), `ambientSpeechBudgetMaxLines` (default `3`),
+  `ambientSpeechBudgetWindowSeconds` (default `60`), `ambientSpeechBudgetHearingRange` (default
+  `16.0` blocks). Default of 3 lines/60s was chosen to feel calm: it allows a greeting plus a
+  couple of mumbles/rumors in quick succession when a player first arrives at a busy work site,
+  but prevents a crowd of a dozen citizens from each getting a turn in the same minute. All fields
+  are read live from `McTalkingConfig.INSTANCE.instance()` on every check, so changes apply without
+  a restart.
+- `ConversationEligibility.Status` and `AmbientLineResult.RejectionReason` (both in `src/api`) each
+  gained a `BUDGET_EXCEEDED` constant; `ConversationServiceBackend.mapAmbientRejection` maps
+  between them for the addon-facing `requestAmbientLine` API.
+- New test: `internal/session/AmbientSpeechBudgetRegistryTest` — fake `AtomicLong` clock, covers
+  budget enforcement across simulated ambient kinds, rolling-window expiry (including the
+  half-open boundary), the read-only peek not consuming budget, multiple players tracked
+  independently, a line heard by two players skipped entirely (not partially charged) when only
+  one is over budget, `clear()`, and invalid-argument validation. `ConversationManager` itself is
+  not unit-testable in isolation (it is wired directly to Minecraft/MineColonies entity and server
+  types), so the budget *policy* is covered at the registry level and the *wiring* was verified by
+  the full `./gradlew test` run plus the required client smoke test.
+- Uncertainty: the talking-device pair creator (`ConversationCreatorDevice`) and the addon pair API
+  (`ConversationServiceBackend`'s `CitizenConversationHandle`) both go through the same
+  `CitizenConversation.performConversation()` entry point as `RandomConversationHandler`, so a
+  player deliberately pairing two citizens with the device also spends ambient budget. This reads
+  the requirements' "player-started conversations are exempt" as referring to direct
+  player-citizen conversations (`ConversationKind.PLAYER`), not player-triggered citizen-to-citizen
+  chatter, since the latter is still two AI citizens talking audibly near the player — exactly the
+  scenario the budget exists to bound. Flagging in case the intended reading was broader.
+
 ---
 
 ## Q5 — Complaint ramp by duration and colony age (#125)
