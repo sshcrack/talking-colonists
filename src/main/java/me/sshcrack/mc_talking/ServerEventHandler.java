@@ -7,10 +7,12 @@ import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.broadcast.BroadcastPropagationService;
 import me.sshcrack.mc_talking.handler.CasualGreetingHandler;
 import me.sshcrack.mc_talking.handler.CitizenMumblingHandler;
+import me.sshcrack.mc_talking.handler.MissingApiKeyOnboardingHandler;
 import me.sshcrack.mc_talking.handler.PregeneratedGreetingHandler;
 import me.sshcrack.mc_talking.handler.RandomConversationHandler;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import me.sshcrack.mc_talking.internal.api.TalkingColonistsApiBackend;
+import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.rumor.RumorMillService;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
@@ -39,6 +41,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -50,6 +53,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
@@ -73,10 +77,20 @@ public class ServerEventHandler {
 
     @SubscribeEvent
     public void onServerStart(ServerStartingEvent event) {
+        MissingApiKeyOnboardingHandler.onServerStart();
+        MissingApiKeyLogger.reset();
+
         if (!McTalkingConfig.hasGeminiApiKey()) {
             McTalking.LOGGER.error("======================");
             McTalking.LOGGER.error("Gemini API key not set. McTalking is disabled.");
             McTalking.LOGGER.error("======================");
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            MissingApiKeyOnboardingHandler.onPlayerLoggedIn(player);
         }
     }
 

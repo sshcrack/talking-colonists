@@ -1,10 +1,16 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractCivilianEntity;
+import com.mojang.brigadier.Command;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.handler.MissingApiKeyOnboardingHandler;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.client.ConversationPresentation;
+import net.minecraft.client.Minecraft;
+import net.minecraft.commands.Commands;
 /*? if forge {*/
 /*import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.client.event.RenderGuiEvent;
@@ -17,6 +23,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
@@ -135,5 +142,28 @@ public class McTalkingClient {
     public void onRenderGui(RenderGuiEvent.Post event) {
     /*?}*/
         ConversationPresentation.renderFocusHint(event.getGuiGraphics());
+    }
+
+    /**
+     * Registers a client-only command that opens the Talking Colonists config
+     * screen. Clicking the onboarding chat message's "open config" link on an
+     * integrated (single-player/LAN) server runs this locally, without a round
+     * trip to the server.
+     */
+    @SubscribeEvent
+    /*? if forge {*/
+    /*public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+    *//*?}*/
+    /*? if neoforge {*/
+    public void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+    /*?}*/
+        event.getDispatcher().register(
+                Commands.literal(MissingApiKeyOnboardingHandler.OPEN_CONFIG_CLIENT_COMMAND)
+                        .executes(ctx -> {
+                            Minecraft minecraft = Minecraft.getInstance();
+                            minecraft.setScreen(McTalkingConfig.INSTANCE.generateGui().generateScreen(minecraft.screen));
+                            return Command.SINGLE_SUCCESS;
+                        })
+        );
     }
 }
