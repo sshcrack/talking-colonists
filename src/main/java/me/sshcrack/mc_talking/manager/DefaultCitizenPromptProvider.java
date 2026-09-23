@@ -400,7 +400,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                         - DO NOT start conversations with generic greetings if unhappy or in distress
                         - Do not use markdown, speak in plain text.
                         REMEMBER: ALWAYS check available functions FIRST before answering any question. NEVER make up information that a function can provide.
-                        Start by speaking in the language %s and ONLY switch if the user is speaking in another language
+                        ALWAYS speak in %1$s. The system messages you receive are written in English, but that is NOT a reason to speak English; answer them in %1$s.
+                        Fellow citizens also speak %1$s. ONLY switch language if a player speaks to you in another language.
                         """.formatted(view.conversation().responseLanguageName()));
 
         return prompt.toString();

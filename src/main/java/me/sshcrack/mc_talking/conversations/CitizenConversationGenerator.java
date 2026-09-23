@@ -97,7 +97,18 @@ public class CitizenConversationGenerator {
             ```
             """;
 
-    private static GeminiTTS.RequestPayload getTTSPrompt(String conversation, List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs) {
+    /** Script-generation system prompt pinned to the configured response language. */
+    static String conversationSystemPrompt(String languageName) {
+        return CONVERSATION_SYSTEM_PROMPT + """
+
+                ## Language
+                - Write every transcript line in %1$s, even though these instructions are in English.
+                - Speaker names, audio tags in square brackets and section headings may stay in English.
+                - Pick accents that fit %1$s speakers.
+                """.formatted(languageName);
+    }
+
+    private static GeminiTTS.RequestPayload getTTSPrompt(String conversation, String languageName, List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs) {
         GeminiTTS.RequestPayload payload = new GeminiTTS.RequestPayload();
 
         GeminiTTS.RequestPayload.Content content = new GeminiTTS.RequestPayload.Content();
@@ -107,10 +118,10 @@ public class CitizenConversationGenerator {
                 Synthesize the multi-speaker dialogue below as natural speech. Follow the configured
                 speaker voices and bracketed vocal cues. Do not read section headings, scene notes,
                 director notes, or formatting instructions aloud; only speak the lines under the
-                transcript section.
+                transcript section. The dialogue is spoken in %s.
 
                 %s
-                """.formatted(conversation);
+                """.formatted(languageName, conversation);
 
         content.parts = List.of(part);
         content.role = "user";
@@ -137,12 +148,12 @@ public class CitizenConversationGenerator {
         return payload;
     }
 
-    private static GeminiFlash.GenerateContentRequest getFlashPrompt(String citizenInfo) {
+    private static GeminiFlash.GenerateContentRequest getFlashPrompt(String citizenInfo, String languageName) {
         GeminiFlash.GenerateContentRequest request = new GeminiFlash.GenerateContentRequest();
 
         GeminiFlash.GenerateContentRequest.SystemInstruction systemInstruction = new GeminiFlash.GenerateContentRequest.SystemInstruction();
         GeminiFlash.GenerateContentRequest.Part systemPart = new GeminiFlash.GenerateContentRequest.Part();
-        systemPart.text = CONVERSATION_SYSTEM_PROMPT;
+        systemPart.text = conversationSystemPrompt(languageName);
         systemInstruction.parts = List.of(systemPart);
         request.system_instruction = systemInstruction;
 
@@ -171,7 +182,9 @@ public class CitizenConversationGenerator {
                     view.identity().female()));
         }
 
-        String conversation = generateConversationScript(participants.size(), citizenInfo);
+        // Every view is built from the same server config, so the first participant's language applies to all.
+        String languageName = participants.get(0).view().conversation().responseLanguageName();
+        String conversation = generateConversationScript(participants.size(), citizenInfo, languageName);
 
         String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         var selectedAi = McTalkingConfig.INSTANCE.instance().currentAiModel;
@@ -184,7 +197,7 @@ public class CitizenConversationGenerator {
                     speakerVoiceConfigs -> GeminiTTS.streamGenerateAudioConversation(
                             McTalkingConfig.TTS_MODEL,
                             apiKey,
-                            getTTSPrompt(conversation, speakerVoiceConfigs),
+                            getTTSPrompt(conversation, languageName, speakerVoiceConfigs),
                             chunkConsumer));
             TtsQuotaManager.reportSuccess();
         } catch (IOException | UnexpectedResponseException e) {
@@ -205,12 +218,12 @@ public class CitizenConversationGenerator {
     }
 
     @NotNull
-    private static String generateConversationScript(int participantCount, StringBuilder citizenInfo) throws ConversationGenerationException {
+    private static String generateConversationScript(int participantCount, StringBuilder citizenInfo, String languageName) throws ConversationGenerationException {
         String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         String rawConversationOutput;
         try {
             McTalking.LOGGER.info("Sending conversation generation request to Gemini Flash for {} citizens", participantCount);
-            rawConversationOutput = GeminiFlash.sendFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, getFlashPrompt(citizenInfo.toString()));
+            rawConversationOutput = GeminiFlash.sendFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, getFlashPrompt(citizenInfo.toString(), languageName));
         } catch (IOException | UnexpectedResponseException e) {
             McTalking.LOGGER.error("Failed to generate conversation using Gemini Flash", e);
             TtsQuotaManager.reportFailure(e);
