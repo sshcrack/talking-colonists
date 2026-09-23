@@ -8,6 +8,7 @@ This roadmap builds on it in three tracks:
 | **A — API gaps** | [api-gaps.md](api-gaps.md) | core | Close the seams that block the addon ideas below |
 | **Q — Quality of life** | [qol.md](qol.md) | core | Fix the friction players and server owners hit today |
 | **X — Addon ideas** | [addons.md](addons.md) | community / separate repos | Build features on the public API instead of in core |
+| **T — Testing infrastructure** | [testing.md](testing.md) | core | Cheaper, targeted verification: mixin-scoped smoke gate, API compatibility check, prompt snapshots, GameTests |
 
 Addons are deliberately **not** core features. Each one lists the API tasks it needs; core ships
 the seam, the addon ships the gameplay. That keeps core small while still unblocking requests like
@@ -88,8 +89,8 @@ A11 unless they want a published API artifact):
 
 | Wave | Tasks | Can run concurrently? | Notes |
 | --- | --- | --- | --- |
-| 0 | R1, A0, Q1, Q2, Q3, Q4, Q6, Q9 | Yes, all | Small and independent. Q1/Q2/Q3 each touch player-facing messages; merge them one after another to avoid `en_us.json` conflicts. |
-| 1 | A1, A2, A3, A6, A8, A9, Q5, Q7 | Yes, all | A1 and A2 both touch colony memory/event persistence; review together. Q5 and Q7 both touch `McTalkingConfig`; merge sequentially. |
+| 0 | R1, A0, Q1, Q2, Q3, Q4, Q6, Q9, T1, T2 | Yes, all | Small and independent. Q1/Q2/Q3 each touch player-facing messages; merge them one after another to avoid `en_us.json` conflicts. |
+| 1 | A1, A2, A3, A6, A8, A9, Q5, Q7, T3, T4, T5 | Yes, all (T5 after T3) | A1 and A2 both touch colony memory/event persistence; review together. Q5 and Q7 both touch `McTalkingConfig`; merge sequentially. |
 | 2 | A4, A5, A7, A10, Q8, Q10 | Yes, except the chain A6 → A4 → Q10 | A4 and A5 both touch `GeminiWsClient`/`CitizenWsClient`; merge sequentially. |
 | 3 | A11, L1 | A11 first | A11 is the 2.1 release gate. L1 is exploratory and can slip. |
 | — | Q11 (#116 refactor) | Opportunistic | Never a blocker. Split `ConversationManager` only inside tasks that already touch it. |
@@ -113,8 +114,8 @@ Additional rules for this roadmap:
 1. **API tasks (A\*)** live in `src/api` and must be backed by `internal/api` runtimes. Every new
    entry point must be feature-detectable through A0, documented in `docs/addon-api.md`, and
    compiled by an `apiTest` example for both loaders.
-2. **No legacy shims** (see `AGENTS.md` — addon API compatibility policy). Additive changes only
-   within 2.x; anything breaking waits for API generation 3.
+2. **No breaking API changes** (see `AGENTS.md` — addon API compatibility policy). Additive changes
+   only within 2.x; anything breaking waits for API generation 3 and needs the maintainer's approval.
 3. **Addon tasks (X\*)** are specifications for separate repositories. Core must not grow the
    gameplay; if an addon needs core behaviour, add or extend an A task instead.
 4. Update the task's GitHub issue and project status when starting and finishing.

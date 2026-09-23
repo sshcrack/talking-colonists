@@ -106,11 +106,19 @@ For local development the Gemini Live Library can be included as a composite bui
 
 ## Addon API Compatibility Policy
 
-The addon API is currently in an intentional breaking-change phase. **Do not preserve or reintroduce
-legacy addon API methods, adapters, aliases, or deprecated compatibility shims unless the user
-explicitly asks for them.** Prefer the cleanest supported API baseline and document migration in
-`docs/addon-migration.md` instead of carrying old interfaces forward. Runtime compatibility for
-normal Talking Colonists users is separate from source compatibility for addon developers.
+The addon API (`src/api`, published as `me.sshcrack:mc_talking-api`) is **stable within API
+generation 2. Do not make breaking changes to it.** Addons such as Colonist Errands build against it.
+
+- Only additive changes: new types, new methods, new enum constants, new default interface methods.
+  Never remove, rename, or change the signature, return type, or documented behaviour of an existing
+  public API type or member, and never add abstract methods to interfaces addons may implement.
+- New features must be feature-detectable (`TalkingColonistsApi` minor version / `ApiFeature`) so
+  addons can degrade gracefully on older 2.x runtimes.
+- Internal classes (everything outside `src/api`, including `internal/`, managers, config, mixins)
+  may be refactored freely. Only the public API surface is protected.
+- Before making any breaking change to the public API, stop and ask the user.
+- Runtime compatibility for normal Talking Colonists users is separate from source compatibility
+  for addon developers; both matter.
 
 ## Code Style
 
