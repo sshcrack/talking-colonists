@@ -7,7 +7,9 @@ import me.sshcrack.mc_talking.manager.tools.AITools;
 import me.sshcrack.mc_talking.manager.DefaultCitizenPromptProvider;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.network.AiStatusPayload;
+import me.sshcrack.mc_talking.network.TalkToCitizenPayload;
 import me.sshcrack.mc_talking.registry.ModItems;
+import net.minecraft.server.level.ServerPlayer;
 /*? if forge {*/
 /*import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -77,6 +79,7 @@ public class McTalking {
         AITools.register();
         McTalkingConfig.loadConfig();
         AiStatusPayload.registerMessages();
+        TalkToCitizenPayload.registerMessages();
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
@@ -92,6 +95,12 @@ public class McTalking {
                 (a, b) -> {
                 }
         ));
+        registrar.playToServer(TalkToCitizenPayload.TYPE, TalkToCitizenPayload.STREAM_CODEC,
+                (payload, ctx) -> ctx.enqueueWork(() -> {
+                    if (ctx.player() instanceof ServerPlayer sender) {
+                        TalkToCitizenPayload.handleOnServer(sender, payload.citizenEntityId());
+                    }
+                }));
     }
     /*?}*/
 }

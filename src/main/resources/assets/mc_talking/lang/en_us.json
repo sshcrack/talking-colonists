@@ -28,6 +28,10 @@
   "mc_talking.configuration.enable_citizen_initiated_contact": "Enable Citizen-Initiated Contact",
   "mc_talking.configuration.citizen_contact_base_chance": "Base chance for contact",
   "mc_talking.configuration.citizen_contact_check_interval_ticks": "Citizen contact check interval (ticks)",
+  "mc_talking.configuration.enable_talk_without_device": "Enable Talking Without Device",
+
+  "key.categories.mc_talking": "Talking Colonists",
+  "key.mc_talking.talk_to_citizen": "Talk to Citizen",
 
   "mc_talking.colonist_ended_conversation": "The citizen ended the conversation.",
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
@@ -49,6 +53,12 @@
   "mc_talking.citizen_in_use": "Another player is already talking to this citizen.",
   "mc_talking.recruit_lore": "Maybe this little gift will help you get this citizen back to join your colony.",
   "mc_talking.invalid_on_visitor": "You cannot use the Talking Device on visitors.",
+  "mc_talking.talk_gesture.target_too_far": "That citizen is too far away to talk to.",
+  "mc_talking.talk_gesture.invalid_on_visitor": "Visitors can't have conversations.",
+  "mc_talking.talk_gesture.voicechat_unavailable": "Voice chat API is not initialized.",
+  "mc_talking.talk_gesture.voicechat_disabled": "Your voice chat is currently disabled. Please enable it to talk to citizens.",
+  "mc_talking.talk_gesture.cannot_speak": "This citizen can't speak right now. They are either already talking or sleeping.",
+  "mc_talking.talk_gesture.started": "Started conversation with %s",
   "mc_talking.commands.expect_tool": "Expected a tool name",
   "mc_talking.commands.invalid_tool": "Invalid tool name: %s",
   "mc_talking.commands.tool_not_found": "Tool not found.",

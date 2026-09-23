@@ -13,6 +13,7 @@ import me.sshcrack.mc_talking.handler.RandomConversationHandler;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import me.sshcrack.mc_talking.internal.api.TalkingColonistsApiBackend;
 import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
+import me.sshcrack.mc_talking.interaction.TalkToCitizenHandler;
 import me.sshcrack.mc_talking.rumor.RumorMillService;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.pregen.DeliveryInteractionManager;
@@ -45,6 +46,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 /*?}*/
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
@@ -54,6 +56,7 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
@@ -145,6 +148,24 @@ public class ServerEventHandler {
             CasualGreetingHandler.onPlayerLeave(player.getUUID());
             PlayerHeatmapTracker.removePlayer(player.getUUID());
         }
+    }
+
+    /**
+     * Sneak + left-click (empty main hand) toggles a direct conversation with the targeted
+     * citizen, mirroring {@code CitizenTalkingDevice}'s left-click gesture but without
+     * requiring the item. Plain right-click on a citizen is left untouched: MineColonies uses
+     * it for its own citizen window, and sneak + right-click for colony inventory access, so
+     * this gesture deliberately uses left-click instead to avoid conflicting with either.
+     */
+    @SubscribeEvent
+    public void onTalkGestureAttack(AttackEntityEvent event) {
+        if (!TalkToCitizenHandler.isEnabled()) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()) return;
+        if (!(event.getTarget() instanceof AbstractEntityCitizen citizen)) return;
+
+        event.setCanceled(true);
+        TalkToCitizenHandler.attempt(player, citizen, true);
     }
 
     private void onServerTickCommon(MinecraftServer server) {

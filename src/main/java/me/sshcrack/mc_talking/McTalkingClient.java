@@ -8,9 +8,11 @@ import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.client.ConversationPresentation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.Commands;
+import me.sshcrack.mc_talking.client.TalkKeybinds;
 /*? if forge {*/
 /*import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.client.event.RenderGuiEvent;
@@ -20,10 +22,12 @@ import net.minecraftforge.fml.common.Mod;
 *//*?}*/
 /*? if neoforge {*/
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
@@ -65,8 +69,9 @@ public class McTalkingClient {
 
 
     /*? if neoforge {*/
-    public McTalkingClient(ModContainer container) {
+    public McTalkingClient(IEventBus modEventBus, ModContainer container) {
         NeoForge.EVENT_BUS.register(this);
+        modEventBus.addListener(TalkKeybinds::register);
         /*? if devtools {*/
         /*me.sshcrack.mc_talking.devtools.DevAutoQuit.init();
         *//*?}*/
@@ -166,4 +171,16 @@ public class McTalkingClient {
                         })
         );
     }
+    @SubscribeEvent
+    /*? if forge {*/
+    /*public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        TalkKeybinds.tick();
+    }
+    *//*?}*/
+    /*? if neoforge {*/
+    public void onClientTick(ClientTickEvent.Post event) {
+        TalkKeybinds.tick();
+    }
+    /*?}*/
 }
