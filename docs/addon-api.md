@@ -64,6 +64,93 @@ Minecraft, MineColonies and Gson types are intentionally used where addons opera
 objects. Provider/transport implementation types such as Gemini Live Lib are not part of the addon
 contract.
 
+## Feature detection
+
+`TalkingColonistsApi.API_MAJOR_VERSION` (`2`) is a breaking-change generation: addons must match it
+exactly. `TalkingColonistsApi.API_MINOR_VERSION` is additive within generation 2 and only ever grows.
+Track A tasks each add one `ApiFeature` constant (`BROADCAST_PUBLISHING`, `COLONY_EVENTS`,
+`TEXT_GENERATION`, `PLAYER_TEXT_INPUT`, `UTTERANCE_EVENTS`, `PLAYER_CONVERSATION_OPTIONS`,
+`PROVIDER_BUDGET`, `VISITOR_SPEAKERS`, `CROSS_COLONY_SESSIONS`, `PLAYER_SPEECH_CAPTURE`) the moment
+the task starts landing; a constant only flips from unsupported to supported once its feature is
+fully implemented, so `TalkingColonistsApi.supports(ApiFeature.X)` reliably means "safe to call X's
+entry points right now," not merely "this API generation knows the name X."
+
+```java
+TalkingColonistsApi.Services services = TalkingColonistsApi.services();
+int minor = services.apiMinorVersion();
+boolean broadcastReady = TalkingColonistsApi.supports(ApiFeature.BROADCAST_PUBLISHING);
+```
+
+### Why this exists
+
+At runtime, `TalkingColonistsApi` and every other API class are loaded from the **installed**
+Talking Colonists mod jar, never from the addon's compile-time `mc_talking-api` dependency. An addon
+compiled against API 2.1 that calls a brand-new static method on a 2.0 runtime gets
+`NoSuchMethodError`, not a friendly "unsupported" result — the method, or even the whole
+`ApiFeature` class, simply is not present in that older jar. `Services.apiMinorVersion()` and
+`Services.supports(ApiFeature)` are **default interface methods**, so an older `Services`
+implementation that never heard of them still satisfies the (recompiled) newer interface and answers
+`0` / `false` — every feature reports unsupported on a runtime that predates it. That default-method
+resolution is what makes `TalkingColonistsApi.supports(...)` itself safe to call on any 2.x runtime
+that already has `ApiFeature`. It does not, by itself, help a 2.0 runtime that predates `ApiFeature`
+and `supports(...)` entirely; see the two safe patterns below for that case.
+
+### Pattern 1 — minimum Talking Colonists version dependency (works on 2.0, no code needed)
+
+If the addon only needs to require a minimum Talking Colonists version, declare that dependency
+through the loader's own mod metadata (Forge/NeoForge `mods.toml` version range on the
+`mc_talking` mod ID). The loader refuses to start the addon on an older Talking Colonists instead of
+throwing `NoSuchMethodError` mid-game. This is the simplest option, but it is all-or-nothing: the
+addon cannot install at all on an older server, even to offer a degraded experience.
+
+### Pattern 2 — catch `NoSuchMethodError`/`NoClassDefFoundError` (works on 2.0, degrades gracefully)
+
+To keep the addon installable on a 2.0 runtime and merely disable the new feature there, wrap **both**
+the `ApiFeature` reference and the `supports(...)` call in one `try` block, at the actual call site:
+
+```java
+static boolean broadcastPublishingAvailable() {
+    try {
+        return TalkingColonistsApi.supports(ApiFeature.BROADCAST_PUBLISHING);
+    } catch (NoSuchMethodError | NoClassDefFoundError predatesApiFeature) {
+        return false; // Talking Colonists 2.0: ApiFeature/supports(...) do not exist yet.
+    }
+}
+```
+
+This works because the JVM resolves symbolic references (the `ApiFeature.BROADCAST_PUBLISHING`
+constant load and the `supports` method call) lazily, at the exact bytecode instruction that uses
+them, not when the surrounding class is loaded. As long as both the enum reference and the method
+call are textually inside the `try` block — not passed in from a caller that resolved
+`ApiFeature.BROADCAST_PUBLISHING` itself before calling in — a runtime that lacks those symbols
+throws `NoSuchMethodError`/`NoClassDefFoundError` right there, and this catches it instead of
+crashing addon startup. A working compiled example lives in
+`src/apiTest/java/me/sshcrack/mc_talking/api/examples/AddonApiCompileExample.java`
+(`broadcastPublishingAvailable()`).
+
+Do not put `ApiFeature` enum constants in `public static final` fields of a class an addon loads
+eagerly at startup (e.g. a field initializer outside any `try`) — that resolves the symbol before any
+`catch` can run.
+
+### Unsupported feature entry points
+
+Every feature entry point added by a later Track A task must fail predictably instead of behaving as
+if the feature existed. When the installed runtime does not implement a feature yet, the entry point
+throws `UnsupportedOperationException` with a message naming the missing `ApiFeature` and the
+installed API version — call `TalkingColonistsApi.requireSupported(ApiFeature.X)` at the top of the
+entry point's implementation rather than inventing another exception shape:
+
+```java
+public static SomeResult publishBroadcast(...) {
+    TalkingColonistsApi.requireSupported(ApiFeature.BROADCAST_PUBLISHING);
+    // ... feature implementation ...
+}
+```
+
+`requireSupported` only helps once the addon can already reach that call safely (i.e. the runtime is
+new enough for `ApiFeature`/`requireSupported` to exist at all); guard the outer call with Pattern 1
+or Pattern 2 above first when the addon must also support a 2.0 runtime.
+
 ## Registration lifetime
 
 Composable extension points return `AddonRegistration`:
