@@ -27,6 +27,7 @@ When working with the Minecolonies API, look at the `scripts/MINECOLONIES_DOCS.m
 ./gradlew publishMods                       # publish to Modrinth/CurseForge
 ./gradlew publishModrinth                   # Modrinth only
 ./gradlew test                              # tests
+./gradlew :1.21.1-neoforge:runGameTestServer :1.20.1-forge:runGameTestServer  # headless server GameTests (src/gameTest, see docs/automated-verification.md)
 ```
 
 CI uses `./gradlew buildAndCollect --no-daemon`. JDK 25 (Microsoft) in CI.

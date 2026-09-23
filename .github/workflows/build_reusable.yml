@@ -152,3 +152,35 @@ jobs:
         with:
           name: client-smoke-logs-${{ matrix.version }}
           path: /tmp/client-smoke-*.log
+
+  server-gametests:
+    name: Server GameTests
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 25
+          distribution: microsoft
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Headless dedicated GameTest servers (no Xvfb). Each exits non-zero when any
+      # required GameTest fails, which fails this step.
+      - name: Run server GameTests on both loaders
+        run: ./gradlew :1.21.1-neoforge:runGameTestServer :1.20.1-forge:runGameTestServer --no-daemon --max-workers=1
+
+      - name: Upload GameTest server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-gametest-logs
+          path: versions/*/run/gametest/logs/

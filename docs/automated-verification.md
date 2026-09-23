@@ -34,6 +34,47 @@ that continues after response startup. Both `MC_TALKING_RUNTIME_SUCCESS` and
 `MC_TALKING_AUTOQUIT_SUCCESS:world` are required.
 Failure logs are retained under `/tmp/client-smoke-*.log`.
 
+## Headless server GameTests
+
+Server-side behaviour backed by real MineColonies state runs as loader GameTests on a
+headless GameTest server (no client, no Xvfb, no Gemini key):
+
+```sh
+./gradlew :1.21.1-neoforge:runGameTestServer
+./gradlew :1.20.1-forge:runGameTestServer
+```
+
+Each task starts a fresh flat test world in `versions/<version>/run/gametest/`, runs every
+test registered in the `mc_talking` namespace, and exits with the number of failed
+required tests, so any failure fails the Gradle task. Look for
+`All N required tests passed :)` or `N required tests failed :(` followed by the failing
+test names in the output (or `versions/<version>/run/gametest/logs/latest.log`).
+
+Tests live in the dev-only `gameTest` source set (`src/gameTest/{java,resources}`),
+created by `configureGameTests()` in `build-logic/`. The release `jar`/`reobfJar` only
+package `main` and `addonApi`; `verifyReleaseJarExcludesGameTests` (run after every
+`jar` and by `check`) fails if a `me/sshcrack/mc_talking/gametest/` class or the test
+template ever lands in the release jar. Stonecutter preprocesses the
+source set like `main`, so `/*? if neoforge {*/` conditionals work there.
+
+- `ColonyTestHarness` creates a real colony owned by a loader fake player inside the
+  test structure, spawns AI-disabled citizens, places hut blocks through MineColonies'
+  own `setPlacedBy` registration, assigns homes/jobs through the building modules, and
+  puts citizens to sleep in a real bed through the citizen sleep handler. It clears the
+  Gemini key for its lifetime (never saved) and deletes the colony on `close()`.
+- Tests use the `mc_talking:empty_floor` template (9x4x9 stone floor) and one batch per
+  test, so only one fixture colony exists at a time.
+- Current tests: `promptViewReflectsHousingAndJob` (public `CitizenContextService`
+  snapshot before/after a real residence + builder hut assignment) and
+  `eligibilityRejectsSleepingCitizen` (awake control is eligible; asleep is `SLEEPING`
+  for every `ConversationKind`). The ambient speech budget test is pending Q4.
+
+To add a test, add a `public static void name(GameTestHelper helper)` method annotated
+with `@GameTest(template = "empty_floor", batch = "<unique batch>")` to a class annotated
+with `@GameTestHolder("mc_talking")` and `@PrefixGameTestTemplate(false)`, build state
+with `ColonyTestHarness` in try-with-resources, assert with `helper.assertTrue`, and end
+with `helper.succeed()`.
+
 ## Optional real Gemini check
 
 ```sh
@@ -64,6 +105,8 @@ than every runtime/API/resource file. The real client-smoke matrix is the author
 gate for mixin correctness and runs regardless of marker state; the marker check exists
 to catch a genuinely stale local marker, not to block unrelated changes such as a
 prompt or lang-file edit.
+A separate `Server GameTests` job (`server-gametests`) runs `runGameTestServer` for both
+versions headlessly and uploads the GameTest server logs.
 The library CI runs both offline suites. Its separate manual `Live Gemini verification`
 workflow accepts `GEMINI_API_KEY` as a repository secret, serializes live workflow runs,
 and runs only one session. Ordinary PR/build jobs do not need credentials.

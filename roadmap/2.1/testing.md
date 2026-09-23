@@ -130,6 +130,32 @@ existing local/fake provider used by `DevRuntimeVerification`.
 - `./gradlew :1.21.1-neoforge:runGameTestServer` and the Forge equivalent pass headless; CI runs them.
 - A deliberately broken eligibility rule makes a GameTest fail.
 
+### Implementation record (2026-09-24, branch `roadmap/t4-gametests`)
+
+- Tasks: `:1.21.1-neoforge:runGameTestServer` and `:1.20.1-forge:runGameTestServer`
+  (ModDevGradle `gameTestServer` run type, `mc_talking` namespace only, fresh world in
+  `versions/<v>/run/gametest/`). The server exits with the failed-required-test count, so any
+  failure fails Gradle.
+- Exclusion: tests live in a dev-only `gameTest` source set (`src/gameTest`, created by
+  `configureGameTests()` in `build-logic/GameTests.kt`). It is added to the dev mod definition
+  but never to `jar`/`reobfJar`; `verifyReleaseJarExcludesGameTests` (after `jar`, and in
+  `check`) guards it. A source set was chosen over the `devtools` Stonecutter switch because it
+  cannot ship by construction and needs no active-source rewrite. Stonecutter preprocesses it.
+- Harness: `ColonyTestHarness` creates a real colony (loader `FakePlayer` owner, `Colonial`
+  pack) in the `mc_talking:empty_floor` template, spawns AI-disabled citizens, places huts via
+  MineColonies `setPlacedBy`, assigns home/job through building modules, sleeps citizens via the
+  sleep handler, clears the Gemini key for its lifetime, and deletes the colony on close.
+  One batch per test.
+- Tests (pass on both loaders): `promptViewReflectsHousingAndJob` (public
+  `CitizenContextService.snapshot` HOMELESS/unemployed before, HOUSED + home/workplace level 1 +
+  builder job name after) and `eligibilityRejectsSleepingCitizen` (awake control eligible;
+  asleep rejected as `SLEEPING` for every `ConversationKind`).
+- Break experiment: disabling the `isSleeping()` check in
+  `ConversationManager.conversationEligibility` failed `eligibilityrejectssleepingcitizen` on both
+  loaders (`1 required tests failed :(`, non-zero exit); reverted.
+- CI: separate `server-gametests` job ("Server GameTests") in `build_reusable.yml`.
+- Pending: the Q4 ambient-budget GameTest (TODO in `TalkingColonistsGameTests`) once Q4 lands.
+
 ---
 
 ## T5 — Live prompt behaviour checks using the game config key

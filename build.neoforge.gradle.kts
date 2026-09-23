@@ -49,6 +49,9 @@ platform {
 // Talking Colonists mod can expose both implementation and API outputs as one mod.
 configureAddonApi()
 
+// Dev-only GameTest source set (src/gameTest); never packaged into the release jar.
+val gameTestSourceSet = configureGameTests()
+
 neoForge {
     version = prop("deps.neoforge")
     accessTransformers.from(rootProject.file("src/main/resources/aw/${stonecutter.current.version}.cfg"))
@@ -98,16 +101,29 @@ neoForge {
             jvmArgument("-Dmc_talking.autoQuit=true")
             jvmArgument("-Djava.io.tmpdir=${file("run").absolutePath}")
         }
+
+        // Headless server GameTests: ./gradlew :<version>:runGameTestServer
+        // Exits with the number of failed required tests (non-zero fails the Gradle task).
+        register("gameTestServer") {
+            type = "gameTestServer"
+            gameDirectory = file("run/gametest/")
+            ideName = "NeoForge GameTest Server (${stonecutter.current.version})"
+            sourceSet = gameTestSourceSet
+            systemProperty("neoforge.enabledGameTestNamespaces", prop("mod.id"))
+            jvmArgument("-Djava.awt.headless=true")
+        }
     }
 
     mods {
         register(prop("mod.id")) {
             sourceSet(sourceSets["main"])
             sourceSet(sourceSets["addonApi"])
+            sourceSet(gameTestSourceSet)
         }
     }
 
     addModdingDependenciesTo(sourceSets["test"])
+    addModdingDependenciesTo(gameTestSourceSet)
 
     sourceSets["main"].resources.srcDir("${rootDir}/versions/datagen/${sc.current.version.split("-")[0]}/src/main/generated")
 }
@@ -235,4 +251,13 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
 
 tasks.named("createMinecraftArtifacts") {
     dependsOn(tasks.named("stonecutterGenerate"))
+}
+
+// Every GameTest run starts from a fresh world so colonies from a previous run cannot leak in.
+tasks.matching { it.name == "runGameTestServer" }.configureEach {
+    doFirst {
+        val dir = file("run/gametest")
+        dir.deleteRecursively()
+        dir.mkdirs()
+    }
 }
