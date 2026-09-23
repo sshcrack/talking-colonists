@@ -5,8 +5,10 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
 GEMINI_VERSION=$(sed -n 's/^deps\.gemini_live_lib_version=//p' gradle.properties | tail -1)
-MOD_VERSION=$(sed -n 's/^mod\.version = "\([^"]*\)"/\1/p' stonecutter.properties.toml | tail -1)
-if [[ -z "$GEMINI_VERSION" || -z "$MOD_VERSION" ]]; then
+MOD_BASE_VERSION=$(sed -n 's/^mod\.version = "\([^"]*\)"/\1/p' stonecutter.properties.toml | tail -1)
+MOD_CHANNEL_TAG=$(sed -n 's/^mod\.channel_tag = "\([^"]*\)"/\1/p' stonecutter.properties.toml | tail -1)
+MOD_VERSION="${MOD_BASE_VERSION}${MOD_CHANNEL_TAG}"
+if [[ -z "$GEMINI_VERSION" || -z "$MOD_BASE_VERSION" ]]; then
   echo "Could not read release versions from gradle.properties / stonecutter.properties.toml" >&2
   exit 2
 fi
