@@ -49,6 +49,6 @@ public enum AvailableAI implements NameableEnum {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(name());
+        return Component.translatable("mc_talking.available_ai." + name().toLowerCase());
     }
 }

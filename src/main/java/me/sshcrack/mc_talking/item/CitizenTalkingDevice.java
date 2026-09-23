@@ -178,7 +178,7 @@ public class CitizenTalkingDevice extends Item {
         // Check if API key is set
         if (!McTalkingConfig.hasGeminiApiKey()) {
             serverPlayer.sendSystemMessage(
-                    Component.literal("No Gemini API key set. Minecolonies Talking Citizens is disabled.")
+                    Component.translatable("mc_talking.talking_device.error.no_api_key")
                             .withStyle(ChatFormatting.RED)
             );
             return true; // Still prevent attack
@@ -186,7 +186,7 @@ public class CitizenTalkingDevice extends Item {
 
         if (!ConversationManager.canCitizenSpeak(citizen, true)) {
             serverPlayer.sendSystemMessage(
-                    Component.literal("This citizen can't speak right now. They are either already talking or sleeping")
+                    Component.translatable("mc_talking.talking_device.error.citizen_not_available")
                             .withStyle(ChatFormatting.RED)
             );
 
@@ -196,7 +196,7 @@ public class CitizenTalkingDevice extends Item {
         // Check if voice chat API is initialized
         if (vcApi == null) {
             serverPlayer.sendSystemMessage(
-                    Component.literal("Voice chat API is not initialized.")
+                    Component.translatable("mc_talking.talking_device.error.voice_chat_not_initialized")
                             .withStyle(ChatFormatting.RED)
             );
             return true; // Still prevent attack
@@ -204,7 +204,7 @@ public class CitizenTalkingDevice extends Item {
 
         if (McTalkingVoicechatPlugin.shouldDisableColoniesTicks(serverPlayer)) {
             serverPlayer.sendSystemMessage(
-                    Component.literal("Your voice chat is currently disabled. Please enable it to talk to citizens.")
+                    Component.translatable("mc_talking.talking_device.error.voice_chat_disabled")
                             .withStyle(ChatFormatting.RED)
             );
 
@@ -237,7 +237,7 @@ public class CitizenTalkingDevice extends Item {
         /*?}*/
 
         serverPlayer.sendSystemMessage(
-                Component.literal("Started conversation with " + citizen.getName().getString())
+                Component.translatable("mc_talking.talking_device.started_conversation", citizen.getName())
                         .withStyle(ChatFormatting.GREEN)
         );
 

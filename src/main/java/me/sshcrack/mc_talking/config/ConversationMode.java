@@ -38,6 +38,6 @@ public enum ConversationMode implements NameableEnum {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(name());
+        return Component.translatable("mc_talking.conversation_mode." + name().toLowerCase());
     }
 }

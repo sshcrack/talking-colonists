@@ -9,6 +9,6 @@ public enum MemoryMode implements NameableEnum {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(name());
+        return Component.translatable("mc_talking.memory_mode." + name().toLowerCase());
     }
 }

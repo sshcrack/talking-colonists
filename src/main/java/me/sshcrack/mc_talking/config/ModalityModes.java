@@ -19,6 +19,6 @@ public enum ModalityModes implements NameableEnum {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(name());
+        return Component.translatable("mc_talking.modality." + name().toLowerCase());
     }
 }

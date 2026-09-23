@@ -380,8 +380,7 @@ public class CitizenWsClient extends GeminiWsClient {
                 presentationFailure(AiStatus.ERROR);
                 McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);
                 if (player.hasPermissions(4) && McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers)
-                    player.sendSystemMessage(Component.literal(
-                            "An error occurred in GeminiWsClient: " + ex.getMessage()));
+                    player.sendSystemMessage(Component.translatable("mc_talking.error.gemini_ws_client", ex.getMessage()));
             });
         } else {
             McTalking.LOGGER.error("CitizenWsClient error for {}", getEntity().getCitizenData() == null ? getEntity().getUUID() : getEntity().getCitizenData().getName(), ex);

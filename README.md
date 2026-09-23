@@ -38,3 +38,10 @@ while requiring the normal Talking Colonists mod at runtime. **Players install o
 Talking Colonists mod; the API artifact is not a second mod.** See [docs/addon-api.md](docs/addon-api.md)
 for coordinates, setup, and the supported API contract. Addon developers upgrading existing
 integrations should use the general [addon migration guide](docs/addon-migration.md).
+
+## Translating Talking Colonists
+
+Translations are stored in `src/main/resources/assets/mc_talking/lang/` as JSON files. To contribute a translation:
+1. Copy `en_us.json` to your language code (e.g., `pt_br.json` for Portuguese).
+2. Keep the JSON keys unchanged; translate only the values.
+3. Submit a pull request with your translated file.

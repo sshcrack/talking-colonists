@@ -28,7 +28,7 @@ public class MumblingTriggerDevice extends Item {
         }
 
         ConversationManager.startMumbling(citizen);
-        player.sendSystemMessage(Component.literal("Started mumbling for selected citizen").withStyle(ChatFormatting.GREEN));
+        player.sendSystemMessage(Component.translatable("mc_talking.mumbling_trigger.started_mumbling").withStyle(ChatFormatting.GREEN));
 
         return true; // Prevent normal attack behavior
     }

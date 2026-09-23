@@ -299,5 +299,33 @@
   "mc_talking.conversation_ended": "Conversation ended",
   "yacl3.config.mc_talking:config.showConversationMouths": "Moving mouths",
   "yacl3.config.mc_talking:config.showConversationMouths.desc": "Animate built-in adult citizen mouths with received voice audio. Custom skins and helmets retain their original faces.",
-  "mc_talking.conversation_hint.interrupt": "Speaking · Speak to interrupt"
+  "mc_talking.conversation_hint.interrupt": "Speaking · Speak to interrupt",
+
+  "mc_talking.conversation_creator.added_citizen": "Added %s to the conversation",
+  "mc_talking.conversation_creator.c2c_disabled": "Citizen-to-citizen conversations are disabled in the config",
+  "mc_talking.conversation_creator.started_conversation": "Started conversation with %s participants",
+
+  "mc_talking.mumbling_trigger.started_mumbling": "Started mumbling for selected citizen",
+
+  "mc_talking.talking_device.error.no_api_key": "No Gemini API key set. Minecolonies Talking Citizens is disabled.",
+  "mc_talking.talking_device.error.citizen_not_available": "This citizen can't speak right now. They are either already talking or sleeping",
+  "mc_talking.talking_device.error.voice_chat_not_initialized": "Voice chat API is not initialized.",
+  "mc_talking.talking_device.error.voice_chat_disabled": "Your voice chat is currently disabled. Please enable it to talk to citizens.",
+  "mc_talking.talking_device.started_conversation": "Started conversation with %s",
+
+  "mc_talking.error.gemini_ws_client": "An error occurred in GeminiWsClient: %s",
+
+  "mc_talking.modality.text": "TEXT",
+  "mc_talking.modality.audio": "AUDIO",
+  "mc_talking.modality.text_and_audio": "TEXT and AUDIO",
+
+  "mc_talking.conversation_mode.live_websockets": "LIVE_WEBSOCKETS",
+  "mc_talking.conversation_mode.flash_tts": "FLASH_TTS",
+  "mc_talking.conversation_mode.auto": "AUTO",
+
+  "mc_talking.memory_mode.live": "LIVE",
+  "mc_talking.memory_mode.flash": "FLASH",
+
+  "mc_talking.available_ai.flash3": "Gemini 3.1 Flash",
+  "mc_talking.available_ai.flash2_5": "Gemini 2.5 Flash"
 }
