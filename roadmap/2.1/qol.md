@@ -126,6 +126,9 @@ Citizens criticise cavern (and other) building styles as if they were poor housi
 fact that the building style is the colony's chosen aesthetic and is not a sign of quality; base
 housing complaints only on building level and happiness factors.
 
+### Implementation
+Added clear instruction to `DefaultCitizenPromptProvider.appendDetailedHappinessState()` directing the model that building style is aesthetic choice and must not be complained about.
+
 ---
 
 ## Q7 — Archetype picker in the config screen (#128)
