@@ -480,6 +480,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Miserable (").append(String.format("%.1f", happiness)).append("/10)\n");
         }
 
+        prompt.append("\nNOTE: A building's style (cavern, medieval, etc.) is the colony's chosen aesthetic and is NOT a sign of poor quality. Base housing satisfaction only on building level and these factors below, never complain about style.\n\n");
+
         for (var modifier : view.wellbeing().happinessModifiers()) {
             var modifierType = modifier.type();
             double factor = modifier.factor();
