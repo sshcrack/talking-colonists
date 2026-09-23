@@ -134,3 +134,61 @@ blocker and retain the distinction between composite success and release readine
     `c9671e005fe6ee64148d9b61009a9fad6d50ea7272d1230939ccd175f4e3a2bb`.
   - `scripts/verify-release-readiness.sh` correctly exits `2` because both public Gemini `2.4.0`
     POM/JAR coordinates still return HTTP 404.
+
+## Implementation record — 2026-09-24 (published-library release verification, still partial)
+
+- Gemini Live Library `2.4.0` was never published (reconfirmed HTTP `404` for POM and JAR on both
+  `2.4.0-1.21.1-neoforge` and `2.4.0-1.20.1-forge`). `2.4.1` **is** published for both loader
+  coordinates: `curl` against `https://maven.sshcrack.me/releases/me/sshcrack/gemini_live_lib/`
+  returned HTTP `200` for the POM and JAR of `2.4.1-1.21.1-neoforge` and `2.4.1-1.20.1-forge`.
+  `gradle.properties` already declared `deps.gemini_live_lib_version=2.4.1`, so no dependency-version
+  edit was needed this pass; `docs/addon-release-readiness.md` previously still said `2.4.0` in prose
+  and has been corrected to `2.4.1` with a historical note tracing the earlier `2.3.6`/`2.4.0` targets.
+- Verified the release build resolves against the published artifact, not a composite build, by
+  running (under this repo's shared Gradle lock, `GRADLE_USER_HOME=/home/hendrik/.gradle`):
+  `GEMINI_LIVE_LIBRARY_DIR=/nonexistent ./gradlew buildAndCollect --no-daemon` (invoked via
+  `scripts/verify-release-readiness.sh`, see below). Gradle's `settings.gradle.kts` printed
+  `Warning: Gemini Live Library not found, skipping includeBuild`, confirming the composite path was
+  not used.
+- `scripts/verify-release-readiness.sh` (`GRADLE_USER_HOME=/home/hendrik/.gradle bash
+  scripts/verify-release-readiness.sh`, `GEMINI_LIVE_LIBRARY_DIR` forced nonexistent internally)
+  initially failed with `Missing collected 1.21.1-neoforge mod/API artifact under build/libs` despite
+  a successful `BUILD SUCCESSFUL`. Root cause: the script derived `MOD_VERSION` from only
+  `mod.version` ("2.0.0") in `stonecutter.properties.toml`, never appending `mod.channel_tag`
+  ("-beta.2"), so it searched for `mc_talking-2.0.0-*.jar` while the actually-collected artifacts are
+  named `mc_talking-2.0.0-beta.2-*.jar` under `build/libs/2.0.0-beta.2/` (matching how
+  `build-logic/src/main/kotlin/Context.kt`'s `fullVersion` is derived). Fixed the script to read both
+  properties and concatenate them. After the fix, a full rerun passed end to end (exit `0`):
+  - Both normal mod JARs and both stripped addon-API JARs were produced and verified:
+    `mc_talking-2.0.0-beta.2-{forge+1.20.1,neoforge+1.21.1}.jar` and the matching
+    `mc_talking-api-2.0.0-beta.2-*` files.
+  - Each mod JAR's `mods.toml`/`neoforge.mods.toml` was extracted and confirmed to constrain
+    `gemini_live_lib` to `versionRange = "[2.4.1,3.0.0)"`, matching the dynamically-derived
+    `compatibleMajorVersionRange` from `deps.gemini_live_lib_version=2.4.1` (no manual metadata edit
+    was needed; the range is computed from the configured version, not hard-coded).
+  - `verifyApiJar` confirmed no implementation classes or installable mod metadata leaked into the
+    developer API JARs, for both loaders.
+- Did not run `bash scripts/test-client-smoke.sh` in this pass: no launch-relevant runtime, API,
+  resource, or build/loader configuration changed (only `scripts/verify-release-readiness.sh`'s
+  bash-level version parsing and documentation prose changed), so `AGENTS.md`'s smoke-test trigger
+  does not apply. If the pre-commit hook disagrees, that will be resolved by actually running the
+  smoke test rather than fabricating a marker.
+- Task 12 remains **Partial**. Everything achievable from this checkout without a real Gemini API key
+  is now done: the published-library dependency question is reconciled (2.4.1, not 2.4.0), the release
+  build/verification path works end to end against the public repository with the composite build
+  provably excluded, both loaders' normal and API artifacts are produced and checked, and the
+  release-readiness script's own version-parsing bug is fixed. The sole remaining acceptance gap is
+  the credentialed in-world validation matrix in `docs/addon-release-readiness.md`
+  ("In-world validation record"), which requires a real Gemini API key and a human playing in a world
+  and cannot be performed by this agent. Remaining maintainer checklist:
+  - [ ] Player dialogue: start/stop a citizen conversation; confirm the audible tail drains and
+        ownership releases.
+  - [ ] Paired dialogue: two citizens converse; audio follows participants; final playback drains.
+  - [ ] Controlled group turns: 3+ citizens take caller-selected turns with attributed shared history.
+  - [ ] Interruption: barge-in/caller interruption stops the exact active turn; late audio is ignored.
+  - [ ] Provider disconnect: bounded recovery or a typed terminal failure occurs, with no leaked
+        busy/provider slot.
+  - [ ] Server shutdown: active/idle controlled sessions and provider/audio resources close cleanly.
+  - [ ] Record date, Minecraft/loader, Talking Colonists build (`2.0.0-beta.2`), and Gemini Live
+        Library build (`2.4.1`) alongside each outcome in `docs/addon-release-readiness.md`.
+  - [ ] Only after all six pass, mark task 12 Complete in `roadmap/README.md`.

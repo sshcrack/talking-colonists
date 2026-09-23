@@ -13,11 +13,14 @@ The supported game/loader targets in this repository are:
 | `1.21.1` | NeoForge `21.1.213` | `1.1.1305-1.21.1-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-beta.1-1.21.1-neoforge` |
 | `1.20.1` | Forge `47.2.0` | `1.20.1-1.1.1218-snapshot` | `me.sshcrack:mc_talking-api:2.0.0-beta.1-1.20.1-forge` |
 
-The normal Talking Colonists runtime currently requires Gemini Live Library `>=2.4.0,<3.0.0` through
+The normal Talking Colonists runtime currently requires Gemini Live Library `>=2.4.1,<3.0.0` through
 its loader metadata. The upper bound is intentional: a future Gemini Live Library 3.x release may
-contain breaking API changes and must not be accepted implicitly. Players install only the normal
-Talking Colonists mod; `mc_talking-api` is a developer compile artifact and must not be packaged or
-installed as a second mod.
+contain breaking API changes and must not be accepted implicitly. The minimum was raised from the
+originally targeted `2.4.0` to `2.4.1` because `2.4.0` was never published to the public Maven
+repository (see "Release artifact verification" below); `2.4.1` is the first published release in
+that line and is a superset-compatible successor. Players install only the normal Talking Colonists
+mod; `mc_talking-api` is a developer compile artifact and must not be packaged or installed as a
+second mod.
 
 API generation 2 is an intentional breaking addon baseline. Compatibility is only claimed for code
 that compiles against the matching `mc_talking-api` artifact and uses `me.sshcrack.mc_talking.api` as
@@ -80,23 +83,39 @@ GRADLE_USER_HOME=/cache/gradle ./gradlew \
 5. verifies both normal mod JARs and stripped addon API JARs, including the API/implementation
    separation;
 6. verifies the runtime mod metadata constrains Gemini Live Library to the compatible semantic-version
-   major (`[2.4.0,3.0.0)` for this release).
+   major (`[2.4.1,3.0.0)` for this release).
 
-### Current blocker recorded 2026-09-07
+### Resolved 2026-09-24 (previously blocked 2026-09-07)
 
-The configured dependency is `deps.gemini_live_lib_version=2.4.0`. Direct public-repository checks
-returned HTTP `404` for both the POM and JAR of:
+The configured dependency is `deps.gemini_live_lib_version=2.4.1`. `2.4.0` was never published (HTTP
+`404` for both the POM and JAR, on both loader coordinates, confirmed again on 2026-09-24). `2.4.1`
+**is** published: direct checks against the public sshcrack Maven repository returned HTTP `200` for
+both the POM and the JAR of:
 
-- `me.sshcrack:gemini_live_lib:2.4.0-1.21.1-neoforge`
-- `me.sshcrack:gemini_live_lib:2.4.0-1.20.1-forge`
+- `me.sshcrack:gemini_live_lib:2.4.1-1.21.1-neoforge`
+- `me.sshcrack:gemini_live_lib:2.4.1-1.20.1-forge`
 
-The repository metadata returned HTTP `200` but did not list either `2.4.0` variant. Therefore a
-composite build or an existing Gradle cache can validate development, but **release readiness remains
-blocked until both 2.4.0 artifacts are publicly published**. Do not bypass this distinction with
-`-PgeminiPublished=true`; that flag is for an already-published library when a local composite happens
-to be present.
+`GEMINI_LIVE_LIBRARY_DIR=/nonexistent GRADLE_USER_HOME=/home/hendrik/.gradle bash
+scripts/verify-release-readiness.sh` now passes end to end (exit `0`) with no composite build present
+(`settings.gradle.kts` printed `Warning: Gemini Live Library not found, skipping includeBuild`). It
+produced and verified both normal mod JARs and both stripped addon-API JARs
+(`build/libs/2.0.0-beta.2/mc_talking-2.0.0-beta.2-{forge+1.20.1,neoforge+1.21.1}.jar` and the matching
+`mc_talking-api-2.0.0-beta.2-*` files), and confirmed each mod JAR's `mods.toml`/`neoforge.mods.toml`
+constrains `gemini_live_lib` to `versionRange = "[2.4.1,3.0.0)"`.
 
-After publishing Gemini Live Library, rerun:
+While reproducing this, `scripts/verify-release-readiness.sh` itself had a latent bug: it read only
+`mod.version` ("2.0.0") from `stonecutter.properties.toml` and never appended `mod.channel_tag`
+("-beta.2"), so it searched for `mc_talking-2.0.0-*.jar` instead of the actually-collected
+`mc_talking-2.0.0-beta.2-*.jar` and failed with "Missing collected artifact" even though the build
+succeeded. The script now reads both properties and concatenates them, matching how
+`build-logic` derives `fullVersion`.
+
+Historical note: earlier iterations of this document referenced Gemini `2.3.6` (2026-09-07 audit) and
+then `2.4.0` (2026-09-07 final review) as the target minimum; neither was ever published. `2.4.1` is
+the current, verified, published target and is what `gradle.properties` and the loader metadata now
+declare.
+
+To rerun this verification after any future dependency bump:
 
 ```sh
 GRADLE_USER_HOME=/cache/gradle bash scripts/verify-release-readiness.sh
@@ -148,9 +167,10 @@ saves migrate without dropping old facts/events/relationship aggregates.
 
 Compatibility limits: no existing Colonist Errands release is declared compatible until a migrated
 build is compiled and tested against API generation 2. Colony Meetings has an integration guide and
-compile-checked example, but no external release was available to test. Final release remains blocked
-until Gemini Live Library `2.4.0` is published for both supported loaders and the credentialed in-world
-matrix above is recorded.
+compile-checked example, but no external release was available to test. Gemini Live Library `2.4.1`
+is now published for both supported loaders and `scripts/verify-release-readiness.sh` passes against
+it; final release still remains blocked until the credentialed in-world matrix above is recorded by a
+maintainer with a real Gemini API key.
 
 ## Draft response to addon maintainers
 
