@@ -38,20 +38,53 @@ For branch/release reviews that fan out across specialized review-only agents, u
 separate spec, standards, API, lifecycle, Minecraft, Gemini/audio, memory/tools, and
 validation lenses.
 
-## Required Client Launch Smoke Test
+## Client Launch Smoke Test (mixin-scoped)
 
-After changing runtime Java, API Java, resources, loader/build configuration, or the
-client-smoke infrastructure itself, you **must** verify that both supported clients
-actually launch. Run:
+Purpose: the client smoke test exists to prove that **mixins inject correctly** on both
+loaders — mixins fail loudly (and only) at real client startup, not in unit tests. It is
+**not** a general runtime test; ordinary Java, prompts, lang files, and the public API
+don't need a client launch to verify, and CI's real launch is the authoritative gate for
+mixin correctness regardless of what runs locally.
+
+### Fast local loop
+
+- While iterating on ordinary (non-mixin) code: `./gradlew :1.21.1-neoforge:test`.
+- Before pushing: run both loaders' suites, `./gradlew :1.21.1-neoforge:test :1.20.1-forge:test`.
+- Only when mixin-relevant files change (see below): `bash scripts/test-client-smoke.sh`.
+
+### When the local gate applies
+
+The pre-commit hook (`scripts/check-client-smoke-required.sh`) and the fingerprint
+(`scripts/client-smoke-fingerprint.py`) only cover files that can affect mixin
+application:
+
+- `src/main/java/me/sshcrack/mc_talking/mixin/**` (the mixin classes themselves)
+- Mixin configs, matched by suffix (`*.mixins.json`)
+- `src/main/resources/aw/**` (access transformers/wideners — a bad AT/AW breaks mixin targets)
+- `build-logic/**`, `build.forge.gradle.kts`, `build.neoforge.gradle.kts` (loader wiring
+  and generated mod manifests)
+- `settings.gradle.kts`, `stonecutter.gradle.kts`, `stonecutter.properties.toml`,
+  `gradle.properties` (a MineColonies/loader dependency bump can break mixin targets)
+- `.pre-commit-config.yaml` and the smoke scripts/fingerprint script themselves
+
+Editing a prompt string, a lang file, a manager class, or the public API (`src/api`) does
+**not** require the marker. `scripts/client-smoke-fingerprint.py`'s `relevant()` function
+is the single source of truth for this set — the pre-commit check calls
+`client-smoke-fingerprint.py changed` rather than duplicating the file list.
+
+### Running it
 
 ```sh
 bash scripts/test-client-smoke.sh
 ```
 
 The smoke test:
-1. Discovers every Stonecutter version (`1.21.1-neoforge`, `1.20.1-forge`).
-2. Runs the versions **serially** with `runClientAutoQuit` and one Gradle worker, so
-   Minecraft/NeoForm downloads do not compete with each other.
+1. Discovers every Stonecutter version (`1.21.1-neoforge`, `1.20.1-forge`). Pass a version
+   as `$1` (e.g. `bash scripts/test-client-smoke.sh 1.21.1-neoforge`) to run only one —
+   this is how CI's parallel matrix invokes it. A single-version run never writes the
+   marker, since it has not verified every loader.
+2. With no argument, runs all versions **serially** with `runClientAutoQuit` and one
+   Gradle worker, so Minecraft/NeoForm downloads do not compete with each other.
 3. Uses an existing singleplayer save when available. On a clean checkout with no
    save, auto mode opens Minecraft's vanilla create-world screen and creates a
    default disposable smoke-test world automatically. A title screen alone never
@@ -71,26 +104,29 @@ If the sandbox can reach Mojang metadata but its asset CDN is blocked, use
 launches the real client, creates/enters the smoke world, and exercises mixins/mod
 construction; it only skips downloading cosmetic vanilla asset objects.
 
-On success the script writes `.client-smoke-verified`, which contains a fingerprint
-of the staged launch-relevant content. Stage the intended changes before running the
+On success the script writes `.client-smoke-verified`, which contains a fingerprint of
+the staged mixin-relevant content only. Stage the intended changes before running the
 test, then stage the marker. Stonecutter may temporarily rewrite the active source
 view during the launch; fingerprinting the index keeps that generated view out of the
 verification contract:
 
 ```sh
-git add <intended runtime/build changes>
+git add <intended mixin-relevant changes>
 bash scripts/test-client-smoke.sh
 git add .client-smoke-verified
 ```
 
-The pre-commit hook compares the marker with the staged launch-relevant content and
-blocks stale or missing verification. CI independently compares the committed marker
-with the committed tree. This avoids the old commit-hash race where a marker could
-only describe the parent commit rather than the code being committed.
+The pre-commit hook compares the marker with the staged mixin-relevant content and
+blocks stale or missing verification, but only when mixin-relevant files are staged.
+CI runs the real launch for both loaders as parallel matrix jobs (`client-smoke
+(1.21.1-neoforge)` and `client-smoke (1.20.1-forge)`) and is the authoritative gate,
+independent of the marker; a separate fast `smoke-marker-check` job checks the marker
+against the committed tree over the same mixin-relevant set. This avoids the old
+commit-hash race where a marker could only describe the parent commit rather than the
+code being committed, and avoids requiring the marker (and the merge conflicts that
+come with it) for changes that can't affect mixin injection.
 
-Mixin changes receive the same real-launch coverage through this required client
-smoke test, and `scripts/check-mixin-registration.sh` separately enforces mixin
-registration.
+`scripts/check-mixin-registration.sh` separately enforces mixin registration.
 
 If a version fails, inspect the printed Gradle log and its adjacent `-minecraft.log`
 copy. Do not fabricate or hand-edit `.client-smoke-verified`.

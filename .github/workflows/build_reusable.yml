@@ -68,21 +68,25 @@ jobs:
           name: build-artifacts
           path: build/libs/
 
-  client-smoke-verification:
+  # Fast, no-JDK check: does the committed .client-smoke-verified marker match the
+  # mixin-relevant file set at HEAD? This only exists to catch a genuinely stale local
+  # marker (e.g. a mixin edited without re-running the smoke test); it does not gate on
+  # unrelated changes (prompts, lang files, ordinary Java, the public API) since those
+  # are outside the mixin-relevant set that client-smoke-fingerprint.py hashes.
+  # It runs independently of the real client-smoke matrix below, which is the
+  # authoritative gate regardless of marker state.
+  smoke-marker-check:
     runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 30
-    env:
-      LIBGL_ALWAYS_SOFTWARE: '1'
-      CLIENT_SMOKE_TIMEOUT_SECONDS: '600'
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Verify required client launch smoke test was run locally
+      - name: Test the smoke gate file set
+        run: python3 scripts/tests/test_smoke_gate.py
+
+      - name: Verify committed smoke marker matches mixin-relevant content
         run: |
           if [ ! -f .client-smoke-verified ]; then
             echo "ERROR: Client launch smoke test has not been verified."
@@ -93,14 +97,36 @@ jobs:
           verified=$(tr -d ' \n' < .client-smoke-verified)
           expected=$(python3 scripts/client-smoke-fingerprint.py head)
           if [ -z "$verified" ] || [ "$verified" != "$expected" ]; then
-            echo "ERROR: Client launch smoke verification is stale."
+            echo "ERROR: Client launch smoke verification is stale for the mixin-relevant file set."
             echo "verified: $verified"
             echo "expected: $expected"
             echo "Re-run 'bash scripts/test-client-smoke.sh' locally and commit .client-smoke-verified."
             exit 1
           fi
 
-          echo "✓ Client launch smoke fingerprint matches committed launch-relevant content"
+          echo "✓ Client launch smoke fingerprint matches committed mixin-relevant content"
+
+  # The real gate: launch each Stonecutter version's actual client and verify it enters a
+  # world and completes a real citizen conversation. Runs as a parallel matrix (one job per
+  # loader) instead of serially, since each version gets its own runner.
+  client-smoke:
+    name: Client Smoke (${{ matrix.version }})
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [ 1.21.1-neoforge, 1.20.1-forge ]
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      CLIENT_SMOKE_TIMEOUT_SECONDS: '600'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -114,12 +140,12 @@ jobs:
       - name: Install headless graphics runtime
         run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgl1-mesa-dri libasound2t64
 
-      - name: Launch both clients and verify real citizen conversations
-        run: xvfb-run -a bash scripts/test-client-smoke.sh
+      - name: Launch client and verify a real citizen conversation
+        run: xvfb-run -a bash scripts/test-client-smoke.sh "${{ matrix.version }}"
 
       - name: Upload launch and runtime verification logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: client-smoke-logs
+          name: client-smoke-logs-${{ matrix.version }}
           path: /tmp/client-smoke-*.log

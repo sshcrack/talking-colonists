@@ -53,9 +53,17 @@ test uses the config key. No Forge config copy is required. Never commit any key
 
 ## CI
 
-Mod CI runs both loader suites and launches both clients under Xvfb/software graphics,
-uploading test reports and launch logs even on failure. The existing staged-content
-smoke marker policy remains enforced; CI additionally executes the real launches.
+Mod CI runs both loader suites, then launches both clients under Xvfb/software
+graphics as **parallel matrix jobs** (`client-smoke (1.21.1-neoforge)` and
+`client-smoke (1.20.1-forge)`), uploading per-version test reports and launch logs even
+on failure. A separate, fast `smoke-marker-check` job checks the committed
+`.client-smoke-verified` marker against the mixin-relevant file set (mixin classes,
+mixin configs, access transformers/wideners, build logic/loader scripts, Stonecutter
+files, and dependency versions — see `AGENTS.md` § "Client Launch Smoke Test") rather
+than every runtime/API/resource file. The real client-smoke matrix is the authoritative
+gate for mixin correctness and runs regardless of marker state; the marker check exists
+to catch a genuinely stale local marker, not to block unrelated changes such as a
+prompt or lang-file edit.
 The library CI runs both offline suites. Its separate manual `Live Gemini verification`
 workflow accepts `GEMINI_API_KEY` as a repository secret, serializes live workflow runs,
 and runs only one session. Ordinary PR/build jobs do not need credentials.
