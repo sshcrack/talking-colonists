@@ -31,7 +31,7 @@ API and `src/main/java/me/sshcrack/mc_talking/` for the runtime.
 | A4 | No typed player input into a live conversation | no chat handler; `addPlayerStatement` exists only on controlled sessions | Q10, X10, X11 | M |
 | A5 | No per-utterance events outside controlled sessions | lifecycle events carry no text; `GeminiWsClient.onInputTranscription/onOutputTranscription` are internal | X3, X7, X9, X10 | M |
 | A6 | Player conversations cannot be scoped by an addon | `startPlayerConversation(player, citizen)` takes no context or tool allow-list | A4, X5, X7, X10, X11 | S |
-| A7 | No quota or capacity view for scheduling costly work | `config/QuotaTracker` is internal; only `hasAmbientCapacity` is public | X2, X6, L1 | S |
+| A7 | No quota, capacity, or config view for scheduling costly work | `config/QuotaTracker` is internal; only `hasAmbientCapacity` is public; Errands reads `McTalkingConfig` by reflection | X2, X6, L1 | S |
 | A8 | Visitors cannot speak | `ConversationManager.java:596` rejects `VisitorCitizen` | X5 | M |
 | A9 | Multi-colony controlled sessions are undefined | no documented or tested behaviour for mixed-colony attendees | X8 | S |
 | A10 | No speech-to-text without a citizen | microphone audio only flows into citizen sessions | X1 (voice loudspeaker) | L |
@@ -197,7 +197,10 @@ conversations.
 
 Expose a read-only `ProviderBudgetService`: foreground and background slots in use / available,
 per-model quota state (`OK`, `EXHAUSTED_UNTIL(time)`, `UNKNOWN`) from `QuotaTracker`, and TTS quota
-from `TtsQuotaManager`. Add a listener for quota state changes. Addons use this to schedule
+from `TtsQuotaManager`. Add a listener for quota state changes. Also expose the read-only
+configuration addons currently read by reflection (whether an API key is set, the selected model,
+the urgent-contact blocking multiplier) and a `reloadConfig()` entry point, so Colonist Errands can
+drop its reflective access to `McTalkingConfig`. Addons use this to schedule
 expensive work (nightly newspaper, campfire nights) and to show honest "citizens are tired" UI.
 
 ### Acceptance

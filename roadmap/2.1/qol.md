@@ -181,3 +181,17 @@ sees what they sent. This helps players without a microphone and in noisy rooms.
 
 Not a scheduled task. When another task touches `ConversationManager` or another class listed in
 #116, extract the part it changes into an internal module with tests. Never block feature work on it.
+
+**This is an internal refactor only — it must not break addons.** Guardrails:
+
+- Nothing under `src/api` changes as part of Q11. If a refactor seems to need an API change, it
+  becomes a separate, additive Track A task.
+- Add a binary-compatibility check to CI (for example japicmp against the last published
+  `mc_talking-api` artifact) so an accidental API break fails the build instead of reaching addons.
+- Keep `config.McTalkingConfig` in place with its `INSTANCE` handler and field names. Field names
+  are also the config file keys, and Colonist Errands 3.0 reads `geminiApiKey`, `currentAiModel`,
+  `hasGeminiApiKey()`, `load()` and `blockingTaskUrgencyMultiplier` by reflection (fail-soft).
+- Keep `internal.tool.AiToolRuntime.findById(...).providerName()` until Errands switches to the
+  public `AiToolRegistry.providerName(addonId, tool)`, which already returns the same name.
+- Before merging a refactor, grep the pinned Colonist Errands source for `me.sshcrack.mc_talking`
+  outside `.api.` and confirm those reflective targets still resolve.
