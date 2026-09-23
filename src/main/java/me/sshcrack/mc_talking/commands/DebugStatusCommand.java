@@ -2,14 +2,22 @@ package me.sshcrack.mc_talking.commands;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.QuotaSnapshot;
+import me.sshcrack.mc_talking.config.QuotaStatus;
 import me.sshcrack.mc_talking.config.QuotaTracker;
+import me.sshcrack.mc_talking.config.TtsQuotaManager;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 
 public class DebugStatusCommand {
 
@@ -94,10 +102,19 @@ public class DebugStatusCommand {
                     .withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("\n"));
 
-            boolean liveQuotaExceeded = QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
+            for (AvailableAI model : AvailableAI.values()) {
+                QuotaSnapshot snapshot = QuotaTracker.snapshot(model.getName());
+                msg.append(Component.literal("  "))
+                        .append(Component.translatable("mc_talking.debug.status_quota_model",
+                                model.getName(), quotaStateStr(snapshot), resetEstimateStr(snapshot)))
+                        .withStyle(ChatFormatting.GRAY)
+                        .append(Component.literal("\n"));
+            }
+
+            QuotaSnapshot ttsSnapshot = TtsQuotaManager.snapshot();
             msg.append(Component.literal("  "))
-                    .append(Component.translatable("mc_talking.debug.status_quota",
-                            liveQuotaExceeded ? "§cexceeded" : "§aok"))
+                    .append(Component.translatable("mc_talking.debug.status_quota_tts",
+                            quotaStateStr(ttsSnapshot), resetEstimateStr(ttsSnapshot)))
                     .withStyle(ChatFormatting.GRAY)
                     .append(Component.literal("\n"));
 
@@ -110,5 +127,23 @@ public class DebugStatusCommand {
             return msg;
         }, false);
         return 1;
+    }
+
+    private static String quotaStateStr(QuotaSnapshot snapshot) {
+        return snapshot.status() == QuotaStatus.EXHAUSTED ? "§cexceeded" : "§aok";
+    }
+
+    private static String resetEstimateStr(QuotaSnapshot snapshot) {
+        if (snapshot.status() != QuotaStatus.EXHAUSTED || snapshot.resetAtMs() == null) {
+            return "unknown";
+        }
+        Duration remaining = Duration.between(Instant.now(), Instant.ofEpochMilli(snapshot.resetAtMs()));
+        if (remaining.isNegative()) return "unknown";
+        long totalSeconds = remaining.getSeconds();
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        String wallClock = DateTimeFormatter.ofPattern("HH:mm:ss")
+                .format(Instant.ofEpochMilli(snapshot.resetAtMs()).atZone(java.time.ZoneId.systemDefault()));
+        return String.format("~%dm%ds (around %s)", minutes, seconds, wallClock);
     }
 }

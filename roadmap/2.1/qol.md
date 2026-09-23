@@ -63,6 +63,35 @@ config toggle. This task also cleans up the quota state that A7 exposes.
 
 - Tests for quota state transitions; manual check of action-bar text for a forced quota error.
 
+### Implementation record
+
+Done on `roadmap/q2-quota-visibility`. `config.QuotaTracker` and `config.TtsQuotaManager` now
+expose their state as an immutable `config.QuotaSnapshot` (`model`, `status` — `OK`/`EXHAUSTED` —,
+`sinceMs`, nullable `resetAtMs`), designed so A7's read-only `ProviderBudgetService` can wrap
+`QuotaTracker.snapshot(model)`/`snapshotAll()` and `TtsQuotaManager.snapshot()` without further
+internal changes. `resetAtMs` is only populated from a provider-supplied retry hint
+(`QuotaRetryInfo.parseRetryDelayMs`, matched against `google.rpc.RetryInfo`'s `retryDelay` in a
+raw Gemini error body) — our own progressive backoff is a local guess and is deliberately not
+surfaced as an authoritative estimate. The Live session quota path (`GeminiWsClient`/
+`GeminiLiveClient`) only gets a close-reason string, not a structured body, so its reset time is
+"unknown" today; TTS/Flash HTTP failures (`UnexpectedResponseException`) can populate it when the
+API includes one.
+
+`CitizenWsClient.onQuotaExceededEvent` now shows every player in the failed conversation a
+translated action-bar message (`mc_talking.quota_exceeded_actionbar`) via
+`config.QuotaPlayerMessageThrottle` (per-player 30s window, fake-clock-testable). The raw
+diagnostic message to OP players is now also gated by `sendErrorsToPlayers` (previously
+unconditional for quota, unlike the sibling error-path). `/talking_colonists status` lists a
+quota line per `AvailableAI` model plus one for TTS, each with state and a formatted reset
+estimate or "unknown".
+
+New tests: `QuotaTrackerTest`, `TtsQuotaManagerTest`, `QuotaPlayerMessageThrottleTest` (all with
+fake clocks) covering exceeded→reset transitions, per-model/TTS independence, progressive
+backoff, provider retry-delay parsing, and the per-player message throttle window.
+
+Not done here (left for A7): no public API wrapper was added; `QuotaSnapshot`/`QuotaStatus` are
+internal types in `config`, addressed only for A7 to reuse read-only.
+
 ---
 
 ## Q3 — Localize hard-coded strings

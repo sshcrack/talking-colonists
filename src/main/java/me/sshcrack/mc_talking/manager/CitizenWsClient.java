@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.config.QuotaPlayerMessageThrottle;
 
 /**
  * Unified WebSocket client for citizen AI conversations.
@@ -365,7 +366,10 @@ public class CitizenWsClient extends GeminiWsClient {
         if (player != null) {
             Objects.requireNonNull(player.getServer()).execute(() -> {
                 presentationFailure(AiStatus.QUOTA_EXCEEDED);
-                if (player.hasPermissions(4))
+                if (QuotaPlayerMessageThrottle.shouldNotify(player.getUUID())) {
+                    player.displayClientMessage(Component.translatable("mc_talking.quota_exceeded_actionbar"), true);
+                }
+                if (player.hasPermissions(4) && McTalkingConfig.INSTANCE.instance().sendErrorsToPlayers)
                     player.sendSystemMessage(Component.literal(message));
             });
         } else {
