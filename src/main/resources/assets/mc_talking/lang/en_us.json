@@ -307,7 +307,6 @@
 
   "mc_talking.mumbling_trigger.started_mumbling": "Started mumbling for selected citizen",
 
-  "mc_talking.talking_device.error.no_api_key": "No Gemini API key set. Minecolonies Talking Citizens is disabled.",
   "mc_talking.talking_device.error.citizen_not_available": "This citizen can't speak right now. They are either already talking or sleeping",
   "mc_talking.talking_device.error.voice_chat_not_initialized": "Voice chat API is not initialized.",
   "mc_talking.talking_device.error.voice_chat_disabled": "Your voice chat is currently disabled. Please enable it to talk to citizens.",

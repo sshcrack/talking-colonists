@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.config;
 
+import java.util.Locale;
 import java.util.List;
 
 import dev.isxander.yacl3.api.NameableEnum;
@@ -19,6 +20,6 @@ public enum ModalityModes implements NameableEnum {
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("mc_talking.modality." + name().toLowerCase());
+        return Component.translatable("mc_talking.modality." + name().toLowerCase(Locale.ROOT));
     }
 }

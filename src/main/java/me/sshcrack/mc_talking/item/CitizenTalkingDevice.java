@@ -178,7 +178,7 @@ public class CitizenTalkingDevice extends Item {
         // Check if API key is set
         if (!McTalkingConfig.hasGeminiApiKey()) {
             serverPlayer.sendSystemMessage(
-                    Component.translatable("mc_talking.talking_device.error.no_api_key")
+                    Component.translatable("mc_talking.no_key")
                             .withStyle(ChatFormatting.RED)
             );
             return true; // Still prevent attack
