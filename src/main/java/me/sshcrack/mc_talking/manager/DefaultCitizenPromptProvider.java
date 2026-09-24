@@ -261,6 +261,11 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("## COLONY HISTORY\n");
             obs.append("- This colony was founded by ").append(view.colony().foundingPlayer()).append(".\n");
             obs.append("- The colony is now ").append(view.colony().ageDays()).append(" days old.\n");
+            if (ComplaintRamp.isYoung(view.colony().ageDays(), limits.get().complaints())) {
+                obs.append("- The colony was only just founded. You're hopeful and excited to build something new together, "
+                        + "and patient about what isn't there yet: the leader is still setting things up, so nothing has "
+                        + "been neglected.\n");
+            }
         }
 
         if (view.colony().milestone() != null) {
@@ -327,7 +332,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         int colonyAge = view.colony().ageDays();
         if (view.verifiedFacts().housingStatus() == CitizenHousingStatus.HOMELESS) {
             var tier = ComplaintRamp.activeTier(modifiers, HappinessModifierType.HOMELESSNESS, colonyAge, complaints);
-            prompt.append(switch (tier == null ? ComplaintRamp.Tier.COMPLAINT : tier) {
+            prompt.append(switch (tier == null ? ComplaintRamp.Tier.REMARK : tier) {
                 case REMARK -> "- Would like a home of your own at some point\n";
                 case COMPLAINT -> "- Concerned about not having a home\n";
                 case DEMAND -> "- Very concerned about not having a home\n";
@@ -336,7 +341,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         if (!view.identity().child() && view.work().jobName() == null && view.visitor() == null) {
             var tier = ComplaintRamp.activeTier(modifiers, HappinessModifierType.UNEMPLOYMENT, colonyAge, complaints);
-            prompt.append(switch (tier == null ? ComplaintRamp.Tier.COMPLAINT : tier) {
+            prompt.append(switch (tier == null ? ComplaintRamp.Tier.REMARK : tier) {
                 case REMARK -> "- Hoping to be given a job soon\n";
                 case COMPLAINT -> "- Frustrated about not having a job\n";
                 case DEMAND -> "- Fed up with having no job for so long\n";

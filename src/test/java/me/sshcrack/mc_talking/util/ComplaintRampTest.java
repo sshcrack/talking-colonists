@@ -39,11 +39,21 @@ class ComplaintRampTest {
     }
 
     @Test
-    void housingStaysARemarkWhileTheColonyIsYoung() {
+    void everyProblemStaysARemarkWhileTheColonyIsYoung() {
+        // Nothing in a new colony has been neglected yet, it just has not been built.
         assertEquals(Tier.REMARK, ComplaintRamp.tier(HOMELESSNESS, 0.0, 6, 6, DEFAULTS));
+        assertEquals(Tier.REMARK, ComplaintRamp.tier(UNEMPLOYMENT, 0.0, 6, 6, DEFAULTS));
         assertEquals(Tier.DEMAND, ComplaintRamp.tier(HOMELESSNESS, 0.0, 6, 7, DEFAULTS));
-        assertEquals(Tier.DEMAND, ComplaintRamp.tier(UNEMPLOYMENT, 0.0, 6, 6, DEFAULTS),
-                "the grace period only softens housing");
+        assertEquals(Tier.DEMAND, ComplaintRamp.tier(UNEMPLOYMENT, 0.0, 6, 7, DEFAULTS));
+        assertTrue(ComplaintRamp.isYoung(6, DEFAULTS));
+        assertTrue(!ComplaintRamp.isYoung(6, new Settings(false, 1, 5, 7)), "no grace without the ramp");
+    }
+
+    @Test
+    void generalUnhappinessBarelyCountsAsUrgentInAYoungColony() {
+        assertEquals(1.5, ComplaintRamp.unhappinessUrgency(2.0, OLD_COLONY, DEFAULTS), 1e-9);
+        assertEquals(0.45, ComplaintRamp.unhappinessUrgency(2.0, 1, DEFAULTS), 1e-9);
+        assertEquals(0.0, ComplaintRamp.unhappinessUrgency(6.0, 1, DEFAULTS), 1e-9);
     }
 
     @Test

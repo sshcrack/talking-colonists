@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.conversations;
 
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.testing.CitizenPromptViewFixture;
@@ -53,12 +54,50 @@ class ComplaintPromptTest {
 
     @Test
     void unemploymentEscalatesToo() {
-        String early = prompt(citizen().job(null, null)
+        String early = prompt(citizen().job(null, null).colonyAgeDays(40)
                 .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 0)));
-        String late = prompt(citizen().job(null, null)
+        String late = prompt(citizen().job(null, null).colonyAgeDays(40)
                 .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 6)));
         assertTrue(early.contains("Hoping to be given a job soon"), early);
         assertTrue(late.contains("Fed up with having no job for so long"), late);
         assertTrue(late.contains("You've been without a job for so long"), late);
+    }
+
+    private static CitizenPromptViewFixture unsafe(int colonyAge, boolean raided) {
+        CitizenPromptViewFixture fixture = citizen().colonyAgeDays(colonyAge)
+                .happinessModifiers(new HappinessModifierView(HappinessModifierType.SECURITY, 0.1, 0));
+        ColonyPromptView c = fixture.build().colony();
+        return fixture.colony(new ColonyPromptView(c.id(), c.name(), false, c.foundingPlayer(), colonyAge,
+                raided ? 1_000L : null, 0, c.currentGameTimeTicks(), c.recentEvents(), c.connections(),
+                c.milestone(), c.environment()));
+    }
+
+    @Test
+    void youngColonyWithoutARaidFearsNothing() {
+        String prompt = prompt(unsafe(1, false));
+        assertFalse(prompt.contains("guards"), prompt);
+    }
+
+    @Test
+    void terrorNeedsARealRaid() {
+        String calm = prompt(unsafe(30, false));
+        String raided = prompt(unsafe(30, true));
+        assertTrue(calm.contains("You wish there were more guards patrolling the colony"), calm);
+        assertFalse(calm.contains("terrified"), calm);
+        assertTrue(raided.contains("You feel terrified"), raided);
+    }
+
+    @Test
+    void youngColonyIsLongJoblessButStillHopeful() {
+        String prompt = prompt(citizen().job(null, null).colonyAgeDays(3)
+                .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 3)));
+        assertTrue(prompt.contains("Hoping to be given a job soon"), prompt);
+        assertFalse(prompt.contains("Frustrated"), prompt);
+    }
+
+    @Test
+    void youngColonyIsHopefulAboutItsFounding() {
+        assertTrue(prompt(citizen().colonyAgeDays(2)).contains("The colony was only just founded. You're hopeful"));
+        assertFalse(prompt(citizen().colonyAgeDays(12)).contains("only just founded"));
     }
 }

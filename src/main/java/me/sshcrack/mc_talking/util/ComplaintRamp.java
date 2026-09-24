@@ -28,7 +28,8 @@ public final class ComplaintRamp {
      * @param enabled            when false, the tier follows only how bad the problem is, as before
      * @param complaintAfterDays colony days before a remark becomes a complaint
      * @param demandAfterDays    colony days before a complaint becomes a demand
-     * @param youngColonyDays    housing complaints stay remarks while the colony is younger than this
+     * @param youngColonyDays    while the colony is younger than this, every problem stays a remark: the
+     *                           player is still setting things up, so nothing is their fault yet
      */
     public record Settings(boolean enabled, int complaintAfterDays, int demandAfterDays, int youngColonyDays) {
         public static final Settings DEFAULTS = new Settings(true, 1, 5, 7);
@@ -61,10 +62,22 @@ public final class ComplaintRamp {
         if (activeDays < settings.complaintAfterDays()) tier = Tier.REMARK;
         else if (activeDays < settings.demandAfterDays()) tier = Tier.COMPLAINT;
         else tier = Tier.DEMAND;
-        if (type == HappinessModifierType.HOMELESSNESS && colonyAgeDays < settings.youngColonyDays()) {
-            tier = tier.atMost(Tier.REMARK);
-        }
+        if (isYoung(colonyAgeDays, settings)) tier = tier.atMost(Tier.REMARK);
         return tier;
+    }
+
+    /**
+     * Whether the colony is still in its founding days, when citizens are hopeful rather than
+     * demanding: what is missing has not been neglected yet, it just has not been built.
+     */
+    public static boolean isYoung(int colonyAgeDays, @NotNull Settings settings) {
+        return settings.enabled() && colonyAgeDays < settings.youngColonyDays();
+    }
+
+    /** The general-unhappiness part of the urgency weight; low while the colony is young. */
+    public static double unhappinessUrgency(double happiness, int colonyAgeDays, @NotNull Settings settings) {
+        double weight = happiness < 3.0 ? 1.5 : happiness < 5.0 ? 0.6 : 0;
+        return isYoung(colonyAgeDays, settings) ? weight * 0.3 : weight;
     }
 
     public static @NotNull Tier tier(@NotNull HappinessModifierView modifier, int colonyAgeDays,

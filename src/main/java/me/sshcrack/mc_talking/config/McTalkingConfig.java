@@ -540,7 +540,7 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "complaints")
     @IntField(min = 0, max = 100)
-    @SerialEntry(comment = "While the colony is younger than this many days, housing problems are only mentioned in passing.")
+    @SerialEntry(comment = "While the colony is younger than this many days, citizens are hopeful about what is not built yet: problems are only mentioned in passing, they only fear raids after one happened, and they don't call out in frustration. (The key keeps its old name so saved configs still apply.)")
     public int youngColonyHousingGraceDays = 7;
 
     // Colony Diplomacy

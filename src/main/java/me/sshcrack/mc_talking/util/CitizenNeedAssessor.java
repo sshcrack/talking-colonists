@@ -39,11 +39,8 @@ public class CitizenNeedAssessor {
         double weight = 0;
 
         double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
-        if (happiness < 3.0) {
-            weight += 1.5;
-        } else if (happiness < 5.0) {
-            weight += 0.6;
-        }
+        weight += ComplaintRamp.unhappinessUrgency(happiness, data.getColony().getDay(),
+                McTalkingConfig.INSTANCE.instance().complaintRampSettings());
 
         if (data.getCitizenDiseaseHandler().isSick()) {
             weight += 0.8;

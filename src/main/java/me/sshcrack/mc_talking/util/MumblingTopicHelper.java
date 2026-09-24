@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Difficulty;
 
@@ -567,8 +568,19 @@ public final class MumblingTopicHelper {
             ));
         }
 
+        boolean young = ComplaintRamp.isYoung(data.getColony().getDay(),
+                McTalkingConfig.INSTANCE.instance().complaintRampSettings());
+
         // ── CRITICAL: no home ────────────────────────────
         if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
+            // In a new colony nobody has a home yet; it is a hope, not an emergency.
+            if (young) {
+                return format(playerName, MiscUtil.pick(
+                        "The colony is brand new and you don't have a home yet. Call out to %s by name and cheerfully ask when houses might go up.",
+                        "You're excited about the new colony and hoping for a place of your own. Call out to %s by name and share that hope.",
+                        "Call out to %s by name, tell them you're glad to be part of the new colony, and ask whether a home for you is planned."
+                ));
+            }
             return format(playerName, MiscUtil.pick(
                     "You have nowhere to sleep. Call out to %s by name and urgently ask for help.",
                     "You're distressed about having no home. Call out to %s by name and plead for shelter.",
@@ -577,8 +589,9 @@ public final class MumblingTopicHelper {
         }
 
         // ── LOW HAPPINESS ────────────────────────────────
+        // Unhappiness in a new colony comes from what is not built yet; it is no reason to scold anyone.
         double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
-        if (happiness < 3.0) {
+        if (happiness < 3.0 && !young) {
             return format(playerName, MiscUtil.pick(
                     "You're miserable and can't hold it in anymore. Call out to %s by name and voice your frustration.",
                     "You've had enough. Call out to %s by name and demand something change.",
