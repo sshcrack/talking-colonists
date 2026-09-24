@@ -55,6 +55,8 @@ mixin correctness regardless of what runs locally.
 - Prompt text is snapshot-tested (`src/test/resources/prompt-snapshots/`). After an intended
   prompt change, regenerate with `UPDATE_PROMPT_SNAPSHOTS=1 ./gradlew :1.21.1-neoforge:test --tests '*PromptSnapshotTest' --rerun`
   and review the snapshot diff. Build prompt views in tests with `CitizenPromptViewFixture`.
+- Optional, after prompt changes: `bash scripts/test-prompt-behaviour.sh` checks live model
+  behaviour (3 cheap requests; key from the game config; skips without one).
 
 ### When the local gate applies
 
