@@ -23,6 +23,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import me.sshcrack.mc_talking.broadcast.NewsParticles;
+import net.minecraft.server.level.ServerLevel;
 
 final class MemoryServiceBackend implements MemoryService {
     @Override
@@ -113,9 +115,9 @@ final class MemoryServiceBackend implements MemoryService {
                             new BroadcastPublisher.Settings(config.enableBroadcastPropagation, config.maxBroadcastsStored));
                     // Announced at a place (a bell, a notice board): let the word visibly go out from there.
                     if (result.isPublished() && request.originPosition() != null
-                            && colony.getWorld() instanceof net.minecraft.server.level.ServerLevel level) {
-                        me.sshcrack.mc_talking.broadcast.NewsParticles.ring(level, request.originPosition(),
-                                me.sshcrack.mc_talking.broadcast.NewsParticles.Kind.BROADCAST);
+                            && colony.getWorld() instanceof ServerLevel level) {
+                        NewsParticles.ring(level, request.originPosition(),
+                                NewsParticles.Kind.BROADCAST);
                     }
                     return result;
                 });
