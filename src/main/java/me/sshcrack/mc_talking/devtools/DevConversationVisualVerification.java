@@ -35,6 +35,10 @@ public final class DevConversationVisualVerification {
             for (int dx = -5; dx <= 5; dx++) {
                 for (int dz = -5; dz <= 6; dz++) {
                     world.setBlockAndUpdate(new BlockPos(x + dx, y - 1, z + dz), Blocks.STONE_BRICKS.defaultBlockState());
+                    // The platform can end up inside a mountain; clear head room so nobody suffocates.
+                    for (int dy = 0; dy <= 3; dy++) {
+                        world.setBlockAndUpdate(new BlockPos(x + dx, y + dy, z + dz), Blocks.AIR.defaultBlockState());
+                    }
                 }
             }
             world.setDayTime(6000);
