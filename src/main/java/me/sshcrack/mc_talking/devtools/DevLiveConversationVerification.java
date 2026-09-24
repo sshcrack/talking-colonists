@@ -5,6 +5,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
+import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.PlayerTextResult;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -54,13 +55,15 @@ final class DevLiveConversationVerification {
             require(!key.isEmpty(), "live key file is empty");
             registration = server.submit(() -> {
                 config.geminiApiKey = key;
-                // Output transcription is needed to see what the citizen answered.
+                // Turns on output transcription so the citizen's answer can be read.
                 config.enableConversationSummaryAndMemorize = true;
                 return CitizenConversationService.registerUtteranceListener("mc_talking_dev:live", 0, events::add);
             }).get(5, TimeUnit.SECONDS);
 
-            var started = server.submit(() -> ConversationManager.startPlayerConversationDetailed(player, citizen))
-                    .get(10, TimeUnit.SECONDS);
+            // No memory extraction at the end: that would be an extra Flash-Lite request. The check
+            // then uses only the Live model.
+            var started = server.submit(() -> CitizenConversationService.startPlayerConversation(player, citizen,
+                    PlayerConversationOptions.defaults().withMemoryExtraction(false))).get(10, TimeUnit.SECONDS);
             require(started.started(), "live player conversation start: " + started);
             waitForReady(server, citizen);
             McTalking.LOGGER.info("MC_TALKING_LIVE: provider ready");

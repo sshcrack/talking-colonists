@@ -149,8 +149,8 @@ player conversation with the fixture citizen, then checks two things:
   - The line is routed to the citizen as `TYPED`, and the answer uses the requested word.
   - The player sees the local echo, and the raw line never appears in chat.
 
-It logs `MC_TALKING_LIVE_SUCCESS:` and the citizen's answers. Cost: one Live session and about
-three turns, plus one Flash-Lite memory request when the conversation ends. The key is read
+It logs `MC_TALKING_LIVE_SUCCESS:` and the citizen's answers. Cost: one Live session with about
+three turns, and no Flash-Lite or TTS request (memory extraction is off for that conversation). The key is read
 into memory for the run only: it is never logged or saved to the config. Without the variable
 the smoke test behaves as before.
 
