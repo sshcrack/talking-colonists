@@ -27,6 +27,11 @@ public final class HappinessPromptSection {
 
         prompt.append("\nNOTE: A building's style (cavern, medieval, etc.) is the colony's chosen aesthetic and is NOT a sign of poor quality. Base housing satisfaction only on building level and these factors below, never complain about style.\n\n");
 
+        // A new colony lacks guards, variety and comfort because nothing is built yet, not because the
+        // player neglected it: mood problems show less while it is young (fading out, never flipping),
+        // and nobody fears raids before one really happened.
+        int age = view.colony().ageDays();
+        boolean raided = view.colony().lastRaidEndTimeTicks() != null;
         for (var modifier : view.wellbeing().happinessModifiers()) {
             var modifierType = modifier.type();
             double factor = modifier.factor();
@@ -144,8 +149,9 @@ public final class HappinessPromptSection {
 
                 case SECURITY:
                     if (factor < 0.8) {
-                        if (!view.colony().peaceful()) {
-                            if (factor < 0.3) {
+                        double felt = ComplaintRamp.eased(factor, age, complaints);
+                        if (!view.colony().peaceful() && (raided ? felt < 0.8 : felt < 0.6)) {
+                            if (felt < 0.3 && raided) {
                                 prompt.append("- ").append(MiscUtil.pick(
                                     "You feel terrified — there are hardly any guards to protect the colony",
                                     "Every noise at night makes you jump — the colony desperately needs more guards",
@@ -177,8 +183,8 @@ public final class HappinessPromptSection {
                     break;
 
                 case SOCIAL:
-                    if (factor < 0.8) {
-                        if (factor < 0.5) {
+                    if (ComplaintRamp.eased(factor, age, complaints) < 0.8) {
+                        if (ComplaintRamp.eased(factor, age, complaints) < 0.5) {
                             prompt.append("- ").append(MiscUtil.pick(
                                 "Seeing so many fellow citizens sick, hungry, or homeless is devastating",
                                 "The colony's morale is in shambles — suffering is everywhere you look",
@@ -225,8 +231,8 @@ public final class HappinessPromptSection {
                     break;
 
                 case FOOD:
-                    if (factor < 0.8) {
-                        if (factor < 0.4) {
+                    if (ComplaintRamp.eased(factor, age, complaints) < 0.8) {
+                        if (ComplaintRamp.eased(factor, age, complaints) < 0.4) {
                             prompt.append("- ").append(MiscUtil.pick(
                                 "The food situation is dire — barely any variety and mostly tasteless vanilla scraps. The colony needs proper Minecolonies meals",
                                 "You're tired of eating the same plain food over and over. You'd kill for some decent tier 2 or 3 cooking",

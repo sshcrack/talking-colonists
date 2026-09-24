@@ -25,18 +25,29 @@ public final class ComplaintRamp {
     }
 
     /**
-     * @param enabled            when false, the tier follows only how bad the problem is, as before
-     * @param complaintAfterDays colony days before a remark becomes a complaint
-     * @param demandAfterDays    colony days before a complaint becomes a demand
-     * @param youngColonyDays    housing complaints stay remarks while the colony is younger than this
+     * @param enabled             when false, the tier follows only how bad the problem is, as before
+     * @param complaintAfterDays  in an established colony, how many times its usual fix time a problem
+     *                            may last before a remark becomes a complaint (the harshness)
+     * @param demandAfterDays     the same, before a complaint becomes a demand
+     * @param youngColonyDays     colony age over which the founding patience fades out
+     * @param youngColonyPatience how many times longer problems may last in a brand-new colony; fades
+     *                            linearly to 1 over {@code youngColonyDays}, so citizens never flip from
+     *                            patient to angry on one day
      */
-    public record Settings(boolean enabled, int complaintAfterDays, int demandAfterDays, int youngColonyDays) {
-        public static final Settings DEFAULTS = new Settings(true, 1, 5, 7);
+    public record Settings(boolean enabled, int complaintAfterDays, int demandAfterDays, int youngColonyDays,
+                           double youngColonyPatience) {
+        public static final double DEFAULT_YOUNG_COLONY_PATIENCE = 3.0;
+        public static final Settings DEFAULTS = new Settings(true, 1, 5, 10, DEFAULT_YOUNG_COLONY_PATIENCE);
 
         public Settings {
             complaintAfterDays = Math.max(0, complaintAfterDays);
             demandAfterDays = Math.max(complaintAfterDays, demandAfterDays);
             youngColonyDays = Math.max(0, youngColonyDays);
+            youngColonyPatience = Math.max(1.0, youngColonyPatience);
+        }
+
+        public Settings(boolean enabled, int complaintAfterDays, int demandAfterDays, int youngColonyDays) {
+            this(enabled, complaintAfterDays, demandAfterDays, youngColonyDays, DEFAULT_YOUNG_COLONY_PATIENCE);
         }
     }
 
@@ -57,14 +68,61 @@ public final class ComplaintRamp {
         if (!settings.enabled()) {
             return factor < SEVERE_FACTOR ? Tier.DEMAND : Tier.COMPLAINT;
         }
-        Tier tier;
-        if (activeDays < settings.complaintAfterDays()) tier = Tier.REMARK;
-        else if (activeDays < settings.demandAfterDays()) tier = Tier.COMPLAINT;
-        else tier = Tier.DEMAND;
-        if (type == HappinessModifierType.HOMELESSNESS && colonyAgeDays < settings.youngColonyDays()) {
-            tier = tier.atMost(Tier.REMARK);
-        }
-        return tier;
+        // A problem is only held against the player once it has lasted longer than fixing it takes.
+        double allowance = fixDays(type) * patience(colonyAgeDays, settings);
+        if (activeDays < settings.complaintAfterDays() * allowance) return Tier.REMARK;
+        if (activeDays < settings.demandAfterDays() * allowance) return Tier.COMPLAINT;
+        return Tier.DEMAND;
+    }
+
+    /**
+     * Rough colony days an established colony needs to fix the problem: a residence takes a builder
+     * a day or two, a job needs a hut placed and a worker assigned, a sick citizen a healer.
+     */
+    static double fixDays(@NotNull HappinessModifierType type) {
+        return switch (type) {
+            case HOMELESSNESS -> 2.0;
+            case HEALTH -> 1.5;
+            default -> 1.0;
+        };
+    }
+
+    /**
+     * How many times longer than usual problems may last: {@code youngColonyPatience} when the colony
+     * is founded, falling linearly to 1 once it is {@code youngColonyDays} old.
+     */
+    public static double patience(int colonyAgeDays, @NotNull Settings settings) {
+        if (!settings.enabled() || settings.youngColonyDays() == 0) return 1.0;
+        double youth = Math.max(0.0, 1.0 - (double) colonyAgeDays / settings.youngColonyDays());
+        return 1.0 + (settings.youngColonyPatience() - 1.0) * youth;
+    }
+
+    /**
+     * How much of a mood problem citizens let show, from 1/patience in a brand-new colony up to 1
+     * once it is established. A new colony lacks guards and variety because nothing is built yet.
+     */
+    public static double severity(int colonyAgeDays, @NotNull Settings settings) {
+        return 1.0 / patience(colonyAgeDays, settings);
+    }
+
+    /** A happiness factor below 1 pulled towards neutral by {@link #severity}; factors of 1 or more are kept. */
+    public static double eased(double factor, int colonyAgeDays, @NotNull Settings settings) {
+        if (factor >= 1.0) return factor;
+        return 1.0 - (1.0 - factor) * severity(colonyAgeDays, settings);
+    }
+
+    /**
+     * Whether the colony is still in its founding days, when citizens are more hopeful than demanding:
+     * what is missing has not been neglected yet, it just has not been built.
+     */
+    public static boolean isYoung(int colonyAgeDays, @NotNull Settings settings) {
+        return patience(colonyAgeDays, settings) > 1.0;
+    }
+
+    /** The general-unhappiness part of the urgency weight, scaled by {@link #severity}. */
+    public static double unhappinessUrgency(double happiness, int colonyAgeDays, @NotNull Settings settings) {
+        double weight = happiness < 3.0 ? 1.5 : happiness < 5.0 ? 0.6 : 0;
+        return weight * severity(colonyAgeDays, settings);
     }
 
     public static @NotNull Tier tier(@NotNull HappinessModifierView modifier, int colonyAgeDays,

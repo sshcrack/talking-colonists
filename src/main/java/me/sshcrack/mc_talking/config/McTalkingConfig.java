@@ -530,18 +530,23 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "complaints")
     @IntField(min = 0, max = 100)
-    @SerialEntry(comment = "Colony days a problem must last before a passing remark becomes a complaint.")
+    @SerialEntry(comment = "Harshness: in an established colony, a problem may last this many times its usual fix time (about 2 days for a home, 1 for a job) before a passing remark becomes a complaint.")
     public int complaintAfterDays = 1;
 
     @AutoGen(category = "citizens", group = "complaints")
     @IntField(min = 0, max = 100)
-    @SerialEntry(comment = "Colony days a problem must last before a complaint becomes a demand.")
+    @SerialEntry(comment = "Harshness: in an established colony, a problem may last this many times its usual fix time before a complaint becomes a demand.")
     public int complaintDemandAfterDays = 5;
 
     @AutoGen(category = "citizens", group = "complaints")
     @IntField(min = 0, max = 100)
-    @SerialEntry(comment = "While the colony is younger than this many days, housing problems are only mentioned in passing.")
-    public int youngColonyHousingGraceDays = 7;
+    @SerialEntry(comment = "Over this many colony days the founding patience (see youngColonyPatience) fades gradually to normal, so citizens never turn from patient to angry on one day. Raids are only feared after one happened. (The key keeps its old name so saved configs still apply.)")
+    public int youngColonyHousingGraceDays = 10;
+
+    @AutoGen(category = "citizens", group = "complaints")
+    @DoubleField(min = 1.0, max = 10.0)
+    @SerialEntry(comment = "How many times longer problems may last in a brand-new colony before citizens complain, and how much milder their moods are. Fades gradually to normal over the young colony grace days. 1 turns the founding patience off.")
+    public double youngColonyPatience = ComplaintRamp.Settings.DEFAULT_YOUNG_COLONY_PATIENCE;
 
     // Colony Diplomacy
     @AutoGen(category = "citizens", group = "colony_diplomacy")
@@ -633,7 +638,7 @@ public class McTalkingConfig {
 
     public ComplaintRamp.Settings complaintRampSettings() {
         return new ComplaintRamp.Settings(enableComplaintRamp, complaintAfterDays,
-                complaintDemandAfterDays, youngColonyHousingGraceDays);
+                complaintDemandAfterDays, youngColonyHousingGraceDays, youngColonyPatience);
     }
 
     public static boolean hasGeminiApiKey() {
