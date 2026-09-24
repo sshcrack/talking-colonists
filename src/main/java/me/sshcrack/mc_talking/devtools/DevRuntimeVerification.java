@@ -151,6 +151,9 @@ public final class DevRuntimeVerification {
                 require(me.sshcrack.mc_talking.McTalkingClient.getConversationPartner(citizen.getUUID()) == null,
                         "ended foreground ownership cleared on client");
                 DevConversationVisualVerification.verify(server, citizen);
+                if (DevLiveConversationVerification.isConfigured()) {
+                    DevLiveConversationVerification.verify(server, citizen);
+                }
                 McTalking.LOGGER.info("MC_TALKING_RUNTIME_SUCCESS:citizen,prompt,queued-input,audio,reconnect,microphone-turn,padding-response,cleanup");
             } catch (Exception error) {
                 throw new IllegalStateException("In-world conversation verification failed", error);
