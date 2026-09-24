@@ -22,6 +22,9 @@ import me.sshcrack.mc_talking.api.memory.BroadcastSource;
 import me.sshcrack.mc_talking.api.memory.CitizenMemoryService;
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
+import me.sshcrack.mc_talking.config.ConfigPreset;
+import me.sshcrack.mc_talking.config.ConfigPresets;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -307,6 +310,17 @@ public final class TalkingColonistsGameTests {
                 }
             }
         });
+        helper.succeed();
+    }
+
+    /** Q8: a fresh config is the Free Tier preset, so new installs do not show Custom. */
+    @GameTest(template = FLOOR, batch = "mc_talking_config_presets", timeoutTicks = 20)
+    public static void freshConfigIsFreeTierPreset(GameTestHelper helper) {
+        McTalkingConfig config = new McTalkingConfig();
+        helper.assertTrue(config.configPreset == ConfigPreset.FREE_TIER, "default preset should be FREE_TIER");
+        helper.assertTrue(ConfigPresets.matches(config, ConfigPreset.FREE_TIER),
+                "field defaults should equal the Free Tier preset");
+        helper.assertTrue(!ConfigPresets.reconcile(config), "a fresh config should need no preset change");
         helper.succeed();
     }
 

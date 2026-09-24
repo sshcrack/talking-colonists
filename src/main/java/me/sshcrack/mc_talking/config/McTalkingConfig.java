@@ -44,6 +44,15 @@ public class McTalkingConfig {
                     .build())
             .build();
 
+    // Preset selector (roadmap Q8). Kept first so it is at the top of the screen.
+    @AutoGen(category = "api")
+    @EnumCycler
+    @SerialEntry(comment = "Sets the session and ambient-chatter entries at once. FREE_TIER: the defaults, fits a free AI Studio key. PAID_KEY: more concurrent sessions and chatter. QUIET_COLONY: citizens only talk when a player talks to them. Editing one of those entries afterwards switches this to CUSTOM. See docs/config-presets.md for the keys each preset sets.")
+    public ConfigPreset configPreset = ConfigPreset.FREE_TIER;
+
+    @SerialEntry(comment = "Internal: the preset whose values were last written. A different configPreset is applied on the next load.")
+    public ConfigPreset appliedConfigPreset = ConfigPreset.FREE_TIER;
+
     // API Configuration
     @AutoGen(category = "api")
     @StringField
@@ -718,6 +727,20 @@ public class McTalkingConfig {
                 McTalking.LOGGER.info("[Config] Migrated default maxConcurrentBackground from 3 to 1");
             }
             INSTANCE.instance().configVersion = 4;
+            INSTANCE.save();
+        }
+
+        applyPresetChanges();
+    }
+
+    /**
+     * Writes a newly chosen preset, or marks the preset {@link ConfigPreset#CUSTOM} when one
+     * of its values was edited, and saves if that changed anything.
+     */
+    public static void applyPresetChanges() {
+        ConfigPreset before = INSTANCE.instance().configPreset;
+        if (ConfigPresets.reconcile(INSTANCE.instance())) {
+            McTalking.LOGGER.info("[Config] Preset {} -> {}", before, INSTANCE.instance().configPreset);
             INSTANCE.save();
         }
     }
