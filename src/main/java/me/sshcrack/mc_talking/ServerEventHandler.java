@@ -100,6 +100,7 @@ public class ServerEventHandler {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         McTalkingDebugCommand.register(event.getDispatcher());
+        MissingApiKeyOnboardingHandler.registerServerFallback(event.getDispatcher(), event.getCommandSelection());
     }
 
     @SubscribeEvent

@@ -2,7 +2,11 @@ package me.sshcrack.mc_talking.handler;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.onboarding.MissingKeyOnboardingTracker;
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
+import me.sshcrack.mc_talking.client.ConfigScreenOpener;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -63,6 +67,25 @@ public final class MissingApiKeyOnboardingHandler {
         }
 
         player.sendSystemMessage(message);
+    }
+
+    /**
+     * Server-side twin of the client command, for Forge 1.20.1, which sends clicked chat commands
+     * straight to the server instead of trying client commands first. The link is only offered on
+     * integrated servers, which share the JVM with the host's client, so the command opens the
+     * screen there directly. Registered only for integrated servers and only usable by the host.
+     */
+    public static void registerServerFallback(CommandDispatcher<CommandSourceStack> dispatcher,
+                                              Commands.CommandSelection selection) {
+        if (selection == Commands.CommandSelection.DEDICATED) return;
+        dispatcher.register(Commands.literal(OPEN_CONFIG_CLIENT_COMMAND)
+                .requires(source -> source.getServer() != null && !source.getServer().isDedicatedServer()
+                        && source.getPlayer() != null
+                        && source.getServer().isSingleplayerOwner(source.getPlayer().getGameProfile()))
+                .executes(ctx -> {
+                    ConfigScreenOpener.open();
+                    return Command.SINGLE_SUCCESS;
+                }));
     }
 
     /** Resets the once-per-session notification state. Call when the server starts. */
