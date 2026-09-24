@@ -61,7 +61,9 @@ public class RumorMillService {
                     for (int j = i + 1; j < entities.size() && propagated < maxPropagations; j++) {
                         AbstractEntityCitizen c2 = entities.get(j);
 
-                        if (c1.distanceToSqr(c2) > range * range) continue;
+                        PairMode mode = pairMode(ConversationManager.isAsleep(c1), ConversationManager.isAsleep(c2),
+                                sameHome(c1, c2), c1.distanceToSqr(c2) <= range * range);
+                        if (mode == PairMode.SKIP) continue;
 
                         long pairKey = ((long) Math.min(c1.getId(), c2.getId()) << 32)
                                 | (Math.max(c1.getId(), c2.getId()) & 0xFFFFFFFFL);
@@ -78,7 +80,7 @@ public class RumorMillService {
                                 propagated++;
                                 McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
                                         c1.getCitizenData().getName(), c2.getCitizenData().getName());
-                                if (!attemptRumorTalking(c1, c2, rumor, server, cfg)) {
+                                if (mode == PairMode.AWAKE && !attemptRumorTalking(c1, c2, rumor, server, cfg)) {
                                     GossipMoments.start(c1, c2, GossipMoments.Kind.RUMOR, null);
                                 }
                             }
@@ -90,7 +92,7 @@ public class RumorMillService {
                                 propagated++;
                                 McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
                                         c2.getCitizenData().getName(), c1.getCitizenData().getName());
-                                if (!attemptRumorTalking(c2, c1, rumor, server, cfg)) {
+                                if (mode == PairMode.AWAKE && !attemptRumorTalking(c2, c1, rumor, server, cfg)) {
                                     GossipMoments.start(c2, c1, GossipMoments.Kind.RUMOR, null);
                                 }
                             }
@@ -99,6 +101,32 @@ public class RumorMillService {
                 }
             }
         }
+    }
+
+    /** How two citizens may pass rumors on right now. */
+    enum PairMode {
+        /** Not together. */
+        SKIP,
+        /** Awake and close: the rumor may be voiced or shown as a gossip moment. */
+        AWAKE,
+        /** Housemates going to sleep: the rumor passes silently, as pillow talk, without voice or bubble. */
+        PILLOW_TALK
+    }
+
+    /**
+     * Awake citizens gossip when they are close. When either one is asleep, only housemates share
+     * anything, and only silently: they spend the night under the same roof.
+     */
+    static PairMode pairMode(boolean asleep1, boolean asleep2, boolean housemates, boolean inRange) {
+        if (asleep1 || asleep2) return housemates ? PairMode.PILLOW_TALK : PairMode.SKIP;
+        return inRange ? PairMode.AWAKE : PairMode.SKIP;
+    }
+
+    private static boolean sameHome(AbstractEntityCitizen c1, AbstractEntityCitizen c2) {
+        var d1 = c1.getCitizenData();
+        var d2 = c2.getCitizenData();
+        if (d1 == null || d2 == null || d1.getHomeBuilding() == null || d2.getHomeBuilding() == null) return false;
+        return d1.getHomeBuilding().getPosition().equals(d2.getHomeBuilding().getPosition());
     }
 
     /** Voices the rumor when a player is near; returns whether a spoken line started. */

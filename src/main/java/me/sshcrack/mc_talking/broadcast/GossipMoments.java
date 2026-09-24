@@ -79,6 +79,7 @@ public final class GossipMoments {
         Long last = LAST_PAIR_MOMENT.get(pair);
         if (last != null && now - last < PAIR_COOLDOWN_MS) return false;
         if (ConversationManager.isCitizenBusy(teller) || ConversationManager.isCitizenBusy(listener)) return false;
+        if (ConversationManager.isAsleep(teller) || ConversationManager.isAsleep(listener)) return false;
 
         Moment moment = new Moment(teller, listener);
         for (AbstractEntityCitizen citizen : List.of(teller, listener)) {
