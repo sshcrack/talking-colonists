@@ -8,11 +8,11 @@ mod.authors = ["sshcrack"]
 mod.contributors = []
 mod.inception_year = "2025"
 mod.license.name = "All rights reserved"
-mod.license.url = "https://github.com/sshcrack/talking-colonists/blob/master/LICENSE.md"
+mod.license.url = "https://github.com/talking-colonists/talking-colonists/blob/master/LICENSE.md"
 mod.license.dist = "repo"
-mod.sources_url = "https://github.com/sshcrack/talking-colonists"
-mod.homepage_url = "https://github.com/sshcrack/talking-colonists"
-mod.issues_url = "https://github.com/sshcrack/talking-colonists/issues"
+mod.sources_url = "https://github.com/talking-colonists/talking-colonists"
+mod.homepage_url = "https://github.com/talking-colonists/talking-colonists"
+mod.issues_url = "https://github.com/talking-colonists/talking-colonists/issues"
 mod.discord_url = "https://discord.gg/ScAsuQt5em"
 
 [[mod.pom.developers]]

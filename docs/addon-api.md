@@ -19,7 +19,7 @@ This document describes the supported **API generation 2** addon contract.
 [addon-migration.md](addon-migration.md).
 
 **Starting a new addon?** Use the
-[addon template](https://github.com/sshcrack/talking-colonists-addon-template) ("Use this template"
+[addon template](https://github.com/talking-colonists/talking-colonists-addon-template) ("Use this template"
 on GitHub). It builds for 1.21.1 NeoForge and 1.20.1 Forge and shows feature detection, a prompt
 contributor, a query tool and a lifecycle listener. It targets Talking Colonists 2.1.
 
