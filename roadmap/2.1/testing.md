@@ -204,3 +204,19 @@ push.
 
 - `bash scripts/test-prompt-behaviour.sh` runs locally with the key from the game config and
   reports per-scenario pass/fail; a missing key is a clear skip, not a failure.
+
+
+### Implementation record — 2026-09-24
+
+- `PromptBehaviourLiveTest` (tagged `live`, enabled only when `MC_TALKING_PROMPT_BEHAVIOUR_KEY`
+  is set, so the normal `test` task and CI builds skip it) reuses the T3 fixtures and sends raw
+  `generateContent` requests to `McTalkingConfig.FLASH_MODEL` with the key in a header.
+  Scenarios: `portugueseConversationScript`, `cavernStyleHomeIsNotAComplaint`,
+  `toolAnswerableQuestionCallsTheTool` (declares `list_citizens` + `get_inventory`, expects a
+  `list_citizens` call). HTTP 429 → skipped.
+- `scripts/test-prompt-behaviour.sh` resolves the key (`GEMINI_API_KEY`, else the YACL config
+  of this checkout or the main checkout via `git rev-parse --git-common-dir`), runs the test and
+  prints PASS/FAIL/SKIP per scenario. Missing key → SKIP, exit 0.
+- `.github/workflows/prompt_behaviour.yml`: `workflow_dispatch` only, secret `GEMINI_API_KEY`.
+- Local run with the game-config key: all three scenarios passed; the missing-key path prints
+  SKIP and exits 0.

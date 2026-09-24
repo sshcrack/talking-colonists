@@ -1,0 +1,38 @@
+# Opt-in live prompt behaviour checks against Gemini (roadmap T5). Manual only: never runs on
+# push or pull_request. Needs the GEMINI_API_KEY repository secret; without it the script skips.
+name: Prompt behaviour (live Gemini)
+on:
+  workflow_dispatch:
+
+jobs:
+  prompt-behaviour:
+    name: Prompt behaviour
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 25
+          distribution: 'microsoft'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
+      - name: Run live prompt behaviour checks
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: bash scripts/test-prompt-behaviour.sh --no-daemon --max-workers=1
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prompt-behaviour-report
+          path: versions/1.21.1-neoforge/build/reports/tests/
