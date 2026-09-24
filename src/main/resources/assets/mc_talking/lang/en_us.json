@@ -276,6 +276,8 @@
   "yacl3.config.mc_talking:config.citizenVoiceWhisper.desc": "Marks the citizens voice channel as a whisper, which has a smaller default radius",
   "yacl3.config.mc_talking:config.citizenVoiceDistance": "Citizen Voice Distance",
   "yacl3.config.mc_talking:config.citizenVoiceDistance.desc": "The distance at which the citizen's voice can be heard. Only applies if the value is non 0.",
+  "yacl3.config.mc_talking:config.speechFloorRadius": "One Voice at a Time Radius",
+  "yacl3.config.mc_talking:config.speechFloorRadius.desc": "Citizens wait with greetings, mumbling, rumors and addon lines while a player within this many blocks already hears another citizen speaking or is in a conversation. Set to 0 to let everyone talk at once.",
 
   "yacl3.config.mc_talking:config.category.citizens.group.rumor_mill": "Rumor Mill",
   "yacl3.config.mc_talking:config.enableRumorMill": "Enable Rumor Mill",

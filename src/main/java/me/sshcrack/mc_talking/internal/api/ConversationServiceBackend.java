@@ -308,6 +308,8 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
     ) {
         ControlledSession session = new ControlledSession(server, participants, agenda, options);
         CONTROLLED_SESSIONS.computeIfAbsent(server, ignored -> ConcurrentHashMap.newKeySet()).add(session);
+        // Participants stay engaged between turns: no greetings or mumbling from a campfire circle.
+        me.sshcrack.mc_talking.internal.session.SpeechFloor.hold(session, ConversationKind.CONTROLLED, participants);
         return session;
     }
 
@@ -481,6 +483,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
         @Override
         public void end(@NotNull EndReason reason) {
             runtime.end(reason);
+            me.sshcrack.mc_talking.internal.session.SpeechFloor.release(this);
             unregisterControlledSession(server, this);
         }
 
