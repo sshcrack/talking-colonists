@@ -11,7 +11,11 @@ import me.sshcrack.mc_talking.api.colony.ColonyEventService;
 import me.sshcrack.mc_talking.api.colony.ColonyEventView;
 import me.sshcrack.mc_talking.api.context.CitizenContextService;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
+import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
+import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
+import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
+import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
 import me.sshcrack.mc_talking.api.memory.BroadcastSource;
@@ -35,6 +39,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 *//*?}*/
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -263,6 +269,42 @@ public final class TalkingColonistsGameTests {
                 var kept = ((CitizenDataMemoryExtended) recruit).mc_talking$getMemory();
                 helper.assertTrue(kept != null && kept.getFacts().contains("Steve promised me a bed if I stay"),
                         "recruited citizen should keep the visitor's memory, had " + (kept == null ? null : kept.getFacts()));
+            }
+        });
+        helper.succeed();
+    }
+
+    /** A5: a controlled session's player statement reaches utterance listeners as typed player input. */
+    @GameTest(template = FLOOR, batch = "mc_talking_utterance_events", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void controlledPlayerStatementIsAnUtterance(GameTestHelper helper) {
+        logFailures("controlledPlayerStatementIsAnUtterance", () -> {
+            try (var fixture = ColonyTestHarness.create(helper)) {
+                var citizen = fixture.spawnCitizen(new BlockPos(4, 1, 4));
+                List<ConversationUtteranceEvent> heard = new ArrayList<>();
+                var registration = CitizenConversationService.registerUtteranceListener(
+                        "mc_talking_test:utterances", 0, heard::add);
+                var session = CitizenConversationService.createControlledSession(helper.getLevel().getServer(),
+                        List.of(citizen), "Harvest festival", ControlledConversationOptions.noAddonTools());
+                try {
+                    session.addPlayerStatement(fixture.owner(), "  Who brings the pumpkins?  ");
+                    helper.assertTrue(heard.size() == 1, "expected one utterance, got " + heard);
+                    var event = heard.get(0);
+                    helper.assertTrue(event.kind() == ConversationKind.CONTROLLED
+                                    && event.speaker() == ConversationUtteranceEvent.Speaker.PLAYER
+                                    && event.source() == ConversationUtteranceEvent.Source.TYPED
+                                    && fixture.owner().getUUID().equals(event.speakerId())
+                                    && session.sessionId().equals(event.sessionId())
+                                    && "Who brings the pumpkins?".equals(event.text()),
+                            "unexpected utterance " + event);
+
+                    session.end(ControlledConversationSession.EndReason.COMPLETED);
+                    helper.assertTrue(heard.size() == 1, "no utterance after the session ended, got " + heard);
+                } finally {
+                    registration.close();
+                    if (session.state() != ControlledConversationSession.State.ENDED) {
+                        session.end(ControlledConversationSession.EndReason.COMPLETED);
+                    }
+                }
             }
         });
         helper.succeed();

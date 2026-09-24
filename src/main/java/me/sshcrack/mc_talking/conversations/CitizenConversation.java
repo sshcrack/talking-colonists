@@ -269,6 +269,9 @@ public class CitizenConversation {
                 // Only spend the optional extra Flash request on memories after the
                 // generated conversation was actually heard to completion. Aborted or
                 // timed-out playback must not create memories for unheard dialogue.
+                if (!cancellation.isCancelled() && playbackCompleted && playbackStarted.get()) {
+                    ConversationManager.emitScriptUtterances(participants, completedTranscript);
+                }
                 if (!cancellation.isCancelled() && playbackCompleted && playbackStarted.get()
                         && McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
                     CitizenMemoryGenerator.addAndGenerateMemory(completedTranscript, participants, server)

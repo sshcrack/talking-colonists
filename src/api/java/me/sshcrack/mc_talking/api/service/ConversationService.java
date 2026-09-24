@@ -28,6 +28,12 @@ public interface ConversationService {
     }
     @NotNull CompletableFuture<AmbientLineResult> requestAmbientLine(@NotNull AbstractEntityCitizen citizen, @NotNull String promptDirective);
     @NotNull AddonRegistration registerLifecycleListener(@NotNull String id, int order, @NotNull ConversationLifecycleListener listener);
+
+    /** Runtimes without {@link me.sshcrack.mc_talking.api.ApiFeature#UTTERANCE_EVENTS} cannot report utterances. */
+    default @NotNull AddonRegistration registerUtteranceListener(@NotNull String id, int order,
+                                                                 @NotNull ConversationUtteranceListener listener) {
+        throw new UnsupportedOperationException("Utterance events are not supported by this runtime");
+    }
     @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen);
     @NotNull Optional<ProviderSessionStatus> providerStatus(@NotNull AbstractEntityCitizen citizen);
     @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen);

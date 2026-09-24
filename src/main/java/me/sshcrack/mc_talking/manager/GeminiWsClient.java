@@ -1,5 +1,8 @@
 package me.sshcrack.mc_talking.manager;
 
+import org.jetbrains.annotations.NotNull;
+import me.sshcrack.mc_talking.internal.session.UtteranceTracker;
+import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -455,6 +458,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
                 sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(heardTranscript.trim());
             }
+            utterances.onCitizenTurnHeard(heardTranscript);
             onAudibleTranscriptComplete(heardTranscript.trim());
         }
         return true;
@@ -596,6 +600,18 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * Only populated when audio transcription is enabled (i.e. when citizen memory is enabled).
      */
     protected final StringBuilder sessionTranscript = new StringBuilder();
+    /** Finished player and citizen utterances for addon listeners (roadmap A5). */
+    private final UtteranceTracker utterances = new UtteranceTracker(new UtteranceTracker.Sink() {
+        @Override
+        public void player(@NotNull String text) {
+            ConversationManager.emitClientUtterance(GeminiWsClient.this, ConversationUtteranceEvent.Speaker.PLAYER, text);
+        }
+
+        @Override
+        public void citizen(@NotNull String text) {
+            ConversationManager.emitClientUtterance(GeminiWsClient.this, ConversationUtteranceEvent.Speaker.CITIZEN, text);
+        }
+    });
 
     @Override
     public BidiGenerateContentSetup getSetup() {
@@ -834,6 +850,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onInputTranscription(String transcription) {
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.INPUT_OBSERVED);
+        if (!suppressProviderOutput && transcription != null) utterances.onInputChunk(transcription);
     }
 
     @Override
@@ -850,6 +867,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
         if (suppressProviderOutput) return;
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.TURN_COMPLETED);
+        utterances.onProviderTurnComplete();
         QuotaTracker.reportSuccess(getModelName());
         UUID turnId = ensureOutputTurn();
         generationComplete = true;
@@ -1327,6 +1345,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void close() {
         if (!closeStarted.compareAndSet(false, true)) return;
+        utterances.end();
         MicrophoneTurnModule turns = microphoneTurns;
         if (turns != null) turns.close();
         pendingInput.close();

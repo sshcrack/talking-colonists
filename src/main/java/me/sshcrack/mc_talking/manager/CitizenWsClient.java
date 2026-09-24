@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager;
 
+import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.McTalking;
@@ -265,6 +266,8 @@ public class CitizenWsClient extends GeminiWsClient {
     @Override
     public BidiGenerateContentSetup getSetup() {
         BidiGenerateContentSetup setup = super.getSetup();
+        // Player speech transcripts feed utterance events (roadmap A5); the microphone turn logic ignores them.
+        setup.inputAudioTranscription = new JsonObject();
         if (maxOutputTokens != null) {
             setup.generationConfig.maxOutputTokens = Integer.toString(maxOutputTokens);
         }

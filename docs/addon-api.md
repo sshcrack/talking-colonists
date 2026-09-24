@@ -509,6 +509,29 @@ AddonRegistration tavernTalk = CitizenConversationRules.registerVisitorPolicy(
 - Veto-only speech policies still apply to visitors. Core ambient chatter never picks visitors on its
   own.
 
+## Utterance events
+
+Since API 2.1 (`ApiFeature.UTTERANCE_EVENTS`), addons can follow what is said in every conversation kind:
+
+```java
+CitizenConversationService.registerUtteranceListener("court:testimony", 0, event -> {
+    // Server thread. One event per finished utterance, never partial transcription chunks.
+    if (event.speaker() == ConversationUtteranceEvent.Speaker.PLAYER) {
+        // event.speakerId(), event.text(), event.kind(), event.sessionId() ...
+    }
+});
+```
+
+- Player speech arrives as one utterance once the citizen answers.
+- A citizen's reply arrives once its audio has been heard in full.
+- Pair conversations report each scripted line after playback, with source `SCRIPT`.
+- Controlled-session player statements arrive as `TYPED`.
+- Nothing is reported after a session ends.
+
+Transcription is best effort. Speech-to-text can mishear, and a citizen's words are only what the model
+said. Never treat an utterance as proof for irreversible gameplay; confirm such actions through your own
+AI tool.
+
 ## Starting speech and conversations
 
 Player conversation starts return a typed immediate result:

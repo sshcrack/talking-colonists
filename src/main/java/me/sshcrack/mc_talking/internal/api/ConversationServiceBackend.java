@@ -14,6 +14,8 @@ import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
 import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
+import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
+import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceListener;
 import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
@@ -151,6 +153,15 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             @NotNull ConversationLifecycleListener listener
     ) {
         return ConversationEventRuntime.register(id, order, listener);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerUtteranceListener(
+            @NotNull String id,
+            int order,
+            @NotNull ConversationUtteranceListener listener
+    ) {
+        return ConversationEventRuntime.registerUtterance(id, order, listener);
     }
 
     @Override
@@ -378,6 +389,10 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                 runtime.addTranscript(new ConversationTranscriptEntry(
                         ConversationTranscriptEntry.SpeakerKind.PLAYER,
                         player.getUUID(), player.getName().getString(), statement.trim(), player.level().getGameTime()));
+                ConversationEventRuntime.emitUtterance(new ConversationUtteranceEvent(ConversationKind.CONTROLLED,
+                        null, ConversationUtteranceEvent.Speaker.PLAYER, player.getUUID(), player.getName().getString(),
+                        statement.trim(), runtime.sessionId(), null, ConversationUtteranceEvent.Source.TYPED,
+                        player.level().getGameTime()));
             };
             if (server.isSameThread()) append.run();
             else server.execute(append);
