@@ -136,6 +136,7 @@ public class ServerEventHandler {
         ConversationManager.cleanup();
 
         CasualGreetingHandler.onServerStop();
+        me.sshcrack.mc_talking.broadcast.NewsParticles.clear();
         PlayerHeatmapTracker.clear();
     }
 
@@ -191,6 +192,7 @@ public class ServerEventHandler {
 
     private void onServerTickCommon(MinecraftServer server) {
         tickCounter++;
+        me.sshcrack.mc_talking.broadcast.NewsParticles.tick();
         // Reap timed-out background/foreground reservations even when no feature-specific
         // interval fires or no players are online. This keeps lifecycle ownership in core.
         ConversationManager.tickMaintenance();

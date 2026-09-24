@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.rumor;
 
+import me.sshcrack.mc_talking.broadcast.NewsParticles;
 import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
@@ -77,6 +78,7 @@ public class RumorMillService {
                                 propagated++;
                                 McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
                                         c1.getCitizenData().getName(), c2.getCitizenData().getName());
+                                NewsParticles.trail(c1, c2, NewsParticles.Kind.RUMOR);
                                 attemptRumorTalking(c1, c2, rumor, server, cfg);
                             }
                         }
@@ -87,6 +89,7 @@ public class RumorMillService {
                                 propagated++;
                                 McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
                                         c2.getCitizenData().getName(), c1.getCitizenData().getName());
+                                NewsParticles.trail(c2, c1, NewsParticles.Kind.RUMOR);
                                 attemptRumorTalking(c2, c1, rumor, server, cfg);
                             }
                         }

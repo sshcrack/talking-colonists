@@ -291,6 +291,8 @@
 
   "yacl3.config.mc_talking:config.enableRumorTalking": "Enable Rumor Talking",
   "yacl3.config.mc_talking:config.enableRumorTalking.desc": "If enabled, citizens voice rumors aloud when a player is nearby.",
+  "yacl3.config.mc_talking:config.showNewsParticles": "Show News Spreading",
+  "yacl3.config.mc_talking:config.showNewsParticles.desc": "Shows a small trail of particles when news passes from one citizen to another: white for rumors, gold for colony broadcasts. A ring spreads where a broadcast was announced, such as a rung bell.",
   "yacl3.config.mc_talking:config.rumorTalkingChance": "Rumor Talking Chance",
   "yacl3.config.mc_talking:config.rumorTalkingChance.desc": "Per-propagation chance that a rumor is spoken aloud when a player is in range.",
   "yacl3.config.mc_talking:config.rumorTalkingRange": "Rumor Talking Range",

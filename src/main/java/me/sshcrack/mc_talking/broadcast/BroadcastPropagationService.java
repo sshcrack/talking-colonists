@@ -87,6 +87,7 @@ public class BroadcastPropagationService {
                             McTalking.LOGGER.info("[Broadcast] {} → {}: shared broadcasts",
                                     carrier.getName(), recipient.getName());
                             propagationsLeft--;
+                            NewsParticles.trail(carrierEntity, recipientEntity, NewsParticles.Kind.BROADCAST);
 
                             if (cfg.enableBroadcastYelling && firstAnnounceable != null) {
                                 if (ConversationManager.hasPlayerNearby(carrierEntity, server, cfg.broadcastYellingRange)

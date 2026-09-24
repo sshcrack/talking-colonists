@@ -107,10 +107,17 @@ final class MemoryServiceBackend implements MemoryService {
         return onColonyServerThread(colony, BroadcastPublishResult.failed(BroadcastPublishResult.Status.UNAVAILABLE),
                 () -> {
                     var config = McTalkingConfig.INSTANCE.instance();
-                    return BroadcastPublisher.INSTANCE.publish(
+                    var result = BroadcastPublisher.INSTANCE.publish(
                             new MineColoniesBroadcastColony(colony, config.broadcastPropagationRange),
                             request,
                             new BroadcastPublisher.Settings(config.enableBroadcastPropagation, config.maxBroadcastsStored));
+                    // Announced at a place (a bell, a notice board): let the word visibly go out from there.
+                    if (result.isPublished() && request.originPosition() != null
+                            && colony.getWorld() instanceof net.minecraft.server.level.ServerLevel level) {
+                        me.sshcrack.mc_talking.broadcast.NewsParticles.ring(level, request.originPosition(),
+                                me.sshcrack.mc_talking.broadcast.NewsParticles.Kind.BROADCAST);
+                    }
+                    return result;
                 });
     }
 

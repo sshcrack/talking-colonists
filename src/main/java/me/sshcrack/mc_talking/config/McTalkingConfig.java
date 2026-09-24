@@ -347,6 +347,11 @@ public class McTalkingConfig {
     public boolean enableRumorTalking = true;
 
     @AutoGen(category = "citizens", group = "rumor_mill")
+    @TickBox
+    @SerialEntry(comment = "If true, a small trail of particles shows news passing from one citizen to another (white for rumors, gold for colony broadcasts).")
+    public boolean showNewsParticles = true;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
     @SerialEntry(comment = "Chance (0.0-1.0) that a rumor propagation is voiced aloud when a player is nearby.")
     public double rumorTalkingChance = 0.5;
