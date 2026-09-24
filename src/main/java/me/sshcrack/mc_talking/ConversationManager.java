@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.manager.audio.ControlledTurnAudioProvider;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationLifecycleEvent;
+import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.internal.api.ConversationEventRuntime;
@@ -95,6 +96,8 @@ public class ConversationManager {
                     .map(snapshot -> new ConversationParticipationModule.Ownership(
                             snapshot.token(), snapshot.playerId()))
                     .orElse(null));
+    /** Addon purpose tags of running player conversations, keyed by foreground ownership ID. */
+    private static final Map<UUID, String> sessionPurposes = new ConcurrentHashMap<>();
     private static final Map<UUID, MinecraftConversationParticipationAdapter> participationAdapters =
             new ConcurrentHashMap<>();
     private static final CitizenActivityRegistry activities = new CitizenActivityRegistry(System::nanoTime);
@@ -172,7 +175,8 @@ public class ConversationManager {
             if (closed.get() || !foregroundSessions.markActive(token, "conversation active")) return false;
             if (lifecycleStarted.compareAndSet(false, true)) {
                 foregroundSessions.snapshot(token.citizenId()).ifPresent(snapshot ->
-                        dispatchLifecycleStarted(snapshot.entity(), snapshot.kind(), snapshot.playerId(), snapshot.sessionId(), snapshot.turnId()));
+                        dispatchLifecycleStarted(snapshot.entity(), snapshot.kind(), snapshot.playerId(), snapshot.sessionId(), snapshot.turnId(),
+                                sessionPurposes.get(token.ownershipId())));
             }
             return true;
         }
@@ -468,9 +472,20 @@ public class ConversationManager {
             @Nullable UUID sessionId,
             @Nullable UUID turnId
     ) {
+        dispatchLifecycleStarted(citizen, kind, playerId, sessionId, turnId, null);
+    }
+
+    private static void dispatchLifecycleStarted(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind,
+            @Nullable UUID playerId,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId,
+            @Nullable String purpose
+    ) {
         dispatchLifecycleEvent(new ConversationLifecycleEvent(
                 ConversationLifecycleEvent.Phase.STARTED, kind, citizen, playerId, sessionId, turnId,
-                citizen.level().getGameTime()));
+                citizen.level().getGameTime(), purpose));
     }
 
     private static void dispatchLifecycleEnded(
@@ -488,9 +503,20 @@ public class ConversationManager {
             @Nullable UUID sessionId,
             @Nullable UUID turnId
     ) {
+        dispatchLifecycleEnded(citizen, kind, playerId, sessionId, turnId, null);
+    }
+
+    private static void dispatchLifecycleEnded(
+            AbstractEntityCitizen citizen,
+            ConversationKind kind,
+            @Nullable UUID playerId,
+            @Nullable UUID sessionId,
+            @Nullable UUID turnId,
+            @Nullable String purpose
+    ) {
         dispatchLifecycleEvent(new ConversationLifecycleEvent(
                 ConversationLifecycleEvent.Phase.ENDED, kind, citizen, playerId, sessionId, turnId,
-                citizen.level().getGameTime()));
+                citizen.level().getGameTime(), purpose));
     }
 
     private static void dispatchLifecycleEvent(ConversationLifecycleEvent event) {
@@ -508,13 +534,15 @@ public class ConversationManager {
         var snapshot = ended.snapshot();
         var participation = participationAdapters.remove(snapshot.token().ownershipId());
         if (participation != null) participation.complete();
+        String purpose = sessionPurposes.remove(snapshot.token().ownershipId());
         // Provider callbacks may arrive off-thread. Lifecycle dispatch, need inspection for cooldown,
         // inventory/status cleanup, and every other Minecraft-world read happen on the server thread.
         runOnServerThread(snapshot.entity(), () -> {
             boolean wasActive = ended.previousState() == ForegroundSessionRegistry.State.ACTIVE
                     || ended.previousState() == ForegroundSessionRegistry.State.RECOVERING;
             if (wasActive) {
-                dispatchLifecycleEnded(snapshot.entity(), snapshot.kind(), snapshot.playerId(), snapshot.sessionId(), snapshot.turnId());
+                dispatchLifecycleEnded(snapshot.entity(), snapshot.kind(), snapshot.playerId(), snapshot.sessionId(), snapshot.turnId(),
+                        purpose);
                 if (snapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT
                         && snapshot.kind() != ConversationKind.CONTROLLED
                         && switch (ended.reason()) {
@@ -1038,6 +1066,15 @@ public class ConversationManager {
      * citizen) it is closed first so the player always wins.</p>
      */
     public static ConversationStartResult startPlayerConversationDetailed(ServerPlayer player, AbstractEntityCitizen citizen) {
+        return startPlayerConversationDetailed(player, citizen, PlayerConversationOptions.defaults());
+    }
+
+    /**
+     * Starts a player conversation with addon options. Non-default options never take over a
+     * mumbling session, because that session's prompt was built without the agenda.
+     */
+    public static ConversationStartResult startPlayerConversationDetailed(ServerPlayer player, AbstractEntityCitizen citizen,
+                                                                          PlayerConversationOptions options) {
         if (!McTalkingConfig.hasGeminiApiKey()) {
             player.sendSystemMessage(Component.translatable("mc_talking.no_key").withStyle(ChatFormatting.RED));
             return ConversationStartResult.rejected(
@@ -1076,7 +1113,8 @@ public class ConversationManager {
         ForegroundSessionRegistry.Token existingToken = foregroundSessions.token(citizenId);
         var existingSnapshot = foregroundSessions.snapshot(citizenId).orElse(null);
 
-        if (existingClient instanceof CitizenWsClient cws && cws.isMumbling() && cws.isPlayerTakeoverAllowed()
+        if (options.isDefault()
+                && existingClient instanceof CitizenWsClient cws && cws.isMumbling() && cws.isPlayerTakeoverAllowed()
                 && existingToken != null && existingSnapshot != null
                 && existingSnapshot.priority() == ForegroundSessionRegistry.Priority.AMBIENT) {
             var promoted = foregroundSessions.promoteToPlayer(existingToken, playerId, ConversationKind.PLAYER);
@@ -1122,7 +1160,7 @@ public class ConversationManager {
         try {
             ws = new CitizenWsClient(
                     new CitizenEntityAudioProvider(citizen, McTalkingVoicechatPlugin.DIRECT_PLAYER_DIALOG),
-                    citizen, player);
+                    citizen, player, options);
         } catch (RuntimeException e) {
             reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "failed to construct provider session");
@@ -1154,6 +1192,7 @@ public class ConversationManager {
                     "failed to connect provider session");
         }
 
+        if (options.purpose() != null) sessionPurposes.put(reservation.token.ownershipId(), options.purpose());
         if (!reservation.activate()) {
             reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "foreground ownership changed before player activation");

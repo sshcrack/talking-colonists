@@ -18,6 +18,14 @@ public interface ConversationService {
     boolean isBusy(@NotNull AbstractEntityCitizen citizen);
     @NotNull ConversationEligibility eligibility(@NotNull AbstractEntityCitizen citizen, @NotNull ConversationKind kind);
     @NotNull ConversationStartResult startPlayerConversation(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen);
+
+    /** Runtimes without {@link me.sshcrack.mc_talking.api.ApiFeature#PLAYER_CONVERSATION_OPTIONS} only accept defaults. */
+    default @NotNull ConversationStartResult startPlayerConversation(@NotNull ServerPlayer player,
+                                                                     @NotNull AbstractEntityCitizen citizen,
+                                                                     @NotNull PlayerConversationOptions options) {
+        if (options.isDefault()) return startPlayerConversation(player, citizen);
+        throw new UnsupportedOperationException("Player conversation options are not supported by this runtime");
+    }
     @NotNull CompletableFuture<AmbientLineResult> requestAmbientLine(@NotNull AbstractEntityCitizen citizen, @NotNull String promptDirective);
     @NotNull AddonRegistration registerLifecycleListener(@NotNull String id, int order, @NotNull ConversationLifecycleListener listener);
     @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen);

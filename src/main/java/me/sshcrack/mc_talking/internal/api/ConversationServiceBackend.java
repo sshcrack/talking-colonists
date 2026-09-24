@@ -13,6 +13,7 @@ import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
 import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
+import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.api.conversation.ConversationTranscriptEntry;
@@ -92,6 +93,15 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             @NotNull AbstractEntityCitizen citizen
     ) {
         return ConversationManager.startPlayerConversationDetailed(player, citizen);
+    }
+
+    @Override
+    public @NotNull ConversationStartResult startPlayerConversation(
+            @NotNull ServerPlayer player,
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull PlayerConversationOptions options
+    ) {
+        return ConversationManager.startPlayerConversationDetailed(player, citizen, options);
     }
 
     @Override

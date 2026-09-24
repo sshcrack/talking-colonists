@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.manager;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.internal.audio.MicrophoneTurnModule;
@@ -78,6 +79,7 @@ public class CitizenWsClient extends GeminiWsClient {
     private final boolean startedInSystemMode;
     private final CitizenPromptView promptView;
     private final PromptSessionContext promptSessionContext;
+    private final boolean extractPlayerMemory;
     @Nullable
     private final Integer maxOutputTokens;
     private final AtomicBoolean playerTakeoverPending = new AtomicBoolean(false);
@@ -145,6 +147,7 @@ public class CitizenWsClient extends GeminiWsClient {
         this.onSystemConversationEnded = onSystemConversationEnded;
         this.startedInSystemMode = true;
         this.promptSessionContext = Objects.requireNonNull(promptSessionContext, "promptSessionContext");
+        this.extractPlayerMemory = true;
         this.maxOutputTokens = maxOutputTokens;
         this.promptView = CitizenPromptViewFactory.create(
                 entity.getCitizenData(), Map.of(), null, authenticatedToolPlayerId);
@@ -158,13 +161,23 @@ public class CitizenWsClient extends GeminiWsClient {
      * @param player        the player starting the conversation
      */
     public CitizenWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity, @Nullable ServerPlayer player) {
+        this(audioProvider, entity, player, PlayerConversationOptions.defaults());
+    }
+
+    /**
+     * Creates a direct player conversation with addon options. The agenda and tool allow-list live
+     * only on this client, so they end with the session.
+     */
+    public CitizenWsClient(AudioProvider audioProvider, AbstractEntityCitizen entity, @Nullable ServerPlayer player,
+                           PlayerConversationOptions options) {
         super(audioProvider, entity);
         this.player = player;
         this.authenticatedToolPlayerId = player == null ? null : player.getUUID();
         this.detachedAuthenticatedToolPlayer = null;
         this.onSystemConversationEnded = null;
         this.startedInSystemMode = false;
-        this.promptSessionContext = PromptSessionContext.empty();
+        this.promptSessionContext = PlayerSessionContexts.of(options);
+        this.extractPlayerMemory = options.extractMemory();
         this.maxOutputTokens = null;
         Map<UUID, String> interestedParties = player == null
                 ? Map.of()
@@ -284,7 +297,8 @@ public class CitizenWsClient extends GeminiWsClient {
         if (startedInSystemMode) {
             return PromptRuntime.generateSystemControlledRoleplayPrompt(promptView, promptSessionContext);
         }
-        return PromptRuntime.generateCitizenRoleplayPrompt(promptView, promptSessionContext);
+        return PlayerSessionContexts.withAgenda(PromptRuntime.generateCitizenRoleplayPrompt(promptView, promptSessionContext),
+                promptSessionContext);
     }
 
     /** Injects takeover context before the first real player microphone packet. */
@@ -402,7 +416,8 @@ public class CitizenWsClient extends GeminiWsClient {
         ServerPlayer closingPlayer = player;
         super.close();
 
-        if (closingPlayer == null || !McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
+        if (closingPlayer == null || !extractPlayerMemory
+                || !McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) return;
         if (!startedInSystemMode && playerMemoryCloseHandled.compareAndSet(false, true)) {
             // Direct player conversation — generate memory exactly once for this ownership lifetime.
             triggerPlayerMemoryGeneration(closingPlayer);
