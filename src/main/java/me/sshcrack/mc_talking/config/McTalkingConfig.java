@@ -178,6 +178,13 @@ public class McTalkingConfig {
     public double maxConversationDistance = 8.0;
 
     @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "If true, players can start (or end) a conversation without the Talking Device: by sneaking and "
+            + "left-clicking a citizen with an empty main hand, or via the optional 'Talk to Citizen' keybind (unbound by default). "
+            + "Does not change or remove the Talking Device item.")
+    public boolean enableTalkWithoutDevice = true;
+
+    @AutoGen(category = "general", group = "interaction")
     @EnumCycler
     @SerialEntry(comment = "In which format the AI should respond. This can be text, audio or both.")
     public ModalityModes modality = ModalityModes.AUDIO;

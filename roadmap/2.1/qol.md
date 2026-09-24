@@ -278,6 +278,20 @@ one by sneak + right-clicking a citizen with an empty hand (MineColonies uses pl
 its own GUI), plus an optional client keybind that talks to the citizen under the crosshair. Both
 go through `startPlayerConversation` so all eligibility checks still apply.
 
+
+### Implementation record — 2026-09-24
+
+- Gesture: **sneak + left-click** a citizen with an empty main hand toggles a conversation, mirroring
+  the talking device's left-click. Right-click is untouched (MineColonies' citizen window) and so is
+  sneak + right-click (MineColonies inventory access). Config: `enableTalkWithoutDevice` (default on).
+- Optional keybind "Talk to Citizen" (unbound by default, category "Talking Colonists") ray-casts the
+  citizen under the crosshair within `maxConversationDistance` and sends `TalkToCitizenPayload`
+  (NeoForge payload / Forge SimpleChannel). The server re-resolves the entity, checks type, liveness
+  and distance, and never trusts the client's choice.
+- Both entry points go through `interaction/TalkToCitizenHandler` → `GestureConversationDecision`
+  (pure, unit-tested) → `ConversationManager.startPlayerConversation`, so all eligibility checks apply.
+- `GestureConversationDecisionTest` (8 tests); `./gradlew test` passed on both loaders.
+- Manual checks pending: gesture and keybind in-game on both loaders; MineColonies right-click still opens its window.
 ---
 
 ## Q10 — Type in chat to the citizen you are talking to
