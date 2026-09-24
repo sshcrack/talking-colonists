@@ -299,6 +299,8 @@
 
   "yacl3.config.mc_talking:config.enableRumorTalking": "Enable Rumor Talking",
   "yacl3.config.mc_talking:config.enableRumorTalking.desc": "If enabled, citizens voice rumors aloud when a player is nearby.",
+  "yacl3.config.mc_talking:config.showGossipMoments": "Show Gossip",
+  "yacl3.config.mc_talking:config.showGossipMoments.desc": "When a citizen passes on a rumor or news while you watch, both stop and turn to each other for a moment, and a subtitle tells you what is going on. Rumors stay secret until you ask.",
   "yacl3.config.mc_talking:config.rumorTalkingChance": "Rumor Talking Chance",
   "yacl3.config.mc_talking:config.rumorTalkingChance.desc": "Per-propagation chance that a rumor is spoken aloud when a player is in range.",
   "yacl3.config.mc_talking:config.rumorTalkingRange": "Rumor Talking Range",
@@ -374,6 +376,9 @@
   "yacl3.config.mc_talking:config.reducedConversationMotion": "Reduce conversation motion",
   "yacl3.config.mc_talking:config.reducedConversationMotion.desc": "Keep speech icons static and turn off mouth movement and added head and hand gestures.",
   "mc_talking.conversation_hint.start": "%s · Start a conversation",
+  "mc_talking.gossip.rumor": "%1$s whispers some gossip to %2$s",
+  "mc_talking.gossip.news": "%1$s passes some news on to %2$s",
+  "mc_talking.gossip.news_from": "%1$s tells %2$s the news from %3$s",
   "mc_talking.conversation_hint.your_turn": "Your turn · Listening to you",
   "mc_talking.conversation_hint.end": "%s again · End conversation",
   "mc_talking.conversation_ended": "Conversation ended",

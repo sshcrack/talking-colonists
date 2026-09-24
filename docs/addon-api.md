@@ -103,6 +103,7 @@ example for each one is in `src/apiTest/.../Api21FeaturesExample.java`.
 | `VISITOR_SPEAKERS` | A8 | `CitizenConversationRules.registerVisitorPolicy`, `CitizenPromptView.visitor()` | [Visitors](#visitors-tavern-guests) |
 | `CROSS_COLONY_SESSIONS` | A9 | `createControlledSession` with attendees from several colonies, `ControlledSessionRejectedException` | [Controlled meetings and councils](#controlled-meetings-and-councils) |
 | `PLAYER_SPEECH_CAPTURE` | A10 | `PlayerSpeechCapture.capture`, `cancel`, `isCapturing` | [Player speech capture](#player-speech-capture-api-21-apifeatureplayer_speech_capture) |
+| `BROADCAST_REACH` | — | `CitizenMemoryService.broadcastReach` | [Publishing colony broadcasts](#publishing-colony-broadcasts-api-21-apifeaturebroadcast_publishing) |
 
 ### Why this exists
 
@@ -829,6 +830,10 @@ CitizenMemoryService.retractBroadcast(colony, broadcastId);
   the position), `UNAVAILABLE` (colony not loaded on a server).
 - **Retraction:** `retractBroadcast` makes every citizen of the colony forget it and returns
   whether anyone still remembered it.
+- **Reach** (`ApiFeature.BROADCAST_REACH`): `broadcastReach(colony, broadcastId)` returns
+  `BroadcastReach(heard, citizens)`: how many citizens remember it right now, out of all of them
+  (`everyone()` once all have heard). Empty when nobody remembers it (unknown, retracted, expired).
+  Use it to tell the player how far their news has spread.
 
 Calls are marshalled to the server thread like the other memory operations.
 

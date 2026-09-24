@@ -88,6 +88,7 @@ public class BroadcastPropagationService {
                                     carrier.getName(), recipient.getName());
                             propagationsLeft--;
 
+                            boolean voiced = false;
                             if (cfg.enableBroadcastYelling && firstAnnounceable != null) {
                                 if (ConversationManager.hasPlayerNearby(carrierEntity, server, cfg.broadcastYellingRange)
                                         && !ConversationManager.isCitizenBusy(carrierEntity)) {
@@ -96,8 +97,12 @@ public class BroadcastPropagationService {
                                             + " for the colony: ["
                                             + firstAnnounceable.getMessage()
                                             + "]. Spread the word to those nearby. Don't mention obstacles or anything blocking you.";
-                                    AmbientSessions.startLowPrioritySession(carrierEntity, prompt);
+                                    voiced = AmbientSessions.startLowPrioritySession(carrierEntity, prompt);
                                 }
+                            }
+                            if (!voiced) {
+                                GossipMoments.start(carrierEntity, recipientEntity, GossipMoments.Kind.BROADCAST,
+                                        firstShared.describeSource());
                             }
                         }
                     }

@@ -39,5 +39,7 @@ public enum ApiFeature {
     /** Roadmap A9 — cross-colony sessions. */
     CROSS_COLONY_SESSIONS,
     /** Roadmap A10 — player speech capture. */
-    PLAYER_SPEECH_CAPTURE
+    PLAYER_SPEECH_CAPTURE,
+    /** How far a published broadcast has spread: {@code CitizenMemoryService.broadcastReach}. */
+    BROADCAST_REACH
 }

@@ -15,7 +15,7 @@ the seam, the addon ships the gameplay. That keeps core small while still unbloc
 politics, newspapers, and meetings.
 
 GitHub: every task has an issue on the
-[Talking Colonists Road Map](https://github.com/users/sshcrack/projects/4) project, with
+[Talking Colonists Road Map](https://github.com/orgs/talking-colonists/projects/3) project, with
 "blocked by" links matching the dependency column below and a parent tracking issue per track.
 
 ## Dependency graph
@@ -122,7 +122,7 @@ Additional rules for this roadmap:
 
 ## Status
 
-The [project board](https://github.com/users/sshcrack/projects/4) is the source of truth for status;
+The [project board](https://github.com/orgs/talking-colonists/projects/3) is the source of truth for status;
 these files are the source of truth for scope. Tracking issues: Track A #136, Track Q #137, Track X #138, Track T #171. #131 (local AI) is blocked by L1.
 
 | Task | Issue | Task | Issue | Task | Issue |

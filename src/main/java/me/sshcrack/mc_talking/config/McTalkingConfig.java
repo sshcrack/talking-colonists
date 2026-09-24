@@ -367,6 +367,11 @@ public class McTalkingConfig {
     public boolean enableRumorTalking = true;
 
     @AutoGen(category = "citizens", group = "rumor_mill")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens who pass on a rumor or news while you watch stop, turn to each other for a moment, and you get a subtitle such as \"Kayla whispers some gossip to Mila\".")
+    public boolean showGossipMoments = true;
+
+    @AutoGen(category = "citizens", group = "rumor_mill")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.05)
     @SerialEntry(comment = "Chance (0.0-1.0) that a rumor propagation is voiced aloud when a player is nearby.")
     public double rumorTalkingChance = 0.5;

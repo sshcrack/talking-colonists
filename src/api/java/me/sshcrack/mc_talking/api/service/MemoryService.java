@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.api.service;
 
+import me.sshcrack.mc_talking.api.memory.BroadcastReach;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import me.sshcrack.mc_talking.api.memory.*;
@@ -27,5 +28,10 @@ public interface MemoryService {
     /** Roadmap A1. Default for runtimes that predate broadcast publishing. */
     default boolean retractBroadcast(@NotNull IColony colony, @NotNull String broadcastId) {
         throw new UnsupportedOperationException("Broadcast publishing is not implemented by this runtime");
+    }
+
+    /** Default for runtimes that predate {@code ApiFeature.BROADCAST_REACH}. */
+    default @NotNull Optional<BroadcastReach> broadcastReach(@NotNull IColony colony, @NotNull String broadcastId) {
+        throw new UnsupportedOperationException("Broadcast reach is not implemented by this runtime");
     }
 }

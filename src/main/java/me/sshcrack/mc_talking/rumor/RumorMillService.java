@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.rumor;
 
+import me.sshcrack.mc_talking.broadcast.GossipMoments;
 import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
@@ -77,7 +78,9 @@ public class RumorMillService {
                                 propagated++;
                                 McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
                                         c1.getCitizenData().getName(), c2.getCitizenData().getName());
-                                attemptRumorTalking(c1, c2, rumor, server, cfg);
+                                if (!attemptRumorTalking(c1, c2, rumor, server, cfg)) {
+                                    GossipMoments.start(c1, c2, GossipMoments.Kind.RUMOR, null);
+                                }
                             }
                         }
 
@@ -87,7 +90,9 @@ public class RumorMillService {
                                 propagated++;
                                 McTalking.LOGGER.info("[RumorMill] {} shared a rumor with {}",
                                         c2.getCitizenData().getName(), c1.getCitizenData().getName());
-                                attemptRumorTalking(c2, c1, rumor, server, cfg);
+                                if (!attemptRumorTalking(c2, c1, rumor, server, cfg)) {
+                                    GossipMoments.start(c2, c1, GossipMoments.Kind.RUMOR, null);
+                                }
                             }
                         }
                     }
@@ -96,10 +101,11 @@ public class RumorMillService {
         }
     }
 
-    private static void attemptRumorTalking(AbstractEntityCitizen source, AbstractEntityCitizen target, Rumor rumor, MinecraftServer server, McTalkingConfig cfg) {
-        if (!cfg.enableRumorTalking) return;
-        if (ThreadLocalRandom.current().nextDouble() >= cfg.rumorTalkingChance) return;
-        if (!ConversationManager.hasPlayerNearby(source, server, cfg.rumorTalkingRange)) return;
+    /** Voices the rumor when a player is near; returns whether a spoken line started. */
+    private static boolean attemptRumorTalking(AbstractEntityCitizen source, AbstractEntityCitizen target, Rumor rumor, MinecraftServer server, McTalkingConfig cfg) {
+        if (!cfg.enableRumorTalking) return false;
+        if (ThreadLocalRandom.current().nextDouble() >= cfg.rumorTalkingChance) return false;
+        if (!ConversationManager.hasPlayerNearby(source, server, cfg.rumorTalkingRange)) return false;
 
         String targetName    = target.getCitizenData().getName();
         String originatorName = rumor.getOriginatorName();
@@ -114,7 +120,7 @@ public class RumorMillService {
                 targetName, originatorName, content
         );
 
-        AmbientSessions.startLowPrioritySession(source, prompt);
+        return AmbientSessions.startLowPrioritySession(source, prompt);
     }
 
     @Nullable

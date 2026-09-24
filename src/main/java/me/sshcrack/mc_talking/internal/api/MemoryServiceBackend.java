@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.internal.api;
 
+import me.sshcrack.mc_talking.api.memory.BroadcastReach;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import me.sshcrack.mc_talking.api.memory.AddonConfirmedOutcome;
@@ -19,6 +20,7 @@ import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -112,6 +114,22 @@ final class MemoryServiceBackend implements MemoryService {
                             request,
                             new BroadcastPublisher.Settings(config.enableBroadcastPropagation, config.maxBroadcastsStored));
                 });
+    }
+
+    @Override
+    public @NotNull Optional<BroadcastReach> broadcastReach(@NotNull IColony colony, @NotNull String broadcastId) {
+        Objects.requireNonNull(colony, "colony");
+        Objects.requireNonNull(broadcastId, "broadcastId");
+        return onColonyServerThread(colony, Optional.empty(), () -> {
+            int citizens = 0;
+            int heard = 0;
+            for (ICitizenData citizen : colony.getCitizenManager().getCitizens()) {
+                citizens++;
+                CitizenMemories memories = getExisting(citizen);
+                if (memories != null && memories.hasHeardBroadcast(broadcastId)) heard++;
+            }
+            return heard == 0 ? Optional.<BroadcastReach>empty() : Optional.of(new BroadcastReach(heard, citizens));
+        });
     }
 
     @Override
