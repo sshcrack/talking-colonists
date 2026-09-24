@@ -105,6 +105,9 @@ public final class ColonyTestHarness implements AutoCloseable {
         // Deterministic fixtures: MineColonies AI would otherwise walk, sleep or wake on its own.
         entity.setNoAi(true);
         level.addFreshEntity(entity);
+        if (level.getEntity(entity.getId()) != entity) {
+            throw new GameTestAssertException("Citizen entity is not in the level yet; the test chunk is not entity-ticking");
+        }
         entity.getCitizenColonyHandler().registerWithColony(colony.getID(), data.getId());
         citizens.add(entity);
         return entity;
