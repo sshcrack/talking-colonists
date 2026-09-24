@@ -130,6 +130,30 @@ Credentials are read directly from `GEMINI_LIVE_TEST_KEY_FILE`, `GEMINI_API_KEY`
 then the NeoForge YACL config. If both a config and key are explicitly supplied, the
 test uses the config key. No Forge config copy is required. Never commit any key file.
 
+## Optional live in-world check (typed input and chat)
+
+```sh
+MC_TALKING_LIVE_KEY_FILE=/path/to/key CLIENT_SMOKE_TIMEOUT_SECONDS=480 \
+  bash scripts/test-client-smoke.sh 1.21.1-neoforge   # or 1.20.1-forge
+```
+
+When `MC_TALKING_LIVE_KEY_FILE` is set, the auto-quit client runs
+`DevLiveConversationVerification` after the local in-world checks. It starts a real Gemini
+player conversation with the fixture citizen, then checks two things:
+
+- **A4:**
+  - `sendPlayerText` arrives as a `TYPED` utterance and is recorded in the session transcript.
+  - The citizen's audible answer uses a word the typed line asked for.
+  - `addContext` is delivered and the citizen reacts to it.
+- **Q10:** the client sends `@ …` in chat.
+  - The line is routed to the citizen as `TYPED`, and the answer uses the requested word.
+  - The player sees the local echo, and the raw line never appears in chat.
+
+It logs `MC_TALKING_LIVE_SUCCESS:` and the citizen's answers. Cost: one Live session with about
+three turns, and no Flash-Lite or TTS request (memory extraction is off for that conversation). The key is read
+into memory for the run only: it is never logged or saved to the config. Without the variable
+the smoke test behaves as before.
+
 ## CI
 
 Mod CI runs both loader suites, then launches both clients under Xvfb/software
