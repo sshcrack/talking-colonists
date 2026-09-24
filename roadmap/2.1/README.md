@@ -123,7 +123,7 @@ Additional rules for this roadmap:
 ## Status
 
 The [project board](https://github.com/users/sshcrack/projects/4) is the source of truth for status;
-these files are the source of truth for scope. Tracking issues: Track A #136, Track Q #137, Track X #138. #131 (local AI) is blocked by L1.
+these files are the source of truth for scope. Tracking issues: Track A #136, Track Q #137, Track X #138, Track T #171. #131 (local AI) is blocked by L1.
 
 | Task | Issue | Task | Issue | Task | Issue |
 | --- | --- | --- | --- | --- | --- |
@@ -139,4 +139,5 @@ these files are the source of truth for scope. Tracking issues: Track A #136, Tr
 | X2 | #161 | X3 | #162 | X4 | #163 |
 | X5 | #164 | X6 | #165 | X7 | #166 |
 | X8 | #167 | X9 | #168 | X10 | #169 |
-| X11 | #170 |   |   |   |   |
+| X11 | #170 | T1 | #172 | T2 | #173 |
+| T3 | #174 | T4 | #175 | T5 | #176 |
