@@ -283,6 +283,16 @@
   "yacl3.config.mc_talking:config.memoryCompactionThreshold": "Memory Compaction Threshold",
   "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen.",
 
+  "yacl3.config.mc_talking:config.category.citizens.group.ambient_speech_budget": "Ambient Speech Budget",
+  "yacl3.config.mc_talking:config.enableAmbientSpeechBudget": "Enable Ambient Speech Budget",
+  "yacl3.config.mc_talking:config.enableAmbientSpeechBudget.desc": "If enabled, limits how many ambient lines (greetings, mumbles, voiced rumors/broadcasts, random citizen-to-citizen conversations, addon ambient lines) each player can hear within the rolling window. When a nearby player is over budget the line is skipped entirely so a crowd of citizens cannot all talk over each other. Urgent contacts, player-started conversations, and controlled/meeting sessions are always exempt.",
+  "yacl3.config.mc_talking:config.ambientSpeechBudgetMaxLines": "Max Ambient Lines Per Window",
+  "yacl3.config.mc_talking:config.ambientSpeechBudgetMaxLines.desc": "Maximum number of ambient lines a player may hear within the rolling window before further ambient lines near them are skipped.",
+  "yacl3.config.mc_talking:config.ambientSpeechBudgetWindowSeconds": "Ambient Speech Budget Window (seconds)",
+  "yacl3.config.mc_talking:config.ambientSpeechBudgetWindowSeconds.desc": "Length in seconds of the rolling window used to count ambient lines heard by a player.",
+  "yacl3.config.mc_talking:config.ambientSpeechBudgetHearingRange": "Ambient Speech Budget Hearing Range",
+  "yacl3.config.mc_talking:config.ambientSpeechBudgetHearingRange.desc": "Distance in blocks within which a player is considered to hear an ambient line for budget purposes. An ambient line is skipped entirely if any player within this range of the speaking citizen is over budget.",
+
   "mc_talking.conversation_hint.talking": "Speaking",
   "mc_talking.conversation_hint.listening": "Listening for speech",
   "mc_talking.conversation_hint.thinking": "Thinking about a reply…",

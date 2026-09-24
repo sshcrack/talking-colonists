@@ -422,6 +422,27 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Maximum number of individual events/facts before compaction is triggered for a citizen.")
     public int memoryCompactionThreshold = 15;
 
+    // Ambient Speech Budget
+    @AutoGen(category = "citizens", group = "ambient_speech_budget")
+    @TickBox
+    @SerialEntry(comment = "If true, limits how many ambient lines (greetings, mumbles, voiced rumors/broadcasts, random citizen-to-citizen conversations, addon ambient lines) each player can hear within the rolling window below. When a nearby player is over budget the line is skipped entirely so a crowd of citizens cannot all talk over each other. Urgent contacts, player-started conversations, and controlled/meeting sessions are always exempt.")
+    public boolean enableAmbientSpeechBudget = true;
+
+    @AutoGen(category = "citizens", group = "ambient_speech_budget")
+    @IntField(min = 1, max = 50)
+    @SerialEntry(comment = "Maximum number of ambient lines a player may hear within the rolling window before further ambient lines near them are skipped.")
+    public int ambientSpeechBudgetMaxLines = 3;
+
+    @AutoGen(category = "citizens", group = "ambient_speech_budget")
+    @IntField(min = 1, max = 3600)
+    @SerialEntry(comment = "Length in seconds of the rolling window used to count ambient lines heard by a player.")
+    public int ambientSpeechBudgetWindowSeconds = 60;
+
+    @AutoGen(category = "citizens", group = "ambient_speech_budget")
+    @DoubleField(min = 1.0, max = 128.0)
+    @SerialEntry(comment = "Distance in blocks within which a player is considered to hear an ambient line for budget purposes. An ambient line is skipped entirely if any player within this range of the speaking citizen is over budget.")
+    public double ambientSpeechBudgetHearingRange = 16.0;
+
     public static class ToolListFactory implements ListGroup.ValueFactory<String>, ListGroup.ControllerFactory<String> {
         @Override
         public String provideNewValue() {

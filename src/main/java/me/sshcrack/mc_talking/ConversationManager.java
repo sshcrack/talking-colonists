@@ -12,6 +12,7 @@ import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.internal.api.ConversationEventRuntime;
 import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
+import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudgetRegistry;
 import me.sshcrack.mc_talking.internal.session.BackgroundSessionRegistry;
 import me.sshcrack.mc_talking.internal.session.CitizenActivityRegistry;
 import me.sshcrack.mc_talking.internal.session.ConversationCooldownRegistry;
@@ -98,6 +99,8 @@ public class ConversationManager {
             new ConcurrentHashMap<>();
     private static final CitizenActivityRegistry activities = new CitizenActivityRegistry(System::nanoTime);
     private static final ConversationCooldownRegistry cooldowns = new ConversationCooldownRegistry(System::currentTimeMillis);
+    private static final AmbientSpeechBudgetRegistry ambientSpeechBudget =
+            new AmbientSpeechBudgetRegistry(System::currentTimeMillis);
     private static final BackgroundSessionRegistry<GeminiLiveClient> backgroundSessions =
             new BackgroundSessionRegistry<>(
                     () -> McTalkingConfig.INSTANCE.instance().maxConcurrentBackground,
@@ -585,7 +588,22 @@ public class ConversationManager {
         return canCitizenSpeak(citizen, isPlayerRequest ? ConversationKind.PLAYER : ConversationKind.ADDON_AMBIENT);
     }
 
-    /** Detailed, side-effect-free speech eligibility used by core and addons. */
+    /**
+     * Detailed, side-effect-free speech eligibility used by core and addons.
+     *
+     * <h4>Ambient speech budget</h4>
+     * <p>For every {@link ConversationKind} except {@code PLAYER}, {@code URGENT_CONTACT}, and
+     * {@code CONTROLLED} (player-started, urgent, and controlled/meeting sessions are exempt by
+     * design), this also reports {@link ConversationEligibility.Status#BUDGET_EXCEEDED} when any
+     * player who would currently hear this citizen has already used up their rolling ambient
+     * speech budget (see {@code ambientSpeechBudget*} config). This is a read-only peek — handlers
+     * that scan many candidate citizens before picking one to actually speak (mumbling,
+     * greetings, random citizen conversations, ...) can call this freely without spending budget.
+     * The budget itself is spent once, atomically, at the few real commit points where a line is
+     * actually about to start or play: {@link #startLowPrioritySession}, the citizen-pair
+     * conversation start in {@code CitizenConversation}, and pregenerated audio playback in
+     * {@code PregenerationPlayback}. See {@link #trySpendAmbientSpeechBudget}.</p>
+     */
     public static ConversationEligibility conversationEligibility(
             AbstractEntityCitizen citizen,
             ConversationKind kind
@@ -612,7 +630,74 @@ public class ConversationManager {
                     "an addon speech policy vetoed this conversation kind"
             );
         }
+
+        if (isAmbientBudgetKind(kind) && !hasAmbientSpeechBudgetCapacity(citizen)) {
+            return ConversationEligibility.rejected(
+                    ConversationEligibility.Status.BUDGET_EXCEEDED,
+                    "a nearby player's ambient speech budget is exhausted"
+            );
+        }
+
         return ConversationEligibility.eligibleResult();
+    }
+
+    /** Player-started, urgent, and controlled/meeting sessions are exempt from the ambient speech budget. */
+    private static boolean isAmbientBudgetKind(ConversationKind kind) {
+        return kind != ConversationKind.PLAYER
+                && kind != ConversationKind.URGENT_CONTACT
+                && kind != ConversationKind.CONTROLLED;
+    }
+
+    /** Read-only: would every player who would currently hear {@code citizen} have budget room? */
+    private static boolean hasAmbientSpeechBudgetCapacity(AbstractEntityCitizen citizen) {
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (!config.enableAmbientSpeechBudget) return true;
+        List<UUID> hearers = nearbyHearingPlayerIds(citizen, config.ambientSpeechBudgetHearingRange);
+        long windowMillis = config.ambientSpeechBudgetWindowSeconds * 1000L;
+        return ambientSpeechBudget.hasCapacity(hearers, config.ambientSpeechBudgetMaxLines, windowMillis);
+    }
+
+    /**
+     * Spends one unit of ambient speech budget against every player who would hear {@code citizen}
+     * (and, for a two-citizen conversation, {@code other}) speak right now. Returns {@code true}
+     * (having recorded the spend) unless any such player is already at their per-window limit, in
+     * which case nothing is recorded and the whole line should be skipped — see
+     * {@link AmbientSpeechBudgetRegistry#tryConsume} for why a line is not partially charged
+     * against listeners who still have room.
+     *
+     * <p>This is the single point that actually enforces the budget. Call it exactly once per
+     * ambient line/conversation-start attempt, immediately before it is guaranteed to be spoken or
+     * played — never speculatively while merely scanning candidates.</p>
+     */
+    public static boolean trySpendAmbientSpeechBudget(AbstractEntityCitizen citizen, @Nullable AbstractEntityCitizen other) {
+        var config = McTalkingConfig.INSTANCE.instance();
+        if (!config.enableAmbientSpeechBudget) return true;
+
+        java.util.LinkedHashSet<UUID> hearers = new java.util.LinkedHashSet<>(
+                nearbyHearingPlayerIds(citizen, config.ambientSpeechBudgetHearingRange));
+        if (other != null) {
+            hearers.addAll(nearbyHearingPlayerIds(other, config.ambientSpeechBudgetHearingRange));
+        }
+        long windowMillis = config.ambientSpeechBudgetWindowSeconds * 1000L;
+        return ambientSpeechBudget.tryConsume(hearers, config.ambientSpeechBudgetMaxLines, windowMillis);
+    }
+
+    public static boolean trySpendAmbientSpeechBudget(AbstractEntityCitizen citizen) {
+        return trySpendAmbientSpeechBudget(citizen, null);
+    }
+
+    /** Players in the same dimension as {@code citizen} within {@code range} blocks. */
+    private static List<UUID> nearbyHearingPlayerIds(AbstractEntityCitizen citizen, double range) {
+        MinecraftServer server = citizen.level().getServer();
+        if (server == null) return List.of();
+        double rangeSqr = range * range;
+        List<UUID> result = new java.util.ArrayList<>();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.level() == citizen.level() && player.distanceToSqr(citizen) <= rangeSqr) {
+                result.add(player.getUUID());
+            }
+        }
+        return result;
     }
 
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, ConversationKind kind) {
@@ -878,6 +963,11 @@ public class ConversationManager {
                 citizen, kind, promptSessionContext.sessionId(), promptSessionContext.turnId());
         if (reservation == null) {
             McTalking.LOGGER.debug("[ConversationManager] No low-priority slot available for session for citizen {}", citizenId);
+            return false;
+        }
+
+        if (isAmbientBudgetKind(kind) && !trySpendAmbientSpeechBudget(citizen)) {
+            reservation.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "ambient speech budget exhausted");
             return false;
         }
 
@@ -1159,6 +1249,7 @@ public class ConversationManager {
             }
         }
         cooldowns.clear();
+        ambientSpeechBudget.clear();
         QuotaTracker.clear();
         me.sshcrack.mc_talking.manager.VoiceSelectionService.clear();
         GeminiWsClient.shutdownExecutor();

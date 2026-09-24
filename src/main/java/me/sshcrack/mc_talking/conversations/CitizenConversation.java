@@ -103,6 +103,16 @@ public class CitizenConversation {
      */
     public void performConversation() {
         if (cancellation.isCancelled()) return;
+        // Ambient speech budget: a citizen-to-citizen conversation counts as one ambient event for
+        // every nearby player who would hear either participant, charged once here at the single
+        // entry point that actually starts a pair conversation (regardless of Flash/TTS vs. Live
+        // WebSocket mode, or whether one falls back to the other).
+        AbstractEntityCitizen first = participants.get(0);
+        AbstractEntityCitizen second = participants.size() > 1 ? participants.get(1) : null;
+        if (!ConversationManager.trySpendAmbientSpeechBudget(first, second)) {
+            setState(ConversationState.ENDED);
+            return;
+        }
         switch (mode) {
             case AUTO -> performAutoConversation();
             case FLASH_TTS -> performFlashTtsConversation();
