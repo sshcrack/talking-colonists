@@ -849,6 +849,41 @@ enforce their normal direct-conversation policy. Use `noAddonTools()` for meetin
 no addon tool surface, or `allAddonTools()` only when the orchestrator intentionally grants every
 registered addon tool.
 
+## In-character text generation (API 2.1, `ApiFeature.TEXT_GENERATION`)
+
+`CitizenTextService` writes text in a citizen's voice, or in the colony's collective voice, for
+letters, notices, newspaper items and speeches. It is text only: it never plays audio and never
+takes a conversation slot.
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.TEXT_GENERATION)) {
+    CitizenTextService.generate(citizen, TextRequest.of("postal:letter",
+                    "Write a short thank-you letter to Steve for the new well.").withMaxChars(400))
+            .thenAccept(result -> server.execute(() -> {
+                if (result.isSuccess()) deliverLetter(result.text());
+                else logSkipped(result.status()); // QUOTA, NO_CAPACITY, INVALID_OUTPUT, ...
+            }));
+}
+```
+
+- **Context:** `generate` uses the citizen's normal detailed prompt context, including prompt
+  contributors, and the server's configured response language. `generateColonyVoice(colony, ...)`
+  uses only colony context (name, age, founder, recent events, neighbours, weather) for text that
+  no single citizen writes.
+- **Structured output:** `withResponseSchema(jsonSchema)` requests Gemini structured output. The
+  result's `json()` holds the parsed object; output that is not a JSON object, or lacks a top-level
+  `required` field, is `INVALID_OUTPUT`.
+- **Results:** futures always complete with a `TextResult` and never throw: `SUCCESS`, `QUOTA`
+  (Flash quota exhausted), `NO_CAPACITY` (at most 2 text requests run at once), `INVALID_OUTPUT`,
+  `CANCELLED` (server stopping), `UNAVAILABLE` (no API key or no server), `PROVIDER_ERROR`.
+  `maxChars` over-long text is trimmed at a sentence end.
+- **Costs:** requests use `McTalkingConfig.FLASH_MODEL` (Flash-Lite; about 15 requests/minute and
+  500/day on the free tier) and share its quota tracking. They do not use Gemini Live sessions, so
+  they never compete with conversations for the free tier's 3 concurrent Live sessions.
+- **Threading:** call on the server thread (the prompt reads live game state; other threads are
+  marshalled to it). Completion happens on a worker thread, so hop back with `server.execute(...)`
+  before touching the world. `purpose` (e.g. `"gazette:headline"`) appears in logs.
+
 ## Pregenerated speech
 
 Core owns pregeneration caches, playback interruption, barge-in, queue draining and takeover. Addons

@@ -101,11 +101,11 @@ git diff src/test/resources/prompt-snapshots/
 bash scripts/test-prompt-behaviour.sh
 ```
 
-Sends three small requests to the cheap Flash text model (`McTalkingConfig.FLASH_MODEL`), one
+Sends four small requests to the cheap Flash text model (`McTalkingConfig.FLASH_MODEL`), one
 per scenario, no retries: configured Portuguese yields a Portuguese citizen-to-citizen script
 (stop-word heuristic), a satisfied citizen in a cavern-style home does not complain about the
-style (keyword absence), and "who lives in the colony?" triggers `list_citizens` instead of an
-invented answer. These are plain `generateContent` calls, not Live sessions, so they don't use
+style (keyword absence), "who lives in the colony?" triggers `list_citizens` instead of an
+invented answer, and the A3 text runtime returns schema-valid Portuguese JSON. These are plain `generateContent` calls, not Live sessions, so they don't use
 up the free tier's Live concurrency. The key comes from `GEMINI_API_KEY`, else `geminiApiKey`
 in `versions/<version>/run/config/yacl-mc_talking.json5` (the main checkout's config also works
 from a worktree); it is sent as a header and never printed. No key means SKIP with exit 0; HTTP

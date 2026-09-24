@@ -106,6 +106,7 @@ public class ServerEventHandler {
     @SubscribeEvent
     public void onServerStop(ServerStoppingEvent event) {
         MemoryCompactionService.cleanup();
+        me.sshcrack.mc_talking.internal.api.TextGenerationShutdown.cancelAll();
         PregenerationTaskService.cleanup();
         PregenerationPlayback.cleanup();
         DeliveryInteractionManager.cleanup();

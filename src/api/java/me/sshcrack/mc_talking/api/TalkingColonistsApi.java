@@ -4,6 +4,7 @@ import me.sshcrack.mc_talking.api.service.ContextService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
+import me.sshcrack.mc_talking.api.service.TextService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
 import me.sshcrack.mc_talking.api.service.PromptService;
 import me.sshcrack.mc_talking.api.service.ToolService;
@@ -161,5 +162,10 @@ public final class TalkingColonistsApi {
         @NotNull ContextService context();
         @NotNull ConversationService conversations();
         @NotNull MemoryService memory();
+
+        /** Roadmap A3. Default for runtimes that predate text generation; see {@link ApiFeature#TEXT_GENERATION}. */
+        default @NotNull TextService text() {
+            throw new UnsupportedOperationException("Text generation is not implemented by this runtime");
+        }
     }
 }
