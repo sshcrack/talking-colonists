@@ -23,7 +23,7 @@ public class CitizenAIMixin {
     @Inject(method = "calculateNextState", at = @At("HEAD"), cancellable = true)
     private void mc_talking$suppressWorkDuringUrgentContact(CallbackInfoReturnable<IState> cir) {
         if (McTalkingConfig.INSTANCE.instance().continueWorkDuringConversation) return;
-        if (ConversationManager.isCitizenBusy(citizen)) {
+        if (ConversationManager.shouldPauseRoutine(citizen)) {
             cir.setReturnValue(CitizenAIState.IDLE);
         }
     }
