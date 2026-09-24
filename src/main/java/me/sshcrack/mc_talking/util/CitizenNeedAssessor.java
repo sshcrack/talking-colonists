@@ -1,7 +1,11 @@
 package me.sshcrack.mc_talking.util;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.entity.ai.JobStatus;
+import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
+import com.minecolonies.api.entity.citizen.happiness.ITimeBasedHappinessModifier;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
@@ -46,7 +50,7 @@ public class CitizenNeedAssessor {
         }
 
         if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
-            weight += 0.7;
+            weight += homelessUrgency(data);
         }
 
         double saturation = data.getSaturation();
@@ -71,6 +75,17 @@ public class CitizenNeedAssessor {
         }
 
         return ConversationRuleRuntime.applyUrgencyModifiers(citizen, weight);
+    }
+
+    /** Grows with how long the citizen has been homeless; a flat 0.7 when the complaint ramp is off. */
+    private static double homelessUrgency(ICitizenData data) {
+        var settings = McTalkingConfig.INSTANCE.instance().complaintRampSettings();
+        if (!settings.enabled()) return 0.7;
+        IHappinessModifier modifier = data.getCitizenHappinessHandler().getModifier("homelessness");
+        int days = modifier instanceof ITimeBasedHappinessModifier timed ? timed.getDays() : 0;
+        double factor = modifier == null ? 0 : modifier.getFactor(data);
+        return ComplaintRamp.homelessUrgency(ComplaintRamp.tier(
+                HappinessModifierType.HOMELESSNESS, factor, days, data.getColony().getDay(), settings));
     }
 
     /**
