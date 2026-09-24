@@ -71,8 +71,10 @@ class PromptBehaviourLiveTest {
         request.add("generationConfig", generationConfig(400));
 
         String script = text(generate(request));
+        // Only the transcript must be Portuguese; profile/director notes may stay in English.
+        int transcript = script.toLowerCase(Locale.ROOT).lastIndexOf("transcript");
         List<String> lines = new ArrayList<>();
-        for (String line : script.split("\n")) {
+        for (String line : script.substring(Math.max(transcript, 0)).split("\n")) {
             int colon = line.indexOf(':');
             if (colon > 0 && colon < 40) lines.add(line.substring(colon + 1));
         }
