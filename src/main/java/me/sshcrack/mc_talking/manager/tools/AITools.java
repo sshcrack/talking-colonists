@@ -72,6 +72,11 @@ public class AITools {
     }
 
     public static List<BidiGenerateContentSetup.Tool> getEnabledTools(Predicate<AiToolRuntime.RegisteredTool> addonFilter) {
+        return getEnabledTools(ignored -> true, addonFilter);
+    }
+
+    public static List<BidiGenerateContentSetup.Tool> getEnabledTools(Predicate<String> builtInFilter,
+                                                                      Predicate<AiToolRuntime.RegisteredTool> addonFilter) {
         var list = new ArrayList<BidiGenerateContentSetup.Tool>();
         var tool = new BidiGenerateContentSetup.Tool();
         var rawToolsDisabled = McTalkingConfig.INSTANCE.instance().disabledTools;
@@ -84,6 +89,7 @@ public class AITools {
         tool.functionDeclarations.addAll(
                 builtIns
                         .filter(e -> !rawToolsDisabled.contains(e.getName()))
+                        .filter(e -> builtInFilter.test(e.getName()))
                         .filter(FunctionAction::isEnabled)
                         .map(e -> {
                             var declaration = new BidiGenerateContentSetup.Tool.FunctionDeclaration(e.getName(), e.getDescription());

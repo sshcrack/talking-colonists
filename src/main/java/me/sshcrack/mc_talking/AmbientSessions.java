@@ -9,6 +9,7 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
 import me.sshcrack.mc_talking.internal.session.ConversationEventDispatch;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
+import me.sshcrack.mc_talking.internal.session.RecentAmbientLines;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.audio.ControlledTurnAudioProvider;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
@@ -27,7 +28,41 @@ import java.util.function.Consumer;
  * {@link ConversationManager}, which owns the session registry.
  */
 public final class AmbientSessions {
+    private static final RecentAmbientLines RECENT_LINES = new RecentAmbientLines();
+
     private AmbientSessions() {
+    }
+
+    public static void onServerStop() {
+        RECENT_LINES.clear();
+    }
+
+    /** Mumbles and addon/system lines see what the colony just said, so they do not repeat it. */
+    private static boolean avoidsRepeats(ConversationKind kind) {
+        return kind == ConversationKind.MUMBLE || kind == ConversationKind.ADDON_AMBIENT;
+    }
+
+    private static @Nullable String colonyKey(AbstractEntityCitizen citizen) {
+        var data = citizen.getCitizenData();
+        if (data == null || data.getColony() == null) return null;
+        return data.getColony().getDimension().location() + "#" + data.getColony().getID();
+    }
+
+    private static String speakerName(AbstractEntityCitizen citizen) {
+        return citizen.getDisplayName().getString();
+    }
+
+    private static void rememberLine(AbstractEntityCitizen citizen, String transcript) {
+        String key = colonyKey(citizen);
+        if (key == null || transcript == null) return;
+        String prefix = speakerName(citizen) + ": ";
+        StringBuilder spoken = new StringBuilder();
+        for (String line : transcript.split("\n")) {
+            if (!line.startsWith(prefix)) continue;
+            if (!spoken.isEmpty()) spoken.append(' ');
+            spoken.append(line.substring(prefix.length()));
+        }
+        RECENT_LINES.record(key, speakerName(citizen), spoken.toString(), System.currentTimeMillis());
     }
 
     /**
@@ -275,6 +310,7 @@ public final class AmbientSessions {
             CitizenWsClient client = new CitizenWsClient(new ControlledTurnAudioProvider(citizen, audioAnchor), citizen, c -> {
                 String transcript = c.getSessionTranscriptSnapshot();
                 ConversationEventDispatch.runOnServerThread(citizen, () -> {
+                    if (avoidsRepeats(kind)) rememberLine(citizen, transcript);
                     audibleCompletion.set(true);
                     if (!reservation.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
                             "ambient audible turn completed")) return;
@@ -306,7 +342,13 @@ public final class AmbientSessions {
                         "foreground ownership changed before activation");
                 return false;
             }
-            client.addPromptTextAfterTalkingComplete(userPrompt);
+            String prompt = userPrompt;
+            String key = avoidsRepeats(kind) ? colonyKey(citizen) : null;
+            if (key != null) {
+                prompt += RecentAmbientLines.promptSection(
+                        RECENT_LINES.recent(key, speakerName(citizen), System.currentTimeMillis()));
+            }
+            client.addPromptTextAfterTalkingComplete(prompt);
             return true;
         } catch (RuntimeException e) {
             reservation.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
