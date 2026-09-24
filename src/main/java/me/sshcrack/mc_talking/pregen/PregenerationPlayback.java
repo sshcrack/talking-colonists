@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.pregen;
 
+import me.sshcrack.mc_talking.util.AiStatusHelper;
+import me.sshcrack.mc_talking.network.AiStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
@@ -196,6 +198,12 @@ public final class PregenerationPlayback {
             ACTIVE_PREGENERATED_PLAYBACK.remove(citizenId, entry);
             SpeechFloor.release(entry);
             activity.close();
+            // Back to idle unless something else took the citizen over meanwhile (it sets its own status).
+            AiStatusHelper.runOnServerThread(citizen, () -> {
+                if (!ConversationManager.isCitizenBusy(citizen)) {
+                    AiStatusHelper.setAiStatusOnServerThread(citizen, AiStatus.NONE);
+                }
+            });
         };
         entry.cleanup = cleanup;
 
@@ -228,6 +236,8 @@ public final class PregenerationPlayback {
             });
             stream.addGeminiPcmWithPitch(entry.turnId, audioData.audioBytes(), audioData.sampleRate());
             stream.flushAudio(entry.turnId);
+            // Clips play outside any provider session, so nothing else shows the speaking animation.
+            AiStatusHelper.setAiStatusSynced(citizen, AiStatus.TALKING);
             return true;
         } catch (RuntimeException e) {
             entry.stop("playback startup failed");
