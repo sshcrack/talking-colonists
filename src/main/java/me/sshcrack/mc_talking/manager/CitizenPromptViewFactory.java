@@ -5,15 +5,11 @@ import me.sshcrack.mc_talking.internal.compat.MineColoniesCompatibilityMapper;
 import com.minecolonies.api.colony.ColonyState;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IVisitorData;
-import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.workerbuildings.BuildingCook;
-import com.minecolonies.api.colony.connections.ColonyConnection;
-import com.minecolonies.api.colony.connections.DiplomacyStatus;
-import com.minecolonies.api.colony.connections.IColonyConnectionManager;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.permissions.Rank;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
@@ -32,7 +28,6 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenAIState;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenSubState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
-import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenFamilyView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenIdentityView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenWellbeingView;
@@ -45,14 +40,11 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenVerifiedFactsView;
 import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.prompt.view.ObservedValue;
 import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
-import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPersonalityView;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.conversations.memory.MemorySnapshotFactory;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
-import me.sshcrack.mc_talking.util.ColonyEventBuffer;
-import me.sshcrack.mc_talking.util.ColonyStatsHelper;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
@@ -61,15 +53,13 @@ import me.sshcrack.mc_talking.config.PersonalityArchetype;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.duck.CitizenRecentActionsProvider;
+import me.sshcrack.mc_talking.manager.prompt.ColonyPromptViewFactory;
 import me.sshcrack.mc_talking.mixin.CitizenDataAccessor;
-import me.sshcrack.mc_talking.util.MiscUtil;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -79,7 +69,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.UUID;
 
 import me.sshcrack.mc_talking.McTalking;
@@ -221,7 +210,7 @@ public final class CitizenPromptViewFactory {
                         categorizedRequests.blocked() == null ? List.of() : categorizedRequests.blocked(),
                         activeQuests == null ? List.of() : activeQuests
                 ),
-                createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
+                ColonyPromptViewFactory.createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
                 new ConversationPromptView(
                         getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
                         relation,
@@ -288,7 +277,7 @@ public final class CitizenPromptViewFactory {
                         null
                 ),
                 new CitizenWorkView(null, null, null, extractSkills(data), List.of(), List.of(), List.of()),
-                createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
+                ColonyPromptViewFactory.createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
                 new ConversationPromptView(
                         getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
                         extractPlayerRelation(data, speakingTo),
@@ -691,40 +680,6 @@ public final class CitizenPromptViewFactory {
         return ps.toString();
     }
 
-    /**
-     * Colony-level prompt context. {@code level} supplies time of day, weather and difficulty; the
-     * citizen path passes its entity's level, and without one those fields stay unknown.
-     */
-    public static ColonyPromptView createColonyView(IColony colony, @Nullable Level level) {
-        var envInfo = extractEnvironmentInfo(level);
-        long lastRaidEndTime = ColonyEventBuffer.getLastRaidEndTime(colony);
-        List<String> colonyConnections = extractColonyConnections(colony);
-        return new ColonyPromptView(
-                colony.getID(),
-                colony.getName(),
-                envInfo.peaceful(),
-                colony.getPermissions().getOwnerName(),
-                colony.getDay(),
-                lastRaidEndTime != Long.MAX_VALUE ? lastRaidEndTime : null,
-                ColonyEventBuffer.getLostCitizens(colony),
-                colony.getWorld() != null ? colony.getWorld().getGameTime() : 0,
-                extractRecentEvents(colony),
-                colonyConnections == null ? List.of() : colonyConnections,
-                ColonyStatsHelper.getColonyMilestoneText(colony),
-                envInfo.description()
-        );
-    }
-
-    private static EnvironmentInfo extractEnvironmentInfo(@Nullable Level level) {
-        if (level == null) {
-            return new EnvironmentInfo(null, false);
-        }
-        long dayTime = level.getDayTime() % 24000L;
-        String description = "It is " + MiscUtil.describeTime(dayTime) + " and " + describeWeather(level) + ".";
-        boolean peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
-        return new EnvironmentInfo(description, peaceful);
-    }
-
     private static RequestSnapshot extractRequestSnapshot(
             ICitizenData data,
             @Nullable IBuilding workBuilding,
@@ -801,64 +756,6 @@ public final class CitizenPromptViewFactory {
         return quests.isEmpty() ? null : quests;
     }
 
-    @Nullable
-    private static List<String> extractColonyConnections(IColony colony) {
-        if (!McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
-            return null;
-        }
-        try {
-            IColonyConnectionManager connManager = colony.getConnectionManager();
-            if (connManager == null) {
-                return null;
-            }
-            List<String> connections = new ArrayList<>();
-            TreeMap<Integer, ColonyConnection> direct = connManager.getDirectlyConnectedColonies();
-            if (direct != null) {
-                for (Map.Entry<Integer, ColonyConnection> entry : direct.entrySet()) {
-                    try {
-                        int targetId = entry.getKey();
-                        ColonyConnection conn = entry.getValue();
-                        String connName = conn.name != null ? conn.name : "Colony #" + targetId;
-                        DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
-                        connections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
-                    } catch (Exception e) {
-                        McTalking.LOGGER.warn("Failed to process direct colony connection {}", entry.getKey(), e);
-                    }
-                }
-            }
-            TreeMap<Integer, ColonyConnection> indirect = connManager.getIndirectlyConnectedColonies();
-            if (indirect != null) {
-                for (Map.Entry<Integer, ColonyConnection> entry : indirect.entrySet()) {
-                    try {
-                        int targetId = entry.getKey();
-                        ColonyConnection conn = entry.getValue();
-                        String connName = conn.name != null ? conn.name : "Colony #" + targetId;
-                        DiplomacyStatus status = connManager.getColonyDiplomacyStatus(targetId);
-                        connections.add(connName + " (" + (status != null ? status.name() : "unknown") + ")");
-                    } catch (Exception e) {
-                        McTalking.LOGGER.warn("Failed to process indirect colony connection {}", entry.getKey(), e);
-                    }
-                }
-            }
-            return connections.isEmpty() ? null : connections;
-        } catch (Exception e) {
-            McTalking.LOGGER.warn("Failed to extract colony connections", e);
-            return null;
-        }
-    }
-
-    private static List<String> extractRecentEvents(IColony colony) {
-        int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
-        if (eventWindow <= 0) {
-            return List.of();
-        }
-        return ColonyEventBuffer.getRecentEvents(colony, eventWindow).stream()
-                .map(ColonyEventBuffer.ColonyEvent::description)
-                .toList();
-    }
-
-    private record EnvironmentInfo(@Nullable String description, boolean peaceful) {}
-
     @NotNull
     private static String getRankName(Rank rank) {
         if (rank.isHostile()) {
@@ -912,11 +809,5 @@ public final class CitizenPromptViewFactory {
         } catch (Exception e) {
             return localeCode;
         }
-    }
-
-    private static String describeWeather(Level level) {
-        if (level.isThundering()) return "thundering";
-        if (level.isRaining()) return "rainy";
-        return "clear";
     }
 }

@@ -14,6 +14,7 @@ import me.sshcrack.mc_talking.internal.text.LiveTextRequest;
 import me.sshcrack.mc_talking.internal.text.TextGenerationRuntime;
 import me.sshcrack.mc_talking.internal.text.TextPrompts;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.manager.prompt.ColonyPromptViewFactory;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
 
@@ -85,7 +86,7 @@ final class TextServiceBackend implements TextService {
         Objects.requireNonNull(request, "request");
         var level = colony.getWorld();
         return withPrompt(level == null ? null : level.getServer(), () -> TextPrompts.colony(
-                CitizenPromptViewFactory.createColonyView(colony, level),
+                ColonyPromptViewFactory.createColonyView(colony, level),
                 CitizenPromptViewFactory.getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language)), request);
     }
 
