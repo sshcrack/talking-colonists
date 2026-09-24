@@ -76,13 +76,17 @@ public class CitizenNeedAssessor {
 
     /** Grows with how long the citizen has been homeless; a flat 0.7 when the complaint ramp is off. */
     private static double homelessUrgency(ICitizenData data) {
+        if (!McTalkingConfig.INSTANCE.instance().complaintRampSettings().enabled()) return 0.7;
+        return ComplaintRamp.homelessUrgency(homelessTier(data));
+    }
+
+    /** How strongly the citizen voices having no home, from how long it has lasted and the colony's age. */
+    static ComplaintRamp.Tier homelessTier(ICitizenData data) {
         var settings = McTalkingConfig.INSTANCE.instance().complaintRampSettings();
-        if (!settings.enabled()) return 0.7;
         IHappinessModifier modifier = data.getCitizenHappinessHandler().getModifier("homelessness");
         int days = modifier instanceof ITimeBasedHappinessModifier timed ? timed.getDays() : 0;
         double factor = modifier == null ? 0 : modifier.getFactor(data);
-        return ComplaintRamp.homelessUrgency(ComplaintRamp.tier(
-                HappinessModifierType.HOMELESSNESS, factor, days, data.getColony().getDay(), settings));
+        return ComplaintRamp.tier(HappinessModifierType.HOMELESSNESS, factor, days, data.getColony().getDay(), settings);
     }
 
     /**

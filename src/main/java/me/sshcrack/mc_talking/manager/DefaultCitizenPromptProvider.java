@@ -261,10 +261,14 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             obs.append("## COLONY HISTORY\n");
             obs.append("- This colony was founded by ").append(view.colony().foundingPlayer()).append(".\n");
             obs.append("- The colony is now ").append(view.colony().ageDays()).append(" days old.\n");
-            if (ComplaintRamp.isYoung(view.colony().ageDays(), limits.get().complaints())) {
+            double severity = ComplaintRamp.severity(view.colony().ageDays(), limits.get().complaints());
+            if (severity < 0.6) {
                 obs.append("- The colony was only just founded. You're hopeful and excited to build something new together, "
                         + "and patient about what isn't there yet: the leader is still setting things up, so nothing has "
                         + "been neglected.\n");
+            } else if (severity < 1.0) {
+                obs.append("- The colony is still young. You're mostly patient about what isn't built yet, though you'd "
+                        + "like things to keep moving along.\n");
             }
         }
 

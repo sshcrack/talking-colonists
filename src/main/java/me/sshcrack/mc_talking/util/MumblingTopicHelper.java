@@ -568,13 +568,13 @@ public final class MumblingTopicHelper {
             ));
         }
 
-        boolean young = ComplaintRamp.isYoung(data.getColony().getDay(),
-                McTalkingConfig.INSTANCE.instance().complaintRampSettings());
+        var complaints = McTalkingConfig.INSTANCE.instance().complaintRampSettings();
+        int colonyAge = data.getColony().getDay();
 
         // ── CRITICAL: no home ────────────────────────────
         if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) {
-            // In a new colony nobody has a home yet; it is a hope, not an emergency.
-            if (young) {
+            // Until it has lasted longer than building a home takes, it is a hope, not an emergency.
+            if (CitizenNeedAssessor.homelessTier(data) == ComplaintRamp.Tier.REMARK) {
                 return format(playerName, MiscUtil.pick(
                         "The colony is brand new and you don't have a home yet. Call out to %s by name and cheerfully ask when houses might go up.",
                         "You're excited about the new colony and hoping for a place of your own. Call out to %s by name and share that hope.",
@@ -589,9 +589,10 @@ public final class MumblingTopicHelper {
         }
 
         // ── LOW HAPPINESS ────────────────────────────────
-        // Unhappiness in a new colony comes from what is not built yet; it is no reason to scold anyone.
+        // Unhappiness in a new colony comes from what is not built yet: it shows less while the colony is young.
         double happiness = data.getCitizenHappinessHandler().getHappiness(data.getColony(), data);
-        if (happiness < 3.0 && !young) {
+        double felt = 10.0 - (10.0 - happiness) * ComplaintRamp.severity(colonyAge, complaints);
+        if (felt < 3.0) {
             return format(playerName, MiscUtil.pick(
                     "You're miserable and can't hold it in anymore. Call out to %s by name and voice your frustration.",
                     "You've had enough. Call out to %s by name and demand something change.",

@@ -41,14 +41,14 @@ class ComplaintPromptTest {
 
     @Test
     void longHomelessnessInAnEstablishedColonyBecomesADemand() {
-        String prompt = prompt(homelessFor(8, 40));
+        String prompt = prompt(homelessFor(12, 40));
         assertTrue(prompt.contains("You desperately need a home"), prompt);
         assertTrue(prompt.contains("Very concerned about not having a home"), prompt);
     }
 
     @Test
-    void youngColonyKeepsLongHomelessnessMild() {
-        String prompt = prompt(homelessFor(5, 5));
+    void youngColonyKeepsEarlyHomelessnessMild() {
+        String prompt = prompt(homelessFor(3, 3));
         assertTrue(prompt.contains("You don't have a home yet"), prompt);
     }
 
@@ -90,7 +90,7 @@ class ComplaintPromptTest {
     @Test
     void youngColonyIsLongJoblessButStillHopeful() {
         String prompt = prompt(citizen().job(null, null).colonyAgeDays(3)
-                .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 3)));
+                .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 2)));
         assertTrue(prompt.contains("Hoping to be given a job soon"), prompt);
         assertFalse(prompt.contains("Frustrated"), prompt);
     }
@@ -98,6 +98,8 @@ class ComplaintPromptTest {
     @Test
     void youngColonyIsHopefulAboutItsFounding() {
         assertTrue(prompt(citizen().colonyAgeDays(2)).contains("The colony was only just founded. You're hopeful"));
+        assertTrue(prompt(citizen().colonyAgeDays(7)).contains("The colony is still young. You're mostly patient"));
         assertFalse(prompt(citizen().colonyAgeDays(12)).contains("only just founded"));
+        assertFalse(prompt(citizen().colonyAgeDays(12)).contains("still young"));
     }
 }
