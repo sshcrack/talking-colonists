@@ -111,7 +111,7 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
             String responseJson;
             try {
-                responseJson = MemoryTextRequest.generate(citizen, server, prompt, "Generate the memory JSON now.",
+                responseJson = MemoryTextRequest.generate(citizen, prompt, "Generate the memory JSON now.",
                         MemoryStructuredOutput.schema(MemoryResponseParser.ValidationContext.playerConversation(citizenName, playerName)),
                         "[PlayerMemory]");
             } catch (InterruptedException e) {

@@ -4,20 +4,14 @@ import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
 import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
-import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaRetryInfo;
 import me.sshcrack.mc_talking.config.QuotaTracker;
-import me.sshcrack.mc_talking.util.BackgroundSlotType;
-import net.minecraft.server.MinecraftServer;
+import me.sshcrack.mc_talking.internal.text.LiveTextRequest;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A JSON memory request: Flash-Lite first, the cheap Live model as a fallback. Flash-Lite has a
@@ -26,9 +20,6 @@ import java.util.concurrent.TimeoutException;
  * schema goes into the prompt and the caller's parser still validates the result.
  */
 final class MemoryTextRequest {
-    static final long LIVE_SLOT_WAIT_MILLIS = 60_000;
-    static final long LIVE_ANSWER_TIMEOUT_SECONDS = 90;
-
     /** Why a request produced no text. */
     static final class FailedException extends Exception {
         FailedException(String message, @Nullable Throwable cause) {
@@ -58,12 +49,12 @@ final class MemoryTextRequest {
     }
 
     /** Runs the request for a memory of {@code citizen} (its background Live slot is used for the fallback). */
-    static String generate(AbstractEntityCitizen citizen, MinecraftServer server, String systemPrompt, String userPrompt,
+    static String generate(AbstractEntityCitizen citizen, String systemPrompt, String userPrompt,
                            JsonObject schema, String logTag) throws FailedException, InterruptedException {
         String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
         Flash flash = () -> GeminiFlash.sendSimpleFlashRequest(McTalkingConfig.FLASH_MODEL, apiKey, systemPrompt,
                 userPrompt, GeminiFlash.GenerateContentRequest.GenerationConfig.json(schema));
-        Live live = () -> viaLive(citizen, server, liveSystemPrompt(systemPrompt, schema), userPrompt, logTag);
+        Live live = () -> viaLive(citizen, LiveTextRequest.withSchema(systemPrompt, schema), userPrompt, logTag);
         return run(flash, McTalkingConfig.INSTANCE.instance().enableLiveTextFallback ? live : null, new Quota() {
             @Override
             public boolean flashExhausted() {
@@ -123,56 +114,14 @@ final class MemoryTextRequest {
         return live.send();
     }
 
-    /** The Live model has no response schema, so the prompt carries it. */
-    static String liveSystemPrompt(String systemPrompt, JsonObject schema) {
-        return systemPrompt + "\n\nReply with only one JSON object that matches this JSON Schema. "
-                + "No Markdown, no explanation, nothing before or after the JSON.\n" + schema;
-    }
-
-    private static String viaLive(AbstractEntityCitizen citizen, MinecraftServer server, String systemPrompt,
-                                  String userPrompt, String logTag) throws FailedException, InterruptedException {
-        ConversationManager.BackgroundReservation reservation = reserveSlot(citizen, server);
-        if (reservation == null) {
-            throw new FailedException("No background Live session was free within "
-                    + LIVE_SLOT_WAIT_MILLIS / 1000 + " s", null);
-        }
-        CompletableFuture<String> answer = new CompletableFuture<>();
+    private static String viaLive(AbstractEntityCitizen citizen, String systemPrompt, String userPrompt, String logTag)
+            throws FailedException, InterruptedException {
         var data = citizen.getCitizenData();
-        LiveTextClient client = new LiveTextClient(systemPrompt, userPrompt, citizen.getUUID(),
-                data != null && data.isFemale(), logTag, answer::complete,
-                () -> answer.completeExceptionally(new IllegalStateException("Live text request failed")));
         try {
-            if (!reservation.attachClient(client)) throw new FailedException("Background Live slot was lost", null);
-            client.connect();
-            return answer.get(LIVE_ANSWER_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (ExecutionException | TimeoutException error) {
-            throw new FailedException("Live fallback produced no answer", error);
-        } finally {
-            try {
-                client.close();
-            } catch (RuntimeException ignored) {
-                // Already closed.
-            }
-            reservation.close();
-        }
-    }
-
-    /** Waits for the citizen's background Live slot, so the fallback never exceeds the session limits. */
-    @Nullable
-    private static ConversationManager.BackgroundReservation reserveSlot(AbstractEntityCitizen citizen,
-                                                                         MinecraftServer server)
-            throws InterruptedException {
-        long deadline = System.currentTimeMillis() + LIVE_SLOT_WAIT_MILLIS;
-        while (true) {
-            ConversationManager.BackgroundReservation reservation;
-            try {
-                reservation = server.submit(() -> ConversationManager.reserveBackgroundSlot(citizen,
-                        BackgroundSlotType.COMPACTION)).get(10, TimeUnit.SECONDS);
-            } catch (ExecutionException | TimeoutException error) {
-                return null;
-            }
-            if (reservation != null || System.currentTimeMillis() >= deadline) return reservation;
-            Thread.sleep(2_000);
+            return LiveTextRequest.send(citizen.getUUID(), citizen.getUUID(), data != null && data.isFemale(),
+                    systemPrompt, userPrompt, logTag);
+        } catch (LiveTextRequest.FailedException error) {
+            throw new FailedException(error.getMessage(), error.getCause());
         }
     }
 }

@@ -142,6 +142,110 @@ class TextGenerationRuntimeTest {
         assertFalse(future.join().detail().contains("SECRET"));
     }
 
+    private final List<String[]> liveSent = new ArrayList<>();
+    private final AtomicBoolean liveAvailable = new AtomicBoolean(true);
+    private String liveReply = "The festival starts at dusk, friend.";
+    private Exception liveFailure;
+
+    private final TextGenerationRuntime withFallback = new TextGenerationRuntime(
+            request -> {
+                sent.add(request);
+                if (failure != null) throw failure;
+                return reply;
+            },
+            new TextGenerationRuntime.Fallback() {
+                @Override public boolean available() { return liveAvailable.get(); }
+
+                @Override
+                public String send(String systemPrompt, String userText) throws Exception {
+                    liveSent.add(new String[]{systemPrompt, userText});
+                    if (liveFailure != null) throw liveFailure;
+                    return liveReply;
+                }
+            },
+            new TextGenerationRuntime.QuotaGate() {
+                @Override public boolean exhausted() { return quotaExhausted.get(); }
+                @Override public void reportQuotaExceeded(Exception error) { quotaReports.incrementAndGet(); }
+                @Override public void reportSuccess() { }
+            },
+            () -> true,
+            executor);
+
+    @Test
+    void exhaustedFlashQuotaUsesTheLiveFallbackWithTheSameRequest() {
+        quotaExhausted.set(true);
+        var future = withFallback.submit("system", TextRequest.of("t", "Write a notice").withMaxChars(200));
+        executor.runAll();
+
+        assertTrue(future.join().isSuccess());
+        assertEquals("The festival starts at dusk, friend.", future.join().text());
+        assertTrue(sent.isEmpty(), "Flash is skipped while its quota is exhausted");
+        assertEquals("system", liveSent.get(0)[0]);
+        assertTrue(liveSent.get(0)[1].startsWith("Write a notice") && liveSent.get(0)[1].contains("Keep it under 200"));
+    }
+
+    @Test
+    void flashQuotaAndServerErrorsFallBackButBadRequestsDoNot() {
+        failure = new UnexpectedResponseException("RESOURCE_EXHAUSTED", 429, "{}");
+        var quota = withFallback.submit("system", TextRequest.of("t", "Hi"));
+        executor.runAll();
+        assertTrue(quota.join().isSuccess());
+        assertEquals(1, quotaReports.get());
+
+        failure = new UnexpectedResponseException("unavailable", 503, "{}");
+        var server = withFallback.submit("system", TextRequest.of("t", "Hi"));
+        executor.runAll();
+        assertTrue(server.join().isSuccess());
+
+        failure = new UnexpectedResponseException("bad request", 400, "{}");
+        var bad = withFallback.submit("system", TextRequest.of("t", "Hi"));
+        executor.runAll();
+        assertEquals(TextResult.Status.PROVIDER_ERROR, bad.join().status());
+        assertEquals(2, liveSent.size());
+    }
+
+    @Test
+    void structuredFallbackPutsTheSchemaInThePromptAndStillValidates() {
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "object");
+        JsonArray required = new JsonArray();
+        required.add("headline");
+        schema.add("required", required);
+        quotaExhausted.set(true);
+
+        liveReply = "{\"headline\": \"Bakery opens\"}";
+        var ok = withFallback.submit("system", TextRequest.of("t", "Headline").withResponseSchema(schema));
+        executor.runAll();
+        assertEquals("Bakery opens", ok.join().json().get("headline").getAsString());
+        assertTrue(liveSent.get(0)[0].startsWith("system") && liveSent.get(0)[0].contains("\"headline\""),
+                "the schema is part of the Live system prompt");
+
+        liveReply = "Bakery opens!";
+        var invalid = withFallback.submit("system", TextRequest.of("t", "Headline").withResponseSchema(schema));
+        executor.runAll();
+        assertEquals(TextResult.Status.INVALID_OUTPUT, invalid.join().status());
+    }
+
+    @Test
+    void unavailableOrFailingFallbackKeepsTheFlashStatus() {
+        quotaExhausted.set(true);
+        liveAvailable.set(false);
+        assertEquals(TextResult.Status.QUOTA, withFallback.submit("system", TextRequest.of("t", "Hi")).join().status());
+        assertTrue(liveSent.isEmpty());
+
+        liveAvailable.set(true);
+        liveFailure = new IllegalStateException("closed early");
+        var failed = withFallback.submit("system", TextRequest.of("t", "Hi"));
+        executor.runAll();
+        assertEquals(TextResult.Status.QUOTA, failed.join().status());
+
+        quotaExhausted.set(false);
+        failure = new java.io.IOException("connect failed");
+        var network = withFallback.submit("system", TextRequest.of("t", "Hi"));
+        executor.runAll();
+        assertEquals(TextResult.Status.PROVIDER_ERROR, network.join().status());
+    }
+
     @Test
     void concurrencyIsBoundedAndSlotsAreReleased() {
         var first = runtime.submit("system", TextRequest.of("t", "One"));

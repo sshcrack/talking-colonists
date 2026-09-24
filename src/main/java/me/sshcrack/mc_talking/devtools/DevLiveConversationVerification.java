@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.devtools;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
@@ -8,6 +10,9 @@ import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.PlayerTextResult;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
+import me.sshcrack.mc_talking.api.text.CitizenTextService;
+import me.sshcrack.mc_talking.api.text.TextRequest;
+import me.sshcrack.mc_talking.api.text.TextResult;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
@@ -118,11 +123,19 @@ final class DevLiveConversationVerification {
                     .mc_talking$getOrInitializeMemory()).get(5, TimeUnit.SECONDS);
             int before = memoryCount(server, memory);
             QuotaTracker.reportQuotaExceeded(McTalkingConfig.FLASH_MODEL, TimeUnit.MINUTES.toMillis(10));
+            TextResult headline;
             try {
                 server.submit(() -> PlayerConversationMemoryGenerator.generateAndSave(citizen, player.getUUID(),
                         player.getName().getString(), "leader", transcript, server)).get(5, TimeUnit.SECONDS);
                 long memoryDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(120);
                 while (memoryCount(server, memory) <= before && System.nanoTime() < memoryDeadline) Thread.sleep(500);
+
+                // A3 text generation takes the same fallback; a schema request checks the JSON path.
+                JsonObject schema = JsonParser.parseString("{\"type\":\"object\",\"properties\":{\"headline\":"
+                        + "{\"type\":\"string\"}},\"required\":[\"headline\"]}").getAsJsonObject();
+                headline = server.submit(() -> CitizenTextService.generate(citizen, TextRequest.of("mc_talking_dev:headline",
+                                "Write a short newspaper headline about the colony's pumpkin harvest.").withResponseSchema(schema)))
+                        .get(5, TimeUnit.SECONDS).get(150, TimeUnit.SECONDS);
             } finally {
                 QuotaTracker.reportSuccess(McTalkingConfig.FLASH_MODEL);
             }
@@ -131,7 +144,10 @@ final class DevLiveConversationVerification {
             McTalking.LOGGER.info("MC_TALKING_LIVE: memory fallback saved facts={} events={}",
                     server.submit(memory::getFacts).get(5, TimeUnit.SECONDS),
                     server.submit(memory::getEvents).get(5, TimeUnit.SECONDS));
-            McTalking.LOGGER.info("MC_TALKING_LIVE_SUCCESS:a4-text,a4-transcript,a4-context,q10-route,q10-echo,q10-no-broadcast,memory-live-fallback");
+            require(headline.isSuccess() && headline.json() != null && headline.json().has("headline"),
+                    "A3 text generated through the Live fallback: " + headline);
+            McTalking.LOGGER.info("MC_TALKING_LIVE: A3 text fallback headline: {}", headline.json().get("headline"));
+            McTalking.LOGGER.info("MC_TALKING_LIVE_SUCCESS:a4-text,a4-transcript,a4-context,q10-route,q10-echo,q10-no-broadcast,memory-live-fallback,a3-text-live-fallback");
         } finally {
             AddonRegistration toClose = registration;
             server.submit(() -> {

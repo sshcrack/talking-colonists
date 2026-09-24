@@ -80,7 +80,7 @@ public class CitizenMemoryGenerator extends Thread {
             var validationContext = MemoryResponseParser.ValidationContext.citizenConversation(names);
             String memoryString;
             try {
-                memoryString = MemoryTextRequest.generate(participants.get(0), server, PROMPT, conversation,
+                memoryString = MemoryTextRequest.generate(participants.get(0), PROMPT, conversation,
                         MemoryStructuredOutput.schema(validationContext), "[CitizenMemory]");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

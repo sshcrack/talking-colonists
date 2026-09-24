@@ -1052,8 +1052,13 @@ if (TalkingColonistsApi.supports(ApiFeature.TEXT_GENERATION)) {
   `CANCELLED` (server stopping), `UNAVAILABLE` (no API key or no server), `PROVIDER_ERROR`.
   `maxChars` over-long text is trimmed at a sentence end.
 - **Costs:** requests use `McTalkingConfig.FLASH_MODEL` (Flash-Lite; about 15 requests/minute and
-  500/day on the free tier) and share its quota tracking. They do not use Gemini Live sessions, so
-  they never compete with conversations for the free tier's 3 concurrent Live sessions.
+  500/day on the free tier) and share its quota tracking. When Flash-Lite is out of quota, rate
+  limited, or fails with a server or network error, and the `enableLiveTextFallback` option is on
+  (the default), the request is answered by the cheap Live model instead. It has no daily limit on
+  the free tier, but each fallback request uses one background Live session while it runs, and
+  waits for one when none is free. A structured request's schema is sent in the prompt on that
+  path, and the answer is still checked against it. With the fallback off, or the Live model also out of quota,
+  the result is `QUOTA` as before.
 - **Threading:** call on the server thread (the prompt reads live game state; other threads are
   marshalled to it). Completion happens on a worker thread, so hop back with `server.execute(...)`
   before touching the world. `purpose` (e.g. `"gazette:headline"`) appears in logs.

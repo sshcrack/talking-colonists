@@ -90,7 +90,7 @@ class MemoryTextRequestTest {
     void liveSystemPromptCarriesTheSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
-        String prompt = MemoryTextRequest.liveSystemPrompt("Extract memories.", schema);
+        String prompt = me.sshcrack.mc_talking.internal.text.LiveTextRequest.withSchema("Extract memories.", schema);
         assertTrue(prompt.startsWith("Extract memories."));
         assertTrue(prompt.contains("only one JSON object"));
         assertTrue(prompt.endsWith("{\"type\":\"object\"}"));
