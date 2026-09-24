@@ -1,12 +1,14 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.commands.CitizenChatCommand;
 import me.sshcrack.mc_talking.internal.api.ProviderStatusServiceBackend;
 import me.sshcrack.mc_talking.commands.McTalkingDebugCommand;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.broadcast.BroadcastPropagationService;
 import me.sshcrack.mc_talking.handler.CasualGreetingHandler;
+import me.sshcrack.mc_talking.handler.ChatToCitizenHandler;
 import me.sshcrack.mc_talking.handler.CitizenMumblingHandler;
 import me.sshcrack.mc_talking.handler.MissingApiKeyOnboardingHandler;
 import me.sshcrack.mc_talking.handler.PregeneratedGreetingHandler;
@@ -40,6 +42,7 @@ import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.core.component.DataComponents;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
@@ -53,6 +56,7 @@ import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 /*import net.minecraft.nbt.CompoundTag;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
@@ -98,6 +102,14 @@ public class ServerEventHandler {
         }
     }
 
+    /** Q10: chat lines addressed to the citizen the player is talking to never reach server chat. */
+    @SubscribeEvent
+    public void onServerChat(ServerChatEvent event) {
+        if (ChatToCitizenHandler.onChat(event.getPlayer(), event.getRawText())) {
+            event.setCanceled(true);
+        }
+    }
+
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         TalkingColonistsApiBackend.onPlayerLoggedOut(event.getEntity().getUUID());
@@ -106,6 +118,7 @@ public class ServerEventHandler {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         McTalkingDebugCommand.register(event.getDispatcher());
+        CitizenChatCommand.register(event.getDispatcher());
         MissingApiKeyOnboardingHandler.registerServerFallback(event.getDispatcher(), event.getCommandSelection());
     }
 

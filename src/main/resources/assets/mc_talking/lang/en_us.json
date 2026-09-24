@@ -402,5 +402,15 @@
   "mc_talking.debug.speech_capture.started": "Speech capture started for up to %s s. Speak now.",
   "mc_talking.debug.speech_capture.transcript": "Transcript (%2$s ms of speech): %1$s",
   "mc_talking.debug.speech_capture.failed": "Speech capture ended: %s %s",
-  "mc_talking.debug.speech_capture.players_only": "Only a player can run a speech capture."
+  "mc_talking.debug.speech_capture.players_only": "Only a player can run a speech capture.",
+  "yacl3.config.mc_talking:config.enableChatToCitizen": "Type to Citizens in Chat",
+  "yacl3.config.mc_talking:config.enableChatToCitizen.desc": "While you talk to a citizen, chat lines starting with the prefix below go to that citizen instead of server chat. /citizen_chat on sends every line. Helps players without a microphone.",
+  "yacl3.config.mc_talking:config.chatToCitizenPrefix": "Chat Prefix",
+  "yacl3.config.mc_talking:config.chatToCitizenPrefix.desc": "Chat lines starting with this go to the citizen you are talking to. Leave empty to only use /citizen_chat on.",
+  "mc_talking.chat_to_citizen.echo": "You → %s: %s",
+  "mc_talking.chat_to_citizen.rate_limited": "Slow down, the citizen is still listening. Try again in a few seconds.",
+  "mc_talking.chat_to_citizen.too_long": "That is too long for the citizen (at most %s characters).",
+  "mc_talking.chat_to_citizen.empty": "Nothing to say.",
+  "mc_talking.chat_to_citizen.all_on": "Every chat line now goes to the citizen you are talking to. Turn it off with /citizen_chat off.",
+  "mc_talking.chat_to_citizen.all_off": "Only chat lines starting with \"%s\" go to the citizen you are talking to."
 }
