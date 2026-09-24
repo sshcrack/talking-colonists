@@ -323,6 +323,12 @@
   "yacl3.config.mc_talking:config.broadcastYellingRange.desc": "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.",
 
   "yacl3.config.mc_talking:config.category.citizens.group.memory": "Memory Compaction",
+  "yacl3.config.mc_talking:config.configPreset": "Preset",
+  "yacl3.config.mc_talking:config.configPreset.desc": "Sets the session limits and how often citizens talk on their own, all at once. Free Tier is the default and fits a free AI Studio key. Paid Key allows more sessions and more chatter. Quiet Colony keeps citizens silent unless a player talks to them. Changing one of those settings afterwards switches this to Custom.",
+  "mc_talking.config_preset.custom": "Custom",
+  "mc_talking.config_preset.free_tier": "Free Tier",
+  "mc_talking.config_preset.paid_key": "Paid Key",
+  "mc_talking.config_preset.quiet_colony": "Quiet Colony",
   "yacl3.config.mc_talking:config.memoryMode": "Memory Mode",
   "yacl3.config.mc_talking:config.memoryMode.desc": "How memory compaction is performed. LIVE uses a text-only WebSocket session. FLASH uses the Gemini Flash API.",
   "yacl3.config.mc_talking:config.enableMemoryCompaction": "Enable Memory Compaction",

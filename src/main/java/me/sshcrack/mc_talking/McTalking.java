@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.mojang.logging.LogUtils;
+import me.sshcrack.mc_talking.client.ConfigScreenOpener;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.listener.ColonyEventSubscriber;
 import me.sshcrack.mc_talking.manager.tools.AITools;
@@ -48,7 +49,7 @@ public class McTalking {
 
         ModLoadingContext.get().registerExtensionPoint(
                 ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory((client, parent) -> McTalkingConfig.INSTANCE.generateGui().generateScreen(parent))
+                () -> new ConfigScreenHandler.ConfigScreenFactory((client, parent) -> ConfigScreenOpener.screen(parent))
         );
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -64,7 +65,7 @@ public class McTalking {
 
         ModLoadingContext.get().registerExtensionPoint(
                 IConfigScreenFactory.class,
-                () -> (client, parent) -> McTalkingConfig.INSTANCE.generateGui().generateScreen(parent)
+                () -> (client, parent) -> ConfigScreenOpener.screen(parent)
         );
 
         NeoForge.EVENT_BUS.register(new ServerEventHandler());
