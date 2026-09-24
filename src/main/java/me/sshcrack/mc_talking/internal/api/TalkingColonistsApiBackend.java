@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.api.service.ProviderStatusService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
+import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
 import me.sshcrack.mc_talking.api.service.PromptService;
 import me.sshcrack.mc_talking.api.service.TextService;
@@ -30,7 +31,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
             ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
-            ApiFeature.PROVIDER_BUDGET);
+            ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();
@@ -42,6 +43,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private final ContextService context = new ContextServiceBackend();
     private final ConversationServiceBackend conversations = new ConversationServiceBackend();
     private final MemoryService memory = new MemoryServiceBackend();
+    private final PlayerSpeechService playerSpeech = new PlayerSpeechServiceBackend();
 
     private TalkingColonistsApiBackend() {
     }
@@ -59,8 +61,10 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     @Override public @NotNull ContextService context() { return context; }
     @Override public @NotNull ConversationService conversations() { return conversations; }
     @Override public @NotNull MemoryService memory() { return memory; }
+    @Override public @NotNull PlayerSpeechService playerSpeech() { return playerSpeech; }
 
     public static void onServerStopping(@NotNull MinecraftServer server) {
         ConversationServiceBackend.onServerStopping(server);
+        PlayerSpeechServiceBackend.onServerStopping();
     }
 }

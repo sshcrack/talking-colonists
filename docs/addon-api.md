@@ -1009,6 +1009,51 @@ if (TalkingColonistsApi.supports(ApiFeature.TEXT_GENERATION)) {
   marshalled to it). Completion happens on a worker thread, so hop back with `server.execute(...)`
   before touching the world. `purpose` (e.g. `"gazette:headline"`) appears in logs.
 
+## Player speech capture (API 2.1, `ApiFeature.PLAYER_SPEECH_CAPTURE`)
+
+`PlayerSpeechCapture` turns what a player says through Simple Voice Chat into text, without a
+citizen, for example for a loudspeaker or microphone item.
+
+```java
+// In the item's use handler, on the server thread:
+if (TalkingColonistsApi.supports(ApiFeature.PLAYER_SPEECH_CAPTURE)) {
+    PlayerSpeechCapture.capture(player, Duration.ofSeconds(15))
+            .thenAccept(result -> server.execute(() -> {
+                if (result.isTranscribed()) announce(player, result.transcript());
+                else tellPlayer(player, result.status()); // NO_SPEECH, NO_VOICE_CHAT, QUOTA, ...
+            }));
+}
+```
+
+- **Explicit action only:** start a capture only when the player just did something (used an
+  item, clicked a block or button). Never capture continuously or in the background. While a
+  capture runs, the player sees "● Listening…" above the hotbar, then "Transcribing…".
+- **End of speech:** the capture ends 0.9 s after the player stops speaking. It also ends after
+  6 s without any speech (`NO_SPEECH`), or at `maxDuration`, whichever comes first.
+  `maxDuration` is capped at `PlayerSpeechCapture.MAX_DURATION` (30 s). Speech detection is the
+  same local detector conversations use for barge-in.
+- **Microphone ownership:** while the capture listens, the player's microphone audio goes only to
+  it, not to a citizen conversation. This includes whispering and voice groups. Audio received
+  after the end is ignored. `cancel(player)` stops a capture (`CANCELLED`).
+- **Results:** futures always complete with a `SpeechCaptureResult` and never throw:
+  - `TRANSCRIBED`
+  - `NO_SPEECH`
+  - `CANCELLED` (also when the server stops)
+  - `PLAYER_LEFT`
+  - `BUSY` (one capture per player)
+  - `NO_VOICE_CHAT` (not connected or disabled)
+  - `QUOTA`
+  - `UNAVAILABLE` (no API key)
+  - `PROVIDER_ERROR`
+- **Costs and privacy:** each capture that heard speech makes one request to
+  `McTalkingConfig.FLASH_MODEL` (Flash-Lite, 500/day on the free tier). The request carries the
+  audio as 16 kHz mono WAV and shares that model's quota tracking. Captures that heard no speech
+  make no request. The audio is kept only in memory until the request is sent. It uses no Gemini
+  Live session.
+- **Threading:** call `capture` on the server thread. Completion happens on a worker thread.
+- **Trying it:** `/talking_colonists speech_capture [seconds]` (ops only) captures the running
+  player and prints the transcript.
+
 ## Pregenerated speech
 
 Core owns pregeneration caches, playback interruption, barge-in, queue draining and takeover. Addons

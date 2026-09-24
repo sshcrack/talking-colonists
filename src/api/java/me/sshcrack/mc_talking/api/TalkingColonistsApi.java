@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.api.service.ProviderStatusService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
+import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
 import me.sshcrack.mc_talking.api.service.TextService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
 import me.sshcrack.mc_talking.api.service.PromptService;
@@ -178,6 +179,11 @@ public final class TalkingColonistsApi {
         /** Roadmap A7. Default for runtimes that predate provider status; see {@link ApiFeature#PROVIDER_BUDGET}. */
         default @NotNull ProviderStatusService providerStatus() {
             throw new UnsupportedOperationException("Provider budget status is not implemented by this runtime");
+        }
+
+        /** Roadmap A10. Default for runtimes that predate speech capture; see {@link ApiFeature#PLAYER_SPEECH_CAPTURE}. */
+        default @NotNull PlayerSpeechService playerSpeech() {
+            throw new UnsupportedOperationException("Player speech capture is not implemented by this runtime");
         }
     }
 }

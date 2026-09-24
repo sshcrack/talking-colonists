@@ -26,6 +26,7 @@ public class McTalkingDebugCommand {
         DebugEventsCommand.addTo(root);
         DebugUrgentContactCommand.addTo(root);
         DebugPromptCommand.addTo(root);
+        DebugSpeechCaptureCommand.addTo(root);
         ListToolsCommand.addTo(root);
 
         dispatcher.register(root);

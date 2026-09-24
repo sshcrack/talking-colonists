@@ -13,6 +13,7 @@ import de.maxhenkel.voicechat.api.events.PlayerDisconnectedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStoppedEvent;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.api.PlayerSpeechServiceBackend;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
@@ -75,14 +76,17 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
         var sender = event.getSenderConnection();
         if (sender == null || sender.isDisabled()) return;
 
-        var packet = event.getPacket();
-        if (packet.isWhispering()) return;
-        if (sender.isInGroup() && !McTalkingConfig.INSTANCE.instance().respondInGroups) return;
-
         var vcPlayer = sender.getPlayer();
         if (vcPlayer == null || !(vcPlayer.getPlayer() instanceof ServerPlayer player)) return;
 
+        var packet = event.getPacket();
         byte[] opusData = packet.getOpusEncodedData();
+        // An addon-started speech capture owns the microphone, whispering or in a group alike.
+        if (PlayerSpeechServiceBackend.acceptMicrophoneOpus(player.getUUID(), opusData)) return;
+
+        if (packet.isWhispering()) return;
+        if (sender.isInGroup() && !McTalkingConfig.INSTANCE.instance().respondInGroups) return;
+
         var manager = ConversationManager.getReadyInputClientForPlayer(player.getUUID());
         if (manager == null) {
             // Pregenerated clips have no Live client and therefore own their small decoder locally.
@@ -99,6 +103,7 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
     private void onPlayerDisconnected(PlayerDisconnectedEvent event) {
         PregenerationPlayback.onPlayerDisconnected(event.getPlayerUuid());
+        PlayerSpeechServiceBackend.onPlayerLeft(event.getPlayerUuid());
     }
 
     public static boolean shouldDisableColoniesTicks(ServerPlayer player) {
