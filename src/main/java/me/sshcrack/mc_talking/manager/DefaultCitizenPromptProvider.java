@@ -347,8 +347,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             var tier = ComplaintRamp.activeTier(modifiers, HappinessModifierType.UNEMPLOYMENT, colonyAge, complaints);
             prompt.append(switch (tier == null ? ComplaintRamp.Tier.REMARK : tier) {
                 case REMARK -> "- Hoping to be given a job soon\n";
-                case COMPLAINT -> "- Frustrated about not having a job\n";
-                case DEMAND -> "- Fed up with having no job for so long\n";
+                case COMPLAINT -> "- Concerned about not having a job\n";
+                case DEMAND -> "- Really wishing for a job after so long without one\n";
             });
         }
 
@@ -493,6 +493,8 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("- Do not generate creative responses for information that functions can provide\n");
         prompt.append("- Speak in first person, keep responses brief\n");
         prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
+        prompt.append("- You belong to a community the player leads. Even when unhappy, be honest but constructive: say what "
+                + "bothers you and what would help, but never insult, scold or guilt-trip them. Notice what has gone well, too.\n");
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
         prompt.append("- Do not use markdown, speak in plain text.\n");
 

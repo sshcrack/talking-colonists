@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import me.sshcrack.mc_talking.broadcast.GossipMoments;
+import me.sshcrack.mc_talking.conversations.memory.ProgressMemories;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.commands.CitizenChatCommand;
 import me.sshcrack.mc_talking.internal.api.ProviderStatusServiceBackend;
@@ -139,6 +140,7 @@ public class ServerEventHandler {
         CasualGreetingHandler.onServerStop();
         AmbientSessions.onServerStop();
         GossipMoments.clear();
+        ProgressMemories.clear();
         PlayerHeatmapTracker.clear();
     }
 
@@ -195,6 +197,7 @@ public class ServerEventHandler {
     private void onServerTickCommon(MinecraftServer server) {
         tickCounter++;
         GossipMoments.tick();
+        if (tickCounter % 1200 == 0) ProgressMemories.tick(server);
         // Reap timed-out background/foreground reservations even when no feature-specific
         // interval fires or no players are online. This keeps lifecycle ownership in core.
         ConversationManager.tickMaintenance();

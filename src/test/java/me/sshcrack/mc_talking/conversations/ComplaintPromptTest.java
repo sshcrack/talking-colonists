@@ -59,8 +59,8 @@ class ComplaintPromptTest {
         String late = prompt(citizen().job(null, null).colonyAgeDays(40)
                 .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 6)));
         assertTrue(early.contains("Hoping to be given a job soon"), early);
-        assertTrue(late.contains("Fed up with having no job for so long"), late);
-        assertTrue(late.contains("You've been without a job for so long"), late);
+        assertTrue(late.contains("Really wishing for a job after so long without one"), late);
+        assertTrue(late.contains("You've been without a job for a long while"), late);
     }
 
     private static CitizenPromptViewFixture unsafe(int colonyAge, boolean raided) {
@@ -92,7 +92,7 @@ class ComplaintPromptTest {
         String prompt = prompt(citizen().job(null, null).colonyAgeDays(3)
                 .happinessModifiers(new HappinessModifierView(HappinessModifierType.UNEMPLOYMENT, 0.2, 2)));
         assertTrue(prompt.contains("Hoping to be given a job soon"), prompt);
-        assertFalse(prompt.contains("Frustrated"), prompt);
+        assertFalse(prompt.contains("Concerned about not having a job"), prompt);
     }
 
     @Test
