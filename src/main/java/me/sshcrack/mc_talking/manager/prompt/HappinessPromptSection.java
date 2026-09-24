@@ -62,9 +62,9 @@ public final class HappinessPromptSection {
                                 "You really want a job so you can contribute to the colony",
                                 "Not having a job makes you feel like you don't belong here");
                             case DEMAND -> MiscUtil.pick(
-                                "You've been without a job for so long it's making you feel worthless",
+                                "You've been without a job for a long while and really want to find your place",
                                 "The need for meaningful work has been gnawing at you for days",
-                                "Watching everyone else contribute while you remain unemployed is crushing");
+                                "You'd love to contribute like everyone else and hope a job comes along soon");
                         }).append("\n");
                     } else if (factor > 1.2) {
                         prompt.append("- ").append(MiscUtil.pick(
@@ -89,7 +89,7 @@ public final class HappinessPromptSection {
                             case DEMAND -> MiscUtil.pick(
                                 "This illness has been dragging on for so long — you're desperate for a cure",
                                 "You've been sick for days and it's draining all your strength",
-                                "The long sickness is unbearable — you need medical help urgently");
+                                "The long sickness is wearing you out — you really need a healer");
                         }).append("\n");
                     }
                     break;
@@ -106,9 +106,9 @@ public final class HappinessPromptSection {
                                 "You want to work but can't — something essential is missing from your workplace",
                                 "Standing around with nothing productive to do at your job is frustrating");
                             case DEMAND -> MiscUtil.pick(
-                                "You've been idle at work for days — missing tools or supplies are making your life impossible",
-                                "Being unable to work for so long is driving you crazy — someone needs to fix the supply issue",
-                                "You're at your wit's end — your workplace has been non-functional for too long");
+                                "You've been idle at work for days — the missing tools or supplies keep you from doing your job",
+                                "You've been unable to work for a long while and hope the supply issue gets sorted out",
+                                "Your workplace has been stuck for a long time and you'd really like to get going again");
                         }).append("\n");
                     }
                     break;
@@ -299,8 +299,8 @@ public final class HappinessPromptSection {
                     "Not having a place to live is one of your biggest worries",
                     "You'd really like a home — being without one is getting hard");
                 case DEMAND -> MiscUtil.pick(
-                    "You desperately need a home — living like this is getting unbearable",
-                    "You've gone without a home for days and you're fed up with it",
+                    "You desperately need a home — living without one is wearing you down",
+                    "You've gone without a home for days and it's getting hard",
                     "Being homeless for this long is wearing you down — you want it fixed");
             };
         } else {
