@@ -441,6 +441,14 @@ public class ConversationManager {
         return foregroundSessions.isBusy(id) || activities.isBusy(id);
     }
 
+    /**
+     * Whether the citizen's MineColonies routine should wait: it is busy, or a controlled session (such as
+     * a campfire circle) holds it between lines, so the night routine does not walk it off to bed.
+     */
+    public static boolean shouldPauseRoutine(AbstractEntityCitizen citizen) {
+        return isCitizenBusy(citizen) || SpeechFloor.holds(citizen.getUUID(), ConversationKind.CONTROLLED);
+    }
+
     public static boolean claimAddonActivity(AbstractEntityCitizen citizen, UUID token, long timeoutNanos) {
         return activities.reserveAddon(citizen.getUUID(), token, foregroundSessions.isBusy(citizen.getUUID()), timeoutNanos);
     }

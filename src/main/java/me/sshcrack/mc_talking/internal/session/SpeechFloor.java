@@ -60,6 +60,17 @@ public final class SpeechFloor {
         return new ArrayList<>(HOLDERS.values());
     }
 
+    /** Whether a group of speech kind {@code kind} holds the citizen with this id. */
+    public static boolean holds(UUID id, ConversationKind kind) {
+        for (Group group : HOLDERS.values()) {
+            if (group.kind() != kind) continue;
+            for (Entity member : group.members()) {
+                if (member.getUUID().equals(id)) return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * True when a listener close enough to hear {@code candidate} would also hear one of
      * {@code speakers}: starting now would talk over them. Speakers in {@code exempt} (the
