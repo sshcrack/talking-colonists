@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
+import me.sshcrack.mc_talking.internal.audio.VoiceDucking;
 
 /** Small head-space opening, preserving the original skin during silence. */
 public final class CitizenMouthLayer extends RenderLayer<AbstractEntityCitizen, CitizenModel<AbstractEntityCitizen>> {
@@ -29,6 +30,7 @@ public final class CitizenMouthLayer extends RenderLayer<AbstractEntityCitizen, 
     @Override
     public void render(PoseStack pose, MultiBufferSource buffers, int light, AbstractEntityCitizen citizen,
             float swing, float amount, float partial, float age, float yaw, float pitch) {
+        VoiceDucking.markCitizen(citizen.getUUID());
         var config = McTalkingConfig.INSTANCE.instance();
         var model = getParentModel();
         if (!config.showConversationMouths || config.reducedConversationMotion || !model.head.visible

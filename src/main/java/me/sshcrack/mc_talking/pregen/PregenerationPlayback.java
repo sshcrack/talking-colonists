@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.audio.PcmSpeechDetector;
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
+import me.sshcrack.mc_talking.internal.session.SpeechFloor;
 import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -20,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 /** Playback and interruption owner for cached/pregenerated citizen speech. */
@@ -185,11 +187,14 @@ public final class PregenerationPlayback {
             activity.close();
             return false;
         }
+        // Held synchronously so other clips checked in the same tick wait for this one.
+        SpeechFloor.hold(entry, ConversationKind.PREGENERATED, List.of(citizen));
 
         AtomicBoolean cleanedUp = entry.cleaned;
         Runnable cleanup = () -> {
             if (!cleanedUp.compareAndSet(false, true)) return;
             ACTIVE_PREGENERATED_PLAYBACK.remove(citizenId, entry);
+            SpeechFloor.release(entry);
             activity.close();
         };
         entry.cleanup = cleanup;
@@ -226,6 +231,7 @@ public final class PregenerationPlayback {
             return true;
         } catch (RuntimeException e) {
             entry.stop("playback startup failed");
+            cleanup.run();
             throw e;
         }
     }
@@ -236,6 +242,7 @@ public final class PregenerationPlayback {
             entry.stop("server shutdown");
         }
         ACTIVE_PREGENERATED_PLAYBACK.clear();
+        SpeechFloor.clear();
         for (VoiceBurst burst : PLAYER_VOICE_BURSTS.values()) {
             synchronized (burst) {
                 closeDecoder(burst.decoder);

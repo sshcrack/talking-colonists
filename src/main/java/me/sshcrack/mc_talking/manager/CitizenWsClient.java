@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager;
 
+import me.sshcrack.mc_talking.manager.tools.EndConversationAction;
 import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.BidiGenerateContentSetup;
@@ -277,6 +278,18 @@ public class CitizenWsClient extends GeminiWsClient {
     @Override
     protected boolean allowAddonTool(String toolId) {
         return promptSessionContext.allowsAddonTool(toolId);
+    }
+
+    /** Controlled turns speak one scripted line; status prompts (sleep: "end the conversation") would cut it off. */
+    @Override
+    public boolean sendStatusUpdates() {
+        return !promptSessionContext.isControlledTurn();
+    }
+
+    /** A controlled turn cannot end the shared conversation; only its controller can. */
+    @Override
+    protected boolean allowBuiltInTool(String name) {
+        return !(promptSessionContext.isControlledTurn() && EndConversationAction.NAME.equals(name));
     }
 
     @Override

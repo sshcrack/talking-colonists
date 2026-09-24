@@ -20,6 +20,7 @@ import me.sshcrack.mc_talking.internal.session.DefaultConversationParticipationM
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.internal.session.MinecraftConversationParticipationAdapter;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
+import me.sshcrack.mc_talking.internal.session.SpeechFloor;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -43,6 +44,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
@@ -619,6 +625,10 @@ public class ConversationManager {
             if (isCitizenBusy(citizen)) {
                 return ConversationEligibility.rejected(ConversationEligibility.Status.BUSY, "citizen is already busy");
             }
+            if (kind != ConversationKind.CONTROLLED && isFloorTaken(citizen, kind)) {
+                return ConversationEligibility.rejected(ConversationEligibility.Status.BUSY,
+                        "someone within earshot is already speaking");
+            }
         }
 
         if (!ConversationRuleRuntime.addonsAllowSpeech(citizen, kind)) {
@@ -640,6 +650,39 @@ public class ConversationManager {
 
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, ConversationKind kind) {
         return conversationEligibility(citizen, kind).eligible();
+    }
+
+    /**
+     * Whether a player who would hear {@code citizen} already hears someone else: a foreground
+     * session (a player conversation holds the floor while listening too) or a {@link SpeechFloor}
+     * holder such as a pregenerated clip or a campfire group. A member of a group is engaged for
+     * any speech other than the group's own kind. Unprompted speech waits; player conversations are
+     * never held back, and controlled sessions pause until the floor around their group is free.
+     */
+    public static boolean isFloorTaken(AbstractEntityCitizen citizen, ConversationKind kind) {
+        double radius = McTalkingConfig.INSTANCE.instance().speechFloorRadius;
+        if (radius <= 0 || !(citizen.level() instanceof ServerLevel level)) return false;
+        UUID self = citizen.getUUID();
+        Set<UUID> exempt = new HashSet<>();
+        exempt.add(self);
+        List<SpeechFloor.Voice> speakers = new ArrayList<>();
+        for (SpeechFloor.Group group : SpeechFloor.groups()) {
+            boolean own = group.members().stream().anyMatch(member -> member.getUUID().equals(self));
+            if (own && group.kind() != kind) return true;
+            for (Entity member : group.members()) {
+                if (own) exempt.add(member.getUUID());
+                else if (!member.isRemoved()) speakers.add(SpeechFloor.Voice.of(member));
+            }
+        }
+        for (var snapshot : foregroundSessions.snapshots()) {
+            if (!snapshot.entity().isRemoved()) speakers.add(SpeechFloor.Voice.of(snapshot.entity()));
+        }
+        if (speakers.isEmpty()) return false;
+        List<SpeechFloor.Voice> listeners = level.players().stream()
+                .filter(player -> !player.isSpectator())
+                .map(SpeechFloor.Voice::of)
+                .toList();
+        return SpeechFloor.wouldOverlap(SpeechFloor.Voice.of(citizen), speakers, listeners, exempt, radius);
     }
 
 

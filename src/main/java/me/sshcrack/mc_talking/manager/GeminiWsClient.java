@@ -633,7 +633,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         setup.systemInstruction = sys;
 
-        setup.tools.addAll(AITools.getEnabledTools(tool -> allowAddonTool(tool.id())));
+        setup.tools.addAll(AITools.getEnabledTools(this::allowBuiltInTool, tool -> allowAddonTool(tool.id())));
 
         return setup;
     }
@@ -642,6 +642,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     /** Session-specific addon-tool policy. Ordinary conversations allow registered tools. */
     protected boolean allowAddonTool(String toolId) { return true; }
+
+    /** Session-specific built-in tool policy. Ordinary conversations allow every enabled built-in. */
+    protected boolean allowBuiltInTool(String name) { return true; }
 
     protected UUID toolSessionId() { return providerToolSessionId; }
 
@@ -981,6 +984,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var colony = this.entity.getCitizenColonyHandler().getColony();
 
         var action = AITools.getAction(name);
+        if (action != null && !allowBuiltInTool(name)) action = null;
         var addonAction = AiToolRuntime.findByProviderName(name);
         if (addonAction != null && !allowAddonTool(addonAction.id())) addonAction = null;
         if (action == null && addonAction == null) {

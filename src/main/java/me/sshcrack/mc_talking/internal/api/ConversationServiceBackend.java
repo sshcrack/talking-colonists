@@ -71,6 +71,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import me.sshcrack.mc_talking.internal.session.SpeechFloor;
 
 /** Full-mod implementation of the standalone addon API bridge. */
 final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.service.ConversationService {
@@ -308,6 +309,8 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
     ) {
         ControlledSession session = new ControlledSession(server, participants, agenda, options);
         CONTROLLED_SESSIONS.computeIfAbsent(server, ignored -> ConcurrentHashMap.newKeySet()).add(session);
+        // Participants stay engaged between turns: no greetings or mumbling from a campfire circle.
+        SpeechFloor.hold(session, ConversationKind.CONTROLLED, participants);
         return session;
     }
 
@@ -423,6 +426,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             this.server = java.util.Objects.requireNonNull(server, "server");
             this.hooks = new ControlledHooks(server);
             this.runtime = new ControlledConversationRuntime<>(participants, agenda, options, hooks);
+            hooks.participants = runtime::participants;
         }
 
         @Override
@@ -481,6 +485,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
         @Override
         public void end(@NotNull EndReason reason) {
             runtime.end(reason);
+            SpeechFloor.release(this);
             unregisterControlledSession(server, this);
         }
 
@@ -494,6 +499,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                 implements ControlledConversationRuntime.Hooks<AbstractEntityCitizen, ControlledAudioAnchor> {
             private final MinecraftServer server;
             private final Map<UUID, ServerPlayer> detachedPlayers = new ConcurrentHashMap<>();
+            private Supplier<List<AbstractEntityCitizen>> participants = List::of;
 
             private ControlledHooks(MinecraftServer server) { this.server = server; }
 
@@ -584,7 +590,12 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             }
 
             @Override
-            public boolean hasCapacity() { return ConversationManager.hasLowPriorityCapacity(1); }
+            public boolean hasCapacity() {
+                // Someone outside the session is audible near the group: wait (the session pauses) rather
+                // than talk over them.
+                return ConversationManager.hasLowPriorityCapacity(1) && participants.get().stream()
+                        .noneMatch(member -> ConversationManager.isFloorTaken(member, ConversationKind.CONTROLLED));
+            }
 
             @Override
             public @NotNull ControlledConversationRuntime.StartResult start(
