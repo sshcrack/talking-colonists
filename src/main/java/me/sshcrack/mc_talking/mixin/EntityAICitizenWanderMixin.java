@@ -21,7 +21,7 @@ public class EntityAICitizenWanderMixin {
     @Inject(method = "canUse", at = @At("HEAD"), cancellable = true)
     private void mc_talking$suppressWanderingDuringConversation(CallbackInfoReturnable<Boolean> cir) {
         if (McTalkingConfig.INSTANCE.instance().continueWorkDuringConversation) return;
-        if (ConversationManager.isCitizenBusy(citizen)) {
+        if (ConversationManager.shouldPauseRoutine(citizen)) {
             cir.setReturnValue(false);
         }
     }
