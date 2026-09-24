@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 /** Playback and interruption owner for cached/pregenerated citizen speech. */
 public final class PregenerationPlayback {
@@ -208,6 +209,8 @@ public final class PregenerationPlayback {
             }
 
             GeminiStream stream = new GeminiStream(channel);
+            stream.setTimeline(SpeechTimeline.tracker(citizen, null,
+                    () -> "PREGENERATED"));
             stream.beginTurn(entry.turnId);
             entry.attach(stream, cleanup);
             if (entry.cancelled.get()) return false;

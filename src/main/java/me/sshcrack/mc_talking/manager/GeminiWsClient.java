@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     private static final int MAX_TOTAL_RECOVERY_ATTEMPTS = 6;
@@ -127,6 +128,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
      */
     protected String currentTurnTranscript = "";
+    private long receivedAudioBytes;
+    private long droppedAudioBytes;
 
     private final String logPrefix;
     private final UUID providerToolSessionId = UUID.randomUUID();
@@ -176,6 +179,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         AudioChannel channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
         stream = new GeminiStream(channel);
+        stream.setTimeline(SpeechTimeline.tracker(entity, null,
+                () -> ConversationManager.kindLabel(entity.getUUID())));
         stream.setOnPause(this::onStreamPause);
         gracefulPlaybackClose = new PlaybackDrainCoordinator(
                 this::flushCurrentOutputTurn,
@@ -424,6 +429,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(heardTranscript.trim());
             }
             utterances.onCitizenTurnHeard(heardTranscript);
+            SpeechTimeline.said(entity,
+                    ConversationManager.kindLabel(entity.getUUID()), heardTranscript);
             onAudibleTranscriptComplete(heardTranscript.trim());
         }
         return true;
@@ -821,6 +828,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onTurnComplete() {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
+        if (SpeechTimeline.enabled()) {
+            long[] streamCounters = stream.takeAudioCounters();
+            SpeechTimeline.turn(entity, ConversationManager.kindLabel(entity.getUUID()), receivedAudioBytes,
+                    droppedAudioBytes, streamCounters[0], streamCounters[1], currentTurnTranscript.length(),
+                    suppressProviderOutput);
+            receivedAudioBytes = 0;
+            droppedAudioBytes = 0;
+        }
         if (suppressProviderOutput) return;
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.TURN_COMPLETED);
         utterances.onProviderTurnComplete();
@@ -872,8 +887,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
+        receivedAudioBytes += data.length;
         if (finalGenerationCompleted || suppressProviderOutput) {
             McTalking.LOGGER.debug("{} Dropping audio outside the active provider turn", logPrefix);
+            droppedAudioBytes += data.length;
             return;
         }
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
