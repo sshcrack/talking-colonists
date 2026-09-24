@@ -99,6 +99,11 @@ public class ServerEventHandler {
     }
 
     @SubscribeEvent
+    public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        me.sshcrack.mc_talking.internal.api.PlayerSpeechServiceBackend.onPlayerLeft(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         McTalkingDebugCommand.register(event.getDispatcher());
         MissingApiKeyOnboardingHandler.registerServerFallback(event.getDispatcher(), event.getCommandSelection());

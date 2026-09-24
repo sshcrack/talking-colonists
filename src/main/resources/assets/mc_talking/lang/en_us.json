@@ -396,5 +396,11 @@
   "mc_talking.memory_mode.flash": "FLASH",
 
   "mc_talking.available_ai.flash3": "Gemini 3.1 Flash",
-  "mc_talking.available_ai.flash2_5": "Gemini 2.5 Flash"
+  "mc_talking.available_ai.flash2_5": "Gemini 2.5 Flash",
+  "mc_talking.speech_capture.listening": "● Listening… speak now",
+  "mc_talking.speech_capture.transcribing": "Transcribing…",
+  "mc_talking.debug.speech_capture.started": "Speech capture started for up to %s s. Speak now.",
+  "mc_talking.debug.speech_capture.transcript": "Transcript (%2$s ms of speech): %1$s",
+  "mc_talking.debug.speech_capture.failed": "Speech capture ended: %s %s",
+  "mc_talking.debug.speech_capture.players_only": "Only a player can run a speech capture."
 }
