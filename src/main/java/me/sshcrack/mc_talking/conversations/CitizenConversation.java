@@ -9,6 +9,7 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
+import me.sshcrack.mc_talking.internal.session.SpeechFloor;
 import me.sshcrack.mc_talking.internal.session.ConversationEventDispatch;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
@@ -36,6 +37,8 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import java.util.stream.Collectors;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 /**
  * Orchestrates a citizen-to-citizen conversation.
@@ -115,6 +118,8 @@ public class CitizenConversation {
             setState(ConversationState.ENDED);
             return;
         }
+        // The pair keeps the floor between lines too, so nobody nearby cuts in while the next one generates.
+        SpeechFloor.hold(this, ConversationKind.CITIZEN_PAIR, participants);
         switch (mode) {
             case AUTO -> performAutoConversation();
             case FLASH_TTS -> performFlashTtsConversation();
@@ -177,6 +182,9 @@ public class CitizenConversation {
             }
             locationalChannel = channel;
             stream = new GeminiStream(channel);
+            stream.setTimeline(SpeechTimeline.tracker(participants.get(0),
+                    participants.stream().map(p -> p.getDisplayName().getString())
+                            .collect(Collectors.joining(" & ")), () -> "CITIZEN_PAIR"));
         }
         UUID playbackTurnId = UUID.randomUUID();
         flashPlaybackTurnId = playbackTurnId;
@@ -624,6 +632,7 @@ public class CitizenConversation {
     private void setState(ConversationState newState) {
         ConversationState previous = state.getAndSet(newState);
         if (previous == newState) return;
+        if (newState == ConversationState.ENDED) SpeechFloor.release(this);
         McTalking.LOGGER.info("Conversation state changed to {}", newState);
         if (onStateChanged != null) {
             onStateChanged.accept(newState);
