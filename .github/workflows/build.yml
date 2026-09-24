@@ -47,9 +47,13 @@ jobs:
           echo "" >> comment.md
           echo "Download from the [GitHub Actions run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)." >> comment.md
           cat comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Post PR comment
+      # Update one comment per PR instead of adding a new one each run: edits don't send
+      # notification emails, so a PR produces a single notification however often CI runs.
+      - name: Post or update PR comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body-file comment.md
+          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} \
+            --body-file comment.md --edit-last --create-if-none
