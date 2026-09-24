@@ -1,6 +1,8 @@
 package me.sshcrack.mc_talking.gametest;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import com.minecolonies.api.colony.IVisitorData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.buildings.IBuilding;
@@ -60,7 +62,7 @@ public final class ColonyTestHarness implements AutoCloseable {
     private final ServerLevel level;
     private final ServerPlayer owner;
     private final IColony colony;
-    private final List<EntityCitizen> citizens = new ArrayList<>();
+    private final List<AbstractEntityCitizen> citizens = new ArrayList<>();
     private final String savedApiKey;
     private final boolean savedMemory;
 
@@ -110,6 +112,29 @@ public final class ColonyTestHarness implements AutoCloseable {
         }
         entity.getCitizenColonyHandler().registerWithColony(colony.getID(), data.getId());
         citizens.add(entity);
+        return entity;
+    }
+
+    /** Spawns a real, AI-disabled MineColonies visitor (tavern guest) registered with this colony. */
+    public AbstractEntityCitizen spawnVisitor(BlockPos relative) {
+        BlockPos pos = helper.absolutePos(relative);
+        IVisitorData data = (IVisitorData) colony.getVisitorManager().createAndRegisterCivilianData();
+        AbstractEntityCitizen entity = ModEntities.VISITOR.create(level);
+        if (entity == null) throw new GameTestAssertException("Cannot create visitor entity");
+        entity.setUUID(data.getUUID());
+        entity.setPos(pos.getX() + .5, pos.getY(), pos.getZ() + .5);
+        entity.setCitizenId(data.getId());
+        entity.getCitizenColonyHandler().setColonyId(colony.getID());
+        entity.setNoAi(true);
+        level.addFreshEntity(entity);
+        if (level.getEntity(entity.getId()) != entity) {
+            throw new GameTestAssertException("Visitor entity is not in the level yet; the test chunk is not entity-ticking");
+        }
+        entity.getCitizenColonyHandler().registerWithColony(colony.getID(), data.getId());
+        citizens.add(entity);
+        if (entity.getCitizenData() != data) {
+            throw new GameTestAssertException("Visitor entity did not bind to its visitor data");
+        }
         return entity;
     }
 
@@ -174,7 +199,7 @@ public final class ColonyTestHarness implements AutoCloseable {
     @Override
     public void close() {
         try {
-            for (EntityCitizen citizen : citizens) {
+            for (AbstractEntityCitizen citizen : citizens) {
                 if (citizen.isAlive()) citizen.discard();
             }
             IColonyManager.getInstance().deleteColonyByWorld(colony.getID(), false, level);

@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenVerifiedFactsView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenWorkView;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
+import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,6 +28,7 @@ record CitizenPromptSnapshot(
         @NotNull ConversationPromptView conversation,
         @NotNull CitizenActivityView activity,
         @NotNull CitizenVerifiedFactsView verifiedFacts,
-        @Nullable CitizenMemorySnapshot memories
+        @Nullable CitizenMemorySnapshot memories,
+        @Nullable VisitorPromptView visitor
 ) implements CitizenPromptView {
 }

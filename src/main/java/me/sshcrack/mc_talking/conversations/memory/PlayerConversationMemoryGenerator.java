@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.conversations.memory;
 
+import com.minecolonies.api.colony.IVisitorData;
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
@@ -148,6 +149,9 @@ public class PlayerConversationMemoryGenerator extends Thread {
         }
     }
 
+    /** Facts and events a visitor keeps; older ones are forgotten. */
+    public static final int VISITOR_MAX_MEMORIES = 10;
+
     private void saveMemories(GsonMemoryResponse response, String citizenName) {
         for (var gsonCitizen : response.citizens) {
             if (!gsonCitizen.name.equals(citizenName)) continue;
@@ -166,6 +170,10 @@ public class PlayerConversationMemoryGenerator extends Thread {
                     memory.addRelationshipChange(playerUuid, rel.type, rel.change,
                             MemoryProvenance.CITIZEN_STATEMENT, citizen.getUUID(), null, null);
                 }
+            }
+            if (citizen.getCitizenData() instanceof IVisitorData) {
+                // Visitors only keep a short-term memory; it moves with them if they are recruited.
+                memory.keepNewest(VISITOR_MAX_MEMORIES);
             }
         }
     }

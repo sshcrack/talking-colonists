@@ -11,12 +11,19 @@ final class VerifiedFactPromptRenderer {
     }
 
     static String render(CitizenVerifiedFactsView verified) {
+        return render(verified, false);
+    }
+
+    /** {@code visitor}: a tavern guest, whose lodging is the tavern rather than a colony home. */
+    static String render(CitizenVerifiedFactsView verified, boolean visitor) {
         StringBuilder out = new StringBuilder();
         out.append("## VERIFIED CURRENT FACTS\n");
         out.append("- These point-in-time observations override contradictory recollections below. ")
                 .append("UNLOADED/UNAVAILABLE means unknown, not zero/empty or the opposite state.\n");
 
-        switch (verified.housingStatus()) {
+        if (visitor) {
+            out.append("- Lodging: a guest at the tavern, not assigned a colony home.\n");
+        } else switch (verified.housingStatus()) {
             case HOUSED -> out.append("- Housing: currently assigned a home. Do not claim to be homeless.\n");
             case HOMELESS -> out.append("- Housing: currently no home is assigned.\n");
             case UNKNOWN -> out.append("- Housing: current assignment could not be verified; do not infer housed or homeless.\n");

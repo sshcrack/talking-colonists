@@ -11,6 +11,7 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.util.ComplaintRamp;
 import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
+import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import org.jetbrains.annotations.NotNull;
@@ -65,7 +66,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("Type: ").append(citizenType);
         }
 
-        if (view.work().jobName() != null) {
+        var visitor = view.visitor();
+        if (visitor != null) {
+            prompt.append(", **visitor**");
+        } else if (view.work().jobName() != null) {
             prompt.append(", **").append(view.work().jobName()).append("**");
             if (view.work().workplace() != null) {
                 prompt.append(" at ").append(view.work().workplace().displayName())
@@ -91,8 +95,26 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append(" | Home: ").append(view.work().home().displayName())
                     .append(" (level ").append(view.work().home().level()).append(")");
         }
-        prompt.append("\n\n");
+        prompt.append("\n");
+        if (visitor != null) appendVisitorSituation(prompt, view, visitor, firstPerson);
+        prompt.append("\n");
         return prompt.toString();
+    }
+
+    private static void appendVisitorSituation(StringBuilder prompt, CitizenPromptView view,
+                                               VisitorPromptView visitor, boolean firstPerson) {
+        String you = firstPerson ? "You are" : "They are";
+        prompt.append(you).append(" a traveller staying at the tavern of ").append(view.colony().name())
+                .append(", not a colonist: no job, home or family here yet. ");
+        prompt.append(visitor.daysInColony() == 0 ? "Arrived today"
+                : "Staying for " + visitor.daysInColony() + (visitor.daysInColony() == 1 ? " day" : " days")).append(". ");
+        if (visitor.recruitCost() != null) {
+            prompt.append("The colony can recruit ").append(firstPerson ? "you" : "them").append(" for ")
+                    .append(visitor.recruitCost()).append(". ");
+        }
+        prompt.append(firstPerson
+                ? "You may talk about your travels and whether you would like to settle here.\n"
+                : "They may talk about their travels and whether they would settle here.\n");
     }
 
     private String getGeneralCitizenPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
@@ -232,7 +254,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
     private void addObservations(@NotNull CitizenPromptView view, StringBuilder prompt) {
         StringBuilder obs = new StringBuilder();
-        obs.append(VerifiedFactPromptRenderer.render(view.verifiedFacts()));
+        obs.append(VerifiedFactPromptRenderer.render(view.verifiedFacts(), view.visitor() != null));
 
         if (view.conversation().playerState() != null) {
             obs.append("- The player you are speaking to appears ").append(view.conversation().playerState()).append("\n");
@@ -315,7 +337,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             });
         }
 
-        if (!view.identity().child() && view.work().jobName() == null) {
+        if (!view.identity().child() && view.work().jobName() == null && view.visitor() == null) {
             var tier = ComplaintRamp.activeTier(modifiers, HappinessModifierType.UNEMPLOYMENT, colonyAge, complaints);
             prompt.append(switch (tier == null ? ComplaintRamp.Tier.COMPLAINT : tier) {
                 case REMARK -> "- Hoping to be given a job soon\n";

@@ -6,6 +6,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.api.conversation.VisitorSpeechPolicy;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import org.jetbrains.annotations.NotNull;
 
@@ -16,6 +17,8 @@ public final class ConversationRuleRuntime {
             new RegistrationRegistry<>("Speech policy");
     private static final RegistrationRegistry<CitizenUrgencyModifier> URGENCY =
             new RegistrationRegistry<>("Urgency modifier");
+    private static final RegistrationRegistry<VisitorSpeechPolicy> VISITORS =
+            new RegistrationRegistry<>("Visitor policy");
 
     private ConversationRuleRuntime() {
     }
@@ -34,6 +37,30 @@ public final class ConversationRuleRuntime {
             @NotNull CitizenUrgencyModifier modifier
     ) {
         return URGENCY.register(id, order, modifier);
+    }
+
+    public static @NotNull AddonRegistration registerVisitorPolicy(
+            @NotNull String id,
+            int order,
+            @NotNull VisitorSpeechPolicy policy
+    ) {
+        return VISITORS.register(id, order, policy);
+    }
+
+    /** Whether any registered visitor policy lets this visitor take part in {@code kind}. */
+    public static boolean addonsAllowVisitor(
+            @NotNull AbstractEntityCitizen visitor,
+            @NotNull ConversationKind kind
+    ) {
+        for (var registration : VISITORS.orderedSnapshot()) {
+            try {
+                if (registration.value().allowsVisitor(visitor, kind)) return true;
+            } catch (Throwable t) {
+                LOGGER.log(System.Logger.Level.ERROR,
+                        "Visitor policy " + registration.id() + " failed for " + kind + "; ignoring that policy", t);
+            }
+        }
+        return false;
     }
 
     public static boolean addonsAllowSpeech(

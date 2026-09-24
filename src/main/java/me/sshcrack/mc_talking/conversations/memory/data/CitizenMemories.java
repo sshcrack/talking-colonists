@@ -39,6 +39,7 @@ public class CitizenMemories {
     private static final String TAG_SUMMARIZED_MEMORY = "summarized_memory";
     private static final String TAG_BROADCASTS = "mc_talking_broadcasts";
     private static final String TAG_RUMORS = "mc_talking_rumors";
+    private static final String TAG_VISITOR_SINCE_DAY = "visitor_since_day";
 
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
@@ -53,6 +54,7 @@ public class CitizenMemories {
     private String sessionToken = "";
     private String summarizedMemory = "";
     private long compactionRevision;
+    private int visitorSinceDay = -1;
 
     public record CompactionSnapshot(long revision, String summary, List<String> facts,
                                      List<String> events, List<CitizenMemoryEntryView> entries) {
@@ -164,6 +166,21 @@ public class CitizenMemories {
                 return;
             }
         }
+    }
+
+    /**
+     * Colony days a visitor has stayed, counted from the first time this is asked; the first day is
+     * saved, so the count survives reloads.
+     */
+    public synchronized int visitorDays(int colonyDay) {
+        if (visitorSinceDay < 0 || visitorSinceDay > colonyDay) visitorSinceDay = colonyDay;
+        return colonyDay - visitorSinceDay;
+    }
+
+    /** Keeps only the newest {@code max} facts and events, a visitor's short-term memory. */
+    public synchronized void keepNewest(int max) {
+        while (facts.size() > max) removeFirstEntry(MemoryEntryType.FACT, facts.remove(0));
+        while (events.size() > max) removeFirstEntry(MemoryEntryType.EVENT, events.remove(0));
     }
 
     public synchronized void setSummarizedMemory(String summarizedMemory) {
@@ -336,6 +353,7 @@ public class CitizenMemories {
 
         if (sessionToken != null && !sessionToken.isBlank()) tag.putString(TAG_SESSION_TOKEN, sessionToken);
         if (!summarizedMemory.isBlank()) tag.putString(TAG_SUMMARIZED_MEMORY, summarizedMemory);
+        if (visitorSinceDay >= 0) tag.putInt(TAG_VISITOR_SINCE_DAY, visitorSinceDay);
         return tag;
     }
 
@@ -414,6 +432,7 @@ public class CitizenMemories {
 
         sessionToken = tag.contains(TAG_SESSION_TOKEN) ? tag.getString(TAG_SESSION_TOKEN) : "";
         summarizedMemory = tag.contains(TAG_SUMMARIZED_MEMORY) ? tag.getString(TAG_SUMMARIZED_MEMORY) : "";
+        visitorSinceDay = tag.contains(TAG_VISITOR_SINCE_DAY) ? tag.getInt(TAG_VISITOR_SINCE_DAY) : -1;
     }
 
     private static CompoundTag serializeEntry(CitizenMemoryEntryView entry) {

@@ -4,6 +4,7 @@ import me.sshcrack.mc_talking.internal.compat.MineColoniesCompatibilityMapper;
 
 import com.minecolonies.api.colony.ColonyState;
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IVisitorData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.ModBuildings;
@@ -43,6 +44,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenRequestAvailabilityView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenVerifiedFactsView;
 import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.prompt.view.ObservedValue;
+import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPersonalityView;
@@ -115,6 +117,9 @@ public final class CitizenPromptViewFactory {
             @Nullable ServerPlayer speakingTo,
             @Nullable UUID contextPlayerId
     ) {
+        if (data instanceof IVisitorData visitor) {
+            return createVisitor(visitor, interestedParties, speakingTo, contextPlayerId);
+        }
         String jobName = extractJobName(data);
         long snapshotGameTime = data.getColony().getWorld() == null ? -1L : data.getColony().getWorld().getGameTime();
         List<String> parents = extractParents(data);
@@ -225,8 +230,82 @@ public final class CitizenPromptViewFactory {
                 ),
                 activity,
                 verifiedFacts,
-                memorySnapshot
+                memorySnapshot,
+                null
         );
+    }
+
+    /**
+     * A visitor (tavern guest) has no job, home, family, requests or quests in the colony, so those
+     * stay empty; happiness modifiers such as homelessness do not apply to a guest either.
+     */
+    private static CitizenPromptView createVisitor(
+            IVisitorData data,
+            @NotNull Map<UUID, String> interestedParties,
+            @Nullable ServerPlayer speakingTo,
+            @Nullable UUID contextPlayerId
+    ) {
+        long snapshotGameTime = data.getColony().getWorld() == null ? -1L : data.getColony().getWorld().getGameTime();
+        ObservedValue<Double> observedHealth = extractObservedHealth(data, snapshotGameTime);
+        var personalityExt = (CitizenDataPersonalityExtended) data;
+        personalityExt.mc_talking$assignPersonality();
+        PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
+        CitizenPersonalityView personalityView = personality == null ? null : new CitizenPersonalityView(
+                personality.name().toLowerCase(Locale.ROOT), personality.getPromptLines(), false);
+        var memoryData = (CitizenDataMemoryExtended) data;
+        var memory = memoryData.mc_talking$getOrInitializeMemory();
+        int daysInColony = memory.visitorDays(data.getColony().getDay());
+
+        var equipment = extractEquipment(data, snapshotGameTime);
+        var verifiedFacts = new CitizenVerifiedFactsView(
+                snapshotGameTime,
+                observedHealth,
+                equipment,
+                CitizenHousingStatus.UNKNOWN,
+                ObservedValue.current(new CitizenRequestAvailabilityView(List.of(), List.of()), snapshotGameTime),
+                BuilderActivityStatus.NOT_BUILDER
+        );
+        String nameTagDescription = extractNameTagDescription(data);
+        var activity = new CitizenActivityView(
+                CitizenActivityCategory.OTHER, null, null, null, null,
+                "visiting the colony's tavern", nameTagDescription, List.of());
+
+        return new CitizenPromptSnapshot(
+                data.getUUID(),
+                contextPlayerId,
+                new CitizenIdentityView(data.getName(), data.isChild(), data.isFemale(), false,
+                        personalityView, personalityExt.mc_talking$getCustomPersonality()),
+                new CitizenFamilyView(List.of(), false, List.of(), List.of()),
+                new CitizenWellbeingView(
+                        data.getCitizenDiseaseHandler().isSick(),
+                        false,
+                        data.getSaturation(),
+                        observedHealth.value(),
+                        data.getCitizenHappinessHandler().getHappiness(data.getColony(), data),
+                        List.of(),
+                        false,
+                        List.of(),
+                        null
+                ),
+                new CitizenWorkView(null, null, null, extractSkills(data), List.of(), List.of(), List.of()),
+                createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
+                new ConversationPromptView(
+                        getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
+                        extractPlayerRelation(data, speakingTo),
+                        extractPlayerState(speakingTo),
+                        interestedParties
+                ),
+                activity,
+                verifiedFacts,
+                MemorySnapshotFactory.create(memory),
+                new VisitorPromptView(describeRecruitCost(data.getRecruitCost()), daysInColony)
+        );
+    }
+
+    @Nullable
+    private static String describeRecruitCost(@Nullable ItemStack cost) {
+        if (cost == null || cost.isEmpty()) return null;
+        return cost.getCount() + " x " + cost.getHoverName().getString();
     }
 
     // ── Extracted helpers ────────────────────────────────────────────────

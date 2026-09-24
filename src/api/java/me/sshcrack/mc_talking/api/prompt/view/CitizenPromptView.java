@@ -39,4 +39,12 @@ public interface CitizenPromptView {
     @NotNull CitizenVerifiedFactsView verifiedFacts();
 
     @Nullable CitizenMemorySnapshot memories();
+
+    /**
+     * Visitor facts when this snapshot describes a MineColonies visitor rather than a colonist
+     * (API 2.1, {@link me.sshcrack.mc_talking.api.ApiFeature#VISITOR_SPEAKERS}); otherwise null.
+     */
+    default @Nullable VisitorPromptView visitor() {
+        return null;
+    }
 }
