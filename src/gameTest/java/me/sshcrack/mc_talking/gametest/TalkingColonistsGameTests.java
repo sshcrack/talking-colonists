@@ -5,6 +5,9 @@ import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.core.colony.jobs.JobBuilder;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.api.colony.AddonColonyEvent;
+import me.sshcrack.mc_talking.api.colony.ColonyEventService;
+import me.sshcrack.mc_talking.api.colony.ColonyEventView;
 import me.sshcrack.mc_talking.api.context.CitizenContextService;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
@@ -138,6 +141,34 @@ public final class TalkingColonistsGameTests {
                         "retraction should report the broadcast was remembered");
                 helper.assertTrue(CitizenMemoryService.snapshot(first).orElseThrow().broadcasts().isEmpty(),
                         "retracted broadcast should be forgotten");
+            }
+        });
+        helper.succeed();
+    }
+
+    /** A2: an addon event reaches listeners, the public feed, and the citizen's prompt context. */
+    @GameTest(template = FLOOR, batch = "mc_talking_colony_events", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void addonColonyEventReachesListenersFeedAndPrompt(GameTestHelper helper) {
+        logFailures("addonColonyEventReachesListenersFeedAndPrompt", () -> {
+            var heard = new java.util.ArrayList<ColonyEventView>();
+            try (var fixture = ColonyTestHarness.create(helper);
+                 var listener = ColonyEventService.registerListener("mc_talking_test:listener", 0,
+                         (colony, event) -> { if (event.isAddonEvent()) heard.add(event); })) {
+                var citizen = fixture.spawnCitizen(new BlockPos(4, 1, 4));
+
+                helper.assertTrue(ColonyEventService.record(fixture.colony(),
+                                new AddonColonyEvent("mc_talking_test", "election_won", "Maria won the mayoral election")),
+                        "record should succeed on a loaded colony");
+
+                helper.assertTrue(heard.size() == 1 && "election_won".equals(heard.get(0).addonKey()),
+                        "listener should see exactly the addon event, saw " + heard);
+                var recent = ColonyEventService.recent(fixture.colony(), java.time.Duration.ofMinutes(5));
+                helper.assertTrue(recent.stream().anyMatch(e -> e.isAddonEvent()
+                                && "mc_talking_test".equals(e.addonNamespace())),
+                        "recent feed should contain the addon event, was " + recent);
+                var promptEvents = CitizenContextService.snapshot(citizen).colony().recentEvents();
+                helper.assertTrue(promptEvents.contains("Maria won the mayoral election"),
+                        "citizen prompt context should include the addon event, was " + promptEvents);
             }
         });
         helper.succeed();

@@ -696,6 +696,37 @@ CitizenMemoryService.retractBroadcast(colony, broadcastId);
 
 Calls are marshalled to the server thread like the other memory operations.
 
+## Colony event feed (API 2.1, `ApiFeature.COLONY_EVENTS`)
+
+`ColonyEventService` exposes the colony events citizens already talk about (raids, deaths, births,
+hires, job changes, buildings added, removed and upgraded, colony founded). Addons can add their own.
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.COLONY_EVENTS)) {
+    // Read: newest first, within the last in-game hour
+    List<ColonyEventView> news = ColonyEventService.recent(colony, Duration.ofHours(1));
+
+    // Write: citizens mention it like any other recent event
+    ColonyEventService.record(colony, new AddonColonyEvent("elections", "election_won",
+            "Maria Silva won the mayoral election"));
+
+    // Listen: every newly recorded event, core or addon, on the server thread
+    AddonRegistration reg = ColonyEventService.registerListener("gazette:events", 0,
+            (colony, event) -> queueForNextIssue(colony, event));
+}
+```
+
+- **Distinguishing events:** `ColonyEventView.type()` is a `ColonyEventType`. Addon events are
+  `ADDON` and carry `addonNamespace()` and `addonKey()`. Descriptions are the text citizens see.
+- **Bounds:** core events keep the 20 most recent per colony. Addon events have a separate budget
+  of the 10 most recent **per namespace**, so a chatty addon never pushes out core events or other
+  addons' events. Both are saved with the colony.
+- **Prompts:** addon events appear in citizens' "recent colony events" for the server's
+  `colonyEventWindowSeconds`, the same as core events.
+- **Listeners:** listeners run in ascending `order` on the server thread. An exception in one
+  listener is logged and does not affect the others. Ids must be namespaced; close the
+  registration to stop listening.
+
 ## Autonomous citizen conversations
 
 For a regular two-citizen conversation:
