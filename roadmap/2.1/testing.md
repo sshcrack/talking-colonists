@@ -77,6 +77,18 @@ maintainer-approved break.
 - A deliberately removed public method fails the task; a new public method passes.
 - CI runs it; docs explain the baseline.
 
+
+### Implementation record — 2026-09-24
+
+- `checkApiCompatibility` (per Stonecutter version, wired into `check`) runs the japicmp 0.26.2 CLI
+  through `JavaExec` (no Gradle plugin, so no Gradle-version coupling) against
+  `me.sshcrack:mc_talking-api:<api_baseline_version>-<mc>-<loader>` from maven.sshcrack.me.
+  Flags: public+protected, binary and source incompatibilities are errors, missing third-party
+  classes ignored. Baseline: `api_baseline_version=2.0.0-beta.1` in `gradle.properties`.
+- Current API vs 2.0.0-beta.1 passes on both loaders; all Wave 0 additions report as compatible.
+- Break experiment: making `CitizenConversationService.isBusy` non-public fails both loaders with
+  `METHOD_REMOVED`; reverted.
+- CI runs it in the build job; `AGENTS.md` documents the baseline rule.
 ---
 
 ## T3 — Prompt view fixture and prompt snapshot tests
@@ -110,13 +122,39 @@ loader GameTest framework (NeoForge and Forge) so server tests run headless via 
 (`runGameTestServer` or equivalent) in both Stonecutter versions and in CI. Provide a small harness
 for spawning a MineColonies colony and citizens in a test structure, and add initial tests:
 a citizen's prompt view reflects real housing/job state; conversation eligibility rejects a sleeping
-citizen; the Q4 ambient budget blocks a burst of greetings near a player. No Gemini access: use the
+citizen; the Q4 ambient budget blocks a burst of greetings near a player (dropped: see the implementation record). No Gemini access: use the
 existing local/fake provider used by `DevRuntimeVerification`.
 
 ### Acceptance
 
 - `./gradlew :1.21.1-neoforge:runGameTestServer` and the Forge equivalent pass headless; CI runs them.
 - A deliberately broken eligibility rule makes a GameTest fail.
+
+### Implementation record (2026-09-24, branch `roadmap/t4-gametests`)
+
+- Tasks: `:1.21.1-neoforge:runGameTestServer` and `:1.20.1-forge:runGameTestServer`
+  (ModDevGradle `gameTestServer` run type, `mc_talking` namespace only, fresh world in
+  `versions/<v>/run/gametest/`). The server exits with the failed-required-test count, so any
+  failure fails Gradle.
+- Exclusion: tests live in a dev-only `gameTest` source set (`src/gameTest`, created by
+  `configureGameTests()` in `build-logic/GameTests.kt`). It is added to the dev mod definition
+  but never to `jar`/`reobfJar`; `verifyReleaseJarExcludesGameTests` (after `jar`, and in
+  `check`) guards it. A source set was chosen over the `devtools` Stonecutter switch because it
+  cannot ship by construction and needs no active-source rewrite. Stonecutter preprocesses it.
+- Harness: `ColonyTestHarness` creates a real colony (loader `FakePlayer` owner, `Colonial`
+  pack) in the `mc_talking:empty_floor` template, spawns AI-disabled citizens, places huts via
+  MineColonies `setPlacedBy`, assigns home/job through building modules, sleeps citizens via the
+  sleep handler, clears the Gemini key for its lifetime, and deletes the colony on close.
+  One batch per test.
+- Tests (pass on both loaders): `promptViewReflectsHousingAndJob` (public
+  `CitizenContextService.snapshot` HOMELESS/unemployed before, HOUSED + home/workplace level 1 +
+  builder job name after) and `eligibilityRejectsSleepingCitizen` (awake control eligible;
+  asleep rejected as `SLEEPING` for every `ConversationKind`).
+- Break experiment: disabling the `isSleeping()` check in
+  `ConversationManager.conversationEligibility` failed `eligibilityrejectssleepingcitizen` on both
+  loaders (`1 required tests failed :(`, non-zero exit); reverted.
+- CI: separate `server-gametests` job ("Server GameTests") in `build_reusable.yml`.
+- Dropped: a Q4 ambient-budget GameTest. The budget only counts listeners in the server player list and a GameTest cannot add one (fake player not listed; mock player login breaks MineColonies login sync). Covered by `AmbientSpeechBudgetRegistryTest` instead.
 
 ---
 

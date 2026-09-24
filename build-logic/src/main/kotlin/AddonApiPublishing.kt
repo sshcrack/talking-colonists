@@ -4,7 +4,9 @@ import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.process.CommandLineArgumentProvider
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.create
@@ -154,6 +156,42 @@ fun Project.configureAddonApi() {
                 )
             }
         }
+    }
+
+    // Public API compatibility against the last published developer artifact (AGENTS.md: the
+    // addon API is stable within generation 2). Additions pass; removed or changed public/protected
+    // members and new abstract interface methods fail. After a release, or a maintainer-approved
+    // breaking change, update api_baseline_version in gradle.properties.
+    val apiLoader = sc.current.component1().split("-")[1]
+    val japicmpTool = configurations.create("japicmpTool")
+    dependencies.add(japicmpTool.name, "com.github.siom79.japicmp:japicmp:0.26.2")
+    val apiBaseline = configurations.create("apiCompatibilityBaseline") { isTransitive = false }
+    dependencies.addProvider(apiBaseline.name, providers.gradleProperty("api_baseline_version").map {
+        "me.sshcrack:${prop("mod.id")}-api:$it-${prop("deps.minecraft")}-$apiLoader"
+    })
+    val checkApiCompatibility = tasks.register<JavaExec>("checkApiCompatibility") {
+        group = "verification"
+        description = "Fails if the public addon API breaks compatibility with the published baseline"
+        dependsOn(apiJar)
+        classpath = japicmpTool
+        mainClass.set("japicmp.JApiCmp")
+        inputs.files(apiBaseline, apiJar)
+        val baselineFiles = apiBaseline
+        val currentJar = apiJar.flatMap { it.archiveFile }
+        argumentProviders.add(CommandLineArgumentProvider {
+            listOf(
+                "--old", baselineFiles.singleFile.path,
+                "--new", currentJar.get().asFile.path,
+                "-a", "protected",
+                "--only-modified",
+                "--ignore-missing-classes",
+                "--error-on-binary-incompatibility",
+                "--error-on-source-incompatibility"
+            )
+        })
+    }
+    tasks.named("check") {
+        dependsOn(checkApiCompatibility)
     }
 
     tasks.named("build") {

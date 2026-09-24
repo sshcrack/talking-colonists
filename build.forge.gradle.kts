@@ -51,6 +51,9 @@ platform {
 // Talking Colonists mod can expose both implementation and API outputs as one mod.
 configureAddonApi()
 
+// Dev-only GameTest source set (src/gameTest); never packaged into the release jar.
+val gameTestSourceSet = configureGameTests()
+
 legacyForge {
     version = "${prop("deps.minecraft")}-${prop("deps.forge")}"
 
@@ -98,6 +101,17 @@ legacyForge {
             jvmArgument("-Dmc_talking.autoQuit=true")
             jvmArgument("-Djava.io.tmpdir=${file("run").absolutePath}")
         }
+
+        // Headless server GameTests: ./gradlew :<version>:runGameTestServer
+        // Exits with the number of failed required tests (non-zero fails the Gradle task).
+        register("gameTestServer") {
+            type = "gameTestServer"
+            gameDirectory = file("run/gametest/")
+            ideName = "Forge GameTest Server (${stonecutter.current.version})"
+            sourceSet = gameTestSourceSet
+            systemProperty("forge.enabledGameTestNamespaces", prop("mod.id"))
+            jvmArgument("-Djava.awt.headless=true")
+        }
     }
 
 
@@ -105,10 +119,12 @@ legacyForge {
         register(prop("mod.id")) {
             sourceSet(sourceSets["main"])
             sourceSet(sourceSets["addonApi"])
+            sourceSet(gameTestSourceSet)
         }
     }
 
     addModdingDependenciesTo(sourceSets["test"])
+    addModdingDependenciesTo(gameTestSourceSet)
 }
 
 mixin {
@@ -263,4 +279,13 @@ sourceSets {
 
 tasks.named("createMinecraftArtifacts") {
     dependsOn(tasks.named("stonecutterGenerate"))
+}
+
+// Every GameTest run starts from a fresh world so colonies from a previous run cannot leak in.
+tasks.matching { it.name == "runGameTestServer" }.configureEach {
+    doFirst {
+        val dir = file("run/gametest")
+        dir.deleteRecursively()
+        dir.mkdirs()
+    }
 }
