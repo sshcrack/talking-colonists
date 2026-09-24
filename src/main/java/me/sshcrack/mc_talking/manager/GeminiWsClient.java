@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
+import me.sshcrack.mc_talking.internal.session.OutputTurnTracker;
 import me.sshcrack.mc_talking.internal.tool.ProviderToolCallIds;
 import org.jetbrains.annotations.NotNull;
 import me.sshcrack.mc_talking.internal.session.UtteranceTracker;
@@ -103,12 +104,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Nullable
     private ScheduledFuture<?> reconnectFuture;
     protected volatile boolean generationComplete = false;
-    private volatile boolean providerTurnComplete = false;
-    private volatile boolean outputTurnInterrupted = false;
     private volatile boolean suppressProviderOutput = false;
-    @Nullable private UUID outputTurnId;
-    @Nullable private UUID pendingAudibleTranscriptTurnId;
-    @Nullable private String pendingAudibleTranscript;
+    /** The citizen's current output turn and which transcript counts as heard. */
+    private final OutputTurnTracker turns = new OutputTurnTracker();
     private final PlaybackDrainCoordinator gracefulPlaybackClose;
     /**
      * Whether the AI has started generating audio at least once (used to gate onGenerationPaused).
@@ -376,21 +374,13 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
     }
 
-    private synchronized UUID ensureOutputTurn() {
-        if (outputTurnId == null) {
-            outputTurnId = UUID.randomUUID();
-            outputTurnInterrupted = false;
-            providerTurnComplete = false;
-            pendingAudibleTranscriptTurnId = null;
-            pendingAudibleTranscript = null;
-            stream.beginTurn(outputTurnId);
-        }
-        return outputTurnId;
+    private UUID ensureOutputTurn() {
+        return turns.ensure(stream::beginTurn);
     }
 
     @Nullable
-    private synchronized UUID currentOutputTurn() {
-        return outputTurnId;
+    private UUID currentOutputTurn() {
+        return turns.current();
     }
 
     private void flushCurrentOutputTurn() {
@@ -401,20 +391,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private boolean interruptCurrentOutputForBargeIn() {
         UUID turnId = currentOutputTurn();
         if (turnId == null) return false;
-        boolean providerAlreadyFinished;
-        synchronized (this) {
-            if (!turnId.equals(outputTurnId)) return false;
-            outputTurnInterrupted = true;
-            pendingAudibleTranscriptTurnId = null;
-            pendingAudibleTranscript = null;
-            providerAlreadyFinished = providerTurnComplete;
-        }
+        OutputTurnTracker.BargeIn bargeIn = turns.interruptForBargeIn(turnId);
+        if (bargeIn == null) return false;
         boolean cancelled = stream.cancelTurn(turnId);
 
         // If Gemini had already completed generation, there will be no later interruption/turn
         // completion event to retire this local playback identity. Retire it now so the user's
         // audio can immediately start a fresh provider turn instead of inheriting a cancelled ID.
-        if (providerAlreadyFinished) {
+        if (bargeIn.providerAlreadyFinished()) {
             completeInterruptedTurn(turnId);
             onConversationEnded();
             gracefulPlaybackClose.onPlaybackDrained();
@@ -423,33 +407,17 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private void invalidateCurrentOutputTurn() {
-        UUID turnId;
-        synchronized (this) {
-            turnId = outputTurnId;
-            outputTurnInterrupted = true;
-            providerTurnComplete = false;
-            pendingAudibleTranscriptTurnId = null;
-            pendingAudibleTranscript = null;
-            currentTurnTranscript = "";
-            outputTurnId = null;
-        }
+        UUID turnId = turns.invalidate();
+        currentTurnTranscript = "";
         if (turnId != null) stream.cancelTurn(turnId);
         else stream.stop();
     }
 
     /** Commits only a transcript whose exact audio turn reached the end of playback. */
     private boolean completeAudibleTurn(UUID turnId) {
-        String heardTranscript = null;
-        synchronized (this) {
-            if (!turnId.equals(outputTurnId) || outputTurnInterrupted || !providerTurnComplete) return false;
-            if (turnId.equals(pendingAudibleTranscriptTurnId)) {
-                heardTranscript = pendingAudibleTranscript;
-            }
-            pendingAudibleTranscriptTurnId = null;
-            pendingAudibleTranscript = null;
-            outputTurnId = null;
-            providerTurnComplete = false;
-        }
+        OutputTurnTracker.Completion completion = turns.completeAudible(turnId);
+        if (!completion.completed()) return false;
+        String heardTranscript = completion.heardTranscript();
         if (heardTranscript != null && !heardTranscript.isBlank()) {
             synchronized (sessionTranscript) {
                 if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
@@ -462,15 +430,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private void completeInterruptedTurn(UUID turnId) {
-        synchronized (this) {
-            if (!turnId.equals(outputTurnId)) return;
-            pendingAudibleTranscriptTurnId = null;
-            pendingAudibleTranscript = null;
-            currentTurnTranscript = "";
-            outputTurnId = null;
-            providerTurnComplete = false;
-            outputTurnInterrupted = false;
-        }
+        if (turns.completeInterrupted(turnId)) currentTurnTranscript = "";
     }
 
     public boolean isSessionReadyForInput() {
@@ -703,7 +663,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     protected void onStreamPause() {
         UUID turnId = currentOutputTurn();
-        if (turnId != null && providerTurnComplete && completeAudibleTurn(turnId)) {
+        if (turnId != null && turns.isProviderTurnComplete() && completeAudibleTurn(turnId)) {
             onConversationEnded();
             gracefulPlaybackClose.onPlaybackDrained();
         } else if (recoveryState() == ProviderRecoveryController.State.ACTIVE) {
@@ -794,7 +754,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         McTalking.LOGGER.info("{} Gemini generation interrupted", logPrefix);
         if (suppressProviderOutput) return;
         UUID turnId = ensureOutputTurn();
-        outputTurnInterrupted = true;
+        turns.markInterrupted();
         stream.cancelTurn(turnId);
 
         // Provider-side interruption already updates Gemini's conversation state. The local
@@ -803,8 +763,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         var sPlayer = resolveActivePlayer();
         if (!currentTurnTranscript.isBlank()) sendTranscriptToChat(sPlayer);
         currentTurnTranscript = "";
-        pendingAudibleTranscriptTurnId = null;
-        pendingAudibleTranscript = null;
     }
 
     private void sendTranscriptToChat(@Nullable ServerPlayer sPlayer) {
@@ -866,9 +824,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         QuotaTracker.reportSuccess(getModelName());
         UUID turnId = ensureOutputTurn();
         generationComplete = true;
-        providerTurnComplete = true;
+        turns.markProviderTurnComplete();
 
-        if (outputTurnInterrupted) {
+        if (turns.isInterrupted()) {
             completeInterruptedTurn(turnId);
             onConversationEnded();
             if (shouldEndConversation) requestGracefulEndAfterPlayback();
@@ -879,10 +837,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (!currentTurnTranscript.isBlank()) {
             String transcript = currentTurnTranscript.trim();
             sendTranscriptToChat(sPlayer);
-            synchronized (this) {
-                pendingAudibleTranscriptTurnId = turnId;
-                pendingAudibleTranscript = transcript;
-            }
+            turns.setPendingTranscript(turnId, transcript);
             currentTurnTranscript = "";
         }
 
