@@ -54,6 +54,9 @@ jobs:
       - name: Run both loader test suites
         run: ./gradlew :1.21.1-neoforge:test :1.20.1-forge:test --no-daemon --max-workers=1
 
+      - name: Check public API compatibility
+        run: ./gradlew :1.21.1-neoforge:checkApiCompatibility :1.20.1-forge:checkApiCompatibility --no-daemon --max-workers=1
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4

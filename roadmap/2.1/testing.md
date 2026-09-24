@@ -77,6 +77,18 @@ maintainer-approved break.
 - A deliberately removed public method fails the task; a new public method passes.
 - CI runs it; docs explain the baseline.
 
+
+### Implementation record — 2026-09-24
+
+- `checkApiCompatibility` (per Stonecutter version, wired into `check`) runs the japicmp 0.26.2 CLI
+  through `JavaExec` (no Gradle plugin, so no Gradle-version coupling) against
+  `me.sshcrack:mc_talking-api:<api_baseline_version>-<mc>-<loader>` from maven.sshcrack.me.
+  Flags: public+protected, binary and source incompatibilities are errors, missing third-party
+  classes ignored. Baseline: `api_baseline_version=2.0.0-beta.1` in `gradle.properties`.
+- Current API vs 2.0.0-beta.1 passes on both loaders; all Wave 0 additions report as compatible.
+- Break experiment: making `CitizenConversationService.isBusy` non-public fails both loaders with
+  `METHOD_REMOVED`; reverted.
+- CI runs it in the build job; `AGENTS.md` documents the baseline rule.
 ---
 
 ## T3 — Prompt view fixture and prompt snapshot tests

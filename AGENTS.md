@@ -153,6 +153,10 @@ generation 2. Do not make breaking changes to it.** Addons such as Colonist Erra
 - Internal classes (everything outside `src/api`, including `internal/`, managers, config, mixins)
   may be refactored freely. Only the public API surface is protected.
 - Before making any breaking change to the public API, stop and ask the user.
+- `./gradlew checkApiCompatibility` (part of `check`, run in CI) compares the API jar with the
+  published `mc_talking-api` version in `gradle.properties` (`api_baseline_version`) using japicmp:
+  additions pass, removed/changed public members fail. Bump the baseline after each published
+  release; never bump it to hide a break without the user's approval.
 - Runtime compatibility for normal Talking Colonists users is separate from source compatibility
   for addon developers; both matter.
 
