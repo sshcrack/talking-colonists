@@ -25,7 +25,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
      * entry; a task only adds itself here once its feature is fully implemented and tested. Empty
      * today: no Track A task has landed yet.
      */
-    private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.noneOf(ApiFeature.class);
+    private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final ConversationRuleService conversationRules = new ConversationRuleServiceBackend();

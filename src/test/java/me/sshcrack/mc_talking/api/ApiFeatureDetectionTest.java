@@ -92,14 +92,14 @@ class ApiFeatureDetectionTest {
     }
 
     @Test
-    void allCurrentFeaturesAreUnsupportedOnTheRealBackend() {
+    void realBackendSupportsExactlyTheLandedFeatures() {
         TalkingColonistsApi.Services backend = resolveRealBackend();
+        java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING);
 
         assertEquals(TalkingColonistsApi.API_MINOR_VERSION, backend.apiMinorVersion());
         for (ApiFeature feature : ApiFeature.values()) {
-            assertFalse(
-                    backend.supports(feature),
-                    () -> "no Track A task has landed yet, so " + feature + " must be unsupported");
+            assertEquals(landed.contains(feature), backend.supports(feature),
+                    () -> feature + " support must match whether its Track A task has landed");
         }
     }
 
@@ -110,15 +110,15 @@ class ApiFeatureDetectionTest {
 
     @Test
     void staticFacadeReportsUnsupportedAgainstTheInstalledRuntime() {
-        assertFalse(TalkingColonistsApi.supports(ApiFeature.BROADCAST_PUBLISHING));
+        assertFalse(TalkingColonistsApi.supports(ApiFeature.COLONY_EVENTS));
     }
 
     @Test
     void requireSupportedThrowsDocumentedExceptionForUnsupportedFeature() {
         UnsupportedOperationException exception = assertThrows(
                 UnsupportedOperationException.class,
-                () -> TalkingColonistsApi.requireSupported(ApiFeature.BROADCAST_PUBLISHING));
-        assertEquals(true, exception.getMessage().contains("BROADCAST_PUBLISHING"));
+                () -> TalkingColonistsApi.requireSupported(ApiFeature.COLONY_EVENTS));
+        assertEquals(true, exception.getMessage().contains("COLONY_EVENTS"));
     }
 
     private static TalkingColonistsApi.Services resolveRealBackend() {

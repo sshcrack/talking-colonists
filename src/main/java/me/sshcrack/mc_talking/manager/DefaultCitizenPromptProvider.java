@@ -193,10 +193,15 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         int broadcastCap = limits.get().maxBroadcasts();
         if (broadcastCap > 0 && !memories.broadcasts().isEmpty()) {
             prompt.append(" Colony Broadcasts (most recent first):\n");
-            memories.broadcasts().stream().limit(broadcastCap).forEach(broadcast ->
+            memories.broadcasts().stream().limit(broadcastCap).forEach(broadcast -> {
+                if (broadcast.sourceLabel() != null) {
+                    prompt.append("- ").append(broadcast.sourceLabel()).append(" announced: ");
+                } else {
                     prompt.append("- ").append(broadcast.senderPlayerName())
-                            .append(" sent word via ").append(broadcast.originatorName())
-                            .append(": ").append(broadcast.message()).append("\n"));
+                            .append(" sent word via ").append(broadcast.originatorName()).append(": ");
+                }
+                prompt.append(broadcast.message()).append("\n");
+            });
         }
 
         int rumorCap = limits.get().maxRumors();

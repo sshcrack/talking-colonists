@@ -240,15 +240,35 @@ public class CitizenMemories {
     }
 
     public void addBroadcast(ColonyBroadcast broadcast) {
-        if (knownBroadcastIds.contains(broadcast.getId())) return;
+        addBroadcast(broadcast, McTalkingConfig.INSTANCE.instance().maxBroadcastsStored);
+    }
+
+    /** Returns whether the broadcast was new to this citizen. */
+    public boolean addBroadcast(ColonyBroadcast broadcast, int max) {
+        if (knownBroadcastIds.contains(broadcast.getId())) return false;
         knownBroadcastIds.add(broadcast.getId());
         receivedBroadcasts.add(broadcast);
         receivedBroadcasts.sort(Comparator.comparingLong(ColonyBroadcast::getCreatedAtMs).reversed());
-        int max = McTalkingConfig.INSTANCE.instance().maxBroadcastsStored;
         while (receivedBroadcasts.size() > max) {
             ColonyBroadcast removed = receivedBroadcasts.remove(receivedBroadcasts.size() - 1);
             knownBroadcastIds.remove(removed.getId());
         }
+        return knownBroadcastIds.contains(broadcast.getId());
+    }
+
+    /**
+     * Forgets a broadcast. Its id stays known for this session so propagation cannot hand it back;
+     * after a reload no carrier is left to spread it.
+     */
+    public boolean removeBroadcast(String id) {
+        return receivedBroadcasts.removeIf(b -> b.getId().equals(id));
+    }
+
+    /** Forgets expired broadcasts; returns how many were removed. */
+    public int purgeExpiredBroadcasts(long nowMs) {
+        int before = receivedBroadcasts.size();
+        receivedBroadcasts.removeIf(b -> b.isExpired(nowMs));
+        return before - receivedBroadcasts.size();
     }
 
     public boolean hasHeardBroadcast(String id) {

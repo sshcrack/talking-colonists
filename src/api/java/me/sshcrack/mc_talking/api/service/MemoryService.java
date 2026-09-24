@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.api.service;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import me.sshcrack.mc_talking.api.memory.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,4 +18,14 @@ public interface MemoryService {
                                   @NotNull CitizenRelationshipDimension dimension, float delta);
     @NotNull AddonMemoryWriteResult confirmOutcome(@NotNull ICitizenData citizen, @NotNull AddonConfirmedOutcome outcome);
     @NotNull Optional<CitizenMemorySnapshot> snapshot(@NotNull ICitizenData citizen);
+
+    /** Roadmap A1. Default for runtimes that predate broadcast publishing; see {@code ApiFeature.BROADCAST_PUBLISHING}. */
+    default @NotNull BroadcastPublishResult publishBroadcast(@NotNull IColony colony, @NotNull BroadcastRequest request) {
+        throw new UnsupportedOperationException("Broadcast publishing is not implemented by this runtime");
+    }
+
+    /** Roadmap A1. Default for runtimes that predate broadcast publishing. */
+    default boolean retractBroadcast(@NotNull IColony colony, @NotNull String broadcastId) {
+        throw new UnsupportedOperationException("Broadcast publishing is not implemented by this runtime");
+    }
 }

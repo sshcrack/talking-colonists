@@ -25,6 +25,7 @@ public class BroadcastPropagationService {
         if (!cfg.enableBroadcastPropagation) return;
 
         int propagationsLeft = cfg.broadcastMaxPropagationsPerTick;
+        long now = System.currentTimeMillis();
         double rangeSqr = cfg.broadcastPropagationRange * cfg.broadcastPropagationRange;
 
         for (ServerLevel level : server.getAllLevels()) {
@@ -54,6 +55,7 @@ public class BroadcastPropagationService {
 
                     CitizenMemories carrierMem = ((CitizenDataMemoryExtended) carrier).mc_talking$getMemory();
                     if (carrierMem == null) continue;
+                    carrierMem.purgeExpiredBroadcasts(now);
                     if (carrierMem.getReceivedBroadcasts().isEmpty()) continue;
 
                     for (int j = 0; j < entities.size() && propagationsLeft > 0; j++) {
@@ -72,10 +74,12 @@ public class BroadcastPropagationService {
                         CitizenMemories recipientMem = ((CitizenDataMemoryExtended) recipient).mc_talking$getOrInitializeMemory();
 
                         ColonyBroadcast firstShared = null;
+                        ColonyBroadcast firstAnnounceable = null;
                         for (ColonyBroadcast broadcast : carrierMem.getReceivedBroadcasts()) {
                             if (recipientMem.hasHeardBroadcast(broadcast.getId())) continue;
                             recipientMem.addBroadcast(broadcast);
                             if (firstShared == null) firstShared = broadcast;
+                            if (firstAnnounceable == null && broadcast.isAnnounceAloud()) firstAnnounceable = broadcast;
                         }
 
                         if (firstShared != null) {
@@ -83,13 +87,13 @@ public class BroadcastPropagationService {
                                     carrier.getName(), recipient.getName());
                             propagationsLeft--;
 
-                            if (cfg.enableBroadcastYelling) {
+                            if (cfg.enableBroadcastYelling && firstAnnounceable != null) {
                                 if (ConversationManager.hasPlayerNearby(carrierEntity, server, cfg.broadcastYellingRange)
                                         && !ConversationManager.isCitizenBusy(carrierEntity)) {
                                     String prompt = "A message has arrived from "
-                                            + firstShared.getSenderPlayerName()
+                                            + firstAnnounceable.describeSource()
                                             + " for the colony: ["
-                                            + firstShared.getMessage()
+                                            + firstAnnounceable.getMessage()
                                             + "]. Spread the word to those nearby. Don't mention obstacles or anything blocking you.";
                                     ConversationManager.startLowPrioritySession(carrierEntity, prompt);
                                 }
