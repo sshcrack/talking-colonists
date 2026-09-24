@@ -16,6 +16,7 @@ import dev.isxander.yacl3.config.v2.api.autogen.StringField;
 import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import dev.isxander.yacl3.platform.YACLPlatform;
+import me.sshcrack.mc_talking.util.ComplaintRamp;
 import me.sshcrack.mc_talking.McTalking;
 
 import java.nio.file.Files;
@@ -477,6 +478,27 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
     public List<String> customPersonalityArchetypes = new ArrayList<>();
 
+    // Complaint ramp (roadmap Q5)
+    @AutoGen(category = "citizens", group = "complaints")
+    @TickBox
+    @SerialEntry(comment = "If true, citizens voice a lasting problem (homelessness, no job, sickness, idling at work) more strongly the longer it lasts, from a remark to a complaint to a demand. MineColonies' happiness values are not changed.")
+    public boolean enableComplaintRamp = true;
+
+    @AutoGen(category = "citizens", group = "complaints")
+    @IntField(min = 0, max = 100)
+    @SerialEntry(comment = "Colony days a problem must last before a passing remark becomes a complaint.")
+    public int complaintAfterDays = 1;
+
+    @AutoGen(category = "citizens", group = "complaints")
+    @IntField(min = 0, max = 100)
+    @SerialEntry(comment = "Colony days a problem must last before a complaint becomes a demand.")
+    public int complaintDemandAfterDays = 5;
+
+    @AutoGen(category = "citizens", group = "complaints")
+    @IntField(min = 0, max = 100)
+    @SerialEntry(comment = "While the colony is younger than this many days, housing problems are only mentioned in passing.")
+    public int youngColonyHousingGraceDays = 7;
+
     // Colony Diplomacy
     @AutoGen(category = "citizens", group = "colony_diplomacy")
     @TickBox
@@ -558,6 +580,11 @@ public class McTalkingConfig {
             case NOSTALGIC -> personalityNostalgic;
             case SUPERSTITIOUS -> personalitySuperstitious;
         };
+    }
+
+    public ComplaintRamp.Settings complaintRampSettings() {
+        return new ComplaintRamp.Settings(enableComplaintRamp, complaintAfterDays,
+                complaintDemandAfterDays, youngColonyHousingGraceDays);
     }
 
     public static boolean hasGeminiApiKey() {

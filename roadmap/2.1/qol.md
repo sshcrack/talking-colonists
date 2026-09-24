@@ -229,6 +229,26 @@ the prompt wording and urgent-contact weight. Tiers and grace periods are config
   time; resolving the factor resets its timer; persistence across reload.
 - Close #117, #121–#124 as duplicates referencing this task.
 
+### Implementation record — 2026-09-24 (design changed)
+
+The planned own per-citizen timers are not needed: MineColonies' `TimeBasedHappinessModifier`s
+(homelessness, unemployment, health, idle at job) already count the consecutive colony days a problem
+lasts, reset to 0 when it clears and are saved with the citizen. The old prompt read their factor
+(which MineColonies already scales down after 7 and 14 days) as "desperate for weeks", so a new
+homeless citizen sounded furious straight away. The implementation therefore reads that day count:
+
+- `HappinessModifierView.activeDays` (additive; the 2.0 constructor is kept) comes from
+  `ITimeBasedHappinessModifier.getDays()`.
+- `util/ComplaintRamp`: remark (< `complaintAfterDays`, default 1) → complaint (< `complaintDemandAfterDays`,
+  default 5) → demand. Housing stays a remark while the colony is younger than `youngColonyHousingGraceDays`
+  (default 7). `enableComplaintRamp=false` restores the old severity-only wording. Durations are in colony
+  days (24,000 ticks), matching the thresholds proposed in #125.
+- The prompt has three wordings per problem, and the homeless urgent-contact weight scales 0.2 / 0.7 / 1.0 by
+  tier. MineColonies' happiness values are unchanged, and no mixin or new save data was needed.
+- Tests: `ComplaintRampTest`, `ComplaintPromptTest` (new homeless citizen in a new colony starts mildest; tiers
+  escalate; a reset starts mild again; the young-colony cap applies only to housing). Reload persistence is
+  MineColonies' own NBT (`day` on the modifier).
+
 ---
 
 ## Q6 — Building style is not a complaint (#54)

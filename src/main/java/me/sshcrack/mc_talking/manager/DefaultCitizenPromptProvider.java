@@ -7,6 +7,8 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenSkill;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
+import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
+import me.sshcrack.mc_talking.util.ComplaintRamp;
 import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -25,11 +27,16 @@ import java.util.stream.Collectors;
  */
 public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     /** Config values the prompt text depends on. */
-    public record PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds) {
+    public record PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds,
+                               ComplaintRamp.Settings complaints) {
+        public PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds) {
+            this(maxBroadcasts, maxRumors, raidTraumaDurationSeconds, ComplaintRamp.Settings.DEFAULTS);
+        }
+
         static PromptLimits fromConfig() {
             var config = McTalkingConfig.INSTANCE.instance();
             return new PromptLimits(config.maxBroadcastsInPrompt, config.maxRumorsInPrompt,
-                    config.raidTraumaDurationSeconds);
+                    config.raidTraumaDurationSeconds, config.complaintRampSettings());
         }
     }
 
@@ -296,12 +303,25 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             prompt.append("- Sick and feeling terrible. Needs medical attention\n");
         }
 
+        var complaints = limits.get().complaints();
+        var modifiers = view.wellbeing().happinessModifiers();
+        int colonyAge = view.colony().ageDays();
         if (view.verifiedFacts().housingStatus() == CitizenHousingStatus.HOMELESS) {
-            prompt.append("- Very concerned about not having a home\n");
+            var tier = ComplaintRamp.activeTier(modifiers, HappinessModifierType.HOMELESSNESS, colonyAge, complaints);
+            prompt.append(switch (tier == null ? ComplaintRamp.Tier.COMPLAINT : tier) {
+                case REMARK -> "- Would like a home of your own at some point\n";
+                case COMPLAINT -> "- Concerned about not having a home\n";
+                case DEMAND -> "- Very concerned about not having a home\n";
+            });
         }
 
         if (!view.identity().child() && view.work().jobName() == null) {
-            prompt.append("- Frustrated about not having a job\n");
+            var tier = ComplaintRamp.activeTier(modifiers, HappinessModifierType.UNEMPLOYMENT, colonyAge, complaints);
+            prompt.append(switch (tier == null ? ComplaintRamp.Tier.COMPLAINT : tier) {
+                case REMARK -> "- Hoping to be given a job soon\n";
+                case COMPLAINT -> "- Frustrated about not having a job\n";
+                case DEMAND -> "- Fed up with having no job for so long\n";
+            });
         }
 
         final CitizenStatusView status = view.activity().status();
@@ -494,7 +514,43 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         }
     }
 
-    private static void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {
+    private static void appendHousingComplaint(StringBuilder prompt, boolean homeless, ComplaintRamp.Tier tier) {
+        String line;
+        if (homeless) {
+            line = switch (tier) {
+                case REMARK -> MiscUtil.pick(
+                    "You don't have a home yet — you hope one gets built for you soon",
+                    "You're still waiting for a place to live, but you understand the colony is busy",
+                    "A home of your own would be nice once there's time to build one");
+                case COMPLAINT -> MiscUtil.pick(
+                    "Sleeping without a proper roof over your head is wearing on you",
+                    "Not having a place to live is one of your biggest worries",
+                    "You'd really like a home — being without one is getting hard");
+                case DEMAND -> MiscUtil.pick(
+                    "You desperately need a home — living like this is getting unbearable",
+                    "You've gone without a home for days and you're fed up with it",
+                    "Being homeless for this long is wearing you down — you want it fixed");
+            };
+        } else {
+            line = switch (tier) {
+                case REMARK -> MiscUtil.pick(
+                    "Your home is basic, but it will do for now",
+                    "Your house is small — maybe it can be improved some day",
+                    "Your home is simple, which is fine while the colony is growing");
+                case COMPLAINT -> MiscUtil.pick(
+                    "Your current housing is cramped and basic — you wish for something better",
+                    "The house you're living in could really use an upgrade",
+                    "Your housing situation could be a lot better than this");
+                case DEMAND -> MiscUtil.pick(
+                    "You've put up with cramped housing for a long time and want it improved",
+                    "The shack you're living in barely counts as a proper home",
+                    "Your poor housing has bothered you for days — it needs an upgrade");
+            };
+        }
+        prompt.append("- ").append(line).append("\n");
+    }
+
+    private void appendDetailedHappinessState(CitizenPromptView view, StringBuilder prompt) {
         double happiness = view.wellbeing().happiness();
 
         if (happiness > 8.0) {
@@ -515,20 +571,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
             switch (modifierType) {
                 case HOMELESSNESS:
-                    if (factor < 0.8 && !view.identity().guard()) {
-                        if (factor < 0.3) {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "Sleeping without a proper roof over your head is wearing on you",
-                                "You desperately need a home — living like this is getting unbearable",
-                                "Not having a decent place to live is one of your biggest worries"
-                            )).append("\n");
-                        } else {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "Your current housing is cramped and basic — you wish for something better",
-                                "The shack you're living in barely counts as a proper home",
-                                "Your housing situation could be a lot better than this"
-                            )).append("\n");
-                        }
+                    if (factor < ComplaintRamp.NEGATIVE_FACTOR && !view.identity().guard()) {
+                        appendHousingComplaint(prompt, view.wellbeing().homeless(),
+                                ComplaintRamp.tier(modifier, view.colony().ageDays(), limits.get().complaints()));
                     } else if (factor > 1.2) {
                         prompt.append("- ").append(MiscUtil.pick(
                             "You're proud of your nice home — it's comfortable and well-appointed",
@@ -539,20 +584,21 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     break;
 
                 case UNEMPLOYMENT:
-                    if (factor < 0.8) {
-                        if (factor < 0.4) {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "You've been without a job for so long it's making you feel worthless",
-                                "The desperate need for meaningful work has been gnawing at you for weeks",
-                                "Watching everyone else contribute while you remain unemployed is crushing"
-                            )).append("\n");
-                        } else {
-                            prompt.append("- ").append(MiscUtil.pick(
+                    if (factor < ComplaintRamp.NEGATIVE_FACTOR) {
+                        prompt.append("- ").append(switch (ComplaintRamp.tier(modifier, view.colony().ageDays(), limits.get().complaints())) {
+                            case REMARK -> MiscUtil.pick(
+                                "You'd like to be given a job soon so you can help out",
+                                "You're keen to find some work in the colony",
+                                "You're waiting to be assigned a job and hope it happens soon");
+                            case COMPLAINT -> MiscUtil.pick(
                                 "You feel useless without work — everyone else has a purpose except you",
-                                "You desperately want a job so you can contribute to the colony",
-                                "Not having a job makes you feel like you don't belong here"
-                            )).append("\n");
-                        }
+                                "You really want a job so you can contribute to the colony",
+                                "Not having a job makes you feel like you don't belong here");
+                            case DEMAND -> MiscUtil.pick(
+                                "You've been without a job for so long it's making you feel worthless",
+                                "The need for meaningful work has been gnawing at you for days",
+                                "Watching everyone else contribute while you remain unemployed is crushing");
+                        }).append("\n");
                     } else if (factor > 1.2) {
                         prompt.append("- ").append(MiscUtil.pick(
                             "You take great pride in your high-level position — your expertise is respected",
@@ -563,38 +609,40 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                     break;
 
                 case HEALTH:
-                    if (factor < 0.8) {
-                        if (factor < 0.3) {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "This illness has been dragging on for so long — you're desperate for a cure",
-                                "You've been sick for what feels like forever and it's draining all your strength",
-                                "The prolonged sickness is unbearable — you need medical help urgently"
-                            )).append("\n");
-                        } else {
-                            prompt.append("- ").append(MiscUtil.pick(
+                    if (factor < ComplaintRamp.NEGATIVE_FACTOR) {
+                        prompt.append("- ").append(switch (ComplaintRamp.tier(modifier, view.colony().ageDays(), limits.get().complaints())) {
+                            case REMARK -> MiscUtil.pick(
+                                "You're feeling a bit under the weather",
+                                "You think you're coming down with something",
+                                "You don't feel quite well today");
+                            case COMPLAINT -> MiscUtil.pick(
                                 "You feel terrible — this illness is really taking it out of you",
                                 "Being sick makes everything harder. You wish the hospital would help",
-                                "Your body aches and you can't focus through the fever and discomfort"
-                            )).append("\n");
-                        }
+                                "Your body aches and you can't focus through the fever and discomfort");
+                            case DEMAND -> MiscUtil.pick(
+                                "This illness has been dragging on for so long — you're desperate for a cure",
+                                "You've been sick for days and it's draining all your strength",
+                                "The long sickness is unbearable — you need medical help urgently");
+                        }).append("\n");
                     }
                     break;
 
                 case IDLE_AT_JOB:
-                    if (factor < 0.8) {
-                        if (factor < 0.3) {
-                            prompt.append("- ").append(MiscUtil.pick(
-                                "You've been idle at work for weeks — missing tools or supplies are making your life impossible",
-                                "Being unable to work for so long is driving you crazy — someone needs to fix the supply issue",
-                                "You're at your wit's end — your workplace has been non-functional for too long"
-                            )).append("\n");
-                        } else {
-                            prompt.append("- ").append(MiscUtil.pick(
+                    if (factor < ComplaintRamp.NEGATIVE_FACTOR) {
+                        prompt.append("- ").append(switch (ComplaintRamp.tier(modifier, view.colony().ageDays(), limits.get().complaints())) {
+                            case REMARK -> MiscUtil.pick(
+                                "Something you need at work is missing, so you're waiting around for now",
+                                "Work has stalled for the moment — you're missing tools or supplies",
+                                "You can't get on with your job right now because something is missing");
+                            case COMPLAINT -> MiscUtil.pick(
                                 "You're stuck idle at your job because of missing tools or supplies — it's maddening",
                                 "You want to work but can't — something essential is missing from your workplace",
-                                "Standing around with nothing productive to do at your job is frustrating"
-                            )).append("\n");
-                        }
+                                "Standing around with nothing productive to do at your job is frustrating");
+                            case DEMAND -> MiscUtil.pick(
+                                "You've been idle at work for days — missing tools or supplies are making your life impossible",
+                                "Being unable to work for so long is driving you crazy — someone needs to fix the supply issue",
+                                "You're at your wit's end — your workplace has been non-functional for too long");
+                        }).append("\n");
                     }
                     break;
 

@@ -19,7 +19,7 @@ Colony: **Riverside** | Home: Residence (level 1)
 
 NOTE: A building's style (cavern, medieval, etc.) is the colony's chosen aesthetic and is NOT a sign of poor quality. Base housing satisfaction only on building level and these factors below, never complain about style.
 
-- Your current housing is cramped and basic — you wish for something better
+- Your home is basic, but it will do for now
 - Currently: harvesting wheat at the farm
 
 ## RECENT COLONY EVENTS

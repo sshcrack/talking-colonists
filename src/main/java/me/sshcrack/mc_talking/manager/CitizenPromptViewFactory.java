@@ -20,6 +20,7 @@ import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.api.entity.citizen.happiness.IHappinessModifier;
+import com.minecolonies.api.entity.citizen.happiness.ITimeBasedHappinessModifier;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.entity.citizen.EntityCitizen;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
@@ -500,7 +501,9 @@ public final class CitizenPromptViewFactory {
                     if (modifier == null) {
                         return null;
                     }
-                    return new HappinessModifierView(MineColoniesCompatibilityMapper.happinessModifier(modifierId), modifier.getFactor(data));
+                    int activeDays = modifier instanceof ITimeBasedHappinessModifier timed ? timed.getDays() : 0;
+                    return new HappinessModifierView(MineColoniesCompatibilityMapper.happinessModifier(modifierId),
+                            modifier.getFactor(data), activeDays);
                 })
                 .filter(Objects::nonNull)
                 .toList();

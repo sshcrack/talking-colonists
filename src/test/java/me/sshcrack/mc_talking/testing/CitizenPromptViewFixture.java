@@ -201,6 +201,21 @@ public final class CitizenPromptViewFixture {
         return this;
     }
 
+    public CitizenPromptViewFixture colonyAgeDays(int ageDays) {
+        var c = colony;
+        colony = new ColonyPromptView(c.id(), c.name(), c.peaceful(), c.foundingPlayer(), ageDays,
+                c.lastRaidEndTimeTicks(), c.lastRaidLostCitizens(), c.currentGameTimeTicks(), c.recentEvents(),
+                c.connections(), c.milestone(), c.environment());
+        return this;
+    }
+
+    /** No home: clears the home building and marks the citizen homeless everywhere the prompt looks. */
+    public CitizenPromptViewFixture homeless() {
+        home(null);
+        return wellbeing(w -> new CitizenWellbeingView(w.sick(), true, w.saturation(), w.healthPercent(),
+                w.happiness(), w.happinessModifiers(), w.hasSchool(), w.blockingInteractionMessages(), w.foodSituation()));
+    }
+
     public CitizenPromptViewFixture happiness(double happiness) {
         return wellbeing(w -> new CitizenWellbeingView(w.sick(), w.homeless(), w.saturation(), w.healthPercent(),
                 happiness, w.happinessModifiers(), w.hasSchool(), w.blockingInteractionMessages(), w.foodSituation()));
