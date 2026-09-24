@@ -9,6 +9,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.audio.PcmSpeechDetector;
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
+import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
 import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -178,7 +179,7 @@ public final class PregenerationPlayback {
             return false;
         }
 
-        if (!ConversationManager.trySpendAmbientSpeechBudget(citizen)) {
+        if (!AmbientSpeechBudget.trySpend(citizen)) {
             ACTIVE_PREGENERATED_PLAYBACK.remove(citizenId, entry);
             activity.close();
             return false;

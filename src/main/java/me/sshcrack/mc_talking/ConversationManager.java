@@ -1,6 +1,5 @@
 package me.sshcrack.mc_talking;
 
-import me.sshcrack.mc_talking.internal.session.ScriptUtterances;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
@@ -15,7 +14,8 @@ import me.sshcrack.mc_talking.api.conversation.ConversationStartResult;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import me.sshcrack.mc_talking.internal.api.ConversationEventRuntime;
 import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
-import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudgetRegistry;
+import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
+import me.sshcrack.mc_talking.internal.session.ConversationEventDispatch;
 import me.sshcrack.mc_talking.internal.session.BackgroundSessionRegistry;
 import me.sshcrack.mc_talking.internal.session.CitizenActivityRegistry;
 import me.sshcrack.mc_talking.internal.session.ConversationCooldownRegistry;
@@ -42,7 +42,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -105,8 +104,6 @@ public class ConversationManager {
             new ConcurrentHashMap<>();
     private static final CitizenActivityRegistry activities = new CitizenActivityRegistry(System::nanoTime);
     private static final ConversationCooldownRegistry cooldowns = new ConversationCooldownRegistry(System::currentTimeMillis);
-    private static final AmbientSpeechBudgetRegistry ambientSpeechBudget =
-            new AmbientSpeechBudgetRegistry(System::currentTimeMillis);
     private static final BackgroundSessionRegistry<GeminiLiveClient> backgroundSessions =
             new BackgroundSessionRegistry<>(
                     () -> McTalkingConfig.INSTANCE.instance().maxConcurrentBackground,
@@ -469,75 +466,18 @@ public class ConversationManager {
         return CitizenNeedAssessor.computeNeedSignature(citizen);
     }
 
-    private static void dispatchLifecycleStarted(
-            AbstractEntityCitizen citizen,
-            ConversationKind kind,
-            @Nullable UUID playerId
-    ) {
-        dispatchLifecycleStarted(citizen, kind, playerId, null, null);
+    private static void dispatchLifecycleStarted(AbstractEntityCitizen citizen, ConversationKind kind,
+                                                 @Nullable UUID playerId, @Nullable UUID sessionId,
+                                                 @Nullable UUID turnId, @Nullable String purpose) {
+        ConversationEventDispatch.lifecycle(ConversationLifecycleEvent.Phase.STARTED, citizen, kind, playerId,
+                sessionId, turnId, purpose);
     }
 
-    private static void dispatchLifecycleStarted(
-            AbstractEntityCitizen citizen,
-            ConversationKind kind,
-            @Nullable UUID playerId,
-            @Nullable UUID sessionId,
-            @Nullable UUID turnId
-    ) {
-        dispatchLifecycleStarted(citizen, kind, playerId, sessionId, turnId, null);
-    }
-
-    private static void dispatchLifecycleStarted(
-            AbstractEntityCitizen citizen,
-            ConversationKind kind,
-            @Nullable UUID playerId,
-            @Nullable UUID sessionId,
-            @Nullable UUID turnId,
-            @Nullable String purpose
-    ) {
-        dispatchLifecycleEvent(new ConversationLifecycleEvent(
-                ConversationLifecycleEvent.Phase.STARTED, kind, citizen, playerId, sessionId, turnId,
-                citizen.level().getGameTime(), purpose));
-    }
-
-    private static void dispatchLifecycleEnded(
-            AbstractEntityCitizen citizen,
-            ConversationKind kind,
-            @Nullable UUID playerId
-    ) {
-        dispatchLifecycleEnded(citizen, kind, playerId, null, null);
-    }
-
-    private static void dispatchLifecycleEnded(
-            AbstractEntityCitizen citizen,
-            ConversationKind kind,
-            @Nullable UUID playerId,
-            @Nullable UUID sessionId,
-            @Nullable UUID turnId
-    ) {
-        dispatchLifecycleEnded(citizen, kind, playerId, sessionId, turnId, null);
-    }
-
-    private static void dispatchLifecycleEnded(
-            AbstractEntityCitizen citizen,
-            ConversationKind kind,
-            @Nullable UUID playerId,
-            @Nullable UUID sessionId,
-            @Nullable UUID turnId,
-            @Nullable String purpose
-    ) {
-        dispatchLifecycleEvent(new ConversationLifecycleEvent(
-                ConversationLifecycleEvent.Phase.ENDED, kind, citizen, playerId, sessionId, turnId,
-                citizen.level().getGameTime(), purpose));
-    }
-
-    private static void dispatchLifecycleEvent(ConversationLifecycleEvent event) {
-        MinecraftServer server = event.citizen().level().getServer();
-        if (server != null && !server.isSameThread()) {
-            server.execute(() -> ConversationEventRuntime.emit(event));
-        } else {
-            ConversationEventRuntime.emit(event);
-        }
+    private static void dispatchLifecycleEnded(AbstractEntityCitizen citizen, ConversationKind kind,
+                                               @Nullable UUID playerId, @Nullable UUID sessionId,
+                                               @Nullable UUID turnId, @Nullable String purpose) {
+        ConversationEventDispatch.lifecycle(ConversationLifecycleEvent.Phase.ENDED, citizen, kind, playerId,
+                sessionId, turnId, purpose);
     }
 
     private static void onForegroundTerminated(
@@ -549,7 +489,7 @@ public class ConversationManager {
         String purpose = sessionPurposes.remove(snapshot.token().ownershipId());
         // Provider callbacks may arrive off-thread. Lifecycle dispatch, need inspection for cooldown,
         // inventory/status cleanup, and every other Minecraft-world read happen on the server thread.
-        runOnServerThread(snapshot.entity(), () -> {
+        ConversationEventDispatch.runOnServerThread(snapshot.entity(), () -> {
             boolean wasActive = ended.previousState() == ForegroundSessionRegistry.State.ACTIVE
                     || ended.previousState() == ForegroundSessionRegistry.State.RECOVERING;
             if (wasActive) {
@@ -597,46 +537,8 @@ public class ConversationManager {
         if (snapshot == null) return;
         UUID playerId = snapshot.playerId();
         if (speaker == ConversationUtteranceEvent.Speaker.PLAYER && playerId == null) return;
-        ConversationKind kind = snapshot.kind();
-        UUID sessionId = snapshot.sessionId();
-        UUID turnId = snapshot.turnId();
-        runOnServerThread(citizen, () -> {
-            UUID speakerId;
-            String speakerName;
-            if (speaker == ConversationUtteranceEvent.Speaker.PLAYER) {
-                MinecraftServer server = citizen.level().getServer();
-                ServerPlayer player = server == null ? null : server.getPlayerList().getPlayer(playerId);
-                speakerId = playerId;
-                speakerName = player == null ? "Player" : player.getName().getString();
-            } else {
-                speakerId = citizen.getUUID();
-                speakerName = citizen.getName().getString();
-            }
-            ConversationEventRuntime.emitUtterance(new ConversationUtteranceEvent(kind, citizen, speaker, speakerId,
-                    speakerName, text, sessionId, turnId, source, citizen.level().getGameTime()));
-        });
-    }
-
-    /** Reports the heard lines of a Flash/TTS pair conversation script, one event per line. */
-    public static void emitScriptUtterances(List<AbstractEntityCitizen> participants, String script) {
-        if (!ConversationEventRuntime.hasUtteranceListeners() || participants.isEmpty()) return;
-        AbstractEntityCitizen first = participants.get(0);
-        runOnServerThread(first, () -> {
-            Map<String, AbstractEntityCitizen> byName = new LinkedHashMap<>();
-            for (AbstractEntityCitizen participant : participants) byName.put(participant.getName().getString(), participant);
-            for (var line : ScriptUtterances.parse(script, List.copyOf(byName.keySet()))) {
-                AbstractEntityCitizen speaker = byName.get(line.speaker());
-                ConversationEventRuntime.emitUtterance(new ConversationUtteranceEvent(ConversationKind.CITIZEN_PAIR,
-                        speaker, ConversationUtteranceEvent.Speaker.CITIZEN, speaker.getUUID(), line.speaker(),
-                        line.text(), null, null, ConversationUtteranceEvent.Source.SCRIPT, speaker.level().getGameTime()));
-            }
-        });
-    }
-
-    private static void runOnServerThread(AbstractEntityCitizen citizen, Runnable action) {
-        MinecraftServer server = citizen.level().getServer();
-        if (server != null && !server.isSameThread()) server.execute(action);
-        else action.run();
+        ConversationEventDispatch.utterance(citizen, snapshot.kind(), speaker, playerId, snapshot.sessionId(),
+                snapshot.turnId(), text, source);
     }
 
     private static void schedulePlayerPresentationCleanup(
@@ -644,7 +546,7 @@ public class ConversationManager {
             UUID playerId,
             boolean sendMessage
     ) {
-        runOnServerThread(entity, () -> {
+        ConversationEventDispatch.runOnServerThread(entity, () -> {
             if (!entity.isAlive()) return;
             MinecraftServer server = entity.level().getServer();
             if (server == null) return;
@@ -695,7 +597,7 @@ public class ConversationManager {
      * The budget itself is spent once, atomically, at the few real commit points where a line is
      * actually about to start or play: {@link #startLowPrioritySession}, the citizen-pair
      * conversation start in {@code CitizenConversation}, and pregenerated audio playback in
-     * {@code PregenerationPlayback}. See {@link #trySpendAmbientSpeechBudget}.</p>
+     * {@code PregenerationPlayback}. See {@link AmbientSpeechBudget#trySpend}.</p>
      */
     public static ConversationEligibility conversationEligibility(
             AbstractEntityCitizen citizen,
@@ -725,7 +627,7 @@ public class ConversationManager {
             );
         }
 
-        if (isAmbientBudgetKind(kind) && !hasAmbientSpeechBudgetCapacity(citizen)) {
+        if (AmbientSpeechBudget.appliesTo(kind) && !AmbientSpeechBudget.hasCapacity(citizen)) {
             return ConversationEligibility.rejected(
                     ConversationEligibility.Status.BUDGET_EXCEEDED,
                     "a nearby player's ambient speech budget is exhausted"
@@ -733,65 +635,6 @@ public class ConversationManager {
         }
 
         return ConversationEligibility.eligibleResult();
-    }
-
-    /** Player-started, urgent, and controlled/meeting sessions are exempt from the ambient speech budget. */
-    private static boolean isAmbientBudgetKind(ConversationKind kind) {
-        return kind != ConversationKind.PLAYER
-                && kind != ConversationKind.URGENT_CONTACT
-                && kind != ConversationKind.CONTROLLED;
-    }
-
-    /** Read-only: would every player who would currently hear {@code citizen} have budget room? */
-    private static boolean hasAmbientSpeechBudgetCapacity(AbstractEntityCitizen citizen) {
-        var config = McTalkingConfig.INSTANCE.instance();
-        if (!config.enableAmbientSpeechBudget) return true;
-        List<UUID> hearers = nearbyHearingPlayerIds(citizen, config.ambientSpeechBudgetHearingRange);
-        long windowMillis = config.ambientSpeechBudgetWindowSeconds * 1000L;
-        return ambientSpeechBudget.hasCapacity(hearers, config.ambientSpeechBudgetMaxLines, windowMillis);
-    }
-
-    /**
-     * Spends one unit of ambient speech budget against every player who would hear {@code citizen}
-     * (and, for a two-citizen conversation, {@code other}) speak right now. Returns {@code true}
-     * (having recorded the spend) unless any such player is already at their per-window limit, in
-     * which case nothing is recorded and the whole line should be skipped — see
-     * {@link AmbientSpeechBudgetRegistry#tryConsume} for why a line is not partially charged
-     * against listeners who still have room.
-     *
-     * <p>This is the single point that actually enforces the budget. Call it exactly once per
-     * ambient line/conversation-start attempt, immediately before it is guaranteed to be spoken or
-     * played — never speculatively while merely scanning candidates.</p>
-     */
-    public static boolean trySpendAmbientSpeechBudget(AbstractEntityCitizen citizen, @Nullable AbstractEntityCitizen other) {
-        var config = McTalkingConfig.INSTANCE.instance();
-        if (!config.enableAmbientSpeechBudget) return true;
-
-        java.util.LinkedHashSet<UUID> hearers = new java.util.LinkedHashSet<>(
-                nearbyHearingPlayerIds(citizen, config.ambientSpeechBudgetHearingRange));
-        if (other != null) {
-            hearers.addAll(nearbyHearingPlayerIds(other, config.ambientSpeechBudgetHearingRange));
-        }
-        long windowMillis = config.ambientSpeechBudgetWindowSeconds * 1000L;
-        return ambientSpeechBudget.tryConsume(hearers, config.ambientSpeechBudgetMaxLines, windowMillis);
-    }
-
-    public static boolean trySpendAmbientSpeechBudget(AbstractEntityCitizen citizen) {
-        return trySpendAmbientSpeechBudget(citizen, null);
-    }
-
-    /** Players in the same dimension as {@code citizen} within {@code range} blocks. */
-    private static List<UUID> nearbyHearingPlayerIds(AbstractEntityCitizen citizen, double range) {
-        MinecraftServer server = citizen.level().getServer();
-        if (server == null) return List.of();
-        double rangeSqr = range * range;
-        List<UUID> result = new java.util.ArrayList<>();
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (player.level() == citizen.level() && player.distanceToSqr(citizen) <= rangeSqr) {
-                result.add(player.getUUID());
-            }
-        }
-        return result;
     }
 
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, ConversationKind kind) {
@@ -966,7 +809,7 @@ public class ConversationManager {
         java.util.concurrent.atomic.AtomicReference<AmbientLineResult> earlyResult =
                 new java.util.concurrent.atomic.AtomicReference<>();
 
-        Consumer<AmbientLineResult> report = result -> runOnServerThread(citizen, () -> {
+        Consumer<AmbientLineResult> report = result -> ConversationEventDispatch.runOnServerThread(citizen, () -> {
             if (!startupCommitted.get()) {
                 earlyResult.compareAndSet(null, result);
                 return;
@@ -1060,7 +903,7 @@ public class ConversationManager {
             return false;
         }
 
-        if (isAmbientBudgetKind(kind) && !trySpendAmbientSpeechBudget(citizen)) {
+        if (AmbientSpeechBudget.appliesTo(kind) && !AmbientSpeechBudget.trySpend(citizen)) {
             reservation.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "ambient speech budget exhausted");
             return false;
         }
@@ -1070,7 +913,7 @@ public class ConversationManager {
             AtomicBoolean completionDelivered = new AtomicBoolean(false);
             CitizenWsClient client = new CitizenWsClient(new ControlledTurnAudioProvider(citizen, audioAnchor), citizen, c -> {
                 String transcript = c.getSessionTranscriptSnapshot();
-                runOnServerThread(citizen, () -> {
+                ConversationEventDispatch.runOnServerThread(citizen, () -> {
                     audibleCompletion.set(true);
                     if (!reservation.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
                             "ambient audible turn completed")) return;
@@ -1086,7 +929,7 @@ public class ConversationManager {
                 return false;
             }
 
-            client.addOnCloseAction(() -> runOnServerThread(citizen, () -> {
+            client.addOnCloseAction(() -> ConversationEventDispatch.runOnServerThread(citizen, () -> {
                 var diagnostic = client.getRecoveryDiagnostic();
                 reservation.end(providerTerminalReason(client), diagnostic.detail());
                 if (completion != null && !audibleCompletion.get()
@@ -1188,12 +1031,12 @@ public class ConversationManager {
                 return ConversationStartResult.rejected(ConversationStartResult.Status.FAILED,
                         "ambient session ownership changed during player takeover");
             }
-            dispatchLifecycleEnded(citizen, promoted.get().before().kind(), null);
+            dispatchLifecycleEnded(citizen, promoted.get().before().kind(), null, null, null, null);
             cws.transitionToPlayer(player);
             var participation = participationAdapters.get(existingToken.ownershipId());
             if (participation != null) participation.refresh();
             UrgentContactHandler.onPlayerTakeover(citizen, player);
-            dispatchLifecycleStarted(citizen, ConversationKind.PLAYER, playerId);
+            dispatchLifecycleStarted(citizen, ConversationKind.PLAYER, playerId, null, null, null);
             return ConversationStartResult.startedResult();
         }
 
@@ -1242,7 +1085,7 @@ public class ConversationManager {
                     "player conversation ownership changed during startup");
         }
 
-        ws.addOnCloseAction(() -> runOnServerThread(citizen, () -> {
+        ws.addOnCloseAction(() -> ConversationEventDispatch.runOnServerThread(citizen, () -> {
             var diagnostic = ws.getRecoveryDiagnostic();
             reservation.end(providerTerminalReason(ws), diagnostic.detail());
         }));
@@ -1354,7 +1197,7 @@ public class ConversationManager {
             }
         }
         cooldowns.clear();
-        ambientSpeechBudget.clear();
+        AmbientSpeechBudget.clear();
         QuotaTracker.clear();
         me.sshcrack.mc_talking.manager.VoiceSelectionService.clear();
         GeminiWsClient.shutdownExecutor();
