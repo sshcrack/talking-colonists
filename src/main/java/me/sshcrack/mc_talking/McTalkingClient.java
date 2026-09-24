@@ -2,11 +2,10 @@ package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractCivilianEntity;
 import com.mojang.brigadier.Command;
-import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.handler.MissingApiKeyOnboardingHandler;
 import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.client.ConfigScreenOpener;
 import me.sshcrack.mc_talking.client.ConversationPresentation;
-import net.minecraft.client.Minecraft;
 import net.minecraft.commands.Commands;
 import me.sshcrack.mc_talking.client.TalkKeybinds;
 /*? if forge {*/
@@ -151,9 +150,9 @@ public class McTalkingClient {
 
     /**
      * Registers a client-only command that opens the Talking Colonists config
-     * screen. Clicking the onboarding chat message's "open config" link on an
-     * integrated (single-player/LAN) server runs this locally, without a round
-     * trip to the server.
+     * screen. On NeoForge, clicking the onboarding chat message's "open config" link
+     * runs this locally. Forge 1.20.1 sends clicked commands straight to the server,
+     * so {@link MissingApiKeyOnboardingHandler#registerServerFallback} covers that case.
      */
     @SubscribeEvent
     /*? if forge {*/
@@ -165,8 +164,7 @@ public class McTalkingClient {
         event.getDispatcher().register(
                 Commands.literal(MissingApiKeyOnboardingHandler.OPEN_CONFIG_CLIENT_COMMAND)
                         .executes(ctx -> {
-                            Minecraft minecraft = Minecraft.getInstance();
-                            minecraft.setScreen(McTalkingConfig.INSTANCE.generateGui().generateScreen(minecraft.screen));
+                            ConfigScreenOpener.open();
                             return Command.SINGLE_SUCCESS;
                         })
         );
