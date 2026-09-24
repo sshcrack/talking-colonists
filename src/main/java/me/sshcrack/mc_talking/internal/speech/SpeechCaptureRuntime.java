@@ -333,4 +333,11 @@ public final class SpeechCaptureRuntime {
         }
         return pcm;
     }
+
+    /** Whole seconds of listening left before {@code deadlineNanos}, rounded up and never below zero. */
+    public static long secondsLeft(long deadlineNanos, long nowNanos) {
+        long left = deadlineNanos - nowNanos;
+        return left <= 0 ? 0 : (left + 999_999_999L) / 1_000_000_000L;
+    }
+
 }
