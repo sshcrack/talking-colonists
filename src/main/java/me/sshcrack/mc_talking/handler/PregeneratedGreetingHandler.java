@@ -77,6 +77,10 @@ public class PregeneratedGreetingHandler {
         }
 
         UUID playerId = player.getUUID();
+        if (!ConversationManager.addressCooldowns().mayAddress(playerId,
+                McTalkingConfig.INSTANCE.instance().playerAddressCooldownSeconds)) {
+            return;
+        }
         double triggerDist = McTalkingConfig.INSTANCE.instance().playerGreetingDistance;
 
         for (AbstractEntityCitizen citizen : citizens) {
@@ -99,6 +103,7 @@ public class PregeneratedGreetingHandler {
                 if (audio != null) {
                     if (PregenerationPlayback.playAudioIfPossible(citizen, audio)) {
                         PregenerationTaskService.recordPlayerGreetingPlayed(citizenId, playerId);
+                        ConversationManager.addressCooldowns().recordAddressed(playerId);
                     } else {
                         PregenerationTaskService.putPlayerGreeting(citizenId, playerId, audio);
                     }

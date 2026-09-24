@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.handler;
 
+import me.sshcrack.mc_talking.internal.session.AddressCooldowns;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
@@ -51,6 +52,10 @@ public class UrgentContactHandler {
             return;
         }
 
+        var config = McTalkingConfig.INSTANCE.instance();
+        AddressCooldowns cooldowns = ConversationManager.addressCooldowns();
+        if (!cooldowns.mayAddress(player.getUUID(), config.playerAddressCooldownSeconds)) return;
+
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
         boolean walkToPlayer = McTalkingConfig.INSTANCE.instance().enableUrgentContactWalkToPlayer;
 
@@ -69,6 +74,7 @@ public class UrgentContactHandler {
             if (!ConversationManager.canCitizenSpeak(citizen, ConversationKind.URGENT_CONTACT)) continue;
             if (citizen.getCitizenData() == null) continue;
             if (lifecycle.isActive(citizen.getUUID())) continue;
+            if (!cooldowns.citizenMayContact(citizen.getUUID(), config.citizenUrgentContactCooldownSeconds)) continue;
             if (!contactedThisInterval.add(citizen.getUUID())) continue;
 
             double urgencyWeight = CitizenNeedAssessor.calculateUrgencyWeight(citizen);
@@ -90,6 +96,8 @@ public class UrgentContactHandler {
                     // reservation consumes it immediately, while an immediate announcement startup
                     // failure does not. This also prevents arrival/startup failures from retry-looping.
                     lifecycle.recordPlayerContact(player.getUUID());
+                    cooldowns.recordAddressed(player.getUUID());
+                    cooldowns.recordCitizenContact(citizen.getUUID());
                     break;
                 }
             }

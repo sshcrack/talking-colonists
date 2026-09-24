@@ -45,6 +45,11 @@ public class CasualGreetingHandler {
             }
         }
 
+        if (!ConversationManager.addressCooldowns().mayAddress(player.getUUID(),
+                McTalkingConfig.INSTANCE.instance().playerAddressCooldownSeconds)) {
+            return;
+        }
+
         double baseChance = McTalkingConfig.INSTANCE.instance().citizenContactBaseChance;
 
         for (AbstractEntityCitizen citizen : citizens) {
@@ -89,6 +94,7 @@ public class CasualGreetingHandler {
                     // Do not consume the cooldown when free-tier background capacity or
                     // quota prevented the greeting from even starting.
                     lastPlayerCasualGreetingTimes.put(playerId, System.currentTimeMillis());
+                    ConversationManager.addressCooldowns().recordAddressed(playerId);
                     break;
                 }
             }
@@ -97,9 +103,11 @@ public class CasualGreetingHandler {
 
     public static void onPlayerLeave(UUID playerId) {
         lastPlayerCasualGreetingTimes.remove(playerId);
+        ConversationManager.addressCooldowns().forgetPlayer(playerId);
     }
 
     public static void onServerStop() {
         lastPlayerCasualGreetingTimes.clear();
+        ConversationManager.addressCooldowns().clear();
     }
 }
