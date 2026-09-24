@@ -594,6 +594,15 @@ public class ConversationManager {
         return canCitizenSpeak(citizen, ConversationKind.ADDON_AMBIENT);
     }
 
+    /**
+     * Whether the citizen is asleep: MineColonies' own sleep state (a citizen in its bed) or the
+     * vanilla sleeping pose. Sleeping citizens never speak, gesture or show a conversation bubble.
+     */
+    public static boolean isAsleep(AbstractEntityCitizen citizen) {
+        var sleep = citizen.getCitizenSleepHandler();
+        return citizen.isSleeping() || (sleep != null && sleep.isAsleep());
+    }
+
     public static boolean canCitizenSpeak(AbstractEntityCitizen citizen, boolean isPlayerRequest) {
         return canCitizenSpeak(citizen, isPlayerRequest ? ConversationKind.PLAYER : ConversationKind.ADDON_AMBIENT);
     }
@@ -618,7 +627,7 @@ public class ConversationManager {
             AbstractEntityCitizen citizen,
             ConversationKind kind
     ) {
-        if (citizen.isSleeping()) {
+        if (isAsleep(citizen)) {
             return ConversationEligibility.rejected(ConversationEligibility.Status.SLEEPING, "citizen is sleeping");
         }
         if (citizen instanceof VisitorCitizen && !ConversationRuleRuntime.addonsAllowVisitor(citizen, kind)) {

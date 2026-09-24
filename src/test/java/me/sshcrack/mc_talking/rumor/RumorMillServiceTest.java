@@ -12,6 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RumorMillServiceTest {
     @Test
+    void sleepingCitizensOnlyShareWithHousematesAndNeverAloud() {
+        assertEquals(RumorMillService.PairMode.AWAKE, RumorMillService.pairMode(false, false, false, true));
+        assertEquals(RumorMillService.PairMode.SKIP, RumorMillService.pairMode(false, false, true, false));
+        assertEquals(RumorMillService.PairMode.PILLOW_TALK, RumorMillService.pairMode(true, true, true, false),
+                "housemates share at night even when their beds are apart");
+        assertEquals(RumorMillService.PairMode.PILLOW_TALK, RumorMillService.pairMode(true, false, true, true),
+                "never voiced while one of them sleeps");
+        assertEquals(RumorMillService.PairMode.SKIP, RumorMillService.pairMode(true, false, false, true),
+                "a sleeper next to a stranger shares nothing");
+    }
+
+    @Test
     void consumesFirstHandEventWithoutMutatingItsSnapshotOrLeavingProvenance() {
         var memory = new CitizenMemories();
         memory.addEvent("I finished the bakery.");
