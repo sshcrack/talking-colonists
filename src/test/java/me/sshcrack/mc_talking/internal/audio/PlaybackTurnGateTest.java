@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.internal.audio;
 
+import me.sshcrack.mc_talking.internal.session.OutputTurnTracker;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -12,6 +13,25 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlaybackTurnGateTest {
+    @Test
+    void silentTurnRetryPlaysInAFreshTurn() {
+        // What GeminiWsClient does when the model ends a turn without audio and is asked again.
+        var gate = new PlaybackTurnGate();
+        var turns = new OutputTurnTracker();
+        List<String> fakeAudio = new ArrayList<>();
+        UUID silent = turns.ensure(gate::begin);
+        assertTrue(gate.beginDrain(silent, () -> { })); // generation complete, no audio
+        assertFalse(gate.accept(silent, () -> fakeAudio.add("retry")), "a draining turn rejects audio");
+
+        UUID dropped = turns.invalidate();
+        gate.cancel(dropped, () -> { });
+        UUID retry = turns.ensure(gate::begin);
+
+        assertFalse(retry.equals(silent));
+        assertTrue(gate.accept(retry, () -> fakeAudio.add("retry")));
+        assertEquals(List.of("retry"), fakeAudio);
+    }
+
     @Test
     void bargeInStopsOnceDiscardsQueuedAudioAndRejectsLateChunks() {
         var gate = new PlaybackTurnGate();

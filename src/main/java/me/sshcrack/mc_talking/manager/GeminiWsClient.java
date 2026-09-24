@@ -881,8 +881,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     /**
      * The model sometimes ends a turn without any audio (only thoughts or an unspoken reply). Nobody
-     * heard it, so drop its transcript and ask once to say it aloud; the output turn stays open for
-     * that audio. Returns true while the retry is pending.
+     * heard it, so drop its transcript and turn, and ask once to say it aloud. Returns true while the
+     * retry is pending.
      */
     private boolean handleSilentTurn() {
         boolean silent = getEffectiveModality() != ModalityModes.TEXT && audioBytesThisTurn == 0
@@ -901,6 +901,9 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
         silentTurnRetried = true;
         McTalking.LOGGER.warn("{} Provider turn ended without audio; asking to say it aloud", logPrefix);
+        // Generation completion already started draining the silent turn, so its gate would reject the
+        // retry's audio: retire it, and the retry opens a fresh turn.
+        invalidateCurrentOutputTurn();
         addPromptTextImmediate(SILENT_TURN_RETRY_PROMPT);
         return true;
     }
