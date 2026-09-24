@@ -548,7 +548,7 @@ CitizenConversationService.registerUtteranceListener("court:testimony", 0, event
 - Player speech arrives as one utterance once the citizen answers.
 - A citizen's reply arrives once its audio has been heard in full.
 - Pair conversations report each scripted line after playback, with source `SCRIPT`.
-- Controlled-session player statements arrive as `TYPED`.
+- Controlled-session player statements and lines sent with `sendPlayerText` arrive as `TYPED`.
 - Nothing is reported after a session ends.
 
 Transcription is best effort. Speech-to-text can mishear, and a citizen's words are only what the model
@@ -602,6 +602,37 @@ CitizenConversationService
 
 `hasAmbientCapacity(slots)`, `hasPlayerNearby(citizen, range)`, `activePlayerId(citizen)`,
 `activeKind(citizen)` and `requestGracefulEnd(citizen)` provide common conversation queries and actions.
+
+## Player text input (API 2.1, `ApiFeature.PLAYER_TEXT_INPUT`)
+
+An addon can put text into a player's live direct conversation. This helps players without a
+microphone, and lets gameplay events reach the citizen:
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.PLAYER_TEXT_INPUT)) {
+    // A line the player typed: the citizen answers it as if it had been spoken.
+    PlayerTextResult sent = CitizenConversationService.sendPlayerText(player, citizen, "Can you bake bread?");
+
+    // Something that just happened: marked as a game event, never as the player's words.
+    CitizenConversationService.addContext(player, citizen, "The player just handed you the deed to the bakery.");
+}
+```
+
+- **Ownership:** only the player who owns the direct conversation with `citizen` can send into it.
+  Anyone else gets `NOT_IN_CONVERSATION`. Pass the authenticated player from your command, packet
+  or chat handler, never a name or UUID the model produced.
+- **Delivery:**
+  - `sendPlayerText` sends a player turn right away, so it can interrupt the citizen like speech
+    does. If the session is still connecting, the turn is queued.
+  - The line is recorded under the player's name for memory extraction, and reported to utterance
+    listeners with source `TYPED`.
+  - `addContext` waits until the citizen finishes its current turn, and the citizen usually
+    reacts to it. It is neither recorded as speech nor replayed after a reconnect.
+- **Limits:**
+  - Text is trimmed and line breaks collapse to spaces. `EMPTY` or `TOO_LONG` (over
+    `PlayerTextResult.MAX_CHARS`, 500 characters).
+  - At most 5 lines and 5 notes per player every 10 seconds (`RATE_LIMITED`).
+- **Threading:** call on the server thread. The result is immediate.
 
 ## Conversation lifecycle observation
 

@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.api.conversation;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.api.ApiFeature;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import net.minecraft.server.MinecraftServer;
@@ -90,6 +91,43 @@ public final class CitizenConversationService {
             @NotNull ConversationUtteranceListener listener
     ) {
         return TalkingColonistsApi.services().conversations().registerUtteranceListener(id, order, listener);
+    }
+
+    /**
+     * Delivers a line the player typed into their direct conversation with {@code citizen} as a
+     * player turn, as if they had said it (API 2.1, {@link me.sshcrack.mc_talking.api.ApiFeature#PLAYER_TEXT_INPUT}).
+     * The citizen answers it. The line is attributed to {@code player}, recorded for memory
+     * extraction, and reported to utterance listeners with source {@code TYPED}.
+     *
+     * <p>Only the player who owns the conversation may send into it; pass the authenticated player
+     * from your command, packet or chat handler, never anything the model produced. Lines are
+     * limited to {@link PlayerTextResult#MAX_CHARS} characters and a few per second. Call on the
+     * server thread.</p>
+     */
+    public static @NotNull PlayerTextResult sendPlayerText(
+            @NotNull ServerPlayer player,
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull String text
+    ) {
+        TalkingColonistsApi.requireSupported(ApiFeature.PLAYER_TEXT_INPUT);
+        return TalkingColonistsApi.services().conversations().sendPlayerText(player, citizen, text);
+    }
+
+    /**
+     * Tells the citizen about something that just happened in the player's direct conversation,
+     * for example "the player just handed you the deed" (API 2.1,
+     * {@link me.sshcrack.mc_talking.api.ApiFeature#PLAYER_TEXT_INPUT}). The note is marked as a game
+     * event, not as something the player said, and is sent after the citizen finishes its current
+     * sentence; the citizen usually reacts to it. Same ownership, length and rate limits as
+     * {@link #sendPlayerText}. Call on the server thread.
+     */
+    public static @NotNull PlayerTextResult addContext(
+            @NotNull ServerPlayer player,
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull String note
+    ) {
+        TalkingColonistsApi.requireSupported(ApiFeature.PLAYER_TEXT_INPUT);
+        return TalkingColonistsApi.services().conversations().addContext(player, citizen, note);
     }
 
     /** Returns the active Talking Colonists conversation kind for this citizen, if any. */

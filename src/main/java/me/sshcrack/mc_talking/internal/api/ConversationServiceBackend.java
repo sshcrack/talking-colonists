@@ -17,6 +17,7 @@ import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceListener;
 import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
+import me.sshcrack.mc_talking.api.conversation.PlayerTextResult;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.api.conversation.ConversationTranscriptEntry;
@@ -46,7 +47,10 @@ import me.sshcrack.mc_talking.internal.compat.FakePlayerCompatibility;
 import me.sshcrack.mc_talking.internal.tool.AiToolRuntime;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
+import me.sshcrack.mc_talking.internal.session.PlayerTextInput;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.manager.CitizenWsClient;
+import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.DefaultCitizenPromptProvider;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -70,6 +74,8 @@ import java.util.function.Supplier;
 /** Full-mod implementation of the standalone addon API bridge. */
 final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.service.ConversationService {
     private static final int MAX_CONTROLLED_TRANSCRIPT_CHARS = 8_000;
+    private static final PlayerTextInput PLAYER_TEXT =
+            new PlayerTextInput(ConversationServiceBackend::directConversation, System::nanoTime);
     private static final Duration MAX_ADDON_ACTIVITY_LEASE = Duration.ofHours(1);
     private static final Map<MinecraftServer, java.util.Set<ControlledSession>> CONTROLLED_SESSIONS =
             new ConcurrentHashMap<>();
@@ -162,6 +168,60 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
             @NotNull ConversationUtteranceListener listener
     ) {
         return ConversationEventRuntime.registerUtterance(id, order, listener);
+    }
+
+    @Override
+    public @NotNull PlayerTextResult sendPlayerText(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen,
+                                                    @NotNull String text) {
+        java.util.Objects.requireNonNull(player, "player");
+        java.util.Objects.requireNonNull(citizen, "citizen");
+        return PLAYER_TEXT.sendText(player.getUUID(), player.getName().getString(), citizen.getUUID(), text);
+    }
+
+    @Override
+    public @NotNull PlayerTextResult addContext(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen,
+                                                @NotNull String note) {
+        java.util.Objects.requireNonNull(player, "player");
+        java.util.Objects.requireNonNull(citizen, "citizen");
+        return PLAYER_TEXT.addContext(player.getUUID(), player.getName().getString(), citizen.getUUID(), note);
+    }
+
+    /** Forgets the player's typed-text rate history when they log out. */
+    public static void onPlayerLoggedOut(UUID playerId) {
+        PLAYER_TEXT.forget(playerId);
+    }
+
+    /** The citizen's current direct player conversation, when its session can take input. */
+    @Nullable
+    private static PlayerTextInput.Conversation directConversation(UUID citizenId) {
+        if (ConversationManager.getActiveConversationKind(citizenId) != ConversationKind.PLAYER) return null;
+        UUID owner = ConversationManager.getPlayerForEntity(citizenId);
+        GeminiWsClient client = ConversationManager.getClientForEntity(citizenId);
+        if (owner == null || client == null || client.isLifecycleClosed()) return null;
+        if (!(client instanceof CitizenWsClient citizenClient) || !citizenClient.isAssociatedWithPlayer(owner)) return null;
+        return new PlayerTextInput.Conversation() {
+            @Override
+            public UUID playerId() {
+                return owner;
+            }
+
+            @Override
+            public void sendPlayerTurn(String text) {
+                client.addPromptTextImmediate(text);
+            }
+
+            @Override
+            public void sendContextNote(String note) {
+                client.addContextNoteAfterTalkingComplete(note);
+            }
+
+            @Override
+            public void recordTypedLine(String playerName, String text) {
+                client.appendPlayerTranscriptLine(playerName, text);
+                ConversationManager.emitClientUtterance(client, ConversationUtteranceEvent.Speaker.PLAYER, text,
+                        ConversationUtteranceEvent.Source.TYPED);
+            }
+        };
     }
 
     @Override

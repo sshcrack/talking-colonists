@@ -34,6 +34,18 @@ public interface ConversationService {
                                                                  @NotNull ConversationUtteranceListener listener) {
         throw new UnsupportedOperationException("Utterance events are not supported by this runtime");
     }
+
+    /** Roadmap A4. Runtimes without {@link me.sshcrack.mc_talking.api.ApiFeature#PLAYER_TEXT_INPUT} throw. */
+    default @NotNull PlayerTextResult sendPlayerText(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen,
+                                                     @NotNull String text) {
+        throw new UnsupportedOperationException("Player text input is not supported by this runtime");
+    }
+
+    /** Roadmap A4. Runtimes without {@link me.sshcrack.mc_talking.api.ApiFeature#PLAYER_TEXT_INPUT} throw. */
+    default @NotNull PlayerTextResult addContext(@NotNull ServerPlayer player, @NotNull AbstractEntityCitizen citizen,
+                                                 @NotNull String note) {
+        throw new UnsupportedOperationException("Player text input is not supported by this runtime");
+    }
     @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen);
     @NotNull Optional<ProviderSessionStatus> providerStatus(@NotNull AbstractEntityCitizen citizen);
     @NotNull Optional<UUID> activePlayerId(@NotNull AbstractEntityCitizen citizen);

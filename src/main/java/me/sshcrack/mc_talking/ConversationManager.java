@@ -580,6 +580,11 @@ public class ConversationManager {
      * now, so a session that ended or was replaced reports nothing; delivery is on the server thread.
      */
     public static void emitClientUtterance(GeminiWsClient client, ConversationUtteranceEvent.Speaker speaker, String text) {
+        emitClientUtterance(client, speaker, text, ConversationUtteranceEvent.Source.TRANSCRIPTION);
+    }
+
+    public static void emitClientUtterance(GeminiWsClient client, ConversationUtteranceEvent.Speaker speaker, String text,
+                                           ConversationUtteranceEvent.Source source) {
         if (!ConversationEventRuntime.hasUtteranceListeners()) return;
         AbstractEntityCitizen citizen = client.getEntity();
         if (foregroundSessions.client(citizen.getUUID()) != client) return;
@@ -603,8 +608,7 @@ public class ConversationManager {
                 speakerName = citizen.getName().getString();
             }
             ConversationEventRuntime.emitUtterance(new ConversationUtteranceEvent(kind, citizen, speaker, speakerId,
-                    speakerName, text, sessionId, turnId, ConversationUtteranceEvent.Source.TRANSCRIPTION,
-                    citizen.level().getGameTime()));
+                    speakerName, text, sessionId, turnId, source, citizen.level().getGameTime()));
         });
     }
 
