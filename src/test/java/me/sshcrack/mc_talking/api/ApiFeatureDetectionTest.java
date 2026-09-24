@@ -94,7 +94,8 @@ class ApiFeatureDetectionTest {
     @Test
     void realBackendSupportsExactlyTheLandedFeatures() {
         TalkingColonistsApi.Services backend = resolveRealBackend();
-        java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING, ApiFeature.TEXT_GENERATION);
+        java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
+                ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS);
 
         assertEquals(TalkingColonistsApi.API_MINOR_VERSION, backend.apiMinorVersion());
         for (ApiFeature feature : ApiFeature.values()) {
@@ -110,15 +111,15 @@ class ApiFeatureDetectionTest {
 
     @Test
     void staticFacadeReportsUnsupportedAgainstTheInstalledRuntime() {
-        assertFalse(TalkingColonistsApi.supports(ApiFeature.COLONY_EVENTS));
+        assertFalse(TalkingColonistsApi.supports(ApiFeature.PLAYER_TEXT_INPUT));
     }
 
     @Test
     void requireSupportedThrowsDocumentedExceptionForUnsupportedFeature() {
         UnsupportedOperationException exception = assertThrows(
                 UnsupportedOperationException.class,
-                () -> TalkingColonistsApi.requireSupported(ApiFeature.COLONY_EVENTS));
-        assertEquals(true, exception.getMessage().contains("COLONY_EVENTS"));
+                () -> TalkingColonistsApi.requireSupported(ApiFeature.PLAYER_TEXT_INPUT));
+        assertEquals(true, exception.getMessage().contains("PLAYER_TEXT_INPUT"));
     }
 
     private static TalkingColonistsApi.Services resolveRealBackend() {

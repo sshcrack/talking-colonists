@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.api;
 
+import me.sshcrack.mc_talking.api.service.ColonyEventFeedService;
 import me.sshcrack.mc_talking.api.service.ContextService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
@@ -166,6 +167,11 @@ public final class TalkingColonistsApi {
         /** Roadmap A3. Default for runtimes that predate text generation; see {@link ApiFeature#TEXT_GENERATION}. */
         default @NotNull TextService text() {
             throw new UnsupportedOperationException("Text generation is not implemented by this runtime");
+        }
+
+        /** Roadmap A2. Default for runtimes that predate the event feed; see {@link ApiFeature#COLONY_EVENTS}. */
+        default @NotNull ColonyEventFeedService colonyEvents() {
+            throw new UnsupportedOperationException("The colony event feed is not implemented by this runtime");
         }
     }
 }

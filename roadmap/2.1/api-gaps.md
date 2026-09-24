@@ -131,6 +131,21 @@ bounds; addon events count against a separate per-namespace budget.
 - Tests cover listener ordering, exceptions in one listener not affecting others, addon event
   bounds, persistence, and prompt inclusion.
 
+### Implementation record — 2026-09-24
+
+- API (additive, `ApiFeature.COLONY_EVENTS` now supported): `api.colony.ColonyEventService.recent(colony, maxAge)`,
+  `record(colony, AddonColonyEvent)`, `registerListener(id, order, ColonyEventListener)`; `ColonyEventView`,
+  `ColonyEventType` (core kinds + `ADDON`), `AddonColonyEvent` (namespace, key, description ≤ 300 chars).
+  `api.service.ColonyEventFeedService` is exposed through a default `Services.colonyEvents()`.
+- Runtime: `ColonyEventBuffer` events carry addon namespace/key (persisted; old saves load unchanged; addon
+  events without a namespace are dropped on load). `trimEvents` keeps 20 core events plus 10 per addon
+  namespace. Every recorded event, core or addon, is dispatched to ordered listeners with per-listener error
+  isolation. The persistence mixin is untouched (it only calls `serialize`/`deserialize`/`trimEvents`).
+- Tests: `ColonyEventBufferTest` (budgets, per-namespace isolation, listener order and failure isolation,
+  unregistering, save/load incl. legacy and corrupt addon events, API type parity, validation) and GameTest
+  `addonColonyEventReachesListenersFeedAndPrompt` (real colony: listener, `recent()`, and the citizen's prompt
+  context), passing on both loaders.
+
 ---
 
 ## A3 — Text-only in-character generation
