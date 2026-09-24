@@ -397,6 +397,81 @@ public class McTalkingConfig {
     @SerialEntry(comment = "If true, each citizen is randomly assigned a personality archetype that influences their speech style and tone.")
     public boolean enablePersonalityArchetypes = true;
 
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Optimist archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityOptimist = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Grump archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityGrump = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Stoic archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityStoic = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Gossip archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityGossip = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Anxious archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityAnxious = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Boastful archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityBoastful = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Timid archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityTimid = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Philosophical archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityPhilosophical = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Sarcastic archetype is in the random pool for newly assigned citizens.")
+    public boolean personalitySarcastic = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Dramatic archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityDramatic = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Nurturing archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityNurturing = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Competitive archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityCompetitive = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Curious archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityCurious = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Nostalgic archetype is in the random pool for newly assigned citizens.")
+    public boolean personalityNostalgic = true;
+
+    @AutoGen(category = "citizens", group = "personality")
+    @TickBox
+    @SerialEntry(comment = "If true, the Superstitious archetype is in the random pool for newly assigned citizens.")
+    public boolean personalitySuperstitious = true;
+
     @AutoGen(category = "citizens")
     @ListGroup(valueFactory = ToolListFactory.class, controllerFactory = ToolListFactory.class)
     @SerialEntry(comment = "Custom personality archetype strings added to the random pool citizens can be assigned. Each entry is a freeform instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'")
@@ -463,6 +538,27 @@ public class McTalkingConfig {
     }
 
 
+
+    /** Whether a built-in archetype is in the random pool. Citizens keep an archetype they already have. */
+    public boolean isArchetypeEnabled(PersonalityArchetype archetype) {
+        return switch (archetype) {
+            case OPTIMIST -> personalityOptimist;
+            case GRUMP -> personalityGrump;
+            case STOIC -> personalityStoic;
+            case GOSSIP -> personalityGossip;
+            case ANXIOUS -> personalityAnxious;
+            case BOASTFUL -> personalityBoastful;
+            case TIMID -> personalityTimid;
+            case PHILOSOPHICAL -> personalityPhilosophical;
+            case SARCASTIC -> personalitySarcastic;
+            case DRAMATIC -> personalityDramatic;
+            case NURTURING -> personalityNurturing;
+            case COMPETITIVE -> personalityCompetitive;
+            case CURIOUS -> personalityCurious;
+            case NOSTALGIC -> personalityNostalgic;
+            case SUPERSTITIOUS -> personalitySuperstitious;
+        };
+    }
 
     public static boolean hasGeminiApiKey() {
         String key = INSTANCE.instance().geminiApiKey;

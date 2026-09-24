@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
+import me.sshcrack.mc_talking.config.PersonalityPool;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
@@ -220,14 +221,10 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
         var config = McTalkingConfig.INSTANCE.instance();
         if (!config.enablePersonalityArchetypes) return;
 
-        List<String> customs = config.customPersonalityArchetypes;
-        int totalPool = PersonalityArchetype.values().length + customs.size();
-        int pick = ThreadLocalRandom.current().nextInt(totalPool);
-
-        if (pick < PersonalityArchetype.values().length) {
-            mc_talking$personality = PersonalityArchetype.values()[pick];
-        } else {
-            mc_talking$customPersonality = customs.get(pick - PersonalityArchetype.values().length);
-        }
+        var pick = PersonalityPool.pick(config::isArchetypeEnabled, config.customPersonalityArchetypes,
+                bound -> ThreadLocalRandom.current().nextInt(bound));
+        if (pick == null) return;
+        mc_talking$personality = pick.archetype();
+        mc_talking$customPersonality = pick.custom();
     }
 }
