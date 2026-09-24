@@ -11,6 +11,7 @@ import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
 import me.sshcrack.mc_talking.internal.session.ConversationEventDispatch;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
+import me.sshcrack.mc_talking.internal.session.ProviderRecoveryController;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
@@ -377,8 +378,8 @@ public class CitizenConversation {
             LiveConversationWsClient currentB = clientBRef.get();
             if (currentA != null) currentA.close();
             if (currentB != null) currentB.close();
-            reservationA.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "paired conversation cancelled");
-            reservationB.end(ForegroundSessionRegistry.TerminalReason.CANCELLED, "paired conversation cancelled");
+            endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                    "paired conversation cancelled");
         };
         liveAbort = cancelLivePair;
         if (cancellation.isCancelled()) {
@@ -389,9 +390,7 @@ public class CitizenConversation {
         Runnable cancelLive = () -> {
             Runnable cleanup = () -> {
                 if (!cleanupStarted.compareAndSet(false, true)) return;
-                reservationA.end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
-                        "paired citizen conversation cancelled");
-                reservationB.end(ForegroundSessionRegistry.TerminalReason.CANCELLED,
+                endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.CANCELLED,
                         "paired citizen conversation cancelled");
             };
             if (server.isSameThread()) cleanup.run();
@@ -405,9 +404,7 @@ public class CitizenConversation {
             server.execute(() -> {
                 liveAbort = () -> { };
                 liveClients = List.of();
-                reservationA.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
-                        "paired citizen conversation completed");
-                reservationB.end(ForegroundSessionRegistry.TerminalReason.COMPLETED,
+                endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.COMPLETED,
                         "paired citizen conversation completed");
                 setState(ConversationState.ENDED);
             });
@@ -451,9 +448,7 @@ public class CitizenConversation {
             LiveConversationWsClient partialB = clientBRef.get();
             if (partialA != null) try { partialA.close(); } catch (Exception ignored) { }
             if (partialB != null) try { partialB.close(); } catch (Exception ignored) { }
-            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
-                    "failed to construct paired provider client");
-            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+            endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "failed to construct paired provider client");
             McTalking.LOGGER.error("[LiveConv] Failed to construct paired Gemini clients", e);
             setState(ConversationState.ENDED);
@@ -475,9 +470,7 @@ public class CitizenConversation {
             cancellation.clearLiveCancellation(cancelLive);
             if (!attachedA && !clientA.isLifecycleClosed()) clientA.close();
             if (!attachedB && !clientB.isLifecycleClosed()) clientB.close();
-            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
-                    "paired client ownership changed before attach");
-            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+            endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "paired client ownership changed before attach");
             setState(ConversationState.ENDED);
             return;
@@ -487,32 +480,8 @@ public class CitizenConversation {
             return;
         }
 
-        clientA.addOnCloseAction(() -> server.execute(() -> {
-            if (!cleanupStarted.compareAndSet(false, true)) return;
-            cancellation.clearLiveCancellation(cancelLive);
-            var diagnostic = clientA.getRecoveryDiagnostic();
-            reservationA.end(
-                    diagnostic.terminalReason() == me.sshcrack.mc_talking.internal.session.ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
-                            ? ForegroundSessionRegistry.TerminalReason.RECOVERY_EXHAUSTED
-                            : ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
-                    diagnostic.detail());
-            reservationB.end(ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
-                    "peer provider session terminated: " + diagnostic.detail());
-            setState(ConversationState.ENDED);
-        }));
-        clientB.addOnCloseAction(() -> server.execute(() -> {
-            if (!cleanupStarted.compareAndSet(false, true)) return;
-            cancellation.clearLiveCancellation(cancelLive);
-            var diagnostic = clientB.getRecoveryDiagnostic();
-            reservationB.end(
-                    diagnostic.terminalReason() == me.sshcrack.mc_talking.internal.session.ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
-                            ? ForegroundSessionRegistry.TerminalReason.RECOVERY_EXHAUSTED
-                            : ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
-                    diagnostic.detail());
-            reservationA.end(ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
-                    "peer provider session terminated: " + diagnostic.detail());
-            setState(ConversationState.ENDED);
-        }));
+        clientA.addOnCloseAction(onProviderClosed(clientA, reservationA, reservationB, cleanupStarted, cancelLive));
+        clientB.addOnCloseAction(onProviderClosed(clientB, reservationB, reservationA, cleanupStarted, cancelLive));
 
         if (cancellation.isCancelled()) {
             cancelLivePair.run();
@@ -523,9 +492,7 @@ public class CitizenConversation {
             clientB.connect();
         } catch (RuntimeException e) {
             cleanupStarted.set(true);
-            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
-                    "failed to connect paired provider session");
-            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+            endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "failed to connect paired provider session");
             McTalking.LOGGER.error("[LiveConv] Failed to connect paired Gemini sessions", e);
             setState(ConversationState.ENDED);
@@ -535,9 +502,7 @@ public class CitizenConversation {
         if (!reservationA.activate() || !reservationB.activate()) {
             cleanupStarted.set(true);
             cancellation.clearLiveCancellation(cancelLive);
-            reservationA.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
-                    "paired ownership changed before activation");
-            reservationB.end(ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
+            endBoth(reservationA, reservationB, ForegroundSessionRegistry.TerminalReason.STARTUP_FAILED,
                     "paired ownership changed before activation");
             setState(ConversationState.ENDED);
             return;
@@ -554,6 +519,30 @@ public class CitizenConversation {
                         + " basic information about them:" + PromptRuntime.getBasicCitizenInfoPrompt(viewB));
 
         setState(ConversationState.PLAYING_AUDIO);
+    }
+
+    private static void endBoth(ConversationManager.ForegroundReservation a, ConversationManager.ForegroundReservation b,
+                                ForegroundSessionRegistry.TerminalReason reason, String detail) {
+        a.end(reason, detail);
+        b.end(reason, detail);
+    }
+
+    /** When one side's provider session ends on its own, end both sides; the peer ends as a provider failure. */
+    private Runnable onProviderClosed(LiveConversationWsClient client, ConversationManager.ForegroundReservation own,
+                                      ConversationManager.ForegroundReservation peer, AtomicBoolean cleanupStarted,
+                                      Runnable cancelLive) {
+        return () -> server.execute(() -> {
+            if (!cleanupStarted.compareAndSet(false, true)) return;
+            cancellation.clearLiveCancellation(cancelLive);
+            var diagnostic = client.getRecoveryDiagnostic();
+            own.end(diagnostic.terminalReason() == ProviderRecoveryController.TerminalReason.RECOVERY_EXHAUSTED
+                            ? ForegroundSessionRegistry.TerminalReason.RECOVERY_EXHAUSTED
+                            : ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
+                    diagnostic.detail());
+            peer.end(ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE,
+                    "peer provider session terminated: " + diagnostic.detail());
+            setState(ConversationState.ENDED);
+        });
     }
 
     // -------------------------------------------------------------------------
