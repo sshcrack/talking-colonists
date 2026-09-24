@@ -37,6 +37,8 @@ import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
 import me.sshcrack.mc_talking.network.AiStatus;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
+import java.util.stream.Collectors;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 /**
  * Orchestrates a citizen-to-citizen conversation.
@@ -180,6 +182,9 @@ public class CitizenConversation {
             }
             locationalChannel = channel;
             stream = new GeminiStream(channel);
+            stream.setTimeline(SpeechTimeline.tracker(participants.get(0),
+                    participants.stream().map(p -> p.getDisplayName().getString())
+                            .collect(Collectors.joining(" & ")), () -> "CITIZEN_PAIR"));
         }
         UUID playbackTurnId = UUID.randomUUID();
         flashPlaybackTurnId = playbackTurnId;

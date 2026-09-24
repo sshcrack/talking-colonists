@@ -8,6 +8,7 @@ import de.maxhenkel.voicechat.api.VolumeCategory;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.ClientReceiveSoundEvent;
 import me.sshcrack.mc_talking.internal.audio.SpeechEnvelope;
+import me.sshcrack.mc_talking.internal.audio.VoiceDucking;
 import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
 import de.maxhenkel.voicechat.api.events.PlayerDisconnectedEvent;
 import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
@@ -66,12 +67,24 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
 
     @Override
     public void registerEvents(EventRegistration registration) {
-        registration.registerEvent(ClientReceiveSoundEvent.EntitySound.class, event ->
-                SpeechEnvelope.accept(event.getEntityId(), event.getRawAudio()));
+        registration.registerEvent(ClientReceiveSoundEvent.EntitySound.class, event -> {
+            short[] pcm = event.getRawAudio();
+            SpeechEnvelope.accept(event.getEntityId(), pcm);
+            event.setRawAudio(VoiceDucking.apply(event.getEntityId(), VoiceDucking.isCitizen(event.getEntityId()),
+                    McTalkingClient.localConversationPartner(), duckedGain(), pcm));
+        });
+        // Locational voices are citizen conversations and anchored addon turns.
+        registration.registerEvent(ClientReceiveSoundEvent.LocationalSound.class, event ->
+                event.setRawAudio(VoiceDucking.apply(event.getId(), true,
+                        McTalkingClient.localConversationPartner(), duckedGain(), event.getRawAudio())));
         registration.registerEvent(MicrophonePacketEvent.class, this::handleMicPacket);
         registration.registerEvent(PlayerDisconnectedEvent.class, this::onPlayerDisconnected);
         registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStarted);
         registration.registerEvent(VoicechatServerStoppedEvent.class, this::onStop);
+    }
+
+    private static float duckedGain() {
+        return (float) McTalkingConfig.INSTANCE.instance().otherCitizensVolumeWhileTalking;
     }
 
     public void handleMicPacket(MicrophonePacketEvent event) {

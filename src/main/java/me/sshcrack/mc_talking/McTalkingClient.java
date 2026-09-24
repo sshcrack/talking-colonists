@@ -36,6 +36,9 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.client.Minecraft;
+import me.sshcrack.mc_talking.internal.audio.VoiceDucking;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Client-side mod class for McTalking.
@@ -94,6 +97,7 @@ public class McTalkingClient {
             aiStatus.clear();
             partners.clear();
             me.sshcrack.mc_talking.internal.audio.SpeechEnvelope.clear();
+            VoiceDucking.clear();
         }
     }
 
@@ -106,6 +110,17 @@ public class McTalkingClient {
     }
 
     public static UUID getConversationPartner(UUID citizen) { return partners.get(citizen); }
+
+    /** The citizen the local player is talking to right now, or null. Safe off the render thread. */
+    public static @Nullable UUID localConversationPartner() {
+        var player = Minecraft.getInstance().player;
+        if (player == null) return null;
+        UUID self = player.getUUID();
+        for (var entry : partners.entrySet()) {
+            if (self.equals(entry.getValue())) return entry.getKey();
+        }
+        return null;
+    }
 
     public static AiStatus getAiStatus(UUID entityId) {
         return aiStatus.getOrDefault(entityId, AiStatus.NONE);

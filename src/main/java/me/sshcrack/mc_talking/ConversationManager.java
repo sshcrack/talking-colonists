@@ -421,6 +421,13 @@ public class ConversationManager {
         return activities.preemptForPlayer(citizenId);
     }
 
+    /** The current foreground session kind of a citizen, for diagnostics. */
+    public static String kindLabel(UUID citizenId) {
+        ConversationKind kind = foregroundSessions.kind(citizenId);
+        if (kind != null) return kind.name();
+        return activities.isBusy(citizenId) ? "ACTIVITY" : "NONE";
+    }
+
     public static boolean isCitizenBusy(AbstractEntityCitizen citizen) {
         UUID id = citizen.getUUID();
         return foregroundSessions.isBusy(id) || activities.isBusy(id);
