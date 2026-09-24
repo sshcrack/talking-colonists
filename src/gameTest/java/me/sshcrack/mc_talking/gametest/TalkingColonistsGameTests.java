@@ -118,7 +118,8 @@ public final class TalkingColonistsGameTests {
         }
     }
 
-    // TODO(T4/Q4): add `ambientBudgetBlocksGreetingBurst` once the Q4 per-player ambient speech
-    // budget lands: spawn several citizens near fixture.owner(), trigger greetings in one tick and
-    // assert only the budgeted number start. The budget code does not exist on this base yet.
+    // The Q4 ambient speech budget is intentionally not covered here: it only counts listeners in
+    // the server player list, and a GameTest cannot add one (the loader fake player is not listed,
+    // and a mock player's login breaks MineColonies' login sync). Its behaviour is covered by
+    // AmbientSpeechBudgetRegistryTest (fake clock, multiple listeners, all-or-nothing charging).
 }

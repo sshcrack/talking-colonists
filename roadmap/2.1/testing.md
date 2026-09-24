@@ -122,7 +122,7 @@ loader GameTest framework (NeoForge and Forge) so server tests run headless via 
 (`runGameTestServer` or equivalent) in both Stonecutter versions and in CI. Provide a small harness
 for spawning a MineColonies colony and citizens in a test structure, and add initial tests:
 a citizen's prompt view reflects real housing/job state; conversation eligibility rejects a sleeping
-citizen; the Q4 ambient budget blocks a burst of greetings near a player. No Gemini access: use the
+citizen; the Q4 ambient budget blocks a burst of greetings near a player (dropped: see the implementation record). No Gemini access: use the
 existing local/fake provider used by `DevRuntimeVerification`.
 
 ### Acceptance
@@ -154,7 +154,7 @@ existing local/fake provider used by `DevRuntimeVerification`.
   `ConversationManager.conversationEligibility` failed `eligibilityrejectssleepingcitizen` on both
   loaders (`1 required tests failed :(`, non-zero exit); reverted.
 - CI: separate `server-gametests` job ("Server GameTests") in `build_reusable.yml`.
-- Pending: the Q4 ambient-budget GameTest (TODO in `TalkingColonistsGameTests`) once Q4 lands.
+- Dropped: a Q4 ambient-budget GameTest. The budget only counts listeners in the server player list and a GameTest cannot add one (fake player not listed; mock player login breaks MineColonies login sync). Covered by `AmbientSpeechBudgetRegistryTest` instead.
 
 ---
 
