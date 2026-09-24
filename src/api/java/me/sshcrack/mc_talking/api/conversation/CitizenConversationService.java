@@ -79,6 +79,19 @@ public final class CitizenConversationService {
         return TalkingColonistsApi.services().conversations().registerLifecycleListener(id, order, listener);
     }
 
+    /**
+     * Observes every finished utterance (player, citizen or system) in core-managed conversations
+     * of all kinds (API 2.1, {@link me.sshcrack.mc_talking.api.ApiFeature#UTTERANCE_EVENTS}).
+     * Partial transcription chunks are never delivered, and nothing is delivered after a session ends.
+     */
+    public static @NotNull AddonRegistration registerUtteranceListener(
+            @NotNull String id,
+            int order,
+            @NotNull ConversationUtteranceListener listener
+    ) {
+        return TalkingColonistsApi.services().conversations().registerUtteranceListener(id, order, listener);
+    }
+
     /** Returns the active Talking Colonists conversation kind for this citizen, if any. */
     public static @NotNull Optional<ConversationKind> activeKind(@NotNull AbstractEntityCitizen citizen) {
         return TalkingColonistsApi.services().conversations().activeKind(citizen);

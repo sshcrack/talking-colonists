@@ -228,6 +228,29 @@ should confirm through their own tools.
 - Tests with fake transport cover player and citizen utterances in player, pair, and controlled
   sessions, no duplicates for chunked transcription, and no events after a session ends.
 
+### Implementation record — 2026-09-24
+
+- API (additive, `ApiFeature.UTTERANCE_EVENTS` now supported): `ConversationUtteranceEvent` (kind, citizen,
+  speaker PLAYER/CITIZEN/SYSTEM, speaker ID and name, text, session/turn IDs, source
+  TRANSCRIPTION/TYPED/SCRIPT, game time) and `CitizenConversationService.registerUtteranceListener`, backed by
+  a default `ConversationService` method. It is a separate listener rather than a new lifecycle `Phase`
+  constant, because an added enum constant could break addons that switch over `Phase` exhaustively.
+- Runtime:
+  - `UtteranceTracker` (one per provider session) collects input transcription chunks and emits a single
+    player utterance when the provider completes the turn. It emits the citizen utterance when that turn's
+    audio has been heard in full, and emits nothing after the session closes.
+  - `ConversationManager.emitClientUtterance` reads the kind, player and controlled IDs from the foreground
+    registry at that moment, and drops the event if the client is no longer the citizen's current session.
+    Delivery is on the server thread.
+  - Citizen Live sessions now request input audio transcription. Only the diagnostic `INPUT_OBSERVED`
+    progress reads it, so microphone turn handling is unchanged.
+  - Flash/TTS pair conversations emit each script line (`ScriptUtterances`, lines after the "Transcript"
+    heading) once playback finished. Live pair clients go through the shared `GeminiWsClient` path.
+    Controlled-session `addPlayerStatement` emits a TYPED player utterance.
+- Tests: `UtteranceTrackerTest` (chunked input → one utterance, one per turn, citizen-only turns, nothing
+  after end), `ScriptUtterancesTest`, and GameTest `controlledPlayerStatementIsAnUtterance`. No fake Live
+  transport exists yet; the tracker is the transport-independent part and is tested directly.
+
 ---
 
 ## A6 — Player conversation start options

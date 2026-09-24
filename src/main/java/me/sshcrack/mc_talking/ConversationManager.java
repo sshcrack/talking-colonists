@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking;
 
+import me.sshcrack.mc_talking.internal.session.ScriptUtterances;
+import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
 import me.sshcrack.gemini_live_lib.GeminiLiveClient;
@@ -40,6 +42,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -566,6 +569,55 @@ public class ConversationManager {
             case INTENTIONAL_CLOSE -> ForegroundSessionRegistry.TerminalReason.CANCELLED;
             default -> ForegroundSessionRegistry.TerminalReason.PROVIDER_FAILURE;
         };
+    }
+
+    /**
+     * Reports a finished utterance of a provider session (roadmap A5). The session context is read
+     * now, so a session that ended or was replaced reports nothing; delivery is on the server thread.
+     */
+    public static void emitClientUtterance(GeminiWsClient client, ConversationUtteranceEvent.Speaker speaker, String text) {
+        if (!ConversationEventRuntime.hasUtteranceListeners()) return;
+        AbstractEntityCitizen citizen = client.getEntity();
+        if (foregroundSessions.client(citizen.getUUID()) != client) return;
+        var snapshot = foregroundSessions.snapshot(citizen.getUUID()).orElse(null);
+        if (snapshot == null) return;
+        UUID playerId = snapshot.playerId();
+        if (speaker == ConversationUtteranceEvent.Speaker.PLAYER && playerId == null) return;
+        ConversationKind kind = snapshot.kind();
+        UUID sessionId = snapshot.sessionId();
+        UUID turnId = snapshot.turnId();
+        runOnServerThread(citizen, () -> {
+            UUID speakerId;
+            String speakerName;
+            if (speaker == ConversationUtteranceEvent.Speaker.PLAYER) {
+                MinecraftServer server = citizen.level().getServer();
+                ServerPlayer player = server == null ? null : server.getPlayerList().getPlayer(playerId);
+                speakerId = playerId;
+                speakerName = player == null ? "Player" : player.getName().getString();
+            } else {
+                speakerId = citizen.getUUID();
+                speakerName = citizen.getName().getString();
+            }
+            ConversationEventRuntime.emitUtterance(new ConversationUtteranceEvent(kind, citizen, speaker, speakerId,
+                    speakerName, text, sessionId, turnId, ConversationUtteranceEvent.Source.TRANSCRIPTION,
+                    citizen.level().getGameTime()));
+        });
+    }
+
+    /** Reports the heard lines of a Flash/TTS pair conversation script, one event per line. */
+    public static void emitScriptUtterances(List<AbstractEntityCitizen> participants, String script) {
+        if (!ConversationEventRuntime.hasUtteranceListeners() || participants.isEmpty()) return;
+        AbstractEntityCitizen first = participants.get(0);
+        runOnServerThread(first, () -> {
+            Map<String, AbstractEntityCitizen> byName = new LinkedHashMap<>();
+            for (AbstractEntityCitizen participant : participants) byName.put(participant.getName().getString(), participant);
+            for (var line : ScriptUtterances.parse(script, List.copyOf(byName.keySet()))) {
+                AbstractEntityCitizen speaker = byName.get(line.speaker());
+                ConversationEventRuntime.emitUtterance(new ConversationUtteranceEvent(ConversationKind.CITIZEN_PAIR,
+                        speaker, ConversationUtteranceEvent.Speaker.CITIZEN, speaker.getUUID(), line.speaker(),
+                        line.text(), null, null, ConversationUtteranceEvent.Source.SCRIPT, speaker.level().getGameTime()));
+            }
+        });
     }
 
     private static void runOnServerThread(AbstractEntityCitizen citizen, Runnable action) {
