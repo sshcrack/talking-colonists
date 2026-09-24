@@ -8,6 +8,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# The client smoke test exists to prove that mixins inject correctly on both loaders.
+# Only files that can affect mixin application, loader metadata, or the mixin-relevant
+# build/dependency graph belong here. Ordinary Java, prompts, lang files, and the public
+# API surface do NOT require a client launch to verify.
 EXACT_FILES = {
     ".pre-commit-config.yaml",
     "build.forge.gradle.kts",
@@ -22,14 +26,24 @@ EXACT_FILES = {
 }
 PREFIXES = (
     "build-logic/",
-    "src/api/java/",
-    "src/main/java/",
-    "src/main/resources/",
+    "src/main/java/me/sshcrack/mc_talking/mixin/",
+    "src/main/resources/aw/",
 )
+# Mixin configs can live anywhere resources are placed (e.g. per-loader variants), so
+# match by suffix rather than a single hardcoded path.
+SUFFIXES = (".mixins.json",)
 
 
 def relevant(path: str) -> bool:
-    return path in EXACT_FILES or path.startswith(PREFIXES)
+    if path in EXACT_FILES or path.startswith(PREFIXES):
+        return True
+    return any(path.endswith(suffix) for suffix in SUFFIXES)
+
+
+def changed_staged_relevant() -> list[str]:
+    raw = git("diff", "--cached", "--name-only", "-z")
+    paths = [p.decode() for p in raw.split(b"\0") if p]
+    return sorted(p for p in paths if relevant(p))
 
 
 def git(*args: str) -> bytes:
@@ -88,8 +102,15 @@ def fingerprint(entries: list[tuple[str, bytes]]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fingerprint client-launch-relevant repository content")
-    parser.add_argument("mode", choices=("worktree", "index", "head"))
+    parser.add_argument("mode", choices=("worktree", "index", "head", "changed"))
     args = parser.parse_args()
+
+    if args.mode == "changed":
+        # Prints each staged path that is mixin-relevant (one per line), or nothing.
+        # Used by check-client-smoke-required.sh to decide whether the local gate applies.
+        for path in changed_staged_relevant():
+            print(path)
+        return 0
 
     if args.mode == "worktree":
         entries = worktree_entries()

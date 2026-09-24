@@ -46,6 +46,18 @@ branches, goes stale after every merge, and serializes parallel work.
   config, an access transformer, or a dependency version still does.
 - CI runs both loaders' launches in parallel and fails if either fails.
 
+
+### Implementation record — 2026-09-24
+
+- Gate and fingerprint cover only mixin-relevant files; `client-smoke-fingerprint.py relevant()` is
+  the single source of truth and `check-client-smoke-required.sh` calls its `changed` mode.
+- CI: `smoke-marker-check` (fast, runs `scripts/tests/test_smoke_gate.py`, then compares the marker
+  over the mixin-relevant set) and a parallel `client-smoke` matrix, one job per Stonecutter version.
+  `test-client-smoke.sh <version>` runs one loader and never writes the marker.
+- `AGENTS.md` and `docs/automated-verification.md` state the purpose (mixin injection), the gated set,
+  and the fast local loop.
+- Required-check names to add on `main`: `build / Client Smoke (1.21.1-neoforge)`,
+  `build / Client Smoke (1.20.1-forge)`, `build / smoke-marker-check` (confirm in the Actions UI).
 ---
 
 ## T2 — Public API binary-compatibility check

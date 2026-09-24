@@ -31,6 +31,19 @@ if [ -z "$VERSIONS" ]; then
     exit 1
 fi
 
+# Optional: restrict to a single Stonecutter version, e.g. for a CI matrix job that runs
+# each loader's client launch in its own parallel job. With no argument, all discovered
+# versions run serially (the default local flow).
+if [ -n "${1:-}" ]; then
+    REQUESTED_VERSION="$1"
+    if ! grep -qxF "$REQUESTED_VERSION" <<<"$VERSIONS"; then
+        echo "ERROR: requested version '$REQUESTED_VERSION' is not among discovered versions:" >&2
+        echo "$VERSIONS" >&2
+        exit 1
+    fi
+    VERSIONS="$REQUESTED_VERSION"
+fi
+
 cleanup_process_group() {
     local pid="$1"
     if kill -0 "$pid" 2>/dev/null; then
@@ -205,6 +218,11 @@ if [ "$FINAL_INDEX_FINGERPRINT" != "$INITIAL_INDEX_FINGERPRINT" ] \
         || [ "$FINAL_WORKTREE_FINGERPRINT" != "$INITIAL_INDEX_FINGERPRINT" ]; then
     echo "ERROR: launch-relevant content changed during the smoke run; refusing to certify a different tree." >&2
     exit 1
+fi
+if [ -n "${REQUESTED_VERSION:-}" ]; then
+    # A single-version run (CI matrix job) must not certify the tree for every loader.
+    echo "Client launch smoke test passed for $REQUESTED_VERSION (marker not written for a single-version run)."
+    exit 0
 fi
 printf '%s\n' "$INITIAL_INDEX_FINGERPRINT" > .client-smoke-verified
 echo "Created .client-smoke-verified ($(cat .client-smoke-verified))"

@@ -4,21 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-changed=$(git diff --cached --name-only -- \
-    'src/main/java/**' \
-    'src/main/resources/**' \
-    'src/api/java/**' \
-    'build-logic/**' \
-    'build.forge.gradle.kts' \
-    'build.neoforge.gradle.kts' \
-    'settings.gradle.kts' \
-    'stonecutter.gradle.kts' \
-    'stonecutter.properties.toml' \
-    'gradle.properties' \
-    '.pre-commit-config.yaml' \
-    'scripts/test-client-smoke.sh' \
-    'scripts/check-client-smoke-required.sh' \
-    'scripts/client-smoke-fingerprint.py')
+# The mixin-relevant file set (mixin classes, mixin configs, access transformers/wideners,
+# build logic, loader build scripts, and the smoke scripts themselves) is the single source
+# of truth in scripts/client-smoke-fingerprint.py's relevant() function. Keep this check in
+# sync with that filter rather than duplicating pathspecs here.
+changed=$(python3 scripts/client-smoke-fingerprint.py changed)
 
 if [ -z "$changed" ]; then
     exit 0
