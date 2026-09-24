@@ -29,6 +29,7 @@ public final class CitizenMouthLayer extends RenderLayer<AbstractEntityCitizen, 
     @Override
     public void render(PoseStack pose, MultiBufferSource buffers, int light, AbstractEntityCitizen citizen,
             float swing, float amount, float partial, float age, float yaw, float pitch) {
+        me.sshcrack.mc_talking.internal.audio.VoiceDucking.markCitizen(citizen.getUUID());
         var config = McTalkingConfig.INSTANCE.instance();
         var model = getParentModel();
         if (!config.showConversationMouths || config.reducedConversationMotion || !model.head.visible

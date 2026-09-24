@@ -276,6 +276,8 @@
   "yacl3.config.mc_talking:config.citizenVoiceWhisper.desc": "Marks the citizens voice channel as a whisper, which has a smaller default radius",
   "yacl3.config.mc_talking:config.citizenVoiceDistance": "Citizen Voice Distance",
   "yacl3.config.mc_talking:config.citizenVoiceDistance.desc": "The distance at which the citizen's voice can be heard. Only applies if the value is non 0.",
+  "yacl3.config.mc_talking:config.otherCitizensVolumeWhileTalking": "Other Citizens' Volume While Talking",
+  "yacl3.config.mc_talking:config.otherCitizensVolumeWhileTalking.desc": "While you talk to a citizen, other citizens' voices fade to this volume for you (0 to 1). Only affects what you hear. Set to 1 to turn it off.",
 
   "yacl3.config.mc_talking:config.category.citizens.group.rumor_mill": "Rumor Mill",
   "yacl3.config.mc_talking:config.enableRumorMill": "Enable Rumor Mill",

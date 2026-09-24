@@ -94,6 +94,7 @@ public class McTalkingClient {
             aiStatus.clear();
             partners.clear();
             me.sshcrack.mc_talking.internal.audio.SpeechEnvelope.clear();
+            me.sshcrack.mc_talking.internal.audio.VoiceDucking.clear();
         }
     }
 
@@ -106,6 +107,17 @@ public class McTalkingClient {
     }
 
     public static UUID getConversationPartner(UUID citizen) { return partners.get(citizen); }
+
+    /** The citizen the local player is talking to right now, or null. Safe off the render thread. */
+    public static @org.jetbrains.annotations.Nullable UUID localConversationPartner() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        if (player == null) return null;
+        UUID self = player.getUUID();
+        for (var entry : partners.entrySet()) {
+            if (self.equals(entry.getValue())) return entry.getKey();
+        }
+        return null;
+    }
 
     public static AiStatus getAiStatus(UUID entityId) {
         return aiStatus.getOrDefault(entityId, AiStatus.NONE);
