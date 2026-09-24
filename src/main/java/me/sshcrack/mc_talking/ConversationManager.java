@@ -297,6 +297,10 @@ public class ConversationManager {
         return backgroundSessions.hasCapacity(slotsNeeded);
     }
 
+    public static int getUsedForegroundSlots() {
+        return foregroundSessions.usedSlots();
+    }
+
     public static int getUsedBackgroundSlots() {
         backgroundSessions.purge();
         return backgroundSessions.size();

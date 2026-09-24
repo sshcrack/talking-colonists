@@ -491,6 +491,29 @@ if (!eligibility.eligible()) {
 }
 ```
 
+## Provider capacity and quota
+
+Since API 2.1 (`ApiFeature.PROVIDER_BUDGET`), addons can check capacity before scheduling expensive work,
+and can explain honestly when citizens cannot talk:
+
+```java
+ProviderBudgetView budget = ProviderBudgetService.snapshot();
+if (budget.background().available() > 0
+        && budget.model(ProviderBudgetService.config().textModel())
+                .map(m -> m.state() == ProviderQuotaState.OK).orElse(false)) {
+    // e.g. generate tonight's newspaper
+}
+
+ProviderBudgetService.registerQuotaListener("gazette:quota", 0, (previous, current) -> {
+    // Runs on the server thread when a model becomes exhausted or recovers.
+});
+```
+
+- `ProviderBudgetService.config()` replaces reflective reads of the config class. It reports whether an
+  API key is set, the Live and text models, and the blocking-task urgency multiplier.
+- `reloadConfig()` reloads the config file.
+- Quota changes are checked about once a second.
+
 ## Visitors (tavern guests)
 
 MineColonies visitors are not conversation participants by default: eligibility reports

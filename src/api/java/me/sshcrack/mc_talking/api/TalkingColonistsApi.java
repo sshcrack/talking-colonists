@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.api;
 
 import me.sshcrack.mc_talking.api.service.ColonyEventFeedService;
 import me.sshcrack.mc_talking.api.service.ContextService;
+import me.sshcrack.mc_talking.api.service.ProviderStatusService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
@@ -172,6 +173,11 @@ public final class TalkingColonistsApi {
         /** Roadmap A2. Default for runtimes that predate the event feed; see {@link ApiFeature#COLONY_EVENTS}. */
         default @NotNull ColonyEventFeedService colonyEvents() {
             throw new UnsupportedOperationException("The colony event feed is not implemented by this runtime");
+        }
+
+        /** Roadmap A7. Default for runtimes that predate provider status; see {@link ApiFeature#PROVIDER_BUDGET}. */
+        default @NotNull ProviderStatusService providerStatus() {
+            throw new UnsupportedOperationException("Provider budget status is not implemented by this runtime");
         }
     }
 }
