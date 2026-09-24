@@ -297,6 +297,16 @@ public class McTalkingConfig {
     @SerialEntry(comment = "Max voice distance of the citizen. Use 0 to use default distance")
     public int citizenVoiceDistance = 0;
 
+    @AutoGen(category = "citizens", group = "voice_chat")
+    @DoubleField(min = 0.0, max = 128.0)
+    @SerialEntry(comment = "Citizens do not start unprompted speech (greetings, mumbling, rumors, addon lines) while a player within this many blocks already hears another citizen speaking or is in a conversation. 0 lets everyone talk at once.")
+    public double speechFloorRadius = 24.0;
+
+    @AutoGen(category = "citizens", group = "voice_chat")
+    @DoubleField(min = 0.0, max = 1.0)
+    @SerialEntry(comment = "While you talk to a citizen, other citizens' voices play at this volume (client side, 0 to 1). 1 turns this off.")
+    public double otherCitizensVolumeWhileTalking = 0.3;
+
     // Per-citizen automatic-session cooldown
     @AutoGen(category = "citizens")
     @IntField(min = 0, max = 10000)

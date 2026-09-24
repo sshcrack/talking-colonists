@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 public class GeminiStream implements Supplier<short[]> {
     public static final int FRAME_SIZE_SAMPLES = 960;
@@ -42,9 +43,15 @@ public class GeminiStream implements Supplier<short[]> {
 
     private Runnable onPause;
     private OpusEncoder encoder;
+    private @Nullable SpeechTimeline.Tracker timeline;
 
     public GeminiStream(AudioChannel channel) {
         this.channel = channel;
+    }
+
+    /** Development diagnostics: report audible segments of this stream (see {@code SpeechTimeline}). */
+    public void setTimeline(@Nullable SpeechTimeline.Tracker timeline) {
+        this.timeline = timeline;
     }
 
     public void setOnPause(Runnable onPause) {
@@ -71,6 +78,7 @@ public class GeminiStream implements Supplier<short[]> {
      */
     public boolean addGeminiPcmWithPitch(UUID turnId, byte[] data, int sampleRate) {
         final boolean[] started = {false};
+        acceptedBytes += data.length;
         boolean accepted = turnGate.accept(turnId, () -> {
             lastSampleRate = sampleRate;
 
@@ -86,7 +94,22 @@ public class GeminiStream implements Supplier<short[]> {
                 started[0] = processBufferedData(sampleRate, false);
             }
         });
+        if (!accepted) {
+            acceptedBytes -= data.length;
+            rejectedBytes += data.length;
+        }
         return accepted && started[0];
+    }
+
+    private long acceptedBytes;
+    private long rejectedBytes;
+
+    /** Diagnostics: audio bytes {accepted, rejected by the turn gate} since the last call. */
+    public long[] takeAudioCounters() {
+        long[] counters = {acceptedBytes, rejectedBytes};
+        acceptedBytes = 0;
+        rejectedBytes = 0;
+        return counters;
     }
 
     /**
@@ -223,6 +246,8 @@ public class GeminiStream implements Supplier<short[]> {
     }
 
     private void stopAndDiscard() {
+        var currentTimeline = timeline;
+        if (currentTimeline != null) currentTimeline.frame(false); // a stopped voice ends its segment too
         audioFrames.clear();
         remainingSamples = new short[0];
         synchronized (incomingData) {
@@ -261,6 +286,8 @@ public class GeminiStream implements Supplier<short[]> {
     @Override
     public short[] get() {
         short[] frame = audioFrames.poll();
+        var currentTimeline = timeline;
+        if (currentTimeline != null) currentTimeline.frame(frame != null);
         if (frame != null) {
             return frame;
         }

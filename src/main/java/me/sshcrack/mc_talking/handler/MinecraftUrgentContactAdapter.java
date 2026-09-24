@@ -72,7 +72,9 @@ final class MinecraftUrgentContactAdapter implements UrgentContactLifecycleModul
         ServerPlayer player = player(playerId);
         if (citizen == null || player == null || citizen.level() != player.level()) return false;
         double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange;
-        return citizen.distanceToSqr(player) <= range * range;
+        // Close enough, and nobody else is audible to the player: wait beside them until it is quiet.
+        return citizen.distanceToSqr(player) <= range * range
+                && !ConversationManager.isFloorTaken(citizen, ConversationKind.URGENT_CONTACT);
     }
 
     @Override
