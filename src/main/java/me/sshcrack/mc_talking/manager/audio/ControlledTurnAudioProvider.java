@@ -3,9 +3,9 @@ package me.sshcrack.mc_talking.manager.audio;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
-import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ControlledAudioAnchor;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,7 +24,7 @@ public final class ControlledTurnAudioProvider implements AudioProvider {
     @Override
     public AudioChannel createChannel() {
         if (anchor == null) return new CitizenEntityAudioProvider(entity, null).createChannel();
-        var api = McTalkingVoicechatPlugin.vcApi;
+        var api = VoicechatAccess.get();
         if (api == null) return null;
         var server = entity.level().getServer();
         if (server == null) return null;
@@ -40,7 +40,7 @@ public final class ControlledTurnAudioProvider implements AudioProvider {
 
     @Override
     public OpusDecoder createDecoder() {
-        var api = McTalkingVoicechatPlugin.vcApi;
+        var api = VoicechatAccess.get();
         return api == null ? null : api.createDecoder();
     }
 }

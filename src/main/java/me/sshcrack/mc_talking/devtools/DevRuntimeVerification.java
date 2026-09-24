@@ -10,10 +10,10 @@ import me.sshcrack.gemini_live_lib.websocket.handshake.ClientHandshake;
 import me.sshcrack.gemini_live_lib.websocket.server.WebSocketServer;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
-import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -127,7 +127,7 @@ public final class DevRuntimeVerification {
                 for (int i = 0; i < speechFrame.length; i++) {
                     speechFrame[i] = (short) Math.round(Math.sin(2.0 * Math.PI * 440.0 * i / 48_000.0) * 6_000.0);
                 }
-                var encoder = McTalkingVoicechatPlugin.vcApi.createEncoder();
+                var encoder = VoicechatAccess.require().createEncoder();
                 try {
                     byte[] opus = encoder.encode(speechFrame);
                     require(playerClient.acceptMicrophoneOpus(opus), "decoded microphone speech classification");

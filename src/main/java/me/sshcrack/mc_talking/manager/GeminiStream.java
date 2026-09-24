@@ -5,6 +5,7 @@ import de.maxhenkel.voicechat.api.audiochannel.AudioPlayer;
 import de.maxhenkel.voicechat.api.opus.OpusEncoder;
 import de.maxhenkel.voicechat.api.opus.OpusEncoderMode;
 import me.sshcrack.mc_talking.internal.audio.PlaybackTurnGate;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.util.AudioHelper;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,7 +18,6 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class GeminiStream implements Supplier<short[]> {
     public static final int FRAME_SIZE_SAMPLES = 960;
@@ -116,7 +116,7 @@ public class GeminiStream implements Supplier<short[]> {
             totalBufferedBytes = 0;
         }
 
-        short[] samples = vcApi.getAudioConverter().bytesToShorts(combined);
+        short[] samples = VoicechatAccess.require().getAudioConverter().bytesToShorts(combined);
 
         samples = AudioHelper.changePitch(samples, sampleRate, pitchFactor);
         // Apply sample rate conversion if needed
@@ -174,6 +174,7 @@ public class GeminiStream implements Supplier<short[]> {
 
             // Only start playing when we have enough buffered frames
             if (!audioFrames.isEmpty() && (!isPreBuffering || audioFrames.size() >= MIN_FRAMES_BEFORE_PLAYBACK || flushed)) {
+                var vcApi = VoicechatAccess.require();
                 OpusEncoder createdEncoder = vcApi.createEncoder(OpusEncoderMode.AUDIO);
                 AudioPlayer createdPlayer = vcApi.createAudioPlayer(channel, createdEncoder, this);
                 encoder = createdEncoder;
@@ -188,7 +189,6 @@ public class GeminiStream implements Supplier<short[]> {
 
         return false;
     }
-
 
     /**
      * Drops audio that has been generated but not yet consumed by the voice-chat player.
@@ -276,7 +276,6 @@ public class GeminiStream implements Supplier<short[]> {
         }
         return null;
     }
-
 
     /**
      * Returns whether generated audio is still buffered or actively playing.

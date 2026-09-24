@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.manager;
 
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import org.jetbrains.annotations.NotNull;
 import me.sshcrack.mc_talking.internal.session.UtteranceTracker;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
@@ -50,8 +51,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
-
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
@@ -85,7 +84,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
         return MICROPHONE_EXECUTOR;
     }
-
 
     /**
      * Returns the model name string for quota tracking.
@@ -657,10 +655,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
         setup.realtimeInputConfig = new BidiGenerateContentSetup.RealtimeInputConfig();
 
-
         //TODO: Allow citizens to speak for themselves
         //setup.realtimeInputConfig.turnCoverage = BidiGenerateContentSetup.RealtimeInputConfig.TurnCoverage.TURN_INCLUDES_ALL_INPUT;
-
 
         var sys = new BidiGenerateContentSetup.SystemInstruction();
         //TODO change player when other player is talking to AI
@@ -1276,6 +1272,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     }
 
     private void submitPcmInput(short[] audio, MicrophoneTurnModule.InputKind kind) {
+        var vcApi = VoicechatAccess.get();
         if (audio == null || audio.length == 0 || vcApi == null) return;
         var input = new RealtimeInput();
         var byteAudio = vcApi.getAudioConverter().shortsToBytes(audio);

@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.audio.PcmSpeechDetector;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.manager.GeminiStream;
 import me.sshcrack.mc_talking.manager.audio.AudioProvider;
 import me.sshcrack.mc_talking.manager.audio.CitizenEntityAudioProvider;
@@ -18,8 +19,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 /** Playback and interruption owner for cached/pregenerated citizen speech. */
 public final class PregenerationPlayback {
@@ -100,7 +99,9 @@ public final class PregenerationPlayback {
      */
     public static void onPlayerOpusPacket(ServerPlayer player, byte[] opusData) {
         if (ACTIVE_PREGENERATED_PLAYBACK.isEmpty()) return;
-        if (player == null || opusData == null || opusData.length == 0 || vcApi == null) return;
+        if (player == null || opusData == null || opusData.length == 0) return;
+        var vcApi = VoicechatAccess.get();
+        if (vcApi == null) return;
         VoiceBurst burst = PLAYER_VOICE_BURSTS.computeIfAbsent(player.getUUID(), ignored -> new VoiceBurst());
         short[] decoded;
         synchronized (burst) {

@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import net.minecraft.ChatFormatting;
 /*? if forge {*/
 /*import net.minecraft.nbt.CompoundTag;
@@ -34,8 +35,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
-
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
@@ -197,7 +196,7 @@ public class CitizenTalkingDevice extends Item {
         }
 
         // Check if voice chat API is initialized
-        if (vcApi == null) {
+        if (!VoicechatAccess.isReady()) {
             serverPlayer.sendSystemMessage(
                     Component.translatable("mc_talking.talking_device.error.voice_chat_not_initialized")
                             .withStyle(ChatFormatting.RED)

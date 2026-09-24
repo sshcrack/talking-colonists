@@ -21,13 +21,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.manager.VoiceSelectionService;
 import me.sshcrack.mc_talking.util.AudioHelper;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 public class PregenerationGeminiClient extends GeminiLiveClient {
     private final UUID citizenId;
@@ -119,10 +119,10 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
     private byte[] resampleToTarget(byte[] data, int currentRate) {
         if (currentRate == TARGET_SAMPLE_RATE) return data;
 
-        short[] shorts = vcApi.getAudioConverter().bytesToShorts(data);
+        short[] shorts = VoicechatAccess.require().getAudioConverter().bytesToShorts(data);
         short[] resampled = AudioHelper.resampleAudio(shorts, currentRate, TARGET_SAMPLE_RATE);
 
-        return vcApi.getAudioConverter().shortsToBytes(resampled);
+        return VoicechatAccess.require().getAudioConverter().shortsToBytes(resampled);
     }
 
     @Override

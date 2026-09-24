@@ -5,6 +5,7 @@ import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
@@ -21,11 +22,12 @@ public class CitizenEntityAudioProvider implements AudioProvider {
 
     @Override
     public AudioChannel createChannel() {
-        if (McTalkingVoicechatPlugin.vcApi == null) {
+        var vcApi = VoicechatAccess.get();
+        if (vcApi == null) {
             return null;
         }
 
-        var channel = McTalkingVoicechatPlugin.vcApi.createEntityAudioChannel(UUID.randomUUID(), McTalkingVoicechatPlugin.vcApi.fromEntity(entity));
+        var channel = vcApi.createEntityAudioChannel(UUID.randomUUID(), vcApi.fromEntity(entity));
         if (channel == null) {
             throw new IllegalStateException("Failed to create audio channel for entity: " + entity.getStringUUID());
         }
@@ -48,7 +50,7 @@ public class CitizenEntityAudioProvider implements AudioProvider {
 
     @Override
     public OpusDecoder createDecoder() {
-        if (McTalkingVoicechatPlugin.vcApi == null) return null;
-        return McTalkingVoicechatPlugin.vcApi.createDecoder();
+        var vcApi = VoicechatAccess.get();
+        return vcApi == null ? null : vcApi.createDecoder();
     }
 }
