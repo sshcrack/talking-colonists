@@ -72,8 +72,8 @@ public class McTalkingClient {
         NeoForge.EVENT_BUS.register(this);
         modEventBus.addListener(TalkKeybinds::register);
         /*? if devtools {*/
-        me.sshcrack.mc_talking.devtools.DevAutoQuit.init();
-        /*?}*/
+        /*me.sshcrack.mc_talking.devtools.DevAutoQuit.init();
+        *//*?}*/
     }
     /*?}*/
 

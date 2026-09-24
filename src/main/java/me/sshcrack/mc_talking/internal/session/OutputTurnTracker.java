@@ -14,7 +14,7 @@ import java.util.function.Supplier;
  * only holds the state, so the rules can be tested without audio.
  */
 public final class OutputTurnTracker {
-    /** Result of {@link #interruptForBargeIn()}: the cancelled turn, and whether the provider had already finished it. */
+    /** Result of {@link #interruptForBargeIn(UUID)}: the cancelled turn, and whether the provider had already finished it. */
     public record BargeIn(UUID turnId, boolean providerAlreadyFinished) {
     }
 
