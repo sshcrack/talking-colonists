@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.commands.McTalkingDebugCommand;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
 import me.sshcrack.mc_talking.broadcast.BroadcastPropagationService;
+import me.sshcrack.mc_talking.broadcast.NewsParticles;
 import me.sshcrack.mc_talking.handler.CasualGreetingHandler;
 import me.sshcrack.mc_talking.handler.ChatToCitizenHandler;
 import me.sshcrack.mc_talking.handler.CitizenMumblingHandler;
