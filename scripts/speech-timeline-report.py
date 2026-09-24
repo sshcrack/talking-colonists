@@ -10,7 +10,8 @@ Reports, for everything a citizen said aloud:
   * overlaps: two citizens within earshot of each other audible at the same time,
   * missing animation: audio played while the citizen's synced status was not TALKING,
   * repeats: lines by different citizens that say nearly the same thing,
-  * how often citizens addressed the player unprompted.
+  * how often citizens addressed the player unprompted,
+  * silent turns: the provider finished a turn with a transcript but no playable audio.
 Exit code 1 when overlaps are found, so scripts can gate on it.
 """
 import argparse
@@ -44,7 +45,7 @@ def log_millis(line):
 
 
 def parse(path):
-    segments, said, marks, statuses, events = [], [], [], [], []
+    segments, said, marks, statuses, events, turns = [], [], [], [], [], []
     with open(path, encoding="utf-8", errors="replace") as log:
         for line in log:
             if MARKER in line:
@@ -52,7 +53,7 @@ def parse(path):
                     entry = json.loads(line.split(MARKER, 1)[1])
                 except json.JSONDecodeError:
                     continue
-                {"segment": segments, "said": said, "mark": marks}.get(entry.get("type"), []).append(entry)
+                {"segment": segments, "said": said, "mark": marks, "turn": turns}.get(entry.get("type"), []).append(entry)
                 continue
             at = log_millis(line)
             if at is None:
@@ -66,7 +67,7 @@ def parse(path):
                 if found:
                     events.append((at, label, found.group(1).strip()))
                     break
-    return segments, said, marks, statuses, events
+    return segments, said, marks, statuses, events, turns
 
 
 def merge(segments):
@@ -167,7 +168,7 @@ def main():
     parser.add_argument("--json", help="also write the findings as JSON")
     args = parser.parse_args()
 
-    segments, said, marks, statuses, events = parse(args.log)
+    segments, said, marks, statuses, events, turns = parse(args.log)
     if not segments and not said:
         print("No SpeechTimeline lines found. Was the game started with -Dmc_talking.speechTimeline=true?")
         return 2
@@ -205,6 +206,12 @@ def main():
     for a, b, score in found_repeats:
         print(f"{score:.2f}  {a['speaker']}: {a['text'][:90]}\n      {b['speaker']}: {b['text'][:90]}")
 
+    silent = [t for t in turns if t["transcriptChars"] > 0 and t["acceptedBytes"] == 0]
+    print(f"\n== Silent turns (transcript but no playable audio): {len(silent)} of {len(turns)}")
+    for t in silent:
+        print(f"{rel(t['at'])} {t['kind']:<15} {t['speaker']}: received {t['receivedBytes']} B, dropped "
+              f"{t['droppedBytes']} B, gate rejected {t['rejectedBytes']} B, suppressed {t['suppressed']}")
+
     times, gaps = addressing(utterances, said, args.player)
     print(f"\n== Unprompted lines addressing {args.player}: {len(times)}", end="")
     if gaps:
@@ -216,7 +223,8 @@ def main():
     total_audio = sum(u["audioMs"] for u in utterances) / 1000
     span = (max(u["end"] for u in utterances) - t0) / 1000 if utterances else 0
     print(f"\n== Summary: {len(utterances)} utterances, {total_audio:.0f}s of audio in {span:.0f}s, "
-          f"{len(found_overlaps)} overlaps, {len(missing)} without animation, {len(found_repeats)} near-repeats")
+          f"{len(found_overlaps)} overlaps, {len(missing)} without animation, {len(found_repeats)} near-repeats, "
+          f"{len(silent)} silent turns")
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as out:
@@ -226,6 +234,7 @@ def main():
                 "withoutAnimation": [{"utterance": u, "statuses": s} for u, s in missing],
                 "repeats": [{"a": a, "b": b, "score": s} for a, b, s in found_repeats],
                 "addressingGapsSeconds": gaps,
+                "silentTurns": silent,
             }, out, indent=2)
     return 1 if found_overlaps else 0
 

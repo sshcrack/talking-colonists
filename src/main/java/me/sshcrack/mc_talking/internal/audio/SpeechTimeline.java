@@ -90,6 +90,25 @@ public final class SpeechTimeline {
         McTalking.LOGGER.info(MARKER + line);
     }
 
+    /**
+     * A provider turn ended: how much audio arrived, how much the client dropped outside a turn,
+     * how much the stream accepted or its turn gate rejected, and the transcript length.
+     */
+    public static void turn(Entity speaker, String kind, long receivedBytes, long droppedBytes, long acceptedBytes,
+                            long rejectedBytes, int transcriptChars, boolean suppressed) {
+        if (!ENABLED) return;
+        JsonObject line = base("turn", new Source(speaker, null, () -> kind));
+        line.addProperty("kind", kind);
+        line.addProperty("at", System.currentTimeMillis());
+        line.addProperty("receivedBytes", receivedBytes);
+        line.addProperty("droppedBytes", droppedBytes);
+        line.addProperty("acceptedBytes", acceptedBytes);
+        line.addProperty("rejectedBytes", rejectedBytes);
+        line.addProperty("transcriptChars", transcriptChars);
+        line.addProperty("suppressed", suppressed);
+        McTalking.LOGGER.info(MARKER + line);
+    }
+
     /** Something the report should show on the timeline, e.g. a scenario step or a started feature. */
     public static void mark(String what) {
         if (!ENABLED) return;

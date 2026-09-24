@@ -78,6 +78,7 @@ public class GeminiStream implements Supplier<short[]> {
      */
     public boolean addGeminiPcmWithPitch(UUID turnId, byte[] data, int sampleRate) {
         final boolean[] started = {false};
+        acceptedBytes += data.length;
         boolean accepted = turnGate.accept(turnId, () -> {
             lastSampleRate = sampleRate;
 
@@ -93,7 +94,22 @@ public class GeminiStream implements Supplier<short[]> {
                 started[0] = processBufferedData(sampleRate, false);
             }
         });
+        if (!accepted) {
+            acceptedBytes -= data.length;
+            rejectedBytes += data.length;
+        }
         return accepted && started[0];
+    }
+
+    private long acceptedBytes;
+    private long rejectedBytes;
+
+    /** Diagnostics: audio bytes {accepted, rejected by the turn gate} since the last call. */
+    public long[] takeAudioCounters() {
+        long[] counters = {acceptedBytes, rejectedBytes};
+        acceptedBytes = 0;
+        rejectedBytes = 0;
+        return counters;
     }
 
     /**

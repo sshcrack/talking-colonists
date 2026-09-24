@@ -128,6 +128,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
      */
     protected String currentTurnTranscript = "";
+    private long receivedAudioBytes;
+    private long droppedAudioBytes;
 
     private final String logPrefix;
     private final UUID providerToolSessionId = UUID.randomUUID();
@@ -823,6 +825,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     @Override
     public void onTurnComplete() {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
+        if (SpeechTimeline.enabled()) {
+            long[] streamCounters = stream.takeAudioCounters();
+            SpeechTimeline.turn(entity, ConversationManager.kindLabel(entity.getUUID()), receivedAudioBytes,
+                    droppedAudioBytes, streamCounters[0], streamCounters[1], currentTurnTranscript.length(),
+                    suppressProviderOutput);
+            receivedAudioBytes = 0;
+            droppedAudioBytes = 0;
+        }
         if (suppressProviderOutput) return;
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.TURN_COMPLETED);
         utterances.onProviderTurnComplete();
@@ -874,8 +884,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onGeneratedAudio(byte[] data, int sampleRate) {
+        receivedAudioBytes += data.length;
         if (finalGenerationCompleted || suppressProviderOutput) {
             McTalking.LOGGER.debug("{} Dropping audio outside the active provider turn", logPrefix);
+            droppedAudioBytes += data.length;
             return;
         }
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
