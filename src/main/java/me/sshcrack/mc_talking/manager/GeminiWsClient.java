@@ -1,12 +1,12 @@
 package me.sshcrack.mc_talking.manager;
 
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
+import me.sshcrack.mc_talking.internal.tool.ProviderToolCallIds;
 import org.jetbrains.annotations.NotNull;
 import me.sshcrack.mc_talking.internal.session.UtteranceTracker;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import de.maxhenkel.voicechat.api.audiochannel.AudioChannel;
@@ -38,7 +38,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -133,7 +132,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     private final String logPrefix;
     private final UUID providerToolSessionId = UUID.randomUUID();
-    private final ThreadLocal<ArrayDeque<ProviderToolCall>> providerToolCalls = new ThreadLocal<>();
+    private final ProviderToolCallIds providerToolCallIds = new ProviderToolCallIds();
     protected final GeminiStream stream;
     @Nullable
     private volatile String selectedVoiceName;
@@ -998,27 +997,15 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
 
     @Override
     public void onMessage(String message) {
-        ArrayDeque<ProviderToolCall> calls = extractProviderToolCalls(message);
-        if (calls.isEmpty()) {
-            super.onMessage(message);
-            return;
-        }
-
-        ArrayDeque<ProviderToolCall> activeCalls = new ArrayDeque<>(calls);
-        providerToolCalls.set(activeCalls);
-        try {
-            super.onMessage(message);
-        } finally {
-            activeCalls.clear();
-            providerToolCalls.remove();
-        }
+        providerToolCallIds.handle(message, () -> super.onMessage(message));
     }
 
     @Override
     public JsonObject onFunctionCall(String name, @Nullable JsonObject args) {
         // Gemini may batch built-in and addon calls together. Consume every call ID in order so a
         // preceding built-in never shifts the idempotency key used by a later addon command.
-        String providerCallId = pollProviderCallId(name);
+        String providerCallId = providerToolCallIds.poll(name, (expected, received) -> McTalking.LOGGER.warn(
+                "{} Provider tool-call ID/name mismatch: expected {}, received {}", logPrefix, expected, received));
         var colony = this.entity.getCitizenColonyHandler().getColony();
 
         var action = AITools.getAction(name);
@@ -1093,19 +1080,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         return result;
     }
 
-    private String pollProviderCallId(String functionName) {
-        ArrayDeque<ProviderToolCall> calls = providerToolCalls.get();
-        if (calls == null) return "";
-        ProviderToolCall call = calls.pollFirst();
-        if (call == null) return "";
-        if (!call.name().equals(functionName)) {
-            McTalking.LOGGER.warn("{} Provider tool-call ID/name mismatch: expected {}, received {}",
-                    logPrefix, call.name(), functionName);
-            return "";
-        }
-        return call.id();
-    }
-
     private boolean tryDeliverToolOperationOutcome(JsonObject outcome) {
         if (!isSessionReadyForInput()) return false;
         try {
@@ -1119,33 +1093,6 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             McTalking.LOGGER.warn("{} Could not deliver asynchronous tool result to the active session", logPrefix, e);
             return false;
         }
-    }
-
-    private static ArrayDeque<ProviderToolCall> extractProviderToolCalls(String message) {
-        ArrayDeque<ProviderToolCall> calls = new ArrayDeque<>();
-        try {
-            var parsed = JsonParser.parseString(message);
-            if (!parsed.isJsonObject()) return calls;
-            var outer = parsed.getAsJsonObject();
-            if (!outer.has("toolCall") || !outer.get("toolCall").isJsonObject()) return calls;
-            var toolCall = outer.getAsJsonObject("toolCall");
-            if (!toolCall.has("functionCalls") || !toolCall.get("functionCalls").isJsonArray()) return calls;
-            for (var element : toolCall.getAsJsonArray("functionCalls")) {
-                if (!element.isJsonObject()) continue;
-                var function = element.getAsJsonObject();
-                if (!function.has("name") || !function.get("name").isJsonPrimitive()) continue;
-                String id = function.has("id") && function.get("id").isJsonPrimitive()
-                        ? function.get("id").getAsString()
-                        : "";
-                calls.addLast(new ProviderToolCall(function.get("name").getAsString(), id));
-            }
-        } catch (RuntimeException ignored) {
-            // The Gemini library remains authoritative for malformed provider-message handling.
-        }
-        return calls;
-    }
-
-    private record ProviderToolCall(String name, String id) {
     }
 
     @Override
