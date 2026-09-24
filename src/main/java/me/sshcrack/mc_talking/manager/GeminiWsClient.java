@@ -127,6 +127,12 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
      * Accumulates AI-generated text/transcription for the current turn to display in chat.
      */
     protected String currentTurnTranscript = "";
+    /** Audio bytes of the current provider turn, to catch turns that end without any audio. */
+    private long audioBytesThisTurn;
+    private boolean textThisTurn;
+    private boolean silentTurnRetried;
+    static final String SILENT_TURN_RETRY_PROMPT =
+            "(Nobody heard that: you did not speak. Say your reply out loud now, in your own voice.)";
 
     private final String logPrefix;
     private final UUID providerToolSessionId = UUID.randomUUID();
@@ -796,9 +802,10 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
         ensureOutputTurn();
         producedOutputSinceSetup = true;
-        var hasTextEnabled = getEffectiveModality() == ModalityModes.TEXT || getEffectiveModality() == ModalityModes.TEXT_AND_AUDIO;
-        if (!hasTextEnabled)
-            return;
+        textThisTurn = true;
+        // With audio output, the spoken words arrive as output transcription; text parts are the model's
+        // thoughts or an unspoken reply, and must not show up as something the citizen said.
+        if (getEffectiveModality() != ModalityModes.TEXT) return;
 
         currentTurnTranscript += text;
     }
@@ -815,6 +822,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
         ensureOutputTurn();
         producedOutputSinceSetup = true;
+        textThisTurn = true;
         currentTurnTranscript += transcription;
     }
 
@@ -822,6 +830,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     public void onTurnComplete() {
         McTalking.LOGGER.info("{} Gemini turn complete", logPrefix);
         if (suppressProviderOutput) return;
+        if (handleSilentTurn()) return;
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.TURN_COMPLETED);
         utterances.onProviderTurnComplete();
         QuotaTracker.reportSuccess(getModelName());
@@ -855,6 +864,32 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
     }
 
+    /**
+     * The model sometimes ends a turn without any audio (only thoughts or an unspoken reply). Nobody
+     * heard it, so drop its transcript and ask once to say it aloud; the output turn stays open for
+     * that audio. Returns true while the retry is pending.
+     */
+    private boolean handleSilentTurn() {
+        boolean silent = getEffectiveModality() != ModalityModes.TEXT && audioBytesThisTurn == 0
+                && textThisTurn && !turns.isInterrupted() && !shouldEndConversation;
+        audioBytesThisTurn = 0;
+        textThisTurn = false;
+        if (!silent) {
+            silentTurnRetried = false;
+            return false;
+        }
+        currentTurnTranscript = "";
+        if (silentTurnRetried) {
+            McTalking.LOGGER.warn("{} Provider turn ended without audio again; giving up on it", logPrefix);
+            silentTurnRetried = false;
+            return false;
+        }
+        silentTurnRetried = true;
+        McTalking.LOGGER.warn("{} Provider turn ended without audio; asking to say it aloud", logPrefix);
+        addPromptTextImmediate(SILENT_TURN_RETRY_PROMPT);
+        return true;
+    }
+
     /** Called only after the transcript's exact audible turn has drained successfully. */
     protected void onAudibleTranscriptComplete(String transcript) {
         // no-op by default
@@ -878,6 +913,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         }
         microphoneProviderProgress(MicrophoneTurnModule.ProviderProgress.RESPONSE_STARTED);
         producedOutputSinceSetup = true;
+        audioBytesThisTurn += data.length;
         UUID turnId = ensureOutputTurn();
         var isJustStarted = stream.addGeminiPcmWithPitch(turnId, data, sampleRate);
         if (!isJustStarted)
