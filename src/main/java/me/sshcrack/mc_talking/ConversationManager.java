@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking;
 
+import me.sshcrack.mc_talking.internal.session.AddressCooldowns;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
@@ -419,6 +420,13 @@ public class ConversationManager {
 
     private static Runnable removeActivityForPlayerPreemption(UUID citizenId) {
         return activities.preemptForPlayer(citizenId);
+    }
+
+    private static final AddressCooldowns addressCooldowns = new AddressCooldowns(System::currentTimeMillis);
+
+    /** How recently citizens addressed each player unprompted, and sought players out. */
+    public static AddressCooldowns addressCooldowns() {
+        return addressCooldowns;
     }
 
     /** The current foreground session kind of a citizen, for diagnostics. */

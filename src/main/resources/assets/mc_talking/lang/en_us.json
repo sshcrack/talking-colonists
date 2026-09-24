@@ -203,6 +203,10 @@
 
   "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds": "Player Urgent Contact Cooldown (seconds)",
   "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds.desc": "Minimum time between urgent citizen contacts for the same player, preventing multiple citizens from calling out at once. Set to 0 to disable.",
+  "yacl3.config.mc_talking:config.playerAddressCooldownSeconds": "Player Address Cooldown (seconds)",
+  "yacl3.config.mc_talking:config.playerAddressCooldownSeconds.desc": "Minimum time between any two unprompted lines citizens address to you: walking up with a need, casual greetings and pregenerated greetings all share it. Set to 0 to disable.",
+  "yacl3.config.mc_talking:config.citizenUrgentContactCooldownSeconds": "Citizen Contact Cooldown (seconds)",
+  "yacl3.config.mc_talking:config.citizenUrgentContactCooldownSeconds.desc": "Minimum time before the same citizen walks up to a player about a need again. Set to 0 to disable.",
 
   "yacl3.config.mc_talking:config.citizenCooldownSeconds": "Citizen Cooldown (seconds)",
   "yacl3.config.mc_talking:config.citizenCooldownSeconds.desc": "Cooldown after an automatic session ends before that citizen can be auto-selected again (mumbling, urgent contact, or citizen-to-citizen). Set to 0 to disable.",

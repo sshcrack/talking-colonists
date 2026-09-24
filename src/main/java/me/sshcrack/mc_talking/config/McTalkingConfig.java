@@ -273,6 +273,16 @@ public class McTalkingConfig {
     public int playerUrgentContactCooldownSeconds = 60;
 
     @AutoGen(category = "citizens", group = "citizen_contact")
+    @IntField(min = 0, max = 10000)
+    @SerialEntry(comment = "Minimum seconds between any two unprompted lines citizens address to the same player: walking up with a need, casual and pregenerated greetings. Set to 0 to disable.")
+    public int playerAddressCooldownSeconds = 150;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
+    @IntField(min = 0, max = 100000)
+    @SerialEntry(comment = "Minimum seconds before the same citizen walks up to a player about a need again. Set to 0 to disable.")
+    public int citizenUrgentContactCooldownSeconds = 600;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Base weight for casual greetings (0.0-1.0). Even content citizens get this small chance to wave/say hello per check interval. Multiplied by citizenContactBaseChance.")
     public double citizenCasualGreetingWeight = 0.1;
