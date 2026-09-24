@@ -183,6 +183,16 @@ public class McTalkingConfig {
     public int maxConcurrentBackground = 1;
 
     @AutoGen(category = "general", group = "interaction")
+    @TickBox
+    @SerialEntry(comment = "If true, a player in a conversation can type to the citizen: chat lines starting with chatToCitizenPrefix (or every line, after /citizen_chat on) go to the citizen instead of server chat.")
+    public boolean enableChatToCitizen = true;
+
+    @AutoGen(category = "general", group = "interaction")
+    @StringField
+    @SerialEntry(comment = "Chat lines starting with this go to the citizen you are talking to. Leave empty to only use /citizen_chat on.")
+    public String chatToCitizenPrefix = "@";
+
+    @AutoGen(category = "general", group = "interaction")
     @DoubleField(min = 1.0, max = 100.0)
     @SerialEntry(comment = "Maximum distance the player can be from a citizen before the conversation is ended")
     public double maxConversationDistance = 8.0;
