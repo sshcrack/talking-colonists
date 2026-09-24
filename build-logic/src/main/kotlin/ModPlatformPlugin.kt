@@ -169,9 +169,32 @@ abstract class ModPlatformPlugin @Inject constructor() : Plugin<Project> {
 				archiveBaseName.set(ctx.modId)
 				dependsOn(generateTask)
 			}
-			if (ctx.loader is Loader.Forge && name == ctx.extension.jarTask.get()) {
+			// Forge 1.20.1 only loads mixin configs named in the jar manifest (mods.toml [[mixins]] is
+			// NeoForge-only). reobfJar rewrites the plain jar, so the attribute must be on both.
+			if (ctx.loader is Loader.Forge && (name == "jar" || name == ctx.extension.jarTask.get())) {
 				manifest.attributes(ctx.loader.mixinConfigAttribute to "${ctx.modId}.mixins.json")
 			}
+		}
+		if (ctx.loader is Loader.Forge) {
+			// Dev runs pass the mixin config as a run argument, so a missing manifest entry only
+			// shows up in production. Fail the build instead.
+			val releaseJar = tasks.named<Jar>(ctx.extension.jarTask.get()).flatMap { it.archiveFile }
+			val attribute = ctx.loader.mixinConfigAttribute
+			val expected = "${ctx.modId}.mixins.json"
+			val verify = tasks.register("verifyMixinManifest") {
+				group = "verification"
+				description = "Checks that the release jar's manifest names the mixin config (Forge loads it only from there)."
+				inputs.file(releaseJar)
+				doLast {
+					val file = releaseJar.get().asFile
+					val actual = java.util.jar.JarFile(file).use { it.manifest?.mainAttributes?.getValue(attribute) }
+					if (actual != expected) {
+						throw org.gradle.api.GradleException("${file.name}: manifest $attribute is '$actual', expected '$expected'; Forge would load no mixins")
+					}
+				}
+			}
+			tasks.named("check") { dependsOn(verify) }
+			tasks.matching { it.name == "buildAndCollect" }.configureEach { dependsOn(verify) }
 		}
 	}
 
