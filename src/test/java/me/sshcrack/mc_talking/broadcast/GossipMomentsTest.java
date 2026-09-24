@@ -2,7 +2,6 @@ package me.sshcrack.mc_talking.broadcast;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStreamReader;
@@ -12,9 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GossipMomentsTest {
+    // Only the Kind enum: loading GossipMoments itself pulls in Minecraft classes, which Forge's
+    // signed jars refuse in plain unit tests.
     private static String key(GossipMoments.Kind kind, String source) {
-        var contents = (TranslatableContents) GossipMoments.subtitle(kind, "Kayla", "Mila", source).getContents();
-        return contents.getKey();
+        return kind.subtitleKey(source);
     }
 
     @Test

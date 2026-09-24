@@ -26,7 +26,15 @@ import java.util.concurrent.TimeUnit;
  * Mila"). Rumor content stays hidden, so the player has a reason to go and ask. Server thread only.
  */
 public final class GossipMoments {
-    public enum Kind { RUMOR, BROADCAST }
+    public enum Kind {
+        RUMOR, BROADCAST;
+
+        /** The subtitle's translation key; rumors never say what was whispered. */
+        String subtitleKey(@Nullable String source) {
+            if (this == RUMOR) return "mc_talking.gossip.rumor";
+            return source == null || source.isBlank() ? "mc_talking.gossip.news" : "mc_talking.gossip.news_from";
+        }
+    }
 
     static final int DURATION_TICKS = 60;
     static final int MAX_ACTIVE = 2;
@@ -99,10 +107,10 @@ public final class GossipMoments {
         return true;
     }
 
-    static MutableComponent subtitle(Kind kind, String teller, String listener, @Nullable String source) {
-        if (kind == Kind.RUMOR) return Component.translatable("mc_talking.gossip.rumor", teller, listener);
-        if (source == null || source.isBlank()) return Component.translatable("mc_talking.gossip.news", teller, listener);
-        return Component.translatable("mc_talking.gossip.news_from", teller, listener, source);
+    private static MutableComponent subtitle(Kind kind, String teller, String listener, @Nullable String source) {
+        String key = kind.subtitleKey(source);
+        if (key.equals("mc_talking.gossip.news_from")) return Component.translatable(key, teller, listener, source);
+        return Component.translatable(key, teller, listener);
     }
 
     public static void tick() {
