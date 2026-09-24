@@ -9,11 +9,11 @@ import me.sshcrack.mc_talking.api.prompt.view.ObservedValue;
 import org.jetbrains.annotations.Nullable;
 
 /** Pure classification of builder truth from one citizen-local snapshot. */
-final class BuilderActivityClassifier {
+public final class BuilderActivityClassifier {
     private BuilderActivityClassifier() {
     }
 
-    static BuilderActivityStatus classify(
+    public static BuilderActivityStatus classify(
             boolean builder,
             boolean asleep,
             JobStatus jobStatus,
