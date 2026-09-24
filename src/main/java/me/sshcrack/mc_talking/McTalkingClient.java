@@ -37,6 +37,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
+import me.sshcrack.mc_talking.internal.audio.VoiceDucking;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Client-side mod class for McTalking.
@@ -110,7 +112,7 @@ public class McTalkingClient {
     public static UUID getConversationPartner(UUID citizen) { return partners.get(citizen); }
 
     /** The citizen the local player is talking to right now, or null. Safe off the render thread. */
-    public static @org.jetbrains.annotations.Nullable UUID localConversationPartner() {
+    public static @Nullable UUID localConversationPartner() {
         var player = Minecraft.getInstance().player;
         if (player == null) return null;
         UUID self = player.getUUID();
