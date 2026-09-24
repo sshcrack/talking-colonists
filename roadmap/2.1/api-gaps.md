@@ -96,6 +96,21 @@ says…" rather than attributing it to a player. Bound message length and per-co
   save/load; the AI tool path routes through the same runtime.
 - A broadcast published with `COLONY_IMMEDIATE` appears in every citizen's next prompt snapshot.
 
+### Implementation record — 2026-09-24
+
+- API (additive, `ApiFeature.BROADCAST_PUBLISHING` now supported): `CitizenMemoryService.publishBroadcast(IColony,
+  BroadcastRequest)` → `BroadcastPublishResult` and `retractBroadcast(IColony, id)`, backed by default methods on
+  `MemoryService`. New `BroadcastRequest` (factories `immediate` / `fromCitizen` / `fromPosition`, `withExpiry`,
+  `withAnnounceAloud`), `BroadcastSource` (`player` / `addon` / `block`), `BroadcastScope`.
+  `CitizenBroadcastMemoryView` gained `provenance`, `sourceLabel`, `expiresAtMs`; the 2.0 constructor is kept.
+  `checkApiCompatibility` reports only additions.
+- Runtime: `broadcast/BroadcastPublisher` is the single path for the API and the `initiate_broadcast` tool
+  (validation, 10 per 10 minutes per colony, provenance). `ColonyBroadcast` persists provenance, source label,
+  expiry and the announce flag; old saves load as player broadcasts. Propagation purges expired broadcasts
+  and only announces broadcasts that allow it; prompts say "<source> announced: ..." for non-player sources.
+- Tests: `BroadcastPublisherTest` covers both scopes, retraction, expiry, rate limits, provenance,
+  save/load plus legacy NBT, request validation, and prompt inclusion after `COLONY_IMMEDIATE`.
+
 ---
 
 ## A2 — Colony event feed

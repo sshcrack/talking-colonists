@@ -656,6 +656,46 @@ writes and do not establish addon-confirmed provenance. Use `confirmOutcome` whe
 asserting that a concrete gameplay outcome happened. Memory storage, compaction, session tokens,
 broadcast/rumor propagation and save coordination remain core responsibilities.
 
+### Publishing colony broadcasts (API 2.1, `ApiFeature.BROADCAST_PUBLISHING`)
+
+Addons can publish the same colony broadcasts a player creates by asking a citizen to spread the
+word (the `initiate_broadcast` AI tool). Both paths share one runtime, so length limits, the
+per-colony rate limit, propagation, and announcing aloud behave the same way.
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.BROADCAST_PUBLISHING)) {
+    var source = BroadcastSource.block(noticeBoardPos, "the notice board");
+    var result = CitizenMemoryService.publishBroadcast(colony,
+            BroadcastRequest.fromPosition(source, "Harvest festival at the town hall tonight!", noticeBoardPos)
+                    .withExpiry(Duration.ofHours(2)));
+    if (result.isPublished()) storeForLater(result.broadcastId());
+}
+// Later, e.g. when the notice is taken down:
+CitizenMemoryService.retractBroadcast(colony, broadcastId);
+```
+
+- **Scope:** `BroadcastRequest.immediate(...)` (`COLONY_IMMEDIATE`) gives the broadcast to every
+  citizen now. `fromCitizen(...)` / `fromPosition(...)` (`PROPAGATE_FROM`) give it to one citizen,
+  or to the loaded citizens within `broadcastPropagationRange` of a position. It then spreads through
+  normal citizen-to-citizen propagation.
+- **Source and provenance:** `BroadcastSource.player/addon/block`. Citizens attribute addon and
+  block broadcasts to the source's display name ("the notice board announced: ..."), recorded as
+  `MemoryProvenance.ADDON_DIRECT_WRITE`. Player broadcasts keep the "X sent word via Y" wording and
+  `PLAYER_STATEMENT`. `CitizenBroadcastMemoryView` exposes `provenance()`, `sourceLabel()` and
+  `expiresAtMs()`.
+- **Expiry and voicing:** `withExpiry(duration)` makes citizens forget it; expired broadcasts leave
+  prompts and stop spreading. `withAnnounceAloud(false)` keeps it out of the spoken announcements
+  that carriers make near players (server config `enableBroadcastYelling` still applies).
+- **Limits:** messages are at most `BroadcastRequest.MAX_MESSAGE_LENGTH` (500) characters; invalid
+  requests throw `IllegalArgumentException`. Each colony can publish 10 broadcasts per 10 minutes
+  (shared with the AI tool). Beyond that, the result is `RATE_LIMITED`. Other results:
+  `DISABLED` (server turned broadcasts off), `NO_RECIPIENTS` (unknown origin citizen or nobody near
+  the position), `UNAVAILABLE` (colony not loaded on a server).
+- **Retraction:** `retractBroadcast` makes every citizen of the colony forget it and returns
+  whether anyone still remembered it.
+
+Calls are marshalled to the server thread like the other memory operations.
+
 ## Autonomous citizen conversations
 
 For a regular two-citizen conversation:

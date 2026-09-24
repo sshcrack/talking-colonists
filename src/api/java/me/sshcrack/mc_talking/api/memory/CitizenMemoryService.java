@@ -1,7 +1,9 @@
 package me.sshcrack.mc_talking.api.memory;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.api.ApiFeature;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import org.jetbrains.annotations.NotNull;
 
@@ -107,5 +109,28 @@ public final class CitizenMemoryService {
 
     public static @NotNull Optional<CitizenMemorySnapshot> snapshot(@NotNull ICitizenData citizen) {
         return TalkingColonistsApi.services().memory().snapshot(citizen);
+    }
+
+    /**
+     * Publishes a colony broadcast, the same kind the {@code initiate_broadcast} AI tool creates.
+     * Citizens remember it with the request's source, include it in their prompts, spread it to each
+     * other and, if allowed, announce it aloud near players. Publishing is rate limited per colony.
+     *
+     * <p>Requires {@link ApiFeature#BROADCAST_PUBLISHING}; check
+     * {@link TalkingColonistsApi#supports(ApiFeature)} first when running on older 2.x runtimes.</p>
+     */
+    public static @NotNull BroadcastPublishResult publishBroadcast(@NotNull IColony colony,
+                                                                   @NotNull BroadcastRequest request) {
+        TalkingColonistsApi.requireSupported(ApiFeature.BROADCAST_PUBLISHING);
+        return TalkingColonistsApi.services().memory().publishBroadcast(colony, request);
+    }
+
+    /**
+     * Makes every citizen of {@code colony} forget a published broadcast so it stops spreading.
+     * Returns whether any citizen still remembered it. Requires {@link ApiFeature#BROADCAST_PUBLISHING}.
+     */
+    public static boolean retractBroadcast(@NotNull IColony colony, @NotNull String broadcastId) {
+        TalkingColonistsApi.requireSupported(ApiFeature.BROADCAST_PUBLISHING);
+        return TalkingColonistsApi.services().memory().retractBroadcast(colony, broadcastId);
     }
 }

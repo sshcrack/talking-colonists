@@ -15,9 +15,12 @@ public final class MemorySnapshotFactory {
         var relationships = memories.getRelationships().stream()
                 .map(r -> new CitizenRelationshipView(r.getTargetUUID(), r.getType(), r.getFactor()))
                 .toList();
+        long now = System.currentTimeMillis();
         var broadcasts = memories.getReceivedBroadcasts().stream()
+                .filter(b -> !b.isExpired(now))
                 .map(b -> new CitizenBroadcastMemoryView(
-                        b.getId(), b.getOriginatorName(), b.getMessage(), b.getCreatedAtMs(), b.getSenderPlayerName()))
+                        b.getId(), b.getOriginatorName(), b.getMessage(), b.getCreatedAtMs(), b.getSenderPlayerName(),
+                        b.getProvenance(), b.getSourceLabel(), b.getExpiresAtMs()))
                 .toList();
         var rumors = memories.getReceivedRumors().stream()
                 .map(r -> new CitizenRumorMemoryView(r.getId(), r.getOriginatorName(), r.getContent()))

@@ -95,7 +95,7 @@ A11 unless they want a published API artifact):
 | 3 | A11, L1 | A11 first | A11 is the 2.1 release gate. L1 is exploratory and can slip. |
 | — | Q11 (#116 refactor) | Opportunistic | Never a blocker. Split `ConversationManager` only inside tasks that already touch it. |
 
-Each wave is a GitHub [milestone](https://github.com/sshcrack/talking-colonists/milestones) (`2.1 · Wave 0` … `2.1 · Wave 3`), and the addon ideas are in the `Community addons` milestone. Q11 and #131 have no milestone.
+Each wave is a GitHub [milestone](https://github.com/sshcrack/talking-colonists/milestones) (`2.1 · Wave 0` … `2.1 · Wave 3`), and the addon ideas are in the `Community addons` milestone. Q11 (#116) is in Wave 2 and #131 (local AI, blocked by L1) in Wave 3; the Track A/Q trackers sit in the wave that completes them, and the Track X tracker in `Community addons`.
 
 Priority for a maintainer with little time: **Q1, Q2, Q3, Q4 → A0, A1, A3 → A2, A6**. That fixes the
 most common complaints and unblocks the three most requested addons (notice board, gazette,

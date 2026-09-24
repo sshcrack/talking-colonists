@@ -1,12 +1,18 @@
 package me.sshcrack.mc_talking.internal.api;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import me.sshcrack.mc_talking.api.memory.AddonConfirmedOutcome;
 import me.sshcrack.mc_talking.api.memory.AddonMemoryWriteResult;
+import me.sshcrack.mc_talking.api.memory.BroadcastPublishResult;
+import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import me.sshcrack.mc_talking.api.service.MemoryService;
+import me.sshcrack.mc_talking.broadcast.BroadcastPublisher;
+import me.sshcrack.mc_talking.broadcast.MineColoniesBroadcastColony;
+import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.MemorySnapshotFactory;
 import me.sshcrack.mc_talking.conversations.memory.data.CitizenMemories;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
@@ -94,11 +100,37 @@ final class MemoryServiceBackend implements MemoryService {
         });
     }
 
+    @Override
+    public @NotNull BroadcastPublishResult publishBroadcast(@NotNull IColony colony, @NotNull BroadcastRequest request) {
+        java.util.Objects.requireNonNull(colony, "colony");
+        java.util.Objects.requireNonNull(request, "request");
+        return onColonyServerThread(colony, BroadcastPublishResult.failed(BroadcastPublishResult.Status.UNAVAILABLE),
+                () -> {
+                    var config = McTalkingConfig.INSTANCE.instance();
+                    return BroadcastPublisher.INSTANCE.publish(
+                            new MineColoniesBroadcastColony(colony, config.broadcastPropagationRange),
+                            request,
+                            new BroadcastPublisher.Settings(config.enableBroadcastPropagation, config.maxBroadcastsStored));
+                });
+    }
+
+    @Override
+    public boolean retractBroadcast(@NotNull IColony colony, @NotNull String broadcastId) {
+        java.util.Objects.requireNonNull(colony, "colony");
+        java.util.Objects.requireNonNull(broadcastId, "broadcastId");
+        return onColonyServerThread(colony, false, () -> BroadcastPublisher.INSTANCE.retract(
+                new MineColoniesBroadcastColony(colony, McTalkingConfig.INSTANCE.instance().broadcastPropagationRange),
+                broadcastId));
+    }
+
     private static <T> T onCitizenServerThread(@NotNull ICitizenData citizen, T unavailable,
                                                 @NotNull Supplier<T> operation) {
         java.util.Objects.requireNonNull(citizen, "citizen");
+        return onColonyServerThread(citizen.getColony(), unavailable, operation);
+    }
+
+    private static <T> T onColonyServerThread(IColony colony, T unavailable, @NotNull Supplier<T> operation) {
         java.util.Objects.requireNonNull(operation, "operation");
-        var colony = citizen.getColony();
         var level = colony == null ? null : colony.getWorld();
         MinecraftServer server = level == null ? null : level.getServer();
         if (server == null) return unavailable;

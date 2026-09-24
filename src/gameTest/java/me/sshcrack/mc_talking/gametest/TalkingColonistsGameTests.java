@@ -8,6 +8,10 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.context.CitizenContextService;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
+import me.sshcrack.mc_talking.api.memory.BroadcastSource;
+import me.sshcrack.mc_talking.api.memory.CitizenMemoryService;
+import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -103,6 +107,37 @@ public final class TalkingColonistsGameTests {
                     helper.assertTrue(asleep.status() == ConversationEligibility.Status.SLEEPING,
                             "sleeping citizen must be rejected as SLEEPING for " + kind + ", was " + asleep);
                 }
+            }
+        });
+        helper.succeed();
+    }
+
+    /** A1: an immediate broadcast reaches every real citizen's memory snapshot, and retraction removes it. */
+    @GameTest(template = FLOOR, batch = "mc_talking_broadcast_publish", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void publishedBroadcastReachesEveryCitizen(GameTestHelper helper) {
+        logFailures("publishedBroadcastReachesEveryCitizen", () -> {
+            try (var fixture = ColonyTestHarness.create(helper)) {
+                var first = fixture.spawnCitizen(new BlockPos(2, 1, 2));
+                var second = fixture.spawnCitizen(new BlockPos(6, 1, 6));
+
+                var result = CitizenMemoryService.publishBroadcast(fixture.colony(), BroadcastRequest.immediate(
+                        BroadcastSource.addon("mc_talking_test", "the notice board"), "Harvest festival tonight"));
+                helper.assertTrue(result.isPublished() && result.recipients() == 2, "expected 2 recipients, was " + result);
+
+                for (var citizen : java.util.List.of(first, second)) {
+                    var broadcasts = CitizenMemoryService.snapshot(citizen).orElseThrow().broadcasts();
+                    helper.assertTrue(broadcasts.size() == 1, "citizen should remember 1 broadcast, had " + broadcasts);
+                    var view = broadcasts.get(0);
+                    helper.assertTrue(view.id().equals(result.broadcastId())
+                                    && "the notice board".equals(view.sourceLabel())
+                                    && view.provenance() == MemoryProvenance.ADDON_DIRECT_WRITE,
+                            "unexpected broadcast view " + view);
+                }
+
+                helper.assertTrue(CitizenMemoryService.retractBroadcast(fixture.colony(), result.broadcastId()),
+                        "retraction should report the broadcast was remembered");
+                helper.assertTrue(CitizenMemoryService.snapshot(first).orElseThrow().broadcasts().isEmpty(),
+                        "retracted broadcast should be forgotten");
             }
         });
         helper.succeed();

@@ -6,9 +6,11 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.gson.properties.ObjectProperty;
 import me.sshcrack.gemini_live_lib.gson.properties.PrimitiveProperty;
 import me.sshcrack.mc_talking.ConversationManager;
-import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
+import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
+import me.sshcrack.mc_talking.api.memory.BroadcastSource;
+import me.sshcrack.mc_talking.broadcast.BroadcastPublisher;
+import me.sshcrack.mc_talking.broadcast.MineColoniesBroadcastColony;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
-import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,11 +41,8 @@ public class InitiateBroadcastAction extends PlayerFunctionAction {
         }
 
         String message = parameters.get("message").getAsString();
-        String originatorName = citizen.getCitizenData() != null ? citizen.getCitizenData().getName() : "Unknown";
-        String broadcastId = UUID.randomUUID().toString();
-
+        UUID playerUUID = ConversationManager.getPlayerForEntity(citizen.getUUID());
         String senderPlayerName = "Unknown Player";
-        var playerUUID = ConversationManager.getPlayerForEntity(citizen.getUUID());
         if (playerUUID != null) {
             var server = citizen.level().getServer();
             if (server != null) {
@@ -54,10 +53,30 @@ public class InitiateBroadcastAction extends PlayerFunctionAction {
             }
         }
 
-        ColonyBroadcast broadcast = new ColonyBroadcast(broadcastId, originatorName, message, System.currentTimeMillis(), senderPlayerName);
+        BroadcastRequest request;
+        try {
+            request = BroadcastRequest.fromCitizen(BroadcastSource.player(playerUUID, senderPlayerName), message, citizen.getUUID());
+        } catch (IllegalArgumentException e) {
+            obj.addProperty("success", false);
+            obj.addProperty("error", "Invalid message: " + e.getMessage());
+            return obj;
+        }
 
-        var memory = ((CitizenDataMemoryExtended) citizen.getCitizenData()).mc_talking$getOrInitializeMemory();
-        memory.addBroadcast(broadcast);
+        var config = McTalkingConfig.INSTANCE.instance();
+        var result = BroadcastPublisher.INSTANCE.publish(
+                new MineColoniesBroadcastColony(colony, config.broadcastPropagationRange),
+                request,
+                new BroadcastPublisher.Settings(config.enableBroadcastPropagation, config.maxBroadcastsStored));
+        if (!result.isPublished()) {
+            obj.addProperty("success", false);
+            obj.addProperty("error", switch (result.status()) {
+                case RATE_LIMITED -> "Too many colony announcements recently. Tell the player to try again later.";
+                case DISABLED -> "Colony announcements are disabled on this server.";
+                default -> "The announcement could not be recorded.";
+            });
+            return obj;
+        }
+        String broadcastId = result.broadcastId();
 
         obj.addProperty("success", true);
         obj.addProperty("broadcast_id", broadcastId);
