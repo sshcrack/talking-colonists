@@ -134,11 +134,44 @@ if [ "$METADATA_ONLY_ASSETS" = "1" ]; then
 fi
 echo
 
+# Forge/NeoForge open an "early loading" GL window before mods load. On software-rendered
+# Xvfb (CI) that window sometimes fails to get a GL context and the client hangs until the
+# timeout, before any Talking Colonists code runs. Disable it for headless/CI launches only.
+# Override with CLIENT_SMOKE_DISABLE_EARLY_WINDOW=0/1.
+DISABLE_EARLY_WINDOW="${CLIENT_SMOKE_DISABLE_EARLY_WINDOW:-}"
+if [ -z "$DISABLE_EARLY_WINDOW" ]; then
+    if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${#DISPLAY_PREFIX[@]}" -gt 0 ]; then
+        DISABLE_EARLY_WINDOW=1
+    else
+        DISABLE_EARLY_WINDOW=0
+    fi
+fi
+
+disable_early_window() {
+    local fml="$ROOT_DIR/versions/$1/run/config/fml.toml"
+    mkdir -p "$(dirname "$fml")"
+    touch "$fml"
+    python3 - "$fml" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+if re.search(r"^earlyWindowControl\s*=", text, re.M):
+    text = re.sub(r"^earlyWindowControl\s*=.*$", "earlyWindowControl = false", text, flags=re.M)
+else:
+    text = text.rstrip("\n") + ("\n" if text.strip() else "") + "earlyWindowControl = false\n"
+open(path, "w").write(text)
+PY
+}
+
 for VERSION in $VERSIONS; do
     LOG_FILE=$(mktemp "/tmp/client-smoke-${VERSION}-XXXXXX.log")
     MC_LOG="$ROOT_DIR/versions/$VERSION/run/logs/latest.log"
     rm -f "$MC_LOG"
     rm -rf "$ROOT_DIR/versions/$VERSION/run/saves/MC_Talking_Smoke"
+
+    if [ "$DISABLE_EARLY_WINDOW" = "1" ]; then
+        disable_early_window "$VERSION"
+    fi
 
     EXTRA_GRADLE_ARGS=()
     if [ "$METADATA_ONLY_ASSETS" = "1" ]; then
