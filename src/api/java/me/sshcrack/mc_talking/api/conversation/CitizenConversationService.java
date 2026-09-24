@@ -147,6 +147,12 @@ public final class CitizenConversationService {
      * tools are available in each explicitly requested turn; core tools keep their normal policy.
      * Turn completion is delivered on the Minecraft server thread after audible playback terminates.
      * </p>
+     *
+     * <p>Since API 2.1 ({@link me.sshcrack.mc_talking.api.ApiFeature#CROSS_COLONY_SESSIONS}) attendees
+     * may belong to different colonies. Each speaker keeps its own colony's prompt, tools and
+     * permissions, and is told which other colonies attend and how its colony relates to them.
+     * Attendees in different dimensions are rejected with a {@link ControlledSessionRejectedException}.
+     * </p>
      */
     public static @NotNull ControlledConversationSession createControlledSession(
             @NotNull MinecraftServer server,

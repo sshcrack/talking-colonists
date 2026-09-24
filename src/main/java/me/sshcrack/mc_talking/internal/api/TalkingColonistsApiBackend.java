@@ -28,7 +28,8 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
      * today: no Track A task has landed yet.
      */
     private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
-            ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS);
+            ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
+            ApiFeature.CROSS_COLONY_SESSIONS);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();

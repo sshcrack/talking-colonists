@@ -5,6 +5,7 @@ import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionHandle;
 import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionPolicy;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
+import me.sshcrack.mc_talking.api.conversation.ControlledSessionRejectedException;
 import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
 import org.junit.jupiter.api.Test;
@@ -441,6 +442,74 @@ class ControlledConversationRuntimeTest {
         assertEquals(AutonomousDiscussionHandle.CompletionReason.TURN_LIMIT, discussion.completion().join());
     }
 
+    private static final ControlledConversationRuntime.ColonyRef RIVERSIDE =
+            new ControlledConversationRuntime.ColonyRef(1, "Riverside");
+    private static final ControlledConversationRuntime.ColonyRef HILLTOP =
+            new ControlledConversationRuntime.ColonyRef(2, "Hilltop");
+
+    @Test
+    void mixedColonyTurnsNameTheOtherColonyAndRelationPerSpeaker() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant ada = hooks.add("Ada", RIVERSIDE, "overworld");
+        FakeParticipant cora = hooks.add("Cora", RIVERSIDE, "overworld");
+        FakeParticipant borin = hooks.add("Borin", HILLTOP, "overworld");
+        hooks.relations.put("1->2", "ALLIES");
+        hooks.relations.put("2->1", "NEUTRAL");
+        var runtime = new ControlledConversationRuntime<>(List.of(ada, cora, borin), "Trade",
+                ControlledConversationOptions.noAddonTools(), hooks);
+
+        runtime.requestTurn(ada, "Open", null);
+        assertEquals("Ada", hooks.startedSpeakers.get(0), "the turn runs in the speaker's own session");
+        assertTrue(hooks.lastPrompt.contains("- Hilltop (your colony's relation: ALLIES): Borin"), hooks.lastPrompt);
+        assertTrue(hooks.lastPrompt.contains("You belong to Riverside"), hooks.lastPrompt);
+        assertFalse(hooks.lastPrompt.contains("Cora"), "own-colony attendees are not listed as foreign");
+        hooks.completeAudibly(AmbientLineResult.completed("Welcome."));
+
+        runtime.requestTurn(borin, "Reply", null);
+        assertEquals("Borin", hooks.startedSpeakers.get(1));
+        assertTrue(hooks.lastPrompt.contains("- Riverside (your colony's relation: NEUTRAL): Ada, Cora"), hooks.lastPrompt);
+        assertTrue(hooks.lastPrompt.contains("You belong to Hilltop"), hooks.lastPrompt);
+        assertTrue(hooks.lastPrompt.contains("Your tools and permissions only apply to your own colony."));
+        hooks.completeAudibly(AmbientLineResult.completed("Thank you."));
+    }
+
+    @Test
+    void singleColonySessionsGetNoCrossColonySection() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant ada = hooks.add("Ada", RIVERSIDE, "overworld");
+        FakeParticipant cora = hooks.add("Cora", RIVERSIDE, "overworld");
+        var runtime = new ControlledConversationRuntime<>(List.of(ada, cora), "Food",
+                ControlledConversationOptions.noAddonTools(), hooks);
+
+        runtime.requestTurn(ada, "Open", null);
+        assertFalse(hooks.lastPrompt.contains("other colonies"), hooks.lastPrompt);
+    }
+
+    @Test
+    void unknownRelationIsSaidToBeUnknown() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant ada = hooks.add("Ada", RIVERSIDE, "overworld");
+        FakeParticipant borin = hooks.add("Borin", HILLTOP, "overworld");
+        var runtime = new ControlledConversationRuntime<>(List.of(ada, borin), "Trade",
+                ControlledConversationOptions.noAddonTools(), hooks);
+
+        runtime.requestTurn(ada, "Open", null);
+        assertTrue(hooks.lastPrompt.contains("- Hilltop (your colony's relation: unknown): Borin"), hooks.lastPrompt);
+    }
+
+    @Test
+    void crossDimensionAttendeesAreRejectedWithATypedFailure() {
+        FakeHooks hooks = new FakeHooks();
+        FakeParticipant ada = hooks.add("Ada", RIVERSIDE, "overworld");
+        FakeParticipant borin = hooks.add("Borin", HILLTOP, "the_nether");
+
+        var rejected = assertThrows(ControlledSessionRejectedException.class, () ->
+                new ControlledConversationRuntime<>(List.of(ada, borin), "Trade",
+                        ControlledConversationOptions.noAddonTools(), hooks));
+        assertEquals(ControlledSessionRejectedException.Reason.CROSS_DIMENSION, rejected.reason());
+        assertInstanceOf(IllegalArgumentException.class, rejected, "old IllegalArgumentException handlers still work");
+    }
+
     private static ControlledConversationRuntime<FakeParticipant, FakeAnchor> runtime(
             FakeHooks hooks, FakeParticipant participant) {
         return new ControlledConversationRuntime<>(List.of(participant), "Agenda",
@@ -472,6 +541,29 @@ class ControlledConversationRuntimeTest {
         private UUID lastCancelledSessionId;
         private UUID lastCancelledTurnId;
         private long monotonicNanos;
+        private final Map<UUID, ControlledConversationRuntime.ColonyRef> colonies = new HashMap<>();
+        private final Map<UUID, Object> dimensions = new HashMap<>();
+        private final Map<String, String> relations = new HashMap<>();
+
+        FakeParticipant add(String name, ControlledConversationRuntime.ColonyRef colony, Object dimension) {
+            FakeParticipant participant = add(name);
+            colonies.put(participant.id(), colony);
+            dimensions.put(participant.id(), dimension);
+            return participant;
+        }
+
+        @Override
+        public ControlledConversationRuntime.ColonyRef colony(FakeParticipant participant) {
+            return colonies.get(participant.id());
+        }
+
+        @Override
+        public Object dimension(FakeParticipant participant) { return dimensions.get(participant.id()); }
+
+        @Override
+        public String relation(FakeParticipant speaker, ControlledConversationRuntime.ColonyRef other) {
+            return relations.get(colonies.get(speaker.id()).id() + "->" + other.id());
+        }
 
         FakeParticipant add(String name) {
             FakeParticipant participant = new FakeParticipant(UUID.randomUUID(), name);
