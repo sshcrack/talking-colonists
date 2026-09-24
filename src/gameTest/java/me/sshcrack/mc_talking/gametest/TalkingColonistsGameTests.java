@@ -38,12 +38,17 @@ import java.util.Objects;
 public final class TalkingColonistsGameTests {
     /** 9x4x9 stone floor; test-only resource in {@code src/gameTest/resources}. */
     private static final String FLOOR = "empty_floor";
+    /**
+     * The runner force-loads the test chunks, but the tickets apply a tick later. Until then a new
+     * entity is not in the level's entity lookup and MineColonies discards the citizen on registration.
+     */
+    private static final long SETUP_TICKS = 20;
 
     private TalkingColonistsGameTests() {
     }
 
     /** The public prompt snapshot reflects real MineColonies housing and job assignments. */
-    @GameTest(template = FLOOR, batch = "mc_talking_prompt_view", timeoutTicks = 100)
+    @GameTest(template = FLOOR, batch = "mc_talking_prompt_view", setupTicks = SETUP_TICKS, timeoutTicks = 100)
     public static void promptViewReflectsHousingAndJob(GameTestHelper helper) {
         logFailures("promptViewReflectsHousingAndJob", () -> {
             try (var fixture = ColonyTestHarness.create(helper)) {
@@ -80,7 +85,7 @@ public final class TalkingColonistsGameTests {
     }
 
     /** Conversation eligibility rejects a citizen MineColonies has put to sleep in a bed. */
-    @GameTest(template = FLOOR, batch = "mc_talking_eligibility_sleep", timeoutTicks = 100)
+    @GameTest(template = FLOOR, batch = "mc_talking_eligibility_sleep", setupTicks = SETUP_TICKS, timeoutTicks = 100)
     public static void eligibilityRejectsSleepingCitizen(GameTestHelper helper) {
         logFailures("eligibilityRejectsSleepingCitizen", () -> {
             try (var fixture = ColonyTestHarness.create(helper)) {
