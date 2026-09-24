@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.internal.api;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
@@ -444,6 +445,32 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
 
             @Override
             public long gameTime(@NotNull AbstractEntityCitizen participant) { return participant.level().getGameTime(); }
+
+            @Override
+            public @Nullable ControlledConversationRuntime.ColonyRef colony(@NotNull AbstractEntityCitizen participant) {
+                var data = participant.getCitizenData();
+                IColony colony = data == null ? null : data.getColony();
+                return colony == null ? null : new ControlledConversationRuntime.ColonyRef(colony.getID(), colony.getName());
+            }
+
+            @Override
+            public @NotNull Object dimension(@NotNull AbstractEntityCitizen participant) {
+                return participant.level().dimension();
+            }
+
+            @Override
+            public @Nullable String relation(@NotNull AbstractEntityCitizen speaker,
+                                             @NotNull ControlledConversationRuntime.ColonyRef other) {
+                var data = speaker.getCitizenData();
+                IColony colony = data == null ? null : data.getColony();
+                if (colony == null || colony.getConnectionManager() == null) return null;
+                try {
+                    var status = colony.getConnectionManager().getColonyDiplomacyStatus(other.id());
+                    return status == null ? null : status.name();
+                } catch (RuntimeException e) {
+                    return null;
+                }
+            }
 
             @Override
             public @NotNull ControlledConversationRuntime.Availability availability(

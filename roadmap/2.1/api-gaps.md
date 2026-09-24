@@ -324,6 +324,23 @@ dimensions with a typed failure.
 - Tests: mixed-colony session runs turns with correct per-speaker context; tool permissions follow
   the speaker's colony; cross-dimension attendees are rejected.
 
+### Implementation record — 2026-09-24
+
+- API (additive, `ApiFeature.CROSS_COLONY_SESSIONS` now supported): `ControlledSessionRejectedException`
+  (extends `IllegalArgumentException`, `Reason.CROSS_DIMENSION`), documented on `createControlledSession`.
+- Runtime: `ControlledConversationRuntime.Hooks` gained default `colony`, `dimension` and `relation` methods.
+  Session creation rejects attendees in different dimensions. Each turn prompt lists the other colonies'
+  attendees and the speaker's colony's diplomacy status toward each colony, and says that tools and
+  permissions apply only to the speaker's own colony.
+- Decision: the speaker's colony applies. A turn runs in the speaker's own provider session, built from the
+  speaker's citizen data, so tools and permission checks resolve against the speaker's colony. Nothing
+  dispatches a tool to another colony.
+- Tests: `ControlledConversationRuntimeTest` covers four cases:
+  - per-speaker cross-colony context in both directions
+  - own-colony attendees not listed as foreign
+  - the turn starts in the speaker's own session
+  - one-colony sessions unchanged, unknown relations, and the typed cross-dimension rejection
+
 ---
 
 ## A10 — Player speech capture

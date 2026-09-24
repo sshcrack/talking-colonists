@@ -805,6 +805,18 @@ for (ConversationTranscriptEntry entry : meeting.transcript()) {
 meeting.end(ControlledConversationSession.EndReason.COMPLETED);
 ```
 
+Since API 2.1 (`ApiFeature.CROSS_COLONY_SESSIONS`), attendees may come from different colonies, for
+example for a peace talk or a trade council:
+
+- Each speaker keeps its own colony's prompt, tools and permissions. A tool a speaker calls acts on
+  the speaker's own colony.
+- Each turn prompt names the other colonies at the session, their attendees, and how the speaker's
+  colony regards each of them (its MineColonies diplomacy status, or "unknown").
+- Attendees in different dimensions cannot hear each other. `createControlledSession` rejects them
+  with a `ControlledSessionRejectedException` whose `reason()` is `CROSS_DIMENSION`. It extends
+  `IllegalArgumentException`.
+
+
 `meeting.sessionId()` is stable for the whole meeting. Every `ControlledTurnResult` contains that
 session ID plus a unique `turnId()`, so orchestration can reject stale work without relying on citizen
 names. Only one turn may be active. A non-participant, an unavailable/unloaded speaker, exhausted

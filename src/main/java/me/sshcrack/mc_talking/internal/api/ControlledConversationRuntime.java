@@ -5,6 +5,7 @@ import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionHandle;
 import me.sshcrack.mc_talking.api.conversation.AutonomousDiscussionPolicy;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.ControlledConversationSession;
+import me.sshcrack.mc_talking.api.conversation.ControlledSessionRejectedException;
 import me.sshcrack.mc_talking.api.conversation.ControlledTurnResult;
 import me.sshcrack.mc_talking.api.conversation.ConversationTranscriptEntry;
 import me.sshcrack.mc_talking.api.prompt.PromptSessionContext;
@@ -12,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +47,19 @@ final class ControlledConversationRuntime<P, A> {
 
         /** Monotonic clock used only for autonomous scheduling limits. */
         default long monotonicNanos() { return System.nanoTime(); }
+
+        /** The participant's colony, or {@code null} when unknown. */
+        default @Nullable ColonyRef colony(@NotNull P participant) { return null; }
+
+        /** The participant's dimension; all known dimensions of a session must match. */
+        default @Nullable Object dimension(@NotNull P participant) { return null; }
+
+        /** How the speaker's colony regards {@code other}, for example {@code "ALLIES"}; null if unknown. */
+        default @Nullable String relation(@NotNull P speaker, @NotNull ColonyRef other) { return null; }
     }
+
+    /** A colony as named in cross-colony turn prompts. Colony IDs are unique within one dimension. */
+    record ColonyRef(int id, @NotNull String name) { }
 
     record Availability(boolean available, @Nullable ControlledTurnResult.FailureReason reason,
                         @NotNull String detail) {
@@ -90,6 +104,45 @@ final class ControlledConversationRuntime<P, A> {
         }
         this.byId = Map.copyOf(unique);
         this.participants = List.copyOf(unique.values());
+        requireOneDimension();
+    }
+
+    private void requireOneDimension() {
+        Object first = null;
+        for (P participant : participants) {
+            Object dimension = hooks.dimension(participant);
+            if (dimension == null) continue;
+            if (first == null) first = dimension;
+            else if (!first.equals(dimension)) {
+                throw new ControlledSessionRejectedException(ControlledSessionRejectedException.Reason.CROSS_DIMENSION,
+                        "Controlled session attendees must be in the same dimension (" + first + " and " + dimension + ")");
+            }
+        }
+    }
+
+    /** Names the other colonies attending, for the speaker's turn prompt; empty for one-colony sessions. */
+    @NotNull String crossColonyContext(@NotNull P speaker) {
+        ColonyRef own = hooks.colony(speaker);
+        if (own == null) return "";
+        Map<Integer, ColonyRef> colonies = new LinkedHashMap<>();
+        Map<Integer, List<String>> attendees = new LinkedHashMap<>();
+        for (P participant : participants) {
+            ColonyRef colony = hooks.colony(participant);
+            if (colony == null || colony.id() == own.id()) continue;
+            colonies.putIfAbsent(colony.id(), colony);
+            attendees.computeIfAbsent(colony.id(), ignored -> new ArrayList<>()).add(hooks.name(participant));
+        }
+        if (colonies.isEmpty()) return "";
+        StringBuilder context = new StringBuilder("Attendees from other colonies:\n");
+        for (ColonyRef colony : colonies.values()) {
+            String relation = hooks.relation(speaker, colony);
+            context.append("- ").append(colony.name())
+                    .append(" (your colony's relation: ").append(relation == null ? "unknown" : relation).append("): ")
+                    .append(String.join(", ", attendees.get(colony.id()))).append('\n');
+        }
+        context.append("You belong to ").append(own.name())
+                .append(" and speak for it. Your tools and permissions only apply to your own colony.\n");
+        return context.toString();
     }
 
     @NotNull UUID sessionId() { return sessionId; }
@@ -245,7 +298,8 @@ final class ControlledConversationRuntime<P, A> {
     private void startTurn(ActiveTurn<P> turn, String topicOrInstruction, String turnAgenda,
                            @Nullable A audioAnchor) {
         if (!isCurrent(turn)) return;
-        String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda, turn.responseTokenLimit());
+        String prompt = buildTurnPrompt(topicOrInstruction, turnAgenda, turn.responseTokenLimit())
+                + crossColonyContext(turn.speaker());
         PromptSessionContext promptContext = PromptSessionContext.controlled(
                 sessionId, turn.turnId(), turnAgenda, options.allowAllAddonTools(), options.allowedAddonTools());
         Availability availability = hooks.availability(turn.speaker(), audioAnchor);
