@@ -2,6 +2,8 @@ package me.sshcrack.mc_talking.api.examples;
 
 import com.google.gson.JsonObject;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.api.ApiFeature;
+import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.api.context.CitizenContextService;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
@@ -204,6 +206,23 @@ final class AddonApiCompileExample {
         return health.state() == ObservationState.CURRENT
                 ? Optional.of(health.value())
                 : Optional.empty();
+    }
+
+    /**
+     * Feature-detection pattern for a Track A entry point (see {@code docs/addon-api.md} §"Feature
+     * detection"). This addon jar may be compiled against a Talking Colonists API newer than the
+     * mod actually installed on a given server; guarding both the {@link ApiFeature} reference and
+     * the {@link TalkingColonistsApi#supports(ApiFeature)} call in one {@code try} block keeps this
+     * call site safe even on a runtime that predates {@link ApiFeature} entirely, because a
+     * {@link NoSuchMethodError}/{@link NoClassDefFoundError} thrown while resolving either symbol
+     * is caught right here instead of crashing addon startup.
+     */
+    static boolean broadcastPublishingAvailable() {
+        try {
+            return TalkingColonistsApi.supports(ApiFeature.BROADCAST_PUBLISHING);
+        } catch (NoSuchMethodError | NoClassDefFoundError predatesApiFeature) {
+            return false;
+        }
     }
 
     static void speakThenContinue(AbstractEntityCitizen citizen) {

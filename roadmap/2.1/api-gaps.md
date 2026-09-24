@@ -58,6 +58,19 @@ with a documented `UnsupportedOperationException` rather than a `NoSuchMethodErr
   `Services` implementation in tests).
 - `docs/addon-api.md` shows the detection pattern; an `apiTest` example compiles for both loaders.
 
+### Implementation record — 2026-09-24
+
+- Added `ApiFeature` (one constant per A1–A10), `TalkingColonistsApi.API_MINOR_VERSION = 1`,
+  `runtimeApiMinorVersion()`, `supports(ApiFeature)`, and `requireSupported(ApiFeature)` (standard
+  `UnsupportedOperationException` for unimplemented entry points). New `Services` methods are
+  default methods, so older implementations answer "minor 0 / unsupported" instead of throwing.
+  The runtime backend reports minor 1 and no supported features yet.
+- `docs/addon-api.md` documents feature detection, including the guard addons need on 2.0 runtimes
+  (where `supports` itself does not exist yet). `AddonApiCompileExample` uses it.
+- `ApiFeatureDetectionTest`: fake `Services` without the new methods reports every feature
+  unsupported and minor 0; the real backend reports minor 1 and nothing supported.
+- `./gradlew test` passed on both loaders. Purely additive; no existing API member changed.
+
 ---
 
 ## A1 — Broadcast and news publishing
