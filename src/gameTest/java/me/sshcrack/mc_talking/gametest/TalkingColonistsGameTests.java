@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.gametest;
 
 import com.minecolonies.api.blocks.ModBlocks;
+import com.minecolonies.api.colony.IVisitorData;
 import com.minecolonies.api.colony.jobs.ModJobs;
 import com.minecolonies.core.colony.jobs.JobBuilder;
 import me.sshcrack.mc_talking.ConversationManager;
@@ -9,6 +10,7 @@ import me.sshcrack.mc_talking.api.colony.AddonColonyEvent;
 import me.sshcrack.mc_talking.api.colony.ColonyEventService;
 import me.sshcrack.mc_talking.api.colony.ColonyEventView;
 import me.sshcrack.mc_talking.api.context.CitizenContextService;
+import me.sshcrack.mc_talking.api.conversation.CitizenConversationRules;
 import me.sshcrack.mc_talking.api.conversation.ConversationEligibility;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
@@ -16,11 +18,14 @@ import me.sshcrack.mc_talking.api.memory.BroadcastSource;
 import me.sshcrack.mc_talking.api.memory.CitizenMemoryService;
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
+import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 /*? if neoforge {*/
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -169,6 +174,95 @@ public final class TalkingColonistsGameTests {
                 var promptEvents = CitizenContextService.snapshot(citizen).colony().recentEvents();
                 helper.assertTrue(promptEvents.contains("Maria won the mayoral election"),
                         "citizen prompt context should include the addon event, was " + promptEvents);
+            }
+        });
+        helper.succeed();
+    }
+
+    /** A8: visitors are rejected by default, and speak only for the kinds a visitor policy allows. */
+    @GameTest(template = FLOOR, batch = "mc_talking_visitor_policy", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void visitorsSpeakOnlyWithAPolicy(GameTestHelper helper) {
+        logFailures("visitorsSpeakOnlyWithAPolicy", () -> {
+            try (var fixture = ColonyTestHarness.create(helper)) {
+                var visitor = fixture.spawnVisitor(new BlockPos(4, 1, 4));
+
+                for (ConversationKind kind : ConversationKind.values()) {
+                    var rejected = ConversationManager.conversationEligibility(visitor, kind);
+                    helper.assertTrue(rejected.status() == ConversationEligibility.Status.VISITOR,
+                            "visitor must be rejected as VISITOR for " + kind + " without a policy, was " + rejected);
+                }
+
+                var registration = CitizenConversationRules.registerVisitorPolicy("mc_talking_test:tavern_talk", 0,
+                        (guest, kind) -> kind == ConversationKind.PLAYER);
+                try {
+                    var player = ConversationManager.conversationEligibility(visitor, ConversationKind.PLAYER);
+                    helper.assertTrue(player.eligible(), "policy should allow PLAYER conversations, was " + player);
+                    var ambient = ConversationManager.conversationEligibility(visitor, ConversationKind.ADDON_AMBIENT);
+                    helper.assertTrue(ambient.status() == ConversationEligibility.Status.VISITOR,
+                            "kinds the policy does not allow stay rejected, was " + ambient);
+                } finally {
+                    registration.close();
+                }
+                var after = ConversationManager.conversationEligibility(visitor, ConversationKind.PLAYER);
+                helper.assertTrue(after.status() == ConversationEligibility.Status.VISITOR,
+                        "closing the policy restores the default rejection, was " + after);
+            }
+        });
+        helper.succeed();
+    }
+
+    /** A8: a visitor's prompt view has visitor facts and none of the colonist-only fields. */
+    @GameTest(template = FLOOR, batch = "mc_talking_visitor_view", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void visitorPromptViewHasNoColonistFields(GameTestHelper helper) {
+        logFailures("visitorPromptViewHasNoColonistFields", () -> {
+            try (var fixture = ColonyTestHarness.create(helper)) {
+                var visitor = fixture.spawnVisitor(new BlockPos(4, 1, 4));
+                var data = (IVisitorData) visitor.getCitizenData();
+                data.setRecruitCosts(new ItemStack(Items.DIAMOND, 3));
+
+                var view = CitizenContextService.snapshot(visitor);
+                helper.assertTrue(view.visitor() != null, "visitor view missing");
+                helper.assertTrue(view.visitor().recruitCost() != null && view.visitor().recruitCost().startsWith("3 x"),
+                        "recruit cost should be described, was " + view.visitor().recruitCost());
+                helper.assertTrue(view.work().jobName() == null && view.work().home() == null
+                                && view.work().workplace() == null, "visitor must have no job/home/workplace: " + view.work());
+                helper.assertTrue(view.work().assignedOrInProgressItemRequests().isEmpty()
+                        && view.work().activeQuests().isEmpty(), "visitor must have no requests or quests");
+                helper.assertTrue(view.family().parentNames().isEmpty() && !view.family().hasPartner()
+                                && view.family().childNames().isEmpty() && view.family().siblingNames().isEmpty(),
+                        "visitor must have no family: " + view.family());
+                helper.assertTrue(view.wellbeing().happinessModifiers().isEmpty() && !view.wellbeing().homeless(),
+                        "visitor must have no colonist happiness modifiers or homelessness");
+                helper.assertTrue(view.verifiedFacts().housingStatus() == CitizenHousingStatus.UNKNOWN,
+                        "visitor housing should be UNKNOWN, was " + view.verifiedFacts().housingStatus());
+            }
+        });
+        helper.succeed();
+    }
+
+    /** A8: a recruited visitor keeps its short-term memory, the way MineColonies copies visitor data. */
+    @GameTest(template = FLOOR, batch = "mc_talking_visitor_recruit", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void recruitedVisitorKeepsItsMemory(GameTestHelper helper) {
+        logFailures("recruitedVisitorKeepsItsMemory", () -> {
+            try (var fixture = ColonyTestHarness.create(helper)) {
+                var visitor = fixture.spawnVisitor(new BlockPos(4, 1, 4));
+                var visitorData = visitor.getCitizenData();
+                var memory = ((CitizenDataMemoryExtended) visitorData).mc_talking$getOrInitializeMemory();
+                memory.addFact("Steve promised me a bed if I stay");
+
+                // MineColonies' RecruitmentInteraction creates a citizen and copies the visitor's NBT into it.
+                var recruit = fixture.colony().getCitizenManager().createAndRegisterCivilianData();
+                /*? if neoforge {*/
+                var provider = helper.getLevel().registryAccess();
+                recruit.deserializeNBT(provider, visitorData.serializeNBT(provider));
+                /*?}*/
+                /*? if forge {*/
+                /*recruit.deserializeNBT(visitorData.serializeNBT());
+                *//*?}*/
+
+                var kept = ((CitizenDataMemoryExtended) recruit).mc_talking$getMemory();
+                helper.assertTrue(kept != null && kept.getFacts().contains("Steve promised me a bed if I stay"),
+                        "recruited citizen should keep the visitor's memory, had " + (kept == null ? null : kept.getFacts()));
             }
         });
         helper.succeed();

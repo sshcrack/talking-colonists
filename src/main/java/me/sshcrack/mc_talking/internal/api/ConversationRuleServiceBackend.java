@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.internal.api;
 
 import me.sshcrack.mc_talking.api.conversation.CitizenSpeechPolicy;
 import me.sshcrack.mc_talking.api.conversation.CitizenUrgencyModifier;
+import me.sshcrack.mc_talking.api.conversation.VisitorSpeechPolicy;
 import me.sshcrack.mc_talking.api.registration.AddonRegistration;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import org.jetbrains.annotations.NotNull;
@@ -17,5 +18,11 @@ final class ConversationRuleServiceBackend implements ConversationRuleService {
     public @NotNull AddonRegistration registerUrgencyModifier(@NotNull String id, int order,
                                                                @NotNull CitizenUrgencyModifier modifier) {
         return ConversationRuleRuntime.registerUrgencyModifier(id, order, modifier);
+    }
+
+    @Override
+    public @NotNull AddonRegistration registerVisitorPolicy(@NotNull String id, int order,
+                                                             @NotNull VisitorSpeechPolicy policy) {
+        return ConversationRuleRuntime.registerVisitorPolicy(id, order, policy);
     }
 }

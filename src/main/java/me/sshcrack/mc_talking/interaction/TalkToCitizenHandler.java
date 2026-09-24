@@ -2,6 +2,8 @@ package me.sshcrack.mc_talking.interaction;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -46,7 +48,8 @@ public final class TalkToCitizenHandler {
                 isEnabled(),
                 alreadyTalkingToThisCitizen,
                 withinRange,
-                citizen instanceof VisitorCitizen,
+                citizen instanceof VisitorCitizen
+                        && !ConversationRuleRuntime.addonsAllowVisitor(citizen, ConversationKind.PLAYER),
                 voicechatApiReady,
                 voicechatDisabledForPlayer,
                 ConversationManager.canCitizenSpeak(citizen, true)

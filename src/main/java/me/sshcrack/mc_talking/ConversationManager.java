@@ -639,8 +639,9 @@ public class ConversationManager {
         if (citizen.isSleeping()) {
             return ConversationEligibility.rejected(ConversationEligibility.Status.SLEEPING, "citizen is sleeping");
         }
-        if (citizen instanceof VisitorCitizen) {
-            return ConversationEligibility.rejected(ConversationEligibility.Status.VISITOR, "visitors are not supported speakers");
+        if (citizen instanceof VisitorCitizen && !ConversationRuleRuntime.addonsAllowVisitor(citizen, kind)) {
+            return ConversationEligibility.rejected(ConversationEligibility.Status.VISITOR,
+                    "visitors only speak when an addon visitor policy allows it");
         }
 
         if (kind != ConversationKind.PLAYER) {

@@ -491,6 +491,24 @@ if (!eligibility.eligible()) {
 }
 ```
 
+## Visitors (tavern guests)
+
+MineColonies visitors are not conversation participants by default: eligibility reports
+`ConversationEligibility.Status.VISITOR`. Since API 2.1 (`ApiFeature.VISITOR_SPEAKERS`), an addon such as a
+tavern recruiter can opt them in for the conversation kinds it needs:
+
+```java
+AddonRegistration tavernTalk = CitizenConversationRules.registerVisitorPolicy(
+        "tavern:talk", 0, (visitor, kind) -> kind == ConversationKind.PLAYER);
+```
+
+- A visitor's prompt view has no job, home, family, requests or happiness modifiers.
+- `CitizenPromptView.visitor()` gives the recruit cost and how many colony days the visitor has stayed.
+- Visitors keep a short-term memory of their 10 newest facts and events. It moves with them when they
+  are recruited.
+- Veto-only speech policies still apply to visitors. Core ambient chatter never picks visitors on its
+  own.
+
 ## Starting speech and conversations
 
 Player conversation starts return a typed immediate result:

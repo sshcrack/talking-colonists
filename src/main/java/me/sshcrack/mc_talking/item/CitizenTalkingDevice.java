@@ -2,6 +2,8 @@ package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.core.entity.visitor.VisitorCitizen;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import net.minecraft.ChatFormatting;
@@ -158,7 +160,8 @@ public class CitizenTalkingDevice extends Item {
             return true; // Prevent attack on client side
         }
 
-        if (entity instanceof VisitorCitizen) {
+        if (entity instanceof VisitorCitizen
+                && !ConversationRuleRuntime.addonsAllowVisitor(citizen, ConversationKind.PLAYER)) {
             player.sendSystemMessage(
                     Component.translatable("mc_talking.invalid_on_visitor")
                             .withStyle(ChatFormatting.RED)

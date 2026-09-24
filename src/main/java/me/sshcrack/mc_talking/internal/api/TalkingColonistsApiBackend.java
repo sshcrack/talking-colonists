@@ -24,12 +24,11 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     /**
      * Single source of truth for {@link #supports(ApiFeature)}. Every {@link ApiFeature} constant
      * is added the moment its roadmap task starts landing, long before this set gains the matching
-     * entry; a task only adds itself here once its feature is fully implemented and tested. Empty
-     * today: no Track A task has landed yet.
+     * entry; a task only adds itself here once its feature is fully implemented and tested.
      */
     private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
-            ApiFeature.CROSS_COLONY_SESSIONS);
+            ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();

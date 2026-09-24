@@ -26,6 +26,7 @@ import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ConversationPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierType;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
+import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ObservedValue;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
@@ -98,6 +99,8 @@ public final class CitizenPromptViewFixture {
             List.of(new CitizenRelationshipView(PLAYER_ID, CitizenRelationshipDimension.FRIENDLINESS, 0.6f)),
             List.of(), List.of(), List.of(),
             "Maria has lived in Riverside since it was founded.");
+
+    private @Nullable VisitorPromptView visitor;
 
     private CitizenPromptViewFixture() {
     }
@@ -252,7 +255,20 @@ public final class CitizenPromptViewFixture {
 
     public CitizenPromptView build() {
         return new FixtureView(citizenId, playerId, identity, family, wellbeing, work, colony, conversation,
-                activity, verifiedFacts, memories);
+                activity, verifiedFacts, memories, visitor);
+    }
+
+    /** A tavern visitor: no job, home or family, with the given visitor facts. */
+    public CitizenPromptViewFixture visitor(VisitorPromptView visitor) {
+        this.visitor = visitor;
+        family = new CitizenFamilyView(List.of(), false, List.of(), List.of());
+        job(null, null);
+        home(null);
+        var f = verifiedFacts;
+        verifiedFacts = new CitizenVerifiedFactsView(f.capturedAtGameTime(), f.healthPercent(), f.equipment(),
+                CitizenHousingStatus.UNKNOWN, f.requests(), f.builderActivity());
+        return wellbeing(w -> new CitizenWellbeingView(w.sick(), false, w.saturation(), w.healthPercent(),
+                w.happiness(), List.of(), false, List.of(), null));
     }
 
     private record FixtureView(
@@ -266,7 +282,8 @@ public final class CitizenPromptViewFixture {
             @NotNull ConversationPromptView conversation,
             @NotNull CitizenActivityView activity,
             @NotNull CitizenVerifiedFactsView verifiedFacts,
-            @Nullable CitizenMemorySnapshot memories
+            @Nullable CitizenMemorySnapshot memories,
+            @Nullable VisitorPromptView visitor
     ) implements CitizenPromptView {
     }
 }

@@ -305,6 +305,26 @@ policy allows visitors. Keep the talking device's current visitor message unless
 - Tests: visitors rejected by default; allowed with a registered policy; recruited visitor keeps
   its short-term memory; prompt view contains no citizen-only fields.
 
+### Implementation record — 2026-09-24
+
+- **API** (additive, `ApiFeature.VISITOR_SPEAKERS` now supported):
+  - `VisitorSpeechPolicy` and `CitizenConversationRules.registerVisitorPolicy`, backed by a default
+    `ConversationRuleService` method.
+  - `VisitorPromptView(recruitCost, daysInColony)`, exposed as a default `CitizenPromptView.visitor()`.
+- **Eligibility:** the `VISITOR` rejection now applies only when no visitor policy allows the requested
+  kind. Veto policies still run afterwards. The talking device and the talk gesture keep their visitor
+  messages unless a policy allows `PLAYER`.
+- **Prompt view:** a visitor view has no job, home, workplace, family, requests, quests or happiness
+  modifiers, and its housing status is `UNKNOWN`. It carries the recruit cost and the days since Talking
+  Colonists first saw the visitor, since MineColonies records no arrival time. The prompt introduces the
+  visitor as a traveller at the tavern and never adds the "no job" or "no home" complaint lines.
+- **Memory:** visitors keep at most 10 facts and 10 events. `VisitorData` extends `CitizenData`, so the
+  memory is saved through the existing mixin. MineColonies' recruitment copies the visitor NBT into the
+  new citizen, so the memory moves with a recruit without further code.
+- **Tests:** GameTests `visitorsSpeakOnlyWithAPolicy`, `visitorPromptViewHasNoColonistFields` and
+  `recruitedVisitorKeepsItsMemory`, which copies visitor NBT the way `RecruitmentInteraction` does.
+  `CitizenMemoriesVisitorTest` covers the memory bound and the saved first-seen day.
+
 ---
 
 ## A9 — Cross-colony controlled sessions
