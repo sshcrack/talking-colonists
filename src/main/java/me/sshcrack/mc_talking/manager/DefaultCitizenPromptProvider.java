@@ -15,13 +15,35 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
  * Default implementation for citizen prompt generation.
  */
 public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
+    /** Config values the prompt text depends on. */
+    public record PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds) {
+        static PromptLimits fromConfig() {
+            var config = McTalkingConfig.INSTANCE.instance();
+            return new PromptLimits(config.maxBroadcastsInPrompt, config.maxRumorsInPrompt,
+                    config.raidTraumaDurationSeconds);
+        }
+    }
+
+    private final Supplier<PromptLimits> limits;
+
+    public DefaultCitizenPromptProvider() {
+        this(PromptLimits::fromConfig);
+    }
+
+    /** Uses {@code limits} instead of the live config, which cannot load outside a running game. */
+    public DefaultCitizenPromptProvider(Supplier<PromptLimits> limits) {
+        this.limits = limits;
+    }
+
     @Override
     public String getBasicCitizenInfoPrompt(@NotNull CitizenPromptView view, boolean firstPerson) {
         StringBuilder prompt = new StringBuilder();
@@ -110,7 +132,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         if (!view.wellbeing().blockingInteractionMessages().isEmpty()) {
             prompt.append("You can't do anything else until the following issues are resolved (written in first person):\n");
             for (var message : view.wellbeing().blockingInteractionMessages()) {
-                prompt.append("- ").append(message);
+                prompt.append("- ").append(message).append("\n");
             }
         }
 
@@ -168,7 +190,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             }
         }
 
-        int broadcastCap = McTalkingConfig.INSTANCE.instance().maxBroadcastsInPrompt;
+        int broadcastCap = limits.get().maxBroadcasts();
         if (broadcastCap > 0 && !memories.broadcasts().isEmpty()) {
             prompt.append(" Colony Broadcasts (most recent first):\n");
             memories.broadcasts().stream().limit(broadcastCap).forEach(broadcast ->
@@ -177,7 +199,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
                             .append(": ").append(broadcast.message()).append("\n"));
         }
 
-        int rumorCap = McTalkingConfig.INSTANCE.instance().maxRumorsInPrompt;
+        int rumorCap = limits.get().maxRumors();
         if (rumorCap > 0 && !memories.rumors().isEmpty()) {
             prompt.append(" Rumors (heard via the grapevine, most recent first):\n");
             memories.rumors().stream().limit(rumorCap).forEach(rumor ->
@@ -298,7 +320,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         // Post-raid trauma
         Long lastRaidEndTimeTicks = view.colony().lastRaidEndTimeTicks();
         if (!view.colony().peaceful() && lastRaidEndTimeTicks != null) {
-            int traumaDuration = McTalkingConfig.INSTANCE.instance().raidTraumaDurationSeconds;
+            int traumaDuration = limits.get().raidTraumaDurationSeconds();
             long sinceTicks = view.colony().currentGameTimeTicks() - lastRaidEndTimeTicks;
             if (traumaDuration > 0 && sinceTicks < traumaDuration * 20L) {
                 int lost = view.colony().lastRaidLostCitizens();
@@ -419,7 +441,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("- Speak in first person, keep responses brief\n");
         prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
-        prompt.append("- Do not use markdown, speak in plain text.");
+        prompt.append("- Do not use markdown, speak in plain text.\n");
 
         var relation = view.conversation().playerRelation();
         if (relation != null) {
@@ -471,13 +493,13 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         double happiness = view.wellbeing().happiness();
 
         if (happiness > 8.0) {
-            prompt.append("- Very happy (").append(String.format("%.1f", happiness)).append("/10)\n");
+            prompt.append("- Very happy (").append(String.format(Locale.ROOT, "%.1f", happiness)).append("/10)\n");
         } else if (happiness > 5.0) {
-            prompt.append("- Content (").append(String.format("%.1f", happiness)).append("/10)\n");
+            prompt.append("- Content (").append(String.format(Locale.ROOT, "%.1f", happiness)).append("/10)\n");
         } else if (happiness > 3.0) {
-            prompt.append("- Unhappy (").append(String.format("%.1f", happiness)).append("/10)\n");
+            prompt.append("- Unhappy (").append(String.format(Locale.ROOT, "%.1f", happiness)).append("/10)\n");
         } else {
-            prompt.append("- Miserable (").append(String.format("%.1f", happiness)).append("/10)\n");
+            prompt.append("- Miserable (").append(String.format(Locale.ROOT, "%.1f", happiness)).append("/10)\n");
         }
 
         prompt.append("\nNOTE: A building's style (cavern, medieval, etc.) is the colony's chosen aesthetic and is NOT a sign of poor quality. Base housing satisfaction only on building level and these factors below, never complain about style.\n\n");

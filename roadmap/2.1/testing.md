@@ -110,6 +110,28 @@ not a complaint" present in the housing section, no markdown instruction missing
 - Snapshot diffs are readable in review; regeneration is one documented command.
 - The language invariant test fails if the language line is removed from any path.
 
+
+### Implementation record — 2026-09-24
+
+- `CitizenPromptViewFixture` (test sources, `me.sshcrack.mc_talking.testing`): realistic housed
+  farmer talking to the colony owner, with memories and happiness modifiers so every section
+  renders; fluent overrides per view group plus shortcuts (`language`, `home`, `job`,
+  `happiness`, `withoutPlayer`, ...). `secondCitizen()` for multi-participant prompts.
+- `PromptSnapshotTest` covers player roleplay, system-controlled roleplay, the Flash script
+  request, the TTS request and the pregenerated greeting (system instruction + realtime input).
+  `PromptSnapshots` compares against `src/test/resources/prompt-snapshots/*.txt`;
+  `UPDATE_PROMPT_SNAPSHOTS=1 ... --rerun` rewrites them. The same snapshots pass on both loaders.
+- `PromptInvariantTest`: language in every speech path, the building-style note, markdown ban.
+- Internal changes needed for determinism/testability (no public API change):
+  `MiscUtil.withFirstPicks`; `DefaultCitizenPromptProvider(Supplier<PromptLimits>)` because
+  `McTalkingConfig` cannot load outside the game; package-visible `getFlashPrompt`,
+  `getTTSPrompt`, `participantInfo`; `PregenerationPrompts` for the greeting and cache note.
+- Prompt fixes found by the snapshots: happiness used the default locale (`6,5/10` on a German
+  JVM), now `Locale.ROOT`; the player-roleplay "plain text." guideline ran into the next line;
+  blocking interaction messages had no line breaks.
+- Break experiment: removing the language sentence from the TTS prompt failed
+  `configuredLanguageReachesEverySpeechPrompt` and the `tts-request` snapshot; reverted.
+
 ---
 
 ## T4 — Headless server GameTests on both loaders

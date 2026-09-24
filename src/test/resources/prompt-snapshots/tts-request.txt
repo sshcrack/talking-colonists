@@ -1,0 +1,17 @@
+===== content (role=user) =====
+Synthesize the multi-speaker dialogue below as natural speech. Follow the configured
+speaker voices and bracketed vocal cues. Do not read section headings, scene notes,
+director notes, or formatting instructions aloud; only speak the lines under the
+transcript section. The dialogue is spoken in English.
+
+## Transcript
+Maria Silva: [cheerfully] Joao! The wheat is finally ready.
+
+Joao Costa: [grumbles] Good. Maybe now someone will fix my roof.
+
+
+===== generation config =====
+responseModalities=[AUDIO]
+temperature=1.0
+speakers=Maria Silva:Kore, Joao Costa:Puck
+

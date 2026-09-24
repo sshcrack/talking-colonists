@@ -52,6 +52,9 @@ mixin correctness regardless of what runs locally.
 - While iterating on ordinary (non-mixin) code: `./gradlew :1.21.1-neoforge:test`.
 - Before pushing: run both loaders' suites, `./gradlew :1.21.1-neoforge:test :1.20.1-forge:test`.
 - Only when mixin-relevant files change (see below): `bash scripts/test-client-smoke.sh`.
+- Prompt text is snapshot-tested (`src/test/resources/prompt-snapshots/`). After an intended
+  prompt change, regenerate with `UPDATE_PROMPT_SNAPSHOTS=1 ./gradlew :1.21.1-neoforge:test --tests '*PromptSnapshotTest' --rerun`
+  and review the snapshot diff. Build prompt views in tests with `CitizenPromptViewFixture`.
 
 ### When the local gate applies
 
