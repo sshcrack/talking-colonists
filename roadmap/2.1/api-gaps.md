@@ -248,6 +248,23 @@ conversations.
 - Tests: context appears only in that session; tool allow-list is enforced at execution time;
   default overload behaves exactly as today.
 
+### Implementation record — 2026-09-24
+
+- API (additive, `ApiFeature.PLAYER_CONVERSATION_OPTIONS` now supported):
+  `CitizenConversationService.startPlayerConversation(player, citizen, PlayerConversationOptions)`, backed by a
+  default `ConversationService` method that accepts only default options on older runtimes. New
+  `PlayerConversationOptions` (agenda ≤ 2000 chars, `ControlledConversationOptions` tools, purpose
+  `[a-z0-9_.:-]{1,64}`, `extractMemory`; `defaults()` plus `with…` methods). `ConversationLifecycleEvent` gained
+  `purpose`; the 2.0 constructor is kept.
+- Runtime: the options become the player client's `PromptSessionContext`, which lives only on that client. The
+  agenda is added to that session's system prompt, and prompt contributors see it through the context. The
+  existing `GeminiWsClient` gate enforces the allow-list when the model calls a tool. `extractMemory=false`
+  skips the conversation summary. Non-default options never take over a mumbling session: they replace it,
+  so the agenda is in the prompt from the start. The purpose is reported on this session's STARTED and ENDED
+  events.
+- Tests: `PlayerConversationOptionsTest`, `PlayerSessionContextsTest` (the agenda reaches only its own
+  session, allow-list semantics, and defaults equal an ordinary conversation).
+
 ---
 
 ## A7 — Capacity and quota status

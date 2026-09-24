@@ -504,6 +504,24 @@ if (!result.started()) {
 }
 ```
 
+Since API 2.1 (`ApiFeature.PLAYER_CONVERSATION_OPTIONS`), an addon can start a scoped conversation, such
+as a quest giver or judge, without changing global prompts:
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.PLAYER_CONVERSATION_OPTIONS)) {
+    PlayerConversationOptions options = PlayerConversationOptions.defaults()
+            .withAgenda("Ask the player to find your lost cat and promise a loaf of bread as a reward.")
+            .withTools(ControlledConversationOptions.allowAddonTools(Set.of("quests:give_quest")))
+            .withPurpose("quests:lost_cat")
+            .withMemoryExtraction(true);
+    CitizenConversationService.startPlayerConversation(player, citizen, options);
+}
+```
+
+The agenda and tool allow-list apply only to that session and are never stored. The purpose appears as
+`ConversationLifecycleEvent.purpose()` on that session's STARTED and ENDED events. If the citizen is
+mumbling, a non-default request replaces that session instead of taking it over.
+
 Addon-directed ambient speech returns a future that reaches terminal state after audible playback:
 
 ```java

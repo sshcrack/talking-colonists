@@ -44,6 +44,21 @@ public final class CitizenConversationService {
     }
 
     /**
+     * Starts a player-owned conversation with a session agenda, addon tool allow-list, purpose tag
+     * and memory choice. Check {@link me.sshcrack.mc_talking.api.ApiFeature#PLAYER_CONVERSATION_OPTIONS}
+     * first; older runtimes throw {@link UnsupportedOperationException} for non-default options.
+     * If the citizen is already mumbling, a non-default request replaces that session instead of
+     * taking it over, so the agenda is in the prompt from the start.
+     */
+    public static @NotNull ConversationStartResult startPlayerConversation(
+            @NotNull ServerPlayer player,
+            @NotNull AbstractEntityCitizen citizen,
+            @NotNull PlayerConversationOptions options
+    ) {
+        return TalkingColonistsApi.services().conversations().startPlayerConversation(player, citizen, options);
+    }
+
+    /**
      * Starts one addon-directed ambient line and completes after audible playback reaches a
      * terminal state. Rejected starts are represented as {@link AmbientLineResult.Status#REJECTED}
      * with a typed rejection reason instead of an ambiguous {@code false}.
