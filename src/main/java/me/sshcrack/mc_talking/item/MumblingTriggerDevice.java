@@ -1,7 +1,7 @@
 package me.sshcrack.mc_talking.item;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.mc_talking.ConversationManager;
+import me.sshcrack.mc_talking.AmbientSessions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
@@ -27,7 +27,7 @@ public class MumblingTriggerDevice extends Item {
             return true; // Prevent attack on client side
         }
 
-        ConversationManager.startMumbling(citizen);
+        AmbientSessions.startMumbling(citizen);
         player.sendSystemMessage(Component.translatable("mc_talking.mumbling_trigger.started_mumbling").withStyle(ChatFormatting.GREEN));
 
         return true; // Prevent normal attack behavior

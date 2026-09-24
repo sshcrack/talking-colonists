@@ -4,6 +4,7 @@ import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.AmbientSessions;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -95,7 +96,7 @@ public class BroadcastPropagationService {
                                             + " for the colony: ["
                                             + firstAnnounceable.getMessage()
                                             + "]. Spread the word to those nearby. Don't mention obstacles or anything blocking you.";
-                                    ConversationManager.startLowPrioritySession(carrierEntity, prompt);
+                                    AmbientSessions.startLowPrioritySession(carrierEntity, prompt);
                                 }
                             }
                         }

@@ -3,6 +3,7 @@ package me.sshcrack.mc_talking.internal.api;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.AmbientSessions;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
@@ -142,7 +143,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
         }
 
         CompletableFuture<AmbientLineResult> future = new CompletableFuture<>();
-        boolean started = ConversationManager.startAddonAmbientSession(citizen, promptDirective, future::complete);
+        boolean started = AmbientSessions.startAddonAmbientSession(citizen, promptDirective, future::complete);
         if (!started) {
             future.complete(AmbientLineResult.rejected(
                     AmbientLineResult.RejectionReason.CAPACITY_EXHAUSTED,
@@ -604,7 +605,7 @@ final class ConversationServiceBackend implements me.sshcrack.mc_talking.api.ser
                 ServerPlayer boundPlayer = authenticatedPlayerId == null
                         ? null
                         : detachedPlayers.get(authenticatedPlayerId);
-                boolean started = ConversationManager.startControlledAmbientSession(
+                boolean started = AmbientSessions.startControlledAmbientSession(
                         participant, prompt, audibleCompletion, promptContext, authenticatedPlayerId, boundPlayer,
                         audioAnchor, maxOutputTokens);
                 if (started) return ControlledConversationRuntime.StartResult.STARTED;

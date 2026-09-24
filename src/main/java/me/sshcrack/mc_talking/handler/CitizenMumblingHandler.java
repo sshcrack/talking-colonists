@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.handler;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.AmbientSessions;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
@@ -23,7 +24,7 @@ public class CitizenMumblingHandler {
             if (!mumbledThisInterval.add(citizen.getUUID()))
                 continue;
             if (Math.random() < McTalkingConfig.INSTANCE.instance().mumblingChance) {
-                ConversationManager.startMumbling(citizen);
+                AmbientSessions.startMumbling(citizen);
                 break;
             }
         }

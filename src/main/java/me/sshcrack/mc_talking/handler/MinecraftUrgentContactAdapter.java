@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.handler;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.AmbientSessions;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.api.conversation.AmbientLineResult;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
@@ -105,7 +106,7 @@ final class MinecraftUrgentContactAdapter implements UrgentContactLifecycleModul
         ServerPlayer originPlayer = player(contact.originPlayerId());
         if (citizen == null || originPlayer == null) return false;
 
-        return ConversationManager.startUrgentAnnouncement(
+        return AmbientSessions.startUrgentAnnouncement(
                 owned.delegate,
                 citizen,
                 originPlayer.getName().getString(),

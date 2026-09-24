@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import me.sshcrack.mc_talking.AmbientSessions;
 import me.sshcrack.mc_talking.ConversationManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -35,7 +36,7 @@ public class DebugPromptCommand {
         }
 
         ConversationManager.forceRemoveCooldown(citizen);
-        ConversationManager.startLowPrioritySession(citizen, prompt);
+        AmbientSessions.startLowPrioritySession(citizen, prompt);
 
         String citizenName = citizen.getCitizenData() != null
                 ? citizen.getCitizenData().getName()
