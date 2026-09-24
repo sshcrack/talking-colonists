@@ -314,9 +314,14 @@ public class ConversationManager {
             AbstractEntityCitizen citizen,
             BackgroundSlotType type
     ) {
-        var token = backgroundSessions.reserve(citizen.getUUID(), type);
+        return reserveBackgroundSlot(citizen.getUUID(), type);
+    }
+
+    /** Background slot keyed by any UUID, e.g. a colony-wide text request with no citizen. Thread-safe. */
+    public static BackgroundReservation reserveBackgroundSlot(UUID ownerId, BackgroundSlotType type) {
+        var token = backgroundSessions.reserve(ownerId, type);
         if (token == null) return null;
-        McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", citizen.getUUID(), type);
+        McTalking.LOGGER.info("[ConversationManager] Reserved background slot for {} (type={})", ownerId, type);
         return new BackgroundReservation(token);
     }
 

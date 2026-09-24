@@ -532,6 +532,11 @@ public class McTalkingConfig {
 
     @AutoGen(category = "citizens", group = "memory")
     @TickBox
+    @SerialEntry(comment = "If true, memory requests (conversation memories and compaction) fall back to the cheap Gemini Live model when Flash-Lite's quota is used up or its service fails. The Live model has no daily limit on the free tier but uses one background Live session while it runs.")
+    public boolean enableLiveTextFallback = true;
+
+    @AutoGen(category = "citizens", group = "memory")
+    @TickBox
     @SerialEntry(comment = "If true, citizen memories will be periodically compacted and summarized to prevent unbounded growth.")
     public boolean enableMemoryCompaction = true;
 

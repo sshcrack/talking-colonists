@@ -2,8 +2,6 @@ package me.sshcrack.mc_talking.conversations.memory;
 
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
-import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
@@ -11,7 +9,6 @@ import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -79,22 +76,17 @@ public class CitizenMemoryGenerator extends Thread {
     public void run() {
         try {
             McTalking.LOGGER.debug("Starting memory generation for {} citizen participants", participants.size());
-            String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
             var names = participants.stream().map(c -> c.getName().getString()).toList();
             var validationContext = MemoryResponseParser.ValidationContext.citizenConversation(names);
             String memoryString;
             try {
-                memoryString = GeminiFlash.sendSimpleFlashRequest(
-                        McTalkingConfig.FLASH_MODEL,
-                        apiKey,
-                        PROMPT,
-                        conversation,
-                        MemoryStructuredOutput.forContext(validationContext));
+                memoryString = MemoryTextRequest.generate(participants.get(0), PROMPT, conversation,
+                        MemoryStructuredOutput.schema(validationContext), "[CitizenMemory]");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 saveCoordinator.cancel("memory generation interrupted");
                 return;
-            } catch (UnexpectedResponseException | IOException e) {
+            } catch (MemoryTextRequest.FailedException e) {
                 McTalking.LOGGER.error("Failed to request citizen memories", e);
                 saveCoordinator.generationFailed("memory request failed", e);
                 return;

@@ -22,9 +22,9 @@ import java.util.concurrent.Semaphore;
 import java.util.function.BooleanSupplier;
 
 /**
- * Runs addon text generation (roadmap A3) as plain Flash requests. These are not Live sessions, so
- * they use their own small concurrency limit instead of the Live background slots that greetings
- * and memory compaction need. Nothing here plays audio or touches conversation slots.
+ * Runs addon text generation (roadmap A3) as plain Flash requests, with an optional {@link Fallback}
+ * (the cheap Live model) when Flash is out of quota or failing. Flash requests use their own small
+ * concurrency limit; only the fallback takes a Live background slot.
  */
 public final class TextGenerationRuntime {
     /** Concurrent text requests; the free tier allows about 15 Flash-Lite requests per minute. */
@@ -44,7 +44,19 @@ public final class TextGenerationRuntime {
         void reportSuccess();
     }
 
+    /**
+     * Answers the same request through another model when Flash is used up or failing (the cheap
+     * Live model in production). Returns the raw text; the runtime interprets it like a Flash answer.
+     */
+    public interface Fallback {
+        /** Whether the fallback can be tried now (enabled and not out of quota itself). */
+        boolean available();
+
+        String send(String systemPrompt, String userText) throws Exception;
+    }
+
     private final Transport transport;
+    private final @Nullable Fallback fallback;
     private final QuotaGate quota;
     private final BooleanSupplier hasApiKey;
     private final Executor executor;
@@ -53,7 +65,13 @@ public final class TextGenerationRuntime {
 
     public TextGenerationRuntime(@NotNull Transport transport, @NotNull QuotaGate quota,
                                  @NotNull BooleanSupplier hasApiKey, @NotNull Executor executor) {
+        this(transport, null, quota, hasApiKey, executor);
+    }
+
+    public TextGenerationRuntime(@NotNull Transport transport, @Nullable Fallback fallback, @NotNull QuotaGate quota,
+                                 @NotNull BooleanSupplier hasApiKey, @NotNull Executor executor) {
         this.transport = transport;
+        this.fallback = fallback;
         this.quota = quota;
         this.hasApiKey = hasApiKey;
         this.executor = executor;
@@ -67,7 +85,8 @@ public final class TextGenerationRuntime {
         if (!hasApiKey.getAsBoolean()) {
             return CompletableFuture.completedFuture(TextResult.failure(TextResult.Status.UNAVAILABLE, "No Gemini API key is configured"));
         }
-        if (quota.exhausted()) {
+        boolean flashUsedUp = quota.exhausted();
+        if (flashUsedUp && !fallbackAvailable()) {
             return CompletableFuture.completedFuture(TextResult.failure(TextResult.Status.QUOTA, "The Flash model quota is exhausted"));
         }
         if (!permits.tryAcquire()) {
@@ -83,7 +102,9 @@ public final class TextGenerationRuntime {
             executor.execute(() -> {
                 try {
                     if (future.isDone()) return;
-                    future.complete(call(providerRequest, request));
+                    future.complete(flashUsedUp
+                            ? viaFallback(systemPrompt, request, TextResult.Status.QUOTA, "The Flash model quota is exhausted")
+                            : call(systemPrompt, providerRequest, request));
                 } catch (Throwable t) {
                     future.complete(TextResult.failure(TextResult.Status.PROVIDER_ERROR, t.getClass().getSimpleName()));
                 } finally {
@@ -108,7 +129,7 @@ public final class TextGenerationRuntime {
         return active.size();
     }
 
-    private TextResult call(GeminiFlash.GenerateContentRequest providerRequest, TextRequest request) {
+    private TextResult call(String systemPrompt, GeminiFlash.GenerateContentRequest providerRequest, TextRequest request) {
         String raw;
         try {
             raw = transport.send(providerRequest);
@@ -118,13 +139,42 @@ public final class TextGenerationRuntime {
         } catch (Exception e) {
             if (isQuotaError(e)) {
                 quota.reportQuotaExceeded(e);
-                return TextResult.failure(TextResult.Status.QUOTA, "The Flash model quota is exhausted");
+                return viaFallback(systemPrompt, request, TextResult.Status.QUOTA, "The Flash model quota is exhausted");
             }
             McTalking.LOGGER.warn("[TextGeneration] {} request failed: {}", request.purpose(), e.getClass().getSimpleName());
+            if (isServiceError(e)) return viaFallback(systemPrompt, request, TextResult.Status.PROVIDER_ERROR, e.getClass().getSimpleName());
             return TextResult.failure(TextResult.Status.PROVIDER_ERROR, e.getClass().getSimpleName());
         }
         quota.reportSuccess();
         return interpret(raw, request);
+    }
+
+    /** Tries the fallback, or reports why Flash failed when there is none. */
+    private TextResult viaFallback(String systemPrompt, TextRequest request, TextResult.Status flashStatus,
+                                   String flashFailure) {
+        if (!fallbackAvailable()) return TextResult.failure(flashStatus, flashFailure);
+        McTalking.LOGGER.info("[TextGeneration] {} falling back to the Live model", request.purpose());
+        String system = request.responseSchema() == null
+                ? systemPrompt : LiveTextRequest.withSchema(systemPrompt, request.responseSchema());
+        try {
+            return interpret(fallback.send(system, userText(request)), request);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return TextResult.failure(TextResult.Status.CANCELLED, "Interrupted");
+        } catch (Exception e) {
+            McTalking.LOGGER.warn("[TextGeneration] {} Live fallback failed: {}", request.purpose(), e.getMessage());
+            return TextResult.failure(flashStatus, flashFailure + "; the Live fallback failed too");
+        }
+    }
+
+    private boolean fallbackAvailable() {
+        return fallback != null && fallback.available();
+    }
+
+    /** Server errors and network failures, which another model may not share. */
+    static boolean isServiceError(Exception e) {
+        if (e instanceof UnexpectedResponseException unexpected) return unexpected.getStatusCode() >= 500;
+        return e instanceof java.io.IOException;
     }
 
     static boolean isQuotaError(Exception e) {
@@ -142,18 +192,24 @@ public final class TextGenerationRuntime {
         system.parts = List.of(part(systemPrompt));
         providerRequest.system_instruction = system;
 
+        if (request.responseSchema() != null) {
+            providerRequest.generationConfig = GeminiFlash.GenerateContentRequest.GenerationConfig.json(request.responseSchema());
+        }
+        GeminiFlash.GenerateContentRequest.Content content = new GeminiFlash.GenerateContentRequest.Content();
+        content.parts = List.of(part(userText(request)));
+        providerRequest.contents = content;
+        return providerRequest;
+    }
+
+    static String userText(TextRequest request) {
         StringBuilder user = new StringBuilder(request.directive());
         if (request.maxChars() != null) {
             user.append("\n\nKeep it under ").append(request.maxChars()).append(" characters.");
         }
         if (request.responseSchema() != null) {
             user.append("\n\nAnswer only with JSON that matches the response schema. Write every text value in the language named above.");
-            providerRequest.generationConfig = GeminiFlash.GenerateContentRequest.GenerationConfig.json(request.responseSchema());
         }
-        GeminiFlash.GenerateContentRequest.Content content = new GeminiFlash.GenerateContentRequest.Content();
-        content.parts = List.of(part(user.toString()));
-        providerRequest.contents = content;
-        return providerRequest;
+        return user.toString();
     }
 
     static TextResult interpret(@Nullable String raw, TextRequest request) {

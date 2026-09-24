@@ -10,6 +10,7 @@ import me.sshcrack.mc_talking.api.service.TextService;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaRetryInfo;
 import me.sshcrack.mc_talking.config.QuotaTracker;
+import me.sshcrack.mc_talking.internal.text.LiveTextRequest;
 import me.sshcrack.mc_talking.internal.text.TextGenerationRuntime;
 import me.sshcrack.mc_talking.internal.text.TextPrompts;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
@@ -18,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
@@ -26,6 +28,19 @@ final class TextServiceBackend implements TextService {
     static final TextGenerationRuntime RUNTIME = new TextGenerationRuntime(
             request -> GeminiFlash.sendFlashRequest(McTalkingConfig.FLASH_MODEL,
                     McTalkingConfig.INSTANCE.instance().geminiApiKey, request, 1),
+            new TextGenerationRuntime.Fallback() {
+                @Override
+                public boolean available() {
+                    return McTalkingConfig.INSTANCE.instance().enableLiveTextFallback
+                            && !QuotaTracker.isQuotaExceeded(McTalkingConfig.CHEAP_LIVE_MODEL.getName());
+                }
+
+                @Override
+                public String send(String systemPrompt, String userText) throws Exception {
+                    // Its own slot owner per request: the slot capacity still limits how many run.
+                    return LiveTextRequest.send(UUID.randomUUID(), null, false, systemPrompt, userText, "[TextGeneration]");
+                }
+            },
             new TextGenerationRuntime.QuotaGate() {
                 @Override
                 public boolean exhausted() {
