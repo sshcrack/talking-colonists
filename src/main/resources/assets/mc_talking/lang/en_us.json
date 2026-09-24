@@ -329,6 +329,8 @@
   "mc_talking.config_preset.free_tier": "Free Tier",
   "mc_talking.config_preset.paid_key": "Paid Key",
   "mc_talking.config_preset.quiet_colony": "Quiet Colony",
+  "yacl3.config.mc_talking:config.enableLiveTextFallback": "Live Model Fallback for Memory",
+  "yacl3.config.mc_talking:config.enableLiveTextFallback.desc": "When Flash-Lite's daily quota is used up or it fails, write conversation memories and compaction with the cheap Live model instead. The Live model has no daily limit on the free tier, but uses one background Live session while it runs.",
   "yacl3.config.mc_talking:config.memoryMode": "Memory Mode",
   "yacl3.config.mc_talking:config.memoryMode.desc": "How memory compaction is performed. LIVE uses a text-only WebSocket session. FLASH uses the Gemini Flash API.",
   "yacl3.config.mc_talking:config.enableMemoryCompaction": "Enable Memory Compaction",

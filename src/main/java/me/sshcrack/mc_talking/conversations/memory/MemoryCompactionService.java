@@ -94,7 +94,9 @@ public class MemoryCompactionService {
         McTalking.LOGGER.info("[MemoryCompaction] Citizen {} has {} events and {} facts",
                 citizen.getCitizenData().getName(), mem.getEvents().size(), mem.getFacts().size());
 
-        if (McTalkingConfig.INSTANCE.instance().memoryMode == MemoryMode.FLASH) {
+        var config = McTalkingConfig.INSTANCE.instance();
+        boolean flashUsedUp = config.enableLiveTextFallback && QuotaTracker.isQuotaExceeded(McTalkingConfig.FLASH_MODEL);
+        if (config.memoryMode == MemoryMode.FLASH && !flashUsedUp) {
             startFlashCompaction(citizen);
         } else {
             startLiveCompaction(citizen);

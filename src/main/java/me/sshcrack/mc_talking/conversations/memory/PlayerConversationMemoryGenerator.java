@@ -3,8 +3,6 @@ package me.sshcrack.mc_talking.conversations.memory;
 import com.minecolonies.api.colony.IVisitorData;
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
-import me.sshcrack.gemini_live_lib.misc.GeminiFlash;
-import me.sshcrack.gemini_live_lib.misc.UnexpectedResponseException;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
@@ -12,7 +10,6 @@ import me.sshcrack.mc_talking.conversations.memory.gson.GsonMemoryResponse;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.server.MinecraftServer;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -101,7 +98,6 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
             McTalking.LOGGER.debug("[PlayerMemory] Generating memories for {} after conversation with {}", citizenName, playerName);
 
-            String apiKey = McTalkingConfig.INSTANCE.instance().geminiApiKey;
             String allowedTypes = Arrays.stream(CitizenRelationshipDimension.values())
                     .map(Enum::name)
                     .collect(Collectors.joining(", "));
@@ -115,17 +111,14 @@ public class PlayerConversationMemoryGenerator extends Thread {
 
             String responseJson;
             try {
-                responseJson = GeminiFlash.sendSimpleFlashRequest(
-                        McTalkingConfig.FLASH_MODEL,
-                        apiKey,
-                        prompt,
-                        "Generate the memory JSON now.",
-                        MemoryStructuredOutput.forPlayerConversation(citizenName, playerName));
+                responseJson = MemoryTextRequest.generate(citizen, server, prompt, "Generate the memory JSON now.",
+                        MemoryStructuredOutput.schema(MemoryResponseParser.ValidationContext.playerConversation(citizenName, playerName)),
+                        "[PlayerMemory]");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 McTalking.LOGGER.debug("[PlayerMemory] Thread interrupted for citizen {}", citizenName);
                 return;
-            } catch (UnexpectedResponseException | IOException e) {
+            } catch (MemoryTextRequest.FailedException e) {
                 McTalking.LOGGER.error("[PlayerMemory] Failed to generate player memories for citizen {}", citizenName, e);
                 return;
             }
