@@ -8,7 +8,9 @@ jobs:
   build:
     uses: ./.github/workflows/build_reusable.yml
 
-  pr-comment:
+  # Keeps a "Build files" section in the PR description up to date instead of commenting.
+  # Editing the description sends no notification emails, however often CI runs.
+  pr-build-files:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: build
@@ -23,37 +25,54 @@ jobs:
           name: build-artifacts
           path: build-artifacts
 
-      - name: Generate PR comment
+      - name: Write build files section
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[] | select(.name=="build-artifacts") | .id' | head -n1)
-          artifact_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          artifact_url="$RUN_URL#artifacts"
           if [ -n "$artifact_id" ]; then
-            artifact_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/$artifact_id"
+            artifact_url="$RUN_URL/artifacts/$artifact_id"
           fi
 
-          echo "## Build Artifacts" > comment.md
-          echo "" >> comment.md
-          echo "These JARs were built from this PR:" >> comment.md
-          echo "" >> comment.md
-          echo "| File | Size |" >> comment.md
-          echo "|------|------|" >> comment.md
-          find build-artifacts -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" -type f | sort | while read jar; do
-            name=$(basename "$jar")
-            size=$(du -h "$jar" | cut -f1)
-            echo "| [\`$name\`]($artifact_url) | $size |" >> comment.md
-          done
-          echo "" >> comment.md
-          echo "Download from the [GitHub Actions run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)." >> comment.md
-          cat comment.md
-          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 📦 Build files"
+            echo ""
+            echo "**[Download all jars (zip)]($artifact_url)**, built from \`${HEAD_SHA:0:7}\` · [CI run]($RUN_URL)"
+            echo ""
+            echo "<details><summary>Included jars</summary>"
+            echo ""
+            echo "| File | Size |"
+            echo "|------|------|"
+            find build-artifacts -name "*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" -type f | sort | while read jar; do
+              echo "| \`$(basename "$jar")\` | $(du -h "$jar" | cut -f1) |"
+            done
+            echo ""
+            echo "</details>"
+          } > section.md
+          cat section.md
+          cat section.md >> "$GITHUB_STEP_SUMMARY"
 
-      # Update one comment per PR instead of adding a new one each run: edits don't send
-      # notification emails, so a PR produces a single notification however often CI runs.
-      - name: Post or update PR comment
+      - name: Update PR description
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} \
-            --body-file comment.md --edit-last --create-if-none
+          # Read the current description right before writing, so recent author edits are kept.
+          gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""' > body.md
+          python3 - <<'PY'
+          import re
+          start, end = "<!-- build-files:start -->", "<!-- build-files:end -->"
+          body = open("body.md", encoding="utf-8").read().rstrip("\n")
+          block = f"{start}\n{open('section.md', encoding='utf-8').read().strip()}\n{end}"
+          pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.S)
+          if pattern.search(body):
+              body = pattern.sub(lambda _: block, body)
+          else:
+              body = f"{body}\n\n---\n{block}" if body else block
+          open("body.md", "w", encoding="utf-8").write(body + "\n")
+          PY
+          gh pr edit "$PR_NUMBER" --repo "$REPO" --body-file body.md
