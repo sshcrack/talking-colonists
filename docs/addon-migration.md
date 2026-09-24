@@ -278,6 +278,28 @@ A typical meeting addon should:
 
 Use `createPairConversation(...)` for ordinary two-citizen autonomous conversation flow.
 
+## Moving to API 2.1
+
+API 2.1 is additive: an addon built for 2.0 runs unchanged on 2.1. It adds supported replacements for
+several internals that addons read in 2.0. Guard each one with `TalkingColonistsApi.supports(...)` (see
+[Feature detection](addon-api.md#feature-detection)) so the addon keeps working on 2.0.x runtimes:
+
+| Instead of | Use (2.1) | `ApiFeature` |
+|---|---|---|
+| Reflection on `McTalkingConfig` (`INSTANCE`, `geminiApiKey`, `hasGeminiApiKey()`, `currentAiModel`, `blockingTaskUrgencyMultiplier`) | `ProviderBudgetService.config()`: `apiKeySet`, `liveModel`, `textModel`, `blockingTaskUrgencyMultiplier` | `PROVIDER_BUDGET` |
+| Reflection on `McTalkingConfig.load()` after editing the config file | `ProviderBudgetService.reloadConfig()` | `PROVIDER_BUDGET` |
+| Reading quota or slot state from managers | `ProviderBudgetService.snapshot()`, `registerQuotaListener(...)` | `PROVIDER_BUDGET` |
+| `internal.tool.AiToolRuntime.findById(...).providerName()` | `AiToolRegistry.providerName(addonId, tool)` (2.0) | none |
+| Injecting news through the `initiate_broadcast` tool or memory internals | `CitizenMemoryService.publishBroadcast(colony, request)` | `BROADCAST_PUBLISHING` |
+| Hooking transcripts or websocket callbacks to follow what was said | `CitizenConversationService.registerUtteranceListener(...)` | `UTTERANCE_EVENTS` |
+| Temporarily swapping global prompts for a quest conversation | `startPlayerConversation(player, citizen, PlayerConversationOptions...)` | `PLAYER_CONVERSATION_OPTIONS` |
+| Sending text into a live session through a provider client | `CitizenConversationService.sendPlayerText` / `addContext` | `PLAYER_TEXT_INPUT` |
+| Calling Gemini yourself for letters or notices | `CitizenTextService.generate` / `generateColonyVoice` | `TEXT_GENERATION` |
+
+On a 2.0 runtime these features report unsupported, so keep a fallback there. That can be the old
+reflection path if the addon already has one, or simply skipping the feature. For the full list of 2.1
+features see [API 2.1 at a glance](addon-api.md#api-21-at-a-glance).
+
 ## Migration checklist
 
 Before declaring an addon API-generation-2 compatible:

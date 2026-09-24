@@ -81,6 +81,24 @@ int minor = services.apiMinorVersion();
 boolean broadcastReady = TalkingColonistsApi.supports(ApiFeature.BROADCAST_PUBLISHING);
 ```
 
+### API 2.1 at a glance
+
+Every 2.1 feature is implemented in Talking Colonists 2.1.0 (`API_MINOR_VERSION` 1). The compile-checked
+example for each one is in `src/apiTest/.../Api21FeaturesExample.java`.
+
+| `ApiFeature` | Roadmap | Entry points | Section |
+|---|---|---|---|
+| `BROADCAST_PUBLISHING` | A1 | `CitizenMemoryService.publishBroadcast`, `retractBroadcast` | [Publishing colony broadcasts](#publishing-colony-broadcasts-api-21-apifeaturebroadcast_publishing) |
+| `COLONY_EVENTS` | A2 | `ColonyEventService.recent`, `record`, `registerListener` | [Colony event feed](#colony-event-feed-api-21-apifeaturecolony_events) |
+| `TEXT_GENERATION` | A3 | `CitizenTextService.generate`, `generateColonyVoice` | [In-character text generation](#in-character-text-generation-api-21-apifeaturetext_generation) |
+| `PLAYER_TEXT_INPUT` | A4 | `CitizenConversationService.sendPlayerText`, `addContext` | [Player text input](#player-text-input-api-21-apifeatureplayer_text_input) |
+| `UTTERANCE_EVENTS` | A5 | `CitizenConversationService.registerUtteranceListener` | [Utterance events](#utterance-events) |
+| `PLAYER_CONVERSATION_OPTIONS` | A6 | `CitizenConversationService.startPlayerConversation(player, citizen, options)` | [Starting speech and conversations](#starting-speech-and-conversations) |
+| `PROVIDER_BUDGET` | A7 | `ProviderBudgetService.snapshot`, `config`, `registerQuotaListener`, `reloadConfig` | [Provider capacity and quota](#provider-capacity-and-quota) |
+| `VISITOR_SPEAKERS` | A8 | `CitizenConversationRules.registerVisitorPolicy`, `CitizenPromptView.visitor()` | [Visitors](#visitors-tavern-guests) |
+| `CROSS_COLONY_SESSIONS` | A9 | `createControlledSession` with attendees from several colonies, `ControlledSessionRejectedException` | [Controlled meetings and councils](#controlled-meetings-and-councils) |
+| `PLAYER_SPEECH_CAPTURE` | A10 | `PlayerSpeechCapture.capture`, `cancel`, `isCapturing` | [Player speech capture](#player-speech-capture-api-21-apifeatureplayer_speech_capture) |
+
 ### Why this exists
 
 At runtime, `TalkingColonistsApi` and every other API class are loaded from the **installed**
