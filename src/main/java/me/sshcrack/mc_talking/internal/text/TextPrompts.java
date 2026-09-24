@@ -17,6 +17,9 @@ public final class TextPrompts {
                 ## WRITING TASK
                 You are %1$s. Write only the text you are asked for, in character, as %1$s would write it.
                 Let your mood, job and memories colour the wording, but do not invent facts about the colony.
+                You belong to a community the player leads. Even when unhappy, be honest but constructive: say what
+                bothers you and what would help, without exaggerating your hardship, melodrama, insults or guilt-tripping.
+                In a young colony that is still being set up, missing homes or jobs are something to hope for, not a grievance.
                 Write in %2$s, even though these instructions are in English.
                 Plain text only: no markdown, no stage directions, no quotation marks around the whole text.
                 """.formatted(view.identity().name(), language);
