@@ -8,8 +8,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class EndConversationAction extends GeneralFunctionAction {
+    public static final String NAME = "end_conversation";
+
     public EndConversationAction() {
-        super("end_conversation", """
+        super(NAME, """
                 Gracefully terminates the current autonomous conversation after audible playback drains.
                 If a farewell is appropriate, say exactly one short goodbye BEFORE invoking this tool.
                 After invoking it, do not repeat or rephrase the farewell.
