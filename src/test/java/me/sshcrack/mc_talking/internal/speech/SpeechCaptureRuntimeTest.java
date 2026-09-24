@@ -291,4 +291,14 @@ class SpeechCaptureRuntimeTest {
             }
         }
     }
+
+    @Test
+    void countdownRoundsUpAndStopsAtZero() {
+        long second = 1_000_000_000L;
+        assertEquals(30, SpeechCaptureRuntime.secondsLeft(30 * second, 0));
+        assertEquals(25, SpeechCaptureRuntime.secondsLeft(30 * second, 5 * second + 1));
+        assertEquals(1, SpeechCaptureRuntime.secondsLeft(30 * second, 30 * second - 1));
+        assertEquals(0, SpeechCaptureRuntime.secondsLeft(30 * second, 31 * second));
+    }
+
 }

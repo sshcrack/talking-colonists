@@ -2,6 +2,7 @@ package me.sshcrack.mc_talking.internal.api;
 
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
 import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
+import me.sshcrack.mc_talking.api.speech.PlayerSpeechCapture;
 import me.sshcrack.mc_talking.api.speech.SpeechCaptureResult;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
@@ -25,6 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Wires {@link SpeechCaptureRuntime} to Simple Voice Chat, the Flash model and the player's action
@@ -39,6 +42,10 @@ public final class PlayerSpeechServiceBackend implements PlayerSpeechService {
     });
     private static final Map<UUID, OpusDecoder> DECODERS = new ConcurrentHashMap<>();
     private static final Map<UUID, ScheduledFuture<?>> INDICATOR_REFRESH = new ConcurrentHashMap<>();
+    /** When each running capture stops listening at the latest ({@link System#nanoTime}), for the countdown. */
+    private static final Map<UUID, Long> DEADLINES = new ConcurrentHashMap<>();
+    /** The countdown turns into a hurry-up for the last seconds. */
+    static final int HURRY_SECONDS = 5;
     private static volatile @Nullable MinecraftServer server;
 
     static final SpeechCaptureRuntime RUNTIME = new SpeechCaptureRuntime(
@@ -56,6 +63,8 @@ public final class PlayerSpeechServiceBackend implements PlayerSpeechService {
     public @NotNull CompletableFuture<SpeechCaptureResult> capture(@NotNull ServerPlayer player, @NotNull Duration maxDuration) {
         Objects.requireNonNull(player, "player");
         server = player.getServer();
+        Duration listening = maxDuration.compareTo(PlayerSpeechCapture.MAX_DURATION) > 0 ? PlayerSpeechCapture.MAX_DURATION : maxDuration;
+        if (!RUNTIME.isCapturing(player.getUUID())) DEADLINES.put(player.getUUID(), System.nanoTime() + listening.toNanos());
         CompletableFuture<SpeechCaptureResult> result = RUNTIME.start(player.getUUID(), maxDuration);
         return result.whenComplete((outcome, error) -> reportQuota(outcome));
     }
@@ -134,31 +143,41 @@ public final class PlayerSpeechServiceBackend implements PlayerSpeechService {
     private static final class ActionBarIndicator implements SpeechCaptureRuntime.Indicator {
         @Override
         public void listening(UUID player) {
-            show(player, Component.translatable("mc_talking.speech_capture.listening").withStyle(ChatFormatting.RED));
+            show(player, () -> {
+                Long deadline = DEADLINES.get(player);
+                if (deadline == null) return Component.translatable("mc_talking.speech_capture.listening").withStyle(ChatFormatting.RED);
+                long left = SpeechCaptureRuntime.secondsLeft(deadline, System.nanoTime());
+                return left <= HURRY_SECONDS
+                        ? Component.translatable("mc_talking.speech_capture.listening_hurry", left).withStyle(ChatFormatting.RED, ChatFormatting.BOLD)
+                        : Component.translatable("mc_talking.speech_capture.listening_left", left).withStyle(ChatFormatting.RED);
+            });
         }
 
         @Override
         public void transcribing(UUID player) {
             closeDecoder(player);
-            show(player, Component.translatable("mc_talking.speech_capture.transcribing").withStyle(ChatFormatting.GRAY));
+            DEADLINES.remove(player);
+            show(player, () -> Component.translatable("mc_talking.speech_capture.transcribing").withStyle(ChatFormatting.GRAY));
         }
 
         @Override
         public void finished(UUID player) {
             closeDecoder(player);
+            DEADLINES.remove(player);
             ScheduledFuture<?> refresh = INDICATOR_REFRESH.remove(player);
             if (refresh != null) refresh.cancel(false);
             onServerThread(player, target -> target.displayClientMessage(Component.empty(), true));
         }
 
-        private static void show(UUID player, Component message) {
+        /** Redrawn every second, so a countdown ticks and the text never fades while it is current. */
+        private static void show(UUID player, Supplier<Component> message) {
             ScheduledFuture<?> previous = INDICATOR_REFRESH.put(player, SCHEDULER.scheduleAtFixedRate(
-                    () -> onServerThread(player, target -> target.displayClientMessage(message, true)),
+                    () -> onServerThread(player, target -> target.displayClientMessage(message.get(), true)),
                     0, 1, TimeUnit.SECONDS));
             if (previous != null) previous.cancel(false);
         }
 
-        private static void onServerThread(UUID player, java.util.function.Consumer<ServerPlayer> action) {
+        private static void onServerThread(UUID player, Consumer<ServerPlayer> action) {
             MinecraftServer current = server;
             if (current == null) return;
             current.execute(() -> {
