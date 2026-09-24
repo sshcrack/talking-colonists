@@ -1,8 +1,11 @@
 package me.sshcrack.mc_talking.util;
 
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 public class MiscUtil {
+    private static final ThreadLocal<Boolean> FIRST_PICKS = ThreadLocal.withInitial(() -> false);
+
     public static String describeTime(long dayTime) {
         if (dayTime < 1000) return "early morning (sunrise)";
         if (dayTime < 6000) return "morning";
@@ -15,6 +18,18 @@ public class MiscUtil {
     }
 
     public static String pick(String... options) {
+        if (FIRST_PICKS.get()) return options[0];
         return options[ThreadLocalRandom.current().nextInt(options.length)];
+    }
+
+    /** Runs {@code action} with {@link #pick} always returning its first option, so prompt text is reproducible. */
+    public static <T> T withFirstPicks(Supplier<T> action) {
+        boolean previous = FIRST_PICKS.get();
+        FIRST_PICKS.set(true);
+        try {
+            return action.get();
+        } finally {
+            FIRST_PICKS.set(previous);
+        }
     }
 }

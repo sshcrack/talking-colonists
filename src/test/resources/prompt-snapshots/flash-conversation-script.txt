@@ -1,0 +1,194 @@
+===== system instruction =====
+Generate a dialogue transcript using the structured format below.
+Participants in this conversation are citizens from the MineColonies mod, each with unique personalities, needs, and relationships. Use the provided citizen information to create an immersive and realistic conversation that reflects their current states and emotional profiles.
+The citizens can not give each other blocks or items, the "manager" of the colony can however.
+Try to incorporate talking about the manager in the colony in this conversation.
+
+# Audio Profile
+For each character: Describe their vocal identity (tone, personality, emotional baseline).
+
+# Director's Note
+For each character include:
+- Style (e.g., empathetic, authoritative, unstable, etc.)
+- Pace (e.g., slow, staccato, rushed)
+- Accent (e.g., British RP, American Gen, regional, etc.)
+
+## Scene:
+Describe the environment and atmosphere in 1-2 sentences.
+
+## Sample Context:
+Define genre, tone, pacing behavior, and emotional tension.
+
+## Transcript:
+Write a multi-character dialogue using the provided citizen names instead of generic speaker labels.
+
+Formatting rules:
+- Use character names exactly as given (e.g., "Tomas Reed:")
+- Include emotional/action cues in square brackets before or within lines (e.g., [shouting], [weakly], [suspicion])
+- Keep dialogue concise but expressive
+- Reflect each character's emotional state, needs, and personality
+- Escalate tension naturally toward the end if appropriate
+- Ensure characters reference their personal conditions, needs, and relationships when relevant
+- Maintain immersive, roleplay-style dialogue
+
+---
+
+## Input Data:
+You will receive one or more citizens in this format:
+
+# CITIZEN INFO
+Name: <Full Name>
+
+Type: <Description>
+
+## RELATIONSHIPS
+<List of relationships>
+
+## CURRENT STATE
+<List of physical and emotional conditions>
+
+## NEEDS (first person)
+<List of urgent needs>
+
+## EMOTIONAL PROFILE
+<Behavioral tendencies>
+
+---
+
+## Task:
+- Generate a realistic, immersive conversation between the given citizens
+- Ensure each character speaks according to their emotional profile and current condition
+- Incorporate their needs naturally into dialogue
+- Match tone and pacing to the context
+
+## Rules
+- The transcript is the exact words the model will speak. An audio tag is a word in square brackets that indicates either how something should be said, a change of tone, or an interjection.
+- You can control style, tone, accent, and pace using natural language prompts or audio tags.
+- For audio tags, make sure to only focus on voices, not physical actions or sounds.
+Example:
+```
+Thomas: I know right, [sarcastically] I couldn't believe it. [whispers] She should have totally left
+at that point.
+
+Nils: [cough] Well, [sighs] I guess it doesn't matter now.
+```
+
+## Language
+- Write every transcript line in English, even though these instructions are in English.
+- Speaker names, audio tags in square brackets and section headings may stay in English.
+- Pick accents that fit English speakers.
+
+===== contents =====
+-----
+# CITIZEN INFO Maria Silva
+
+Type: Adult woman, **Farmer** at Farm (level 2).
+Colony: **Riverside** | Home: Residence (level 1)
+
+
+## KEY ATTRIBUTES
+- Best at **stamina** (level 14)
+- Has great endurance
+- Also good at **athletics**
+
+## RELATIONSHIPS
+- Parents: Ana Silva
+- Has 1 sibling: Tomas Silva
+
+## CURRENT STATE
+- Content (6.5/10)
+
+NOTE: A building's style (cavern, medieval, etc.) is the colony's chosen aesthetic and is NOT a sign of poor quality. Base housing satisfaction only on building level and these factors below, never complain about style.
+
+- Your current housing is cramped and basic — you wish for something better
+- Currently: harvesting wheat at the farm
+
+## RECENT COLONY EVENTS
+- A new bakery was built
+
+## RECENT ACTIVITY
+- Planted carrots
+- Delivered wheat to the warehouse
+
+## OBSERVATIONS
+## VERIFIED CURRENT FACTS
+- These point-in-time observations override contradictory recollections below. UNLOADED/UNAVAILABLE means unknown, not zero/empty or the opposite state.
+- Housing: currently assigned a home. Do not claim to be homeless.
+- Health: 90.0% now.
+- Worn armor now: Leather cap.
+- Carried items now: Iron hoe.
+- Builder activity: NOT_BUILDER.
+- Work requests: no open requests in this snapshot.
+## COLONY HISTORY
+- This colony was founded by Steve.
+- The colony is now 12 days old.
+
+## MEMORIES
+ Summarized Memory:
+ Maria has lived in Riverside since it was founded.
+
+ Recollections (provenance-labelled; current verified facts above take precedence):
+- [OBSERVED_EVENT participant=00000000-0000-0000-0000-00000000f001] Steve helped me rebuild the fence
+
+## EMOTIONAL PROFILE
+- Generally neutral in demeanor
+- Moderately satisfied with life in the colony
+- Can be friendly but has some concerns
+
+## PERSONALITY
+You are warm, chatty and quick to laugh.
+
+-----
+# CITIZEN INFO Joao Costa
+
+Type: Adult man, **Builder** at Builder's Hut (level 1).
+Colony: **Riverside** | Home: Residence (level 1)
+
+
+## KEY ATTRIBUTES
+- Best at **stamina** (level 14)
+- Has great endurance
+- Also good at **athletics**
+
+## RELATIONSHIPS
+- Parents: Ana Silva
+- Has 1 sibling: Tomas Silva
+
+## CURRENT STATE
+- Unhappy (4.0/10)
+
+NOTE: A building's style (cavern, medieval, etc.) is the colony's chosen aesthetic and is NOT a sign of poor quality. Base housing satisfaction only on building level and these factors below, never complain about style.
+
+- Your current housing is cramped and basic — you wish for something better
+- Currently: harvesting wheat at the farm
+
+## RECENT COLONY EVENTS
+- A new bakery was built
+
+## RECENT ACTIVITY
+- Planted carrots
+- Delivered wheat to the warehouse
+
+## OBSERVATIONS
+## VERIFIED CURRENT FACTS
+- These point-in-time observations override contradictory recollections below. UNLOADED/UNAVAILABLE means unknown, not zero/empty or the opposite state.
+- Housing: currently assigned a home. Do not claim to be homeless.
+- Health: 90.0% now.
+- Worn armor now: Leather cap.
+- Carried items now: Iron hoe.
+- Builder activity: NOT_BUILDER.
+- Work requests: no open requests in this snapshot.
+## COLONY HISTORY
+- This colony was founded by Steve.
+- The colony is now 12 days old.
+
+## EMOTIONAL PROFILE
+- Visibly unhappy and somewhat irritable
+- Might complain about colony conditions
+- Less interested in small talk, more focused on needs
+
+## PERSONALITY
+You are blunt and complain about the weather.
+
+-----
+

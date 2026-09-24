@@ -108,7 +108,7 @@ public class CitizenConversationGenerator {
                 """.formatted(languageName);
     }
 
-    private static GeminiTTS.RequestPayload getTTSPrompt(String conversation, String languageName, List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs) {
+    static GeminiTTS.RequestPayload getTTSPrompt(String conversation, String languageName, List<GeminiTTS.RequestPayload.SpeakerVoiceConfig> speakerVoiceConfigs) {
         GeminiTTS.RequestPayload payload = new GeminiTTS.RequestPayload();
 
         GeminiTTS.RequestPayload.Content content = new GeminiTTS.RequestPayload.Content();
@@ -148,7 +148,7 @@ public class CitizenConversationGenerator {
         return payload;
     }
 
-    private static GeminiFlash.GenerateContentRequest getFlashPrompt(String citizenInfo, String languageName) {
+    static GeminiFlash.GenerateContentRequest getFlashPrompt(String citizenInfo, String languageName) {
         GeminiFlash.GenerateContentRequest request = new GeminiFlash.GenerateContentRequest();
 
         GeminiFlash.GenerateContentRequest.SystemInstruction systemInstruction = new GeminiFlash.GenerateContentRequest.SystemInstruction();
@@ -166,16 +166,24 @@ public class CitizenConversationGenerator {
         return request;
     }
 
+    /** Conversational info for every participant, separated the way the script prompt expects. */
+    static StringBuilder participantInfo(List<CitizenPromptView> views) {
+        StringBuilder citizenInfo = new StringBuilder("-----\n");
+        for (CitizenPromptView view : views) {
+            citizenInfo.append(PromptRuntime.generateConversationalInfoPrompt(view)).append("\n-----\n");
+        }
+        return citizenInfo;
+    }
+
     public static String generateConversation(
             List<PromptParticipant> participants,
             Consumer<GeminiTTS.AudioChunk> chunkConsumer
     ) throws ConversationGenerationException {
-        StringBuilder citizenInfo = new StringBuilder("-----\n");
+        StringBuilder citizenInfo = participantInfo(participants.stream().map(PromptParticipant::view).toList());
         List<TtsVoiceRecovery.Speaker> ttsSpeakers = new ArrayList<>();
 
         for (PromptParticipant participant : participants) {
             CitizenPromptView view = participant.view();
-            citizenInfo.append(PromptRuntime.generateConversationalInfoPrompt(view)).append("\n-----\n");
             ttsSpeakers.add(new TtsVoiceRecovery.Speaker(
                     participant.citizenId(),
                     view.identity().name(),

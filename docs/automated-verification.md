@@ -67,13 +67,33 @@ source set like `main`, so `/*? if neoforge {*/` conditionals work there.
 - Current tests: `promptViewReflectsHousingAndJob` (public `CitizenContextService`
   snapshot before/after a real residence + builder hut assignment) and
   `eligibilityRejectsSleepingCitizen` (awake control is eligible; asleep is `SLEEPING`
-  for every `ConversationKind`). The ambient speech budget test is pending Q4.
+  for every `ConversationKind`). The ambient speech budget has no GameTest (it counts
+  listed server players, which a GameTest cannot add); `AmbientSpeechBudgetRegistryTest`
+  covers it.
 
 To add a test, add a `public static void name(GameTestHelper helper)` method annotated
 with `@GameTest(template = "empty_floor", batch = "<unique batch>")` to a class annotated
 with `@GameTestHolder("mc_talking")` and `@PrefixGameTestTemplate(false)`, build state
 with `ColonyTestHarness` in try-with-resources, assert with `helper.assertTrue`, and end
 with `helper.succeed()`.
+
+## Prompt snapshots
+
+`PromptSnapshotTest` renders every prompt path the mod sends to Gemini (player roleplay,
+system-controlled roleplay, Flash conversation script, TTS request, pregenerated greeting)
+from `CitizenPromptViewFixture` and compares it with the text files in
+`src/test/resources/prompt-snapshots/`. Random phrase picks are pinned to their first option
+(`MiscUtil.withFirstPicks`) and config-driven limits use the shipped defaults, so output is
+stable on both loaders. `PromptInvariantTest` checks rules independent of wording: the
+configured language reaches every speech prompt, the housing section says building style is
+not a complaint, and live roleplay prompts forbid markdown.
+
+After an intended prompt change:
+
+```sh
+UPDATE_PROMPT_SNAPSHOTS=1 ./gradlew :1.21.1-neoforge:test --tests '*PromptSnapshotTest' --rerun
+git diff src/test/resources/prompt-snapshots/
+```
 
 ## Optional real Gemini check
 

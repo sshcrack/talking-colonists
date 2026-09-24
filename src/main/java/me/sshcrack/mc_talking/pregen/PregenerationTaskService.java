@@ -172,11 +172,7 @@ public class PregenerationTaskService {
         PregenerationKind kind = isThreat
                 ? PregenerationKind.THREAT
                 : (isPlayerGreeting ? PregenerationKind.PLAYER_GREETING : PregenerationKind.CITIZEN_GREETING);
-        if (kind != PregenerationKind.THREAT) {
-            prompt += " IMPORTANT: this line is cached and may be heard much later. "
-                    + "Do not mention the current time of day, light level, weather, or a meal you are about to have; "
-                    + "use wording that remains true whenever the cached line is played.";
-        }
+        prompt = PregenerationPrompts.withCacheSafetyNote(prompt, kind);
         prompt = PregenerationPromptRuntime.apply(new PregenerationPromptContext(citizen, kind), prompt);
 
         AvailableAI model = isThreat
@@ -418,8 +414,7 @@ public class PregenerationTaskService {
         String key = greeter.getUUID() + ":" + greeted.getUUID();
         if (!pendingRegen.add(key)) return;
 
-        String prompt = "Generate a brief 1-sentence passing greeting for your friend "
-            + greeted.getCitizenData().getName() + ".";
+        String prompt = PregenerationPrompts.citizenGreeting(greeted.getCitizenData().getName());
         boolean started = startPregenerationIfPossible(greeter, prompt, audio -> {
             replaceGreeting(greeter.getUUID(), greeted.getUUID(), audio);
         }, false, false);
