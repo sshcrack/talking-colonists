@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
@@ -27,8 +28,10 @@ public class CasualGreetingHandler {
 
     public static void checkForCasualGreeting(ServerPlayer player, List<AbstractEntityCitizen> citizens,
                                                Set<UUID> greetedThisInterval) {
-        if (!McTalkingConfig.hasGeminiApiKey())
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            MissingApiKeyLogger.warnOnce("casual greetings");
             return;
+        }
 
         double casualWeight = McTalkingConfig.INSTANCE.instance().citizenCasualGreetingWeight;
         if (casualWeight <= 0)

@@ -46,6 +46,18 @@ automatic features (greetings, mumbling) log the missing key once instead of sil
 
 - Translatable message; only operators receive it; never repeated within a session.
 
+
+### Implementation record — 2026-09-24
+
+- `handler/MissingApiKeyOnboardingHandler` + `onboarding/MissingKeyOnboardingTracker`: on login, an
+  operator (permission ≥ 2, or the single-player/LAN owner) without a configured key gets one
+  translated message with a clickable AI Studio link, once per player per server session. On an
+  integrated server it also offers "open config", which runs the client-only command
+  `/mc_talking_open_config` (registered in `McTalkingClient`) to open the YACL screen.
+- `onboarding/MissingApiKeyLogger`: automatic handlers (greetings, urgent contact, random
+  conversations, pregeneration) log the missing key once instead of silently returning.
+- Tests: `MissingKeyOnboardingTrackerTest`, `MissingApiKeyLoggerTest`; `./gradlew test` passed on both loaders.
+- Manual check pending: clicking "open config" in chat opens and keeps the config screen on both loaders.
 ---
 
 ## Q2 — Quota exhaustion visible to players

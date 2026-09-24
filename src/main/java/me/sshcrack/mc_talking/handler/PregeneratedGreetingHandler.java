@@ -4,6 +4,7 @@ import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import me.sshcrack.mc_talking.pregen.PregenerationTaskService;
 import net.minecraft.server.level.ServerPlayer;
@@ -70,8 +71,10 @@ public class PregeneratedGreetingHandler {
     }
 
     public static void playPregeneratedPlayerGreetings(ServerPlayer player, List<AbstractEntityCitizen> citizens) {
-        if (!McTalkingConfig.hasGeminiApiKey())
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            MissingApiKeyLogger.warnOnce("pregenerated player greetings");
             return;
+        }
 
         UUID playerId = player.getUUID();
         double triggerDist = McTalkingConfig.INSTANCE.instance().playerGreetingDistance;

@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.internal.session.UrgentContactLifecycleModule;
+import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -39,7 +40,10 @@ public class UrgentContactHandler {
             List<AbstractEntityCitizen> citizens,
             Set<UUID> contactedThisInterval
     ) {
-        if (!McTalkingConfig.hasGeminiApiKey()) return;
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            MissingApiKeyLogger.warnOnce("citizen-initiated contact");
+            return;
+        }
 
         int playerCooldownSecs = McTalkingConfig.INSTANCE.instance().playerUrgentContactCooldownSeconds;
         if (playerCooldownSecs > 0 && lifecycle.isPlayerOnCooldown(

@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.CitizenConversation;
 import me.sshcrack.mc_talking.network.AiStatus;
+import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.util.AiStatusHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,8 +24,10 @@ public class RandomConversationHandler {
     }
 
     public static void checkForRandomConversations(MinecraftServer server) {
-        if (!McTalkingConfig.hasGeminiApiKey())
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            MissingApiKeyLogger.warnOnce("random citizen-to-citizen conversations");
             return;
+        }
 
         double range = McTalkingConfig.INSTANCE.instance().citizenInteractionRange * 2;
 

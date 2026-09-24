@@ -9,6 +9,7 @@ import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.AvailableAI;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.manager.CitizenPromptViewFactory;
+import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.util.BackgroundSlotType;
 import me.sshcrack.mc_talking.util.CitizenHelper;
@@ -82,7 +83,10 @@ public class PregenerationTaskService {
             HeatmapTracker.decayScores();
         }
 
-        if (!McTalkingConfig.hasGeminiApiKey()) return;
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            MissingApiKeyLogger.warnOnce("pregeneration");
+            return;
+        }
 
         // Priority 1: Player greeting pregen — ensure at least 1 is running if possible
         if (McTalkingConfig.INSTANCE.instance().enablePlayerGreetingPregen && playerGreetingActiveCount.get() < 2) {
@@ -160,7 +164,10 @@ public class PregenerationTaskService {
     private static boolean startPregenerationIfPossible(AbstractEntityCitizen citizen, String prompt,
                                                          java.util.function.Consumer<AudioChunk> onComplete,
                                                          boolean isThreat, boolean isPlayerGreeting) {
-        if (!McTalkingConfig.hasGeminiApiKey()) return false;
+        if (!McTalkingConfig.hasGeminiApiKey()) {
+            MissingApiKeyLogger.warnOnce("pregeneration");
+            return false;
+        }
 
         PregenerationKind kind = isThreat
                 ? PregenerationKind.THREAT
