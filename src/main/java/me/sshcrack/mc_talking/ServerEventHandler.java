@@ -137,6 +137,7 @@ public class ServerEventHandler {
         ConversationManager.cleanup();
 
         CasualGreetingHandler.onServerStop();
+        AmbientSessions.onServerStop();
         NewsParticles.clear();
         PlayerHeatmapTracker.clear();
     }

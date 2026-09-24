@@ -85,14 +85,15 @@ public class CitizenDataMixin implements CitizenDataMemoryExtended, CitizenDataP
             return;
         }
 
+        // A controlled turn (e.g. a campfire story) must not be told to end mid-sentence.
+        if (!client.sendStatusUpdates()) {
+            return;
+        }
+
         if (status == VisibleCitizenStatus.SLEEP) {
             McTalking.LOGGER.info("[STATUS] Sending sleep prompt");
             client.setLastStatus(status);
             client.addPromptTextAfterTalkingComplete(SLEEP_PROMPT);
-            return;
-        }
-
-        if (!client.sendStatusUpdates()) {
             return;
         }
 
