@@ -8,6 +8,8 @@ import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
+import me.sshcrack.mc_talking.internal.session.AmbientSpeechBudget;
+import me.sshcrack.mc_talking.internal.session.ConversationEventDispatch;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.config.ConversationMode;
@@ -108,7 +110,7 @@ public class CitizenConversation {
         // WebSocket mode, or whether one falls back to the other).
         AbstractEntityCitizen first = participants.get(0);
         AbstractEntityCitizen second = participants.size() > 1 ? participants.get(1) : null;
-        if (!ConversationManager.trySpendAmbientSpeechBudget(first, second)) {
+        if (!AmbientSpeechBudget.trySpend(first, second)) {
             setState(ConversationState.ENDED);
             return;
         }
@@ -269,7 +271,7 @@ public class CitizenConversation {
                 // generated conversation was actually heard to completion. Aborted or
                 // timed-out playback must not create memories for unheard dialogue.
                 if (!cancellation.isCancelled() && playbackCompleted && playbackStarted.get()) {
-                    ConversationManager.emitScriptUtterances(participants, completedTranscript);
+                    ConversationEventDispatch.scriptUtterances(participants, completedTranscript);
                 }
                 if (!cancellation.isCancelled() && playbackCompleted && playbackStarted.get()
                         && McTalkingConfig.INSTANCE.instance().enableConversationSummaryAndMemorize) {
