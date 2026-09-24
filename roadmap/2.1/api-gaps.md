@@ -308,6 +308,26 @@ expensive work (nightly newspaper, campfire nights) and to show honest "citizens
 
 - Tests cover state transitions, listener delivery, and that the view is immutable.
 
+### Implementation record — 2026-09-24
+
+- **API** (additive, `ApiFeature.PROVIDER_BUDGET` now supported):
+  - `api.provider.ProviderBudgetService` with `snapshot()`, `config()`, `registerQuotaListener` and
+    `reloadConfig()`, backed by a default `Services.providerStatus()`.
+  - Views: `ProviderBudgetView` (foreground and background `SlotUsage`, the quota of the Live model, the
+    text model and `"tts"`), `ModelQuotaView` (`OK` / `EXHAUSTED` with an optional `exhaustedUntil` /
+    `UNKNOWN` when no API key is set), and `ProviderConfigView` (API key set, Live model, text model,
+    blocking-task urgency multiplier).
+  - The key itself is never exposed.
+- **Runtime:** `internal/provider/ProviderBudgetRuntime` reads through a `Sources` interface. The server
+  tick polls it once a second and notifies listeners of each changed model on the server thread, so an
+  expiring backoff also produces an event. `reloadConfig()` reloads the YACL config from disk.
+- **Tests:** `ProviderBudgetRuntimeTest` covers:
+  - slots and models in the snapshot
+  - `UNKNOWN` without a key
+  - one event per transition, including the recovery
+  - a failing listener does not block the others
+  - immutable views
+
 ---
 
 ## A8 — Visitor speakers

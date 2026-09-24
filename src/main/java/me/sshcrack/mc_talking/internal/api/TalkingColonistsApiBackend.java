@@ -4,6 +4,7 @@ import me.sshcrack.mc_talking.api.ApiFeature;
 import me.sshcrack.mc_talking.api.TalkingColonistsApi;
 import me.sshcrack.mc_talking.api.service.ColonyEventFeedService;
 import me.sshcrack.mc_talking.api.service.ContextService;
+import me.sshcrack.mc_talking.api.service.ProviderStatusService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
@@ -28,11 +29,13 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
      */
     private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
-            ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS);
+            ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
+            ApiFeature.PROVIDER_BUDGET);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();
     private final ColonyEventFeedService colonyEvents = new ColonyEventFeedServiceBackend();
+    private final ProviderStatusService providerStatus = new ProviderStatusServiceBackend();
     private final ConversationRuleService conversationRules = new ConversationRuleServiceBackend();
     private final PregenerationService pregeneration = new PregenerationServiceBackend();
     private final ToolService tools = new ToolServiceBackend();
@@ -49,6 +52,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     @Override public @NotNull PromptService prompts() { return prompts; }
     @Override public @NotNull TextService text() { return text; }
     @Override public @NotNull ColonyEventFeedService colonyEvents() { return colonyEvents; }
+    @Override public @NotNull ProviderStatusService providerStatus() { return providerStatus; }
     @Override public @NotNull ConversationRuleService conversationRules() { return conversationRules; }
     @Override public @NotNull PregenerationService pregeneration() { return pregeneration; }
     @Override public @NotNull ToolService tools() { return tools; }

@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking;
 
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
+import me.sshcrack.mc_talking.internal.api.ProviderStatusServiceBackend;
 import me.sshcrack.mc_talking.commands.McTalkingDebugCommand;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.conversations.memory.MemoryCompactionService;
@@ -176,6 +177,7 @@ public class ServerEventHandler {
         // interval fires or no players are online. This keeps lifecycle ownership in core.
         ConversationManager.tickMaintenance();
         UrgentContactHandler.tick(server);
+        if (tickCounter % 20 == 0) ProviderStatusServiceBackend.RUNTIME.poll();
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);
         boolean doMumblingCheck = (tickCounter % McTalkingConfig.INSTANCE.instance().mumblingCheckIntervalTicks == 0);
