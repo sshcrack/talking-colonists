@@ -100,7 +100,7 @@ public class ServerEventHandler {
 
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        me.sshcrack.mc_talking.internal.api.PlayerSpeechServiceBackend.onPlayerLeft(event.getEntity().getUUID());
+        TalkingColonistsApiBackend.onPlayerLoggedOut(event.getEntity().getUUID());
     }
 
     @SubscribeEvent

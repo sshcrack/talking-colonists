@@ -1303,6 +1303,19 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         if (sentGeneratingStatus)
             onGenerationPaused();
 
+        queueTextAfterTalking(text);
+    }
+
+    /**
+     * Sends an addon context note (roadmap A4) once the citizen's current turn has finished, so it
+     * does not cut the citizen off. Unlike {@link #addPromptTextAfterTalkingComplete} it is not
+     * replayed after a reconnect: it describes a moment, not the session's purpose.
+     */
+    public void addContextNoteAfterTalkingComplete(String text) {
+        queueTextAfterTalking(text);
+    }
+
+    private void queueTextAfterTalking(String text) {
         synchronized (pendingTextAfterTalking) {
             if (isSessionReadyForInput() && currentOutputTurn() != null) {
                 pendingTextAfterTalking.add(text);
@@ -1310,6 +1323,14 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
             }
         }
         addPromptTextImmediate(text);
+    }
+
+    /** Records a line the player typed (roadmap A4) so memory extraction sees it. */
+    public void appendPlayerTranscriptLine(String playerName, String text) {
+        synchronized (sessionTranscript) {
+            if (!sessionTranscript.isEmpty()) sessionTranscript.append("\n");
+            sessionTranscript.append(playerName).append(": ").append(text);
+        }
     }
 
     @Override

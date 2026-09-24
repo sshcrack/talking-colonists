@@ -31,7 +31,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
             ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
-            ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE);
+            ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();
@@ -62,6 +62,11 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     @Override public @NotNull ConversationService conversations() { return conversations; }
     @Override public @NotNull MemoryService memory() { return memory; }
     @Override public @NotNull PlayerSpeechService playerSpeech() { return playerSpeech; }
+
+    public static void onPlayerLoggedOut(@NotNull java.util.UUID playerId) {
+        ConversationServiceBackend.onPlayerLoggedOut(playerId);
+        PlayerSpeechServiceBackend.onPlayerLeft(playerId);
+    }
 
     public static void onServerStopping(@NotNull MinecraftServer server) {
         ConversationServiceBackend.onServerStopping(server);

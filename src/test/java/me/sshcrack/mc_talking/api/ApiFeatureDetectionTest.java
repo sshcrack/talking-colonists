@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.api.service.PregenerationService;
 import me.sshcrack.mc_talking.api.service.PromptService;
 import me.sshcrack.mc_talking.api.service.ToolService;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
@@ -97,7 +98,7 @@ class ApiFeatureDetectionTest {
         java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
                 ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
                 ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
-                ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE);
+                ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT);
 
         assertEquals(TalkingColonistsApi.API_MINOR_VERSION, backend.apiMinorVersion());
         for (ApiFeature feature : ApiFeature.values()) {
@@ -113,15 +114,27 @@ class ApiFeatureDetectionTest {
 
     @Test
     void staticFacadeReportsUnsupportedAgainstTheInstalledRuntime() {
-        assertFalse(TalkingColonistsApi.supports(ApiFeature.PLAYER_TEXT_INPUT));
+        ApiFeature unlanded = unlandedFeature();
+        assertFalse(TalkingColonistsApi.supports(unlanded));
     }
 
     @Test
     void requireSupportedThrowsDocumentedExceptionForUnsupportedFeature() {
+        ApiFeature unlanded = unlandedFeature();
         UnsupportedOperationException exception = assertThrows(
                 UnsupportedOperationException.class,
-                () -> TalkingColonistsApi.requireSupported(ApiFeature.PLAYER_TEXT_INPUT));
-        assertEquals(true, exception.getMessage().contains("PLAYER_TEXT_INPUT"));
+                () -> TalkingColonistsApi.requireSupported(unlanded));
+        assertEquals(true, exception.getMessage().contains(unlanded.name()));
+    }
+
+    /** A feature the installed runtime does not implement yet; skips once every feature has landed. */
+    private static ApiFeature unlandedFeature() {
+        TalkingColonistsApi.Services backend = resolveRealBackend();
+        for (ApiFeature feature : ApiFeature.values()) {
+            if (!backend.supports(feature)) return feature;
+        }
+        Assumptions.abort("every ApiFeature has landed");
+        throw new AssertionError("unreachable");
     }
 
     private static TalkingColonistsApi.Services resolveRealBackend() {
