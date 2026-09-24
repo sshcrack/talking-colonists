@@ -41,6 +41,7 @@
   "mc_talking.ai_status.reconnecting": "Reconnecting",
   "mc_talking.ai_status.urgent_walking": "Walking to Player",
   "mc_talking.no_key": "No Gemini API key set. Please set one in the config file of MineColonies Talking. Until then, the mod will not work.",
+  "mc_talking.quota_exceeded_actionbar": "Citizens are out of breath - the Gemini quota is used up",
   "mc_talking.capacity_reached": "All available AI conversation slots are currently in use. Try again when another player finishes talking.",
   "mc_talking.citizen_in_use": "Another player is already talking to this citizen.",
   "mc_talking.recruit_lore": "Maybe this little gift will help you get this citizen back to join your colony.",
@@ -83,7 +84,8 @@
   "mc_talking.debug.status_pregeneration": "Pregeneration: %s (%s)",
   "mc_talking.debug.status_compaction": "MemCompaction: %s [%s] (%d active)",
 
-  "mc_talking.debug.status_quota": "Live Model Quota: %s",
+  "mc_talking.debug.status_quota_model": "Quota (%s): %s, reset: %s",
+  "mc_talking.debug.status_quota_tts": "Quota (TTS): %s, reset: %s",
 
   "mc_talking.debug.status_bg_slots": "Background Slots: %d/%d",
 
