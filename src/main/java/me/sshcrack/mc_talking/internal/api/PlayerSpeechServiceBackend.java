@@ -1,11 +1,11 @@
 package me.sshcrack.mc_talking.internal.api;
 
 import de.maxhenkel.voicechat.api.opus.OpusDecoder;
-import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
 import me.sshcrack.mc_talking.api.speech.SpeechCaptureResult;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.QuotaTracker;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.speech.GeminiAudioTranscriber;
 import me.sshcrack.mc_talking.internal.speech.SpeechCaptureRuntime;
 import net.minecraft.ChatFormatting;
@@ -78,7 +78,7 @@ public final class PlayerSpeechServiceBackend implements PlayerSpeechService {
     public static boolean acceptMicrophoneOpus(UUID player, byte[] opus) {
         if (!RUNTIME.isCapturing(player)) return false;
         if (!RUNTIME.isListening(player)) return true;
-        OpusDecoder decoder = DECODERS.computeIfAbsent(player, ignored -> McTalkingVoicechatPlugin.vcApi.createDecoder());
+        OpusDecoder decoder = DECODERS.computeIfAbsent(player, ignored -> VoicechatAccess.require().createDecoder());
         short[] pcm;
         synchronized (decoder) {
             if (decoder.isClosed()) return true;
@@ -99,7 +99,7 @@ public final class PlayerSpeechServiceBackend implements PlayerSpeechService {
     private static @Nullable SpeechCaptureResult.Status blockedReason(UUID player) {
         if (!McTalkingConfig.hasGeminiApiKey()) return SpeechCaptureResult.Status.UNAVAILABLE;
         if (QuotaTracker.isQuotaExceeded(McTalkingConfig.FLASH_MODEL)) return SpeechCaptureResult.Status.QUOTA;
-        var api = McTalkingVoicechatPlugin.vcApi;
+        var api = VoicechatAccess.get();
         var connection = api == null ? null : api.getConnectionOf(player);
         if (connection == null || !connection.isConnected() || connection.isDisabled()) {
             return SpeechCaptureResult.Status.NO_VOICE_CHAT;

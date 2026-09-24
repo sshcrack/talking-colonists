@@ -17,6 +17,7 @@ import me.sshcrack.mc_talking.internal.api.PlayerSpeechServiceBackend;
 import me.sshcrack.mc_talking.config.ModalityModes;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
 import me.sshcrack.mc_talking.conversations.memory.PlayerConversationMemoryGenerator;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.pregen.PregenerationPlayback;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -24,7 +25,6 @@ import net.minecraft.server.level.ServerPlayer;
 @ForgeVoicechatPlugin
 public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public static final int TARGET_SAMPLE_RATE = 48000;
-    public static VoicechatServerApi vcApi;
     public static final String DIRECT_PLAYER_DIALOG = "ptc_dialog";
     public static final String CITIZEN_CONVERSATION = "ctc_dialog";
 
@@ -41,11 +41,13 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     public void onStop(VoicechatServerStoppedEvent event) {
         CitizenMemoryGenerator.stopAllGenerators();
         PlayerConversationMemoryGenerator.stopAllGenerators();
+        VoicechatAccess.set(null);
     }
 
     public void onServerStarted(VoicechatServerStartedEvent event) {
         McTalking.LOGGER.info("Voicechat Server Started");
-        vcApi = event.getVoicechat();
+        VoicechatServerApi vcApi = event.getVoicechat();
+        VoicechatAccess.set(vcApi);
 
         VolumeCategory directDialog = vcApi.volumeCategoryBuilder()
                 .setId(DIRECT_PLAYER_DIALOG)
@@ -107,6 +109,8 @@ public class McTalkingVoicechatPlugin implements VoicechatPlugin {
     }
 
     public static boolean shouldDisableColoniesTicks(ServerPlayer player) {
+        var vcApi = VoicechatAccess.get();
+        if (vcApi == null) return false;
         var conn = vcApi.getConnectionOf(player.getUUID());
         return conn != null && conn.isDisabled()
                 && McTalkingConfig.INSTANCE.instance().modality == ModalityModes.AUDIO;

@@ -6,6 +6,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.internal.session.ForegroundSessionRegistry;
 import me.sshcrack.mc_talking.conversations.memory.CitizenMemoryGenerator;
@@ -27,8 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-
-import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.vcApi;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.config.TtsQuotaManager;
@@ -593,7 +592,7 @@ public class CitizenConversation {
             count++;
         }
         if (count == 0) return;
-        channel.updateLocation(vcApi.createPosition(x / count, y / count + 1.5, z / count));
+        channel.updateLocation(VoicechatAccess.require().createPosition(x / count, y / count + 1.5, z / count));
     }
 
     private LocationalAudioChannel constructLocationalAudioChannel() {
@@ -615,6 +614,7 @@ public class CitizenConversation {
         ServerLevel level = (ServerLevel) participants.get(0).level();
 
         UUID channelId = UUID.randomUUID();
+        var vcApi = VoicechatAccess.require();
         var vcLevel = vcApi.fromServerLevel(level);
         var avgPos = vcApi.createPosition(avg.x, avg.y, avg.z);
 

@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.internal.api.ConversationRuleRuntime;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalkingVoicechatPlugin;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -40,7 +41,7 @@ public final class TalkToCitizenHandler {
         AbstractEntityCitizen current = ConversationManager.getActiveEntityForPlayer(player.getUUID());
         boolean alreadyTalkingToThisCitizen = current != null && current.getUUID().equals(citizen.getUUID());
 
-        boolean voicechatApiReady = McTalkingVoicechatPlugin.vcApi != null;
+        boolean voicechatApiReady = VoicechatAccess.isReady();
         boolean voicechatDisabledForPlayer = voicechatApiReady
                 && McTalkingVoicechatPlugin.shouldDisableColoniesTicks(player);
 
