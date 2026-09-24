@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 
 /** Playback and interruption owner for cached/pregenerated citizen speech. */
 public final class PregenerationPlayback {
@@ -186,7 +187,7 @@ public final class PregenerationPlayback {
             return false;
         }
         // Held synchronously so other clips checked in the same tick wait for this one.
-        SpeechFloor.hold(entry, ConversationKind.PREGENERATED, java.util.List.of(citizen));
+        SpeechFloor.hold(entry, ConversationKind.PREGENERATED, List.of(citizen));
 
         AtomicBoolean cleanedUp = entry.cleaned;
         Runnable cleanup = () -> {

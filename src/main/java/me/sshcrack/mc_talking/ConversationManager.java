@@ -44,6 +44,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 
 /*? if neoforge {*/
 import net.minecraft.world.item.component.CustomModelData;
@@ -644,20 +649,20 @@ public class ConversationManager {
      * Whether a player who would hear {@code citizen} already hears someone else: a foreground
      * session (a player conversation holds the floor while listening too) or a {@link SpeechFloor}
      * holder such as a pregenerated clip or a campfire group. A member of a group is engaged for
-     * any speech other than the group's own kind. Unprompted speech waits; player and controlled
-     * turns are not checked here.
+     * any speech other than the group's own kind. Unprompted speech waits; player conversations are
+     * never held back, and controlled sessions pause until the floor around their group is free.
      */
     public static boolean isFloorTaken(AbstractEntityCitizen citizen, ConversationKind kind) {
         double radius = McTalkingConfig.INSTANCE.instance().speechFloorRadius;
-        if (radius <= 0 || !(citizen.level() instanceof net.minecraft.server.level.ServerLevel level)) return false;
+        if (radius <= 0 || !(citizen.level() instanceof ServerLevel level)) return false;
         UUID self = citizen.getUUID();
-        java.util.Set<UUID> exempt = new java.util.HashSet<>();
+        Set<UUID> exempt = new HashSet<>();
         exempt.add(self);
-        List<SpeechFloor.Voice> speakers = new java.util.ArrayList<>();
+        List<SpeechFloor.Voice> speakers = new ArrayList<>();
         for (SpeechFloor.Group group : SpeechFloor.groups()) {
             boolean own = group.members().stream().anyMatch(member -> member.getUUID().equals(self));
             if (own && group.kind() != kind) return true;
-            for (net.minecraft.world.entity.Entity member : group.members()) {
+            for (Entity member : group.members()) {
                 if (own) exempt.add(member.getUUID());
                 else if (!member.isRemoved()) speakers.add(SpeechFloor.Voice.of(member));
             }
