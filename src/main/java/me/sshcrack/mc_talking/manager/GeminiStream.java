@@ -230,6 +230,8 @@ public class GeminiStream implements Supplier<short[]> {
     }
 
     private void stopAndDiscard() {
+        var currentTimeline = timeline;
+        if (currentTimeline != null) currentTimeline.frame(false); // a stopped voice ends its segment too
         audioFrames.clear();
         remainingSamples = new short[0];
         synchronized (incomingData) {

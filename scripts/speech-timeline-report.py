@@ -70,11 +70,15 @@ def parse(path):
 
 
 def merge(segments):
-    """Joins a speaker's segments separated by short buffering gaps into one utterance."""
+    """Joins one voice's segments separated by short buffering gaps into one utterance.
+
+    A voice is a speaker and kind: a citizen playing a greeting clip during their own campfire turn
+    is two voices at once, and counts as an overlap."""
     merged = []
-    for seg in sorted(segments, key=lambda s: (s["id"], s["start"])):
+    for seg in sorted(segments, key=lambda s: (s["id"], s["kind"], s["start"])):
         last = merged[-1] if merged else None
-        if last and last["id"] == seg["id"] and seg["start"] - last["end"] <= MERGE_GAP_MS:
+        if (last and last["id"] == seg["id"] and last["kind"] == seg["kind"]
+                and seg["start"] - last["end"] <= MERGE_GAP_MS):
             last["end"] = seg["end"]
             last["audioMs"] += seg["audioMs"]
         else:
@@ -92,7 +96,7 @@ def overlaps(utterances):
         for b in utterances[i + 1:]:
             if b["start"] >= a["end"]:
                 break
-            if a["id"] == b["id"]:
+            if a["id"] == b["id"] and a["kind"] == b["kind"]:
                 continue
             shared = min(a["end"], b["end"]) - max(a["start"], b["start"])
             if shared >= OVERLAP_MIN_MS and distance(a, b) <= EARSHOT:
