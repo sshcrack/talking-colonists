@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
 import me.sshcrack.mc_talking.api.service.PromptService;
+import me.sshcrack.mc_talking.api.service.TextService;
 import me.sshcrack.mc_talking.api.service.ToolService;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
@@ -25,9 +26,10 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
      * entry; a task only adds itself here once its feature is fully implemented and tested. Empty
      * today: no Track A task has landed yet.
      */
-    private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING);
+    private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING, ApiFeature.TEXT_GENERATION);
 
     private final PromptService prompts = new PromptServiceBackend();
+    private final TextService text = new TextServiceBackend();
     private final ConversationRuleService conversationRules = new ConversationRuleServiceBackend();
     private final PregenerationService pregeneration = new PregenerationServiceBackend();
     private final ToolService tools = new ToolServiceBackend();
@@ -42,6 +44,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     @Override public int apiMinorVersion() { return TalkingColonistsApi.API_MINOR_VERSION; }
     @Override public boolean supports(@NotNull ApiFeature feature) { return SUPPORTED_FEATURES.contains(feature); }
     @Override public @NotNull PromptService prompts() { return prompts; }
+    @Override public @NotNull TextService text() { return text; }
     @Override public @NotNull ConversationRuleService conversationRules() { return conversationRules; }
     @Override public @NotNull PregenerationService pregeneration() { return pregeneration; }
     @Override public @NotNull ToolService tools() { return tools; }

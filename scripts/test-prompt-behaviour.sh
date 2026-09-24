@@ -2,7 +2,8 @@
 # Opt-in live check of prompt behaviour against Gemini (roadmap T5).
 #
 # Runs PromptBehaviourLiveTest: Portuguese citizen-to-citizen script, no complaint about a
-# cavern-style home, and a tool call for a tool-answerable question. Uses the cheap Flash text
+# cavern-style home, a tool call for a tool-answerable question, and structured Portuguese
+# text from the A3 text runtime. Uses the cheap Flash text
 # model, one request per scenario, no retries.
 #
 # Key lookup (never printed): GEMINI_API_KEY, else `geminiApiKey` from the game config

@@ -154,6 +154,24 @@ background capacity pool, respect `QuotaTracker`, and return typed failures (`QU
   exhaustion, cancellation, and language instruction present in the request.
 - Generated text never triggers audio or occupies a foreground slot.
 
+### Implementation record — 2026-09-24
+
+- API (additive, `ApiFeature.TEXT_GENERATION` now supported): `api.text.CitizenTextService.generate(citizen, TextRequest)`
+  and `generateColonyVoice(colony, TextRequest)` → `CompletableFuture<TextResult>`; `TextRequest` (purpose tag,
+  directive, `withMaxChars`, `withResponseSchema`), `TextResult` with typed statuses (`QUOTA`, `NO_CAPACITY`,
+  `INVALID_OUTPUT`, `CANCELLED`, plus `UNAVAILABLE` and `PROVIDER_ERROR`). New `TextService` is exposed through a
+  **default** `Services.text()`, so older `Services` implementations stay compatible.
+- Deviation from the prompt: requests do **not** use the Live background slot pool. They are plain Flash calls, so
+  borrowing Live slots would only starve greetings and compaction without protecting the Live concurrency limit.
+  `TextGenerationRuntime` has its own limit of 2 concurrent requests and uses `QuotaTracker` for the Flash model.
+- Prompts: `TextPrompts.citizen` = `PromptRuntime.getDetailedCitizenInfoPrompt` (with contributors) + writing rules
+  and the response language; `TextPrompts.colony` = `CitizenPromptViewFactory.createColonyView` (extracted from the
+  citizen view builder, so both share one code path) + colony-voice rules.
+- Tests: `TextGenerationRuntimeTest` (fake transport, manual executor): plain text, language in the prompt, colony
+  prompt, structured JSON incl. code fences, missing required field and non-JSON, quota fast-fail and provider 429,
+  no credential leak in errors, bounded concurrency, caller and server-stop cancellation, missing key, trimming.
+  Live: `PromptBehaviourLiveTest.textGenerationReturnsStructuredPortuguese` passes against Gemini.
+
 ---
 
 ## A4 — Player text input into conversations

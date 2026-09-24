@@ -94,7 +94,7 @@ class ApiFeatureDetectionTest {
     @Test
     void realBackendSupportsExactlyTheLandedFeatures() {
         TalkingColonistsApi.Services backend = resolveRealBackend();
-        java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING);
+        java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING, ApiFeature.TEXT_GENERATION);
 
         assertEquals(TalkingColonistsApi.API_MINOR_VERSION, backend.apiMinorVersion());
         for (ApiFeature feature : ApiFeature.values()) {

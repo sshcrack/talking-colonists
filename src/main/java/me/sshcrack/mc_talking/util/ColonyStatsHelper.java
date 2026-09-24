@@ -27,11 +27,14 @@ public final class ColonyStatsHelper {
      * stat permanently dominates the dialogue.
      */
     public static String getColonyMilestoneText(ICitizenData data) {
+        return getColonyMilestoneText(data.getColony());
+    }
+
+    public static String getColonyMilestoneText(IColony colony) {
         if (!McTalkingConfig.INSTANCE.instance().enableColonyStatsMentions) {
             return null;
         }
 
-        IColony colony = data.getColony();
         if (colony == null) return null;
 
         var stats = colony.getStatisticsManager();

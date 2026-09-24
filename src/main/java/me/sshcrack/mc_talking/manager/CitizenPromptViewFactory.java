@@ -131,7 +131,6 @@ public final class CitizenPromptViewFactory {
         PlayerRelationView relation = extractPlayerRelation(data, speakingTo);
         List<String> childrenNames = extractChildrenNames(data);
         List<String> siblingNames = extractSiblingNames(data);
-        String colonyName = data.getColony().getName();
         IBuilding homeBuilding = data.getHomeBuilding();
         String homeBuildingDisplayName = getReadableBuildingName(homeBuilding);
         int homeBuildingLevel = homeBuilding != null ? homeBuilding.getBuildingLevel() : 0;
@@ -149,24 +148,13 @@ public final class CitizenPromptViewFactory {
                 ? null
                 : MemorySnapshotFactory.create(memory);
         String playerState = extractPlayerState(speakingTo);
-        var envInfo = extractEnvironmentInfo(data);
-        String colonyMilestone = ColonyStatsHelper.getColonyMilestoneText(data);
         RequestSnapshot requestSnapshot = extractRequestSnapshot(data, workBuilding, snapshotGameTime);
         CategorizedRequests categorizedRequests = requestSnapshot.categorized();
         List<String> activeQuests = extractActiveQuests(data);
         boolean isGuard = data.getJob() != null && data.getJob().isGuard();
-        List<String> colonyConnections = extractColonyConnections(data);
-        IColony colony = data.getColony();
-        long lastRaidEndTime = ColonyEventBuffer.getLastRaidEndTime(colony);
-        Long lastRaidEndTimeTicks = lastRaidEndTime != Long.MAX_VALUE ? lastRaidEndTime : null;
-        int lastRaidLostCitizens = ColonyEventBuffer.getLostCitizens(colony);
-        long currentGameTimeTicks = colony.getWorld() != null ? colony.getWorld().getGameTime() : 0;
-        List<String> recentEvents = extractRecentEvents(data);
         ActivityParts activityParts = extractActivityParts(data);
         AIWorkerState workState = extractWorkState(data);
         String nameTagDescription = extractNameTagDescription(data);
-        String colonyFoundingPlayer = data.getColony().getPermissions().getOwnerName();
-        int colonyAgeDays = data.getColony().getDay();
         ColonyFoodSituation colonyFoodSituation = extractFoodSituation(data, activityParts.category());
         List<String> recentActions = extractRecentActions(data);
         CitizenHousingStatus housingStatus = extractHousingStatus(data);
@@ -227,20 +215,7 @@ public final class CitizenPromptViewFactory {
                         categorizedRequests.blocked() == null ? List.of() : categorizedRequests.blocked(),
                         activeQuests == null ? List.of() : activeQuests
                 ),
-                new ColonyPromptView(
-                        data.getColony().getID(),
-                        colonyName,
-                        envInfo.peaceful(),
-                        colonyFoundingPlayer,
-                        colonyAgeDays,
-                        lastRaidEndTimeTicks,
-                        lastRaidLostCitizens,
-                        currentGameTimeTicks,
-                        recentEvents,
-                        colonyConnections == null ? List.of() : colonyConnections,
-                        colonyMilestone,
-                        envInfo.description()
-                ),
+                createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
                 new ConversationPromptView(
                         getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
                         relation,
@@ -634,13 +609,34 @@ public final class CitizenPromptViewFactory {
         return ps.toString();
     }
 
-    private static EnvironmentInfo extractEnvironmentInfo(ICitizenData data) {
-        var entityOpt = data.getEntity();
-        if (entityOpt.isEmpty()) {
+    /**
+     * Colony-level prompt context. {@code level} supplies time of day, weather and difficulty; the
+     * citizen path passes its entity's level, and without one those fields stay unknown.
+     */
+    public static ColonyPromptView createColonyView(IColony colony, @Nullable Level level) {
+        var envInfo = extractEnvironmentInfo(level);
+        long lastRaidEndTime = ColonyEventBuffer.getLastRaidEndTime(colony);
+        List<String> colonyConnections = extractColonyConnections(colony);
+        return new ColonyPromptView(
+                colony.getID(),
+                colony.getName(),
+                envInfo.peaceful(),
+                colony.getPermissions().getOwnerName(),
+                colony.getDay(),
+                lastRaidEndTime != Long.MAX_VALUE ? lastRaidEndTime : null,
+                ColonyEventBuffer.getLostCitizens(colony),
+                colony.getWorld() != null ? colony.getWorld().getGameTime() : 0,
+                extractRecentEvents(colony),
+                colonyConnections == null ? List.of() : colonyConnections,
+                ColonyStatsHelper.getColonyMilestoneText(colony),
+                envInfo.description()
+        );
+    }
+
+    private static EnvironmentInfo extractEnvironmentInfo(@Nullable Level level) {
+        if (level == null) {
             return new EnvironmentInfo(null, false);
         }
-        var entity = entityOpt.get();
-        Level level = entity.level();
         long dayTime = level.getDayTime() % 24000L;
         String description = "It is " + MiscUtil.describeTime(dayTime) + " and " + describeWeather(level) + ".";
         boolean peaceful = level.getDifficulty() == Difficulty.PEACEFUL;
@@ -724,12 +720,12 @@ public final class CitizenPromptViewFactory {
     }
 
     @Nullable
-    private static List<String> extractColonyConnections(ICitizenData data) {
+    private static List<String> extractColonyConnections(IColony colony) {
         if (!McTalkingConfig.INSTANCE.instance().enableColonyDiplomacy) {
             return null;
         }
         try {
-            IColonyConnectionManager connManager = data.getColony().getConnectionManager();
+            IColonyConnectionManager connManager = colony.getConnectionManager();
             if (connManager == null) {
                 return null;
             }
@@ -769,8 +765,7 @@ public final class CitizenPromptViewFactory {
         }
     }
 
-    private static List<String> extractRecentEvents(ICitizenData data) {
-        IColony colony = data.getColony();
+    private static List<String> extractRecentEvents(IColony colony) {
         int eventWindow = McTalkingConfig.INSTANCE.instance().colonyEventWindowSeconds;
         if (eventWindow <= 0) {
             return List.of();
@@ -826,7 +821,7 @@ public final class CitizenPromptViewFactory {
         return raw.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 
-    private static String getLanguageNameFromCode(String localeCode) {
+    public static String getLanguageNameFromCode(String localeCode) {
         try {
             String[] parts = localeCode.split("-");
             String languageCode = parts[0];

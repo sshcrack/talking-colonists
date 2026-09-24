@@ -128,6 +128,36 @@ class PromptBehaviourLiveTest {
         assertEquals("list_citizens", called);
     }
 
+    /** A3: the real text runtime returns schema-valid JSON written in the configured language. */
+    @Test
+    void textGenerationReturnsStructuredPortuguese() {
+        var runtime = new me.sshcrack.mc_talking.internal.text.TextGenerationRuntime(
+                request -> me.sshcrack.gemini_live_lib.misc.GeminiFlash.sendFlashRequest(
+                        McTalkingConfig.FLASH_MODEL, System.getenv(KEY_ENV), request, 1),
+                new me.sshcrack.mc_talking.internal.text.TextGenerationRuntime.QuotaGate() {
+                    @Override public boolean exhausted() { return false; }
+                    @Override public void reportQuotaExceeded(Exception error) { }
+                    @Override public void reportSuccess() { }
+                },
+                () -> true, Runnable::run);
+        JsonObject schema = GSON.fromJson("""
+                {"type": "object", "properties": {"headline": {"type": "string"}, "body": {"type": "string"}},
+                 "required": ["headline", "body"]}""", JsonObject.class);
+        String system = MiscUtil.withFirstPicks(() -> me.sshcrack.mc_talking.internal.text.TextPrompts.citizen(
+                citizen().language("Portuguese").build()));
+
+        var result = runtime.submit(system, me.sshcrack.mc_talking.api.text.TextRequest.of("live:gazette",
+                "Write a short village newspaper item about the new bakery.").withResponseSchema(schema)).join();
+
+        Assumptions.assumeFalse(result.status() == me.sshcrack.mc_talking.api.text.TextResult.Status.QUOTA, "quota exhausted");
+        assertTrue(result.isSuccess(), "text generation failed: " + result);
+        String body = result.json().get("headline").getAsString() + " " + result.json().get("body").getAsString();
+        int portuguese = count(body, PORTUGUESE_WORDS);
+        int english = count(body, ENGLISH_WORDS);
+        assertTrue(portuguese >= 3 && portuguese > english * 2,
+                "text does not look Portuguese (pt=" + portuguese + ", en=" + english + "): " + body);
+    }
+
     private static JsonObject request(String system, String user, JsonObject tools, int maxOutputTokens) {
         JsonObject request = new JsonObject();
         request.add("system_instruction", content(null, system));
