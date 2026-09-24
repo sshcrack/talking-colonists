@@ -5,6 +5,7 @@ import me.sshcrack.gemini_live_lib.misc.GeminiTTS;
 import me.sshcrack.mc_talking.api.pregen.PregenerationKind;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
+import me.sshcrack.mc_talking.internal.text.TextPrompts;
 import me.sshcrack.mc_talking.pregen.PregenerationPrompts;
 import me.sshcrack.mc_talking.testing.PromptSnapshots;
 import me.sshcrack.mc_talking.testing.TestPromptProviders;
@@ -65,6 +66,12 @@ class PromptSnapshotTest {
         PromptSnapshots.assertMatches("pregeneration-greeting", MiscUtil.withFirstPicks(() -> section("system instruction",
                 PromptRuntime.generateSystemControlledRoleplayPrompt(view))
                 + section("realtime input", pregenerationGreetingInput())));
+    }
+
+    @Test
+    void addonTextCitizen() {
+        PromptSnapshots.assertMatches("addon-text-citizen",
+                MiscUtil.withFirstPicks(() -> TextPrompts.citizen(citizen().withoutPlayer().build())));
     }
 
     static GeminiFlash.GenerateContentRequest flashRequest(String language) {
