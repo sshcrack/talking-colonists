@@ -28,7 +28,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
      * is added the moment its roadmap task starts landing, long before this set gains the matching
      * entry; a task only adds itself here once its feature is fully implemented and tested.
      */
-    private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
+    private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING, ApiFeature.BROADCAST_REACH,
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
             ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
             ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT);

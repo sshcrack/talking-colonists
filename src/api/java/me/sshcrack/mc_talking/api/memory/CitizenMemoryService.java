@@ -133,4 +133,14 @@ public final class CitizenMemoryService {
         TalkingColonistsApi.requireSupported(ApiFeature.BROADCAST_PUBLISHING);
         return TalkingColonistsApi.services().memory().retractBroadcast(colony, broadcastId);
     }
+
+    /**
+     * How many citizens of {@code colony} currently remember a published broadcast, out of all its
+     * citizens; empty when no citizen remembers it (unknown, retracted or expired). Use it to tell
+     * the player how far their news has spread. Requires {@link ApiFeature#BROADCAST_REACH}.
+     */
+    public static @NotNull Optional<BroadcastReach> broadcastReach(@NotNull IColony colony, @NotNull String broadcastId) {
+        TalkingColonistsApi.requireSupported(ApiFeature.BROADCAST_REACH);
+        return TalkingColonistsApi.services().memory().broadcastReach(colony, broadcastId);
+    }
 }

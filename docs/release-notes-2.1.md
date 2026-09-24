@@ -51,6 +51,7 @@ glance"). Replacements for 2.0-era internals are in `docs/addon-migration.md` ("
 | `VISITOR_SPEAKERS` | Opt-in policy that lets tavern visitors talk, with a visitor prompt view |
 | `CROSS_COLONY_SESSIONS` | Controlled meetings with citizens from several colonies (same dimension) |
 | `PLAYER_SPEECH_CAPTURE` | Turn what a player says through Simple Voice Chat into text, without a citizen |
+| `BROADCAST_REACH` | How many citizens have heard a published broadcast, out of all of them |
 
 Also new: `ApiFeature` / `TalkingColonistsApi.supports(...)` / `requireSupported(...)` (A0), and
 `ConversationLifecycleEvent.purpose()`.

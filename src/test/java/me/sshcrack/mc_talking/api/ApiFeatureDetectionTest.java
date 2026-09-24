@@ -98,7 +98,8 @@ class ApiFeatureDetectionTest {
         java.util.Set<ApiFeature> landed = java.util.EnumSet.of(ApiFeature.BROADCAST_PUBLISHING,
                 ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
                 ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
-                ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT);
+                ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT,
+                ApiFeature.BROADCAST_REACH);
 
         assertEquals(TalkingColonistsApi.API_MINOR_VERSION, backend.apiMinorVersion());
         for (ApiFeature feature : ApiFeature.values()) {
