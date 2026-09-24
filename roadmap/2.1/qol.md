@@ -79,6 +79,10 @@ a `lang/<locale>.json` (Portuguese players have asked).
 
 - `grep -rn 'Component.literal("' src/main/java` finds only debug commands and dynamic values.
 
+### Implementation
+
+Replaced 9 user-facing hard-coded messages in ConversationCreatorDevice, MumblingTriggerDevice, CitizenTalkingDevice, and CitizenWsClient with Component.translatable() calls using new keys in en_us.json. Updated all enum display names (ModalityModes, ConversationMode, MemoryMode, AvailableAI) to use localization. Verified that only 2 dynamic-value Component.literal() calls remain. Added translation contributor guide to README.
+
 ---
 
 ## Q4 — Ambient speech budget per player (#133)

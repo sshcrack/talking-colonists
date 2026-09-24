@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.config;
 
+import java.util.Locale;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -49,6 +50,6 @@ public enum AvailableAI implements NameableEnum {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(name());
+        return Component.translatable("mc_talking.available_ai." + name().toLowerCase(Locale.ROOT));
     }
 }

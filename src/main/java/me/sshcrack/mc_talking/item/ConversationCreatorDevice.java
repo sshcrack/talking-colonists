@@ -42,7 +42,7 @@ public class ConversationCreatorDevice extends Item {
         }
 
         conversationParticipants.add(citizen);
-        player.sendSystemMessage(Component.literal("Added " + citizen.getName().getString() + " to the conversation").withStyle(ChatFormatting.GREEN));
+        player.sendSystemMessage(Component.translatable("mc_talking.conversation_creator.added_citizen", citizen.getName()).withStyle(ChatFormatting.GREEN));
 
         return true; // Prevent normal attack behavior
     }
@@ -62,7 +62,7 @@ public class ConversationCreatorDevice extends Item {
         }
 
         if (!McTalkingConfig.INSTANCE.instance().enableCitizenToCitizenConversation) {
-            player.sendSystemMessage(Component.literal("Citizen-to-citizen conversations are disabled in the config").withStyle(ChatFormatting.RED));
+            player.sendSystemMessage(Component.translatable("mc_talking.conversation_creator.c2c_disabled").withStyle(ChatFormatting.RED));
             return InteractionResultHolder.pass(player.getItemInHand(usedHand));
         }
 
@@ -70,7 +70,7 @@ public class ConversationCreatorDevice extends Item {
         var conversation = new CitizenConversation(player.getServer(), participants);
         conversation.performConversation();
 
-        player.sendSystemMessage(Component.literal("Started conversation with " + participants.size() + " participants").withStyle(ChatFormatting.GREEN));
+        player.sendSystemMessage(Component.translatable("mc_talking.conversation_creator.started_conversation", participants.size()).withStyle(ChatFormatting.GREEN));
         conversation.setOnStateChanged(newState -> {
             AiStatus newStatus = switch (newState) {
                 case GENERATING -> AiStatus.THINKING;
