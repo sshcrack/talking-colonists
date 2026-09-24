@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 public abstract class GeminiWsClient extends GeminiLiveClient {
     private static final int MAX_TOTAL_RECOVERY_ATTEMPTS = 6;
@@ -176,6 +177,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
         AudioChannel channel = audioProvider.createChannel();
         this.decoder = audioProvider.createDecoder();
         stream = new GeminiStream(channel);
+        stream.setTimeline(SpeechTimeline.tracker(entity, null,
+                () -> ConversationManager.kindLabel(entity.getUUID())));
         stream.setOnPause(this::onStreamPause);
         gracefulPlaybackClose = new PlaybackDrainCoordinator(
                 this::flushCurrentOutputTurn,
@@ -424,6 +427,8 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
                 sessionTranscript.append(entity.getDisplayName().getString()).append(": ").append(heardTranscript.trim());
             }
             utterances.onCitizenTurnHeard(heardTranscript);
+            SpeechTimeline.said(entity,
+                    ConversationManager.kindLabel(entity.getUUID()), heardTranscript);
             onAudibleTranscriptComplete(heardTranscript.trim());
         }
         return true;

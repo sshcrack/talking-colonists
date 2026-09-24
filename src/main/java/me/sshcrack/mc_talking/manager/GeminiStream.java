@@ -18,6 +18,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
+import me.sshcrack.mc_talking.internal.audio.SpeechTimeline;
 
 public class GeminiStream implements Supplier<short[]> {
     public static final int FRAME_SIZE_SAMPLES = 960;
@@ -42,9 +43,15 @@ public class GeminiStream implements Supplier<short[]> {
 
     private Runnable onPause;
     private OpusEncoder encoder;
+    private @Nullable SpeechTimeline.Tracker timeline;
 
     public GeminiStream(AudioChannel channel) {
         this.channel = channel;
+    }
+
+    /** Development diagnostics: report audible segments of this stream (see {@code SpeechTimeline}). */
+    public void setTimeline(@Nullable SpeechTimeline.Tracker timeline) {
+        this.timeline = timeline;
     }
 
     public void setOnPause(Runnable onPause) {
@@ -261,6 +268,8 @@ public class GeminiStream implements Supplier<short[]> {
     @Override
     public short[] get() {
         short[] frame = audioFrames.poll();
+        var currentTimeline = timeline;
+        if (currentTimeline != null) currentTimeline.frame(frame != null);
         if (frame != null) {
             return frame;
         }
