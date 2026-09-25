@@ -18,6 +18,12 @@ Uses **Stonecutter** for two versions: `1.21.1-neoforge` (VCS default) and `1.20
 ## Minecolonies Lookup
 When working with the Minecolonies API, look at the `scripts/MINECOLONIES_DOCS.md` to view the docs and if you need actual code insight, use the gradle classes / minecolonies sources jar to view the source.
 
+Before designing a feature that depends on how the game plays (building, upgrades, builders,
+happiness, guards, raids, growth, day/night), read `docs/minecolonies-mechanics.md`: what really
+triggers what in MineColonies and how long it takes. Check the design against it, for example
+"a placed hut is level 0 until a builder builds it" or "a guard tower holds one guard at any level",
+instead of leaving such mismatches for a playtest to find.
+
 ## Build & Run
 
 ```sh
