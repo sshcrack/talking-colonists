@@ -132,7 +132,7 @@ public abstract class GeminiWsClient extends GeminiLiveClient {
     private long audioBytesThisTurn;
     private boolean textThisTurn;
     private boolean silentTurnRetried;
-    static final String SILENT_TURN_RETRY_PROMPT =
+    public static final String SILENT_TURN_RETRY_PROMPT =
             "(Nobody heard that: you did not speak. Say your reply out loud now, in your own voice.)";
     private long receivedAudioBytes;
     private long droppedAudioBytes;

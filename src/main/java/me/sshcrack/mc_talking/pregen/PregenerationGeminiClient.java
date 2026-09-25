@@ -24,12 +24,24 @@ import me.sshcrack.gemini_live_lib.misc.GeminiTTS.AudioChunk;
 import me.sshcrack.mc_talking.internal.audio.VoicechatAccess;
 import me.sshcrack.mc_talking.internal.prompt.PromptRuntime;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.manager.GeminiWsClient;
 import me.sshcrack.mc_talking.manager.VoiceSelectionService;
 import me.sshcrack.mc_talking.util.AudioHelper;
 
 import static me.sshcrack.mc_talking.McTalkingVoicechatPlugin.TARGET_SAMPLE_RATE;
 
 public class PregenerationGeminiClient extends GeminiLiveClient {
+    /** What to do when a turn completes: sometimes the model answers with text only and no audio. */
+    enum TurnOutcome {
+        DELIVER, RETRY, FAIL;
+
+        /** Audio is delivered; a silent turn is asked for once more, like live turns (#249); a second one fails. */
+        static TurnOutcome after(int audioBytes, boolean retried) {
+            if (audioBytes > 0) return DELIVER;
+            return retried ? FAIL : RETRY;
+        }
+    }
+
     private final UUID citizenId;
     private final CitizenPromptView promptView;
     private final String promptText;
@@ -44,6 +56,7 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
     private final AtomicInteger voiceRecoveryAttempts = new AtomicInteger();
     private final AtomicBoolean voiceRecoveryScheduled = new AtomicBoolean(false);
     private final AtomicBoolean terminal = new AtomicBoolean(false);
+    private boolean retriedSilentTurn;
 
     /**
      * Set to {@code true} once {@link #onTurnComplete} fires (successfully or not).
@@ -143,15 +156,28 @@ public class PregenerationGeminiClient extends GeminiLiveClient {
 
     @Override
     public void onTurnComplete() {
-        completed = true;
         byte[] audioData = audioBuffer.toByteArray();
-        if (audioData.length > 0) {
-            QuotaTracker.reportSuccess(modelName);
-            onComplete.accept(new AudioChunk(audioData, TARGET_SAMPLE_RATE));
-        } else {
-            McTalking.LOGGER.warn("Pregeneration completed without producing audio");
-            runOnErrorOnce();
+        switch (TurnOutcome.after(audioData.length, retriedSilentTurn)) {
+            case RETRY -> {
+                // The model answered without speaking: ask once more in the same session.
+                retriedSilentTurn = true;
+                McTalking.LOGGER.info("Pregeneration turn produced no audio; asking once more");
+                var input = new RealtimeInput();
+                input.text = GeminiWsClient.SILENT_TURN_RETRY_PROMPT;
+                send(ClientMessages.input(input));
+                return;
+            }
+            case DELIVER -> {
+                if (retriedSilentTurn) McTalking.LOGGER.info("Pregeneration produced audio after the retry");
+                QuotaTracker.reportSuccess(modelName);
+                onComplete.accept(new AudioChunk(audioData, TARGET_SAMPLE_RATE));
+            }
+            case FAIL -> {
+                McTalking.LOGGER.warn("Pregeneration completed without producing audio, also after a retry");
+                runOnErrorOnce();
+            }
         }
+        completed = true;
         terminal.set(true);
         close();
     }
