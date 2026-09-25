@@ -256,6 +256,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     // triggers SHA-256 digest errors during class loading.
     exclude("**/AiToolDispatcherTest.class")
     exclude("**/RumorMillServiceTest.class")
+    exclude("**/IntroductionQueueTest.class")
     filter {
         includeTestsMatching("*Test")
         includeTestsMatching("*Tests")
@@ -266,6 +267,8 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
         // MineColonies/Forge types and are covered on NeoForge.
         excludeTestsMatching("*AiToolDispatcherTest*")
         excludeTestsMatching("*RumorMillServiceTest*")
+        // Introduction triggers take ServerPlayer and IColony, so building one loads Minecraft types.
+        excludeTestsMatching("*IntroductionQueueTest*")
     }
 }
 
