@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
+import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.guide.AddonGuide;
 import me.sshcrack.mc_talking.api.intro.Introduction;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
@@ -140,7 +141,9 @@ public final class Introductions {
             AbstractEntityCitizen citizen = data.getEntity().orElse(null);
             if (citizen == null || !citizen.isAlive() || citizen.isRemoved() || citizen.isSleeping()) continue;
             if (citizen.level() != player.level() || citizen.distanceToSqr(player) > SEARCH_RANGE * SEARCH_RANGE) continue;
-            if (CitizenConversationService.isBusy(citizen)) continue;
+            // Free to walk over and able to speak now: not in a conversation, a campfire circle or another controlled session.
+            if (ConversationManager.shouldPauseRoutine(citizen)
+                    || !ConversationManager.canCitizenSpeak(citizen, ConversationKind.ADDON_AMBIENT)) continue;
             citizens.add(citizen);
         }
         citizens.sort(Comparator.comparingDouble(citizen -> citizen.distanceToSqr(player)));
