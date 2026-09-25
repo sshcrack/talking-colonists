@@ -555,7 +555,7 @@ public class CitizenMemories {
         for (ComplaintHistory.Entry entry : complaints.entries()) {
             CompoundTag entryTag = new CompoundTag();
             entryTag.putString("topic", entry.topic().id());
-            entryTag.putUUID("player", entry.player());
+            entryTag.putString("player", entry.player().toString());
             entryTag.putInt("raised", entry.raised());
             entryTag.putInt("answered", entry.answered());
             entryTag.putBoolean("answered_last", entry.answeredLast());
@@ -568,7 +568,7 @@ public class CitizenMemories {
         for (ComplaintHistory.Residue residue : complaints.allResidues()) {
             CompoundTag residueTag = new CompoundTag();
             residueTag.putString("topic", residue.topic().id());
-            residueTag.putUUID("player", residue.player());
+            residueTag.putString("player", residue.player().toString());
             residueTag.putInt("raised", residue.raised());
             residueTag.putInt("fixed_day", residue.fixedDay());
             residuesTag.add(residueTag);
@@ -582,8 +582,9 @@ public class CitizenMemories {
         for (int i = 0; i < entriesTag.size(); i++) {
             CompoundTag entryTag = entriesTag.getCompound(i);
             ComplaintTopic topic = ComplaintTopic.byId(entryTag.getString("topic"));
-            if (topic == null || !entryTag.hasUUID("player")) continue;
-            entries.add(new ComplaintHistory.Entry(topic, entryTag.getUUID("player"), entryTag.getInt("raised"),
+            UUID player = readUuid(entryTag, "player");
+            if (topic == null || player == null) continue;
+            entries.add(new ComplaintHistory.Entry(topic, player, entryTag.getInt("raised"),
                     entryTag.getInt("answered"), entryTag.getBoolean("answered_last"), entryTag.getInt("first_day"),
                     entryTag.getInt("last_day")));
         }
@@ -592,8 +593,9 @@ public class CitizenMemories {
         for (int i = 0; i < residuesTag.size(); i++) {
             CompoundTag residueTag = residuesTag.getCompound(i);
             ComplaintTopic topic = ComplaintTopic.byId(residueTag.getString("topic"));
-            if (topic == null || !residueTag.hasUUID("player")) continue;
-            residues.add(new ComplaintHistory.Residue(topic, residueTag.getUUID("player"), residueTag.getInt("raised"),
+            UUID player = readUuid(residueTag, "player");
+            if (topic == null || player == null) continue;
+            residues.add(new ComplaintHistory.Residue(topic, player, residueTag.getInt("raised"),
                     residueTag.getInt("fixed_day")));
         }
         complaints.load(entries, residues);
