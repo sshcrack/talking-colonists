@@ -104,6 +104,7 @@ example for each one is in `src/apiTest/.../Api21FeaturesExample.java`.
 | `CROSS_COLONY_SESSIONS` | A9 | `createControlledSession` with attendees from several colonies, `ControlledSessionRejectedException` | [Controlled meetings and councils](#controlled-meetings-and-councils) |
 | `PLAYER_SPEECH_CAPTURE` | A10 | `PlayerSpeechCapture.capture`, `cancel`, `isCapturing` | [Player speech capture](#player-speech-capture-api-21-apifeatureplayer_speech_capture) |
 | `BROADCAST_REACH` | — | `CitizenMemoryService.broadcastReach` | [Publishing colony broadcasts](#publishing-colony-broadcasts-api-21-apifeaturebroadcast_publishing) |
+| `ADDON_GUIDES` | — | `AddonGuideService.register`, `guides` | [Addon guides and the Colony Handbook](#addon-guides-and-the-colony-handbook-api-21-apifeatureaddon_guides) |
 
 ### Why this exists
 
@@ -1117,6 +1118,36 @@ if (TalkingColonistsApi.supports(ApiFeature.PLAYER_SPEECH_CAPTURE)) {
 - **Threading:** call `capture` on the server thread. Completion happens on a worker thread.
 - **Trying it:** `/talking_colonists speech_capture [seconds]` (ops only) captures the running
   player and prints the transcript.
+
+## Addon guides and the Colony Handbook (API 2.1, `ApiFeature.ADDON_GUIDES`)
+
+Players get lost when nothing in the game explains an addon. Register a short `AddonGuide` per feature
+and it becomes a chapter of the **Colony Handbook** (a craftable item: a book and a paper; Talking
+Colonists' own "Talking to your citizens" chapter comes first). Citizens know the guides too: in
+player conversations they can explain a feature in their own words when asked ("how can I tell
+everyone something?").
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.ADDON_GUIDES)) {
+    AddonGuideService.register(new AddonGuide("my_addon:market", "Market Day",
+            "Once a week citizens set up stalls and trade what they made.",
+            List.of("Craft a Market Stall and place it in the colony.",
+                    "On market day, right-click a stall to see what is on offer."),
+            List.of("Operators: /market start opens the market now.")));
+}
+```
+
+- **Where:** register in the mod constructor, which runs on both sides. The handbook window reads the
+  guides on the client and the prompt reads them on the server, so there is nothing to sync.
+- **Writing a guide:** a title (at most 40 characters), a summary of one or two sentences (at most
+  300), then up to six steps and six notes (at most 200 characters each). Steps should use blocks and
+  items a survival player can get; commands for operators go in the notes. Citizens only learn the
+  title, the summary and the steps.
+- **Ids:** namespaced; chapters are sorted by id. Registering an id twice fails; close the returned
+  `AddonRegistration` to remove a guide.
+- **Older runtimes:** a Talking Colonists build without `ADDON_GUIDES` has no handbook. Guard with
+  `supports`; a build that predates the constant itself throws `NoSuchFieldError`, so an addon that
+  must run on early 2.1 pre-releases can catch `LinkageError` around the registration.
 
 ## Pregenerated speech
 

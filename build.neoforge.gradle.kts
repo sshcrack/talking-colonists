@@ -230,7 +230,7 @@ dependencies {
     implementation("com.ldtteam:minecolonies:${prop("deps.minecolonies_version")}")
     runtimeOnly("com.ldtteam:domum-ornamentum:${prop("deps.domum_version")}")
     runtimeOnly("com.ldtteam:structurize:${prop("deps.structurize_version")}")
-    runtimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
+    implementation("com.ldtteam:blockui:${prop("deps.blockui_version")}")
 
     implementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+1.21.1-neoforge")
 }

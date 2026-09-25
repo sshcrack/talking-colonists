@@ -29,10 +29,8 @@
   "mc_talking.configuration.citizen_contact_base_chance": "Base chance for contact",
   "mc_talking.configuration.citizen_contact_check_interval_ticks": "Citizen contact check interval (ticks)",
   "mc_talking.configuration.enable_talk_without_device": "Enable Talking Without Device",
-
   "key.categories.mc_talking": "Talking Colonists",
   "key.mc_talking.talk_to_citizen": "Talk to Citizen",
-
   "mc_talking.colonist_ended_conversation": "The citizen ended the conversation.",
   "mc_talking.too_far": "Your conversation has been ended - You are too far away.",
   "mc_talking.ai_status.listening": "Listening",
@@ -68,7 +66,6 @@
   "mc_talking.commands.tool_entry": "  %s (%s)",
   "mc_talking.commands.tool_category_player": "player-only",
   "mc_talking.commands.tool_category_general": "general",
-
   "mc_talking.debug.not_citizen": "Target must be a MineColonies citizen.",
   "mc_talking.debug.not_player": "Command must be executed by a player.",
   "mc_talking.debug.urgent_contact_triggered": "Triggered urgent contact walk-to-player for %s",
@@ -79,14 +76,12 @@
   "mc_talking.debug.prompt_triggered": "Started low-priority session for %s with prompt: \"%s\"",
   "mc_talking.debug.memory_disabled": "Citizen memory is disabled in config.",
   "mc_talking.debug.memory_empty": "No memories stored for this citizen.",
-
   "mc_talking.debug.header": "--- McTalking Debug Overview ---",
   "mc_talking.debug.api_key_set": "  API Key: §a✔ §r(set)",
   "mc_talking.debug.api_key_empty": "  API Key: §c✘ §r(not set)",
   "mc_talking.debug.active_sessions": "  Active sessions: %d/%d (%d player)",
   "mc_talking.debug.config_toggles": "  Memory: %s  Personality: %s  C2C: %s  Pregen: %s",
   "mc_talking.debug.cooldown": "  Cooldown: %s",
-
   "mc_talking.debug.status_header": "--- McTalking Status ---",
   "mc_talking.debug.api_key_status": "API Key: %s",
   "mc_talking.debug.status_sessions": "Sessions: %d/%d (%d player, %d non-player, %d pregen, %d compaction)",
@@ -96,47 +91,34 @@
   "mc_talking.debug.status_citizen_to_citizen": "Citizen-to-Citizen: %s",
   "mc_talking.debug.status_pregeneration": "Pregeneration: %s (%s)",
   "mc_talking.debug.status_compaction": "MemCompaction: %s [%s] (%d active)",
-
   "mc_talking.debug.status_quota_model": "Quota (%s): %s, reset: %s",
   "mc_talking.debug.status_quota_tts": "Quota (TTS): %s, reset: %s",
-
   "mc_talking.debug.status_bg_slots": "Background Slots: %d/%d",
-
   "mc_talking.debug.connections_header": "--- Active Connections (%d) ---",
-
   "mc_talking.debug.citizen_header": "--- Citizen Info: %s ---",
-
   "mc_talking.debug.memory_header": "--- Citizen Memory: %s ---",
-
   "mc_talking.debug.events_header": "--- Colony Events: %s (#%d) ---",
-
   "yacl3.config.mc_talking:config.category.api": "API",
   "yacl3.config.mc_talking:config.category.general": "General",
   "yacl3.config.mc_talking:config.category.citizens": "Citizens",
-
   "yacl3.config.mc_talking:config.category.general.group.interaction": "Interaction",
   "yacl3.config.mc_talking:config.category.general.group.resource_management": "Resource Management",
   "yacl3.config.mc_talking:config.category.citizens.group.citizen_to_citizen": "Citizen-to-Citizen Conversations",
   "yacl3.config.mc_talking:config.category.citizens.group.random_conversations": "Random Conversations",
   "yacl3.config.mc_talking:config.category.citizens.group.mumbling": "Mumbling",
   "yacl3.config.mc_talking:config.category.citizens.group.citizen_contact": "Citizen-Initiated Contact",
-
   "yacl3.config.mc_talking:config.category.citizens.group.colony_events": "Colony Events",
   "yacl3.config.mc_talking:config.colonyEventWindowSeconds": "Colony Event Window (seconds)",
   "yacl3.config.mc_talking:config.colonyEventWindowSeconds.desc": "How long (in seconds) colony lifecycle events (births, deaths, job changes, building changes) appear in citizen prompts. Set to 0 to disable.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.colony_diplomacy": "Colony Diplomacy",
   "yacl3.config.mc_talking:config.enableColonyDiplomacy": "Enable Colony Diplomacy",
   "yacl3.config.mc_talking:config.enableColonyDiplomacy.desc": "If enabled, citizens reference neighboring colonies and their diplomatic standing (allies, enemies, etc.) in conversations.",
-
   "yacl3.config.mc_talking:config.enableColonyStatsMentions": "Enable Colony Stats Mentions",
   "yacl3.config.mc_talking:config.enableColonyStatsMentions.desc": "If enabled, citizens occasionally mention colony milestones (buildings built, mobs killed, etc.) in their idle mumbles and conversations.",
-
   "yacl3.config.mc_talking:config.geminiApiKey": "API Key",
   "yacl3.config.mc_talking:config.geminiApiKey.desc": "Gemini API key used to authenticate all AI requests. If empty, all functionality is disabled.",
   "yacl3.config.mc_talking:config.currentAiModel": "AI Model",
   "yacl3.config.mc_talking:config.currentAiModel.desc": "Model used for live Gemini WebSocket conversations.",
-
   "yacl3.config.mc_talking:config.language": "Language",
   "yacl3.config.mc_talking:config.language.desc": "Preferred response language. If players ask to speak in another language, the AI will for their session.",
   "yacl3.config.mc_talking:config.respondInGroups": "Respond in Groups",
@@ -157,7 +139,6 @@
   "yacl3.config.mc_talking:config.sendErrorsToPlayers.desc": "If enabled, players with OP level receive Gemini runtime errors in chat; otherwise errors are only logged.",
   "yacl3.config.mc_talking:config.disabledTools": "Disabled Tools",
   "yacl3.config.mc_talking:config.disabledTools.desc": "Function-call tool names to block from the AI. Disabled tools are removed from the tool list sent to Gemini.",
-
   "yacl3.config.mc_talking:config.enableConversationSummaryAndMemorize": "Enable Conversation Summary and Memorization",
   "yacl3.config.mc_talking:config.enableConversationSummaryAndMemorize.desc": "Stores conversation memory summaries when sessions end and enables transcript capture for memory generation. This consumes additional free-tier quota; disable it if you are frequently rate-limited. AIs can still remember important events mid-conversation using the 'add_event_to_memory' tool.",
   "yacl3.config.mc_talking:config.enableCitizenToCitizenConversation": "Enable Citizen to Citizen Conversation",
@@ -182,39 +163,29 @@
   "yacl3.config.mc_talking:config.citizenContactBaseChance.desc": "Base per-check chance for urgent contact. Multiplied by an urgency score from happiness, sickness, hunger, health, and homelessness.",
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks": "Citizen Contact Check Interval (ticks)",
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks.desc": "How often the server checks whether urgent citizens should initiate contact. 20 ticks = 1 second.",
-
   "yacl3.config.mc_talking:config.citizenCasualGreetingWeight": "Casual Greeting Weight",
   "yacl3.config.mc_talking:config.citizenCasualGreetingWeight.desc": "Base weight for casual greetings. Even content citizens without urgent needs get this small chance to wave or say hello. Multiplied by citizenContactBaseChance.",
-
   "yacl3.config.mc_talking:config.enablePlayerGreetingPregen": "Enable Player Greeting Pregeneration",
   "yacl3.config.mc_talking:config.enablePlayerGreetingPregen.desc": "If true, the mod will pregenerate personalized player greetings for frequent citizen-player pairs in the background.",
-
   "yacl3.config.mc_talking:config.playerGreetingDistance": "Player Greeting Distance",
   "yacl3.config.mc_talking:config.playerGreetingDistance.desc": "Distance in blocks within which a citizen will trigger their pregenerated player greeting on first approach.",
-
   "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer": "Walk to Player on Urgent Contact",
   "yacl3.config.mc_talking:config.enableUrgentContactWalkToPlayer.desc": "When enabled, urgent citizens walk toward you over a larger search range, follow you until close, then auto-start the conversation. They stop following when the need resolves.",
-
   "yacl3.config.mc_talking:config.urgentContactSearchRange": "Urgent Contact Search Range",
   "yacl3.config.mc_talking:config.urgentContactSearchRange.desc": "Extended scan radius (in blocks) for finding citizens with urgent needs when walk-to-player is enabled.",
-
   "yacl3.config.mc_talking:config.blockingTaskUrgencyMultiplier": "Blocking Task Urgency Multiplier",
   "yacl3.config.mc_talking:config.blockingTaskUrgencyMultiplier.desc": "Extra urgency weight for citizens stuck on a task (missing tools/items). Higher values make them much more likely to call for help.",
-
   "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds": "Player Urgent Contact Cooldown (seconds)",
   "yacl3.config.mc_talking:config.playerUrgentContactCooldownSeconds.desc": "Minimum time between urgent citizen contacts for the same player, preventing multiple citizens from calling out at once. Set to 0 to disable.",
   "yacl3.config.mc_talking:config.playerAddressCooldownSeconds": "Player Address Cooldown (seconds)",
   "yacl3.config.mc_talking:config.playerAddressCooldownSeconds.desc": "Minimum time between any two unprompted lines citizens address to you: walking up with a need, casual greetings and pregenerated greetings all share it. Set to 0 to disable.",
   "yacl3.config.mc_talking:config.citizenUrgentContactCooldownSeconds": "Citizen Contact Cooldown (seconds)",
   "yacl3.config.mc_talking:config.citizenUrgentContactCooldownSeconds.desc": "Minimum time before the same citizen walks up to a player about a need again. Set to 0 to disable.",
-
   "yacl3.config.mc_talking:config.citizenCooldownSeconds": "Citizen Cooldown (seconds)",
   "yacl3.config.mc_talking:config.citizenCooldownSeconds.desc": "Cooldown after an automatic session ends before that citizen can be auto-selected again (mumbling, urgent contact, or citizen-to-citizen). Set to 0 to disable.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.raid_trauma": "Post-Raid Trauma",
   "yacl3.config.mc_talking:config.raidTraumaDurationSeconds": "Raid Trauma Duration (seconds)",
   "yacl3.config.mc_talking:config.raidTraumaDurationSeconds.desc": "How long citizens express trauma in their prompts after a raid ends. During this window their speech reflects distress and memories of the attack. Set to 0 to disable.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.complaints": "Complaints",
   "yacl3.config.mc_talking:config.enableComplaintRamp": "Complaints Grow Over Time",
   "yacl3.config.mc_talking:config.enableComplaintRamp.desc": "Citizens mention a new problem (no home, no job, sickness, idling at work) in passing, complain after a while and make demands if it lasts. Durations are the colony days MineColonies already counts. Happiness values are not changed.",
@@ -261,22 +232,17 @@
   "yacl3.config.mc_talking:config.personalitySuperstitious.desc": "Sees omens, luck and curses everywhere. Turn off to keep it out of the random pool; citizens that already have it keep it.",
   "yacl3.config.mc_talking:config.customPersonalityArchetypes": "Custom Personality Archetypes",
   "yacl3.config.mc_talking:config.customPersonalityArchetypes.desc": "Freeform personality descriptions added to the assignment pool. Each entry is a plain-English instruction injected into the citizen's system prompt. Example: 'Always speak in rhyming couplets.'",
-
   "yacl3.config.mc_talking:config.category.citizens.group.pregeneration": "Voice Pregeneration",
   "yacl3.config.mc_talking:config.enablePregeneration": "Enable Pregeneration",
   "yacl3.config.mc_talking:config.enablePregeneration.desc": "If true, enables pregeneration of citizen voices. That way AI will generate greetings / exclaims in the background and dynamically play them",
   "yacl3.config.mc_talking:config.pregeneratedGreetingDistance": "Pregenerated Greeting Distance",
   "yacl3.config.mc_talking:config.pregeneratedGreetingDistance.desc": "Distance within which pregenerated greetings can be played. If a citizen has a pregenerated greeting and you come within this distance, the greeting will play automatically without needing to start a conversation.",
-
   "yacl3.config.mc_talking:config.threatPlayCooldownMs": "Threat Play Cooldown (ms)",
   "yacl3.config.mc_talking:config.threatPlayCooldownMs.desc": "Minimum time in milliseconds between automatic threat audio plays for the same citizen. Set to 0 to disable.",
-
   "yacl3.config.mc_talking:config.maxPregeneratedGreetingsPerCitizen": "Max Pregenerated Greetings Per Citizen",
   "yacl3.config.mc_talking:config.maxPregeneratedGreetingsPerCitizen.desc": "Maximum number of cached pregenerated greetings stored per citizen. Oldest greetings are discarded when this limit is reached.",
-
   "yacl3.config.mc_talking:config.maxGreetingsPerTickInterval": "Max Greetings Per Tick Interval",
   "yacl3.config.mc_talking:config.maxGreetingsPerTickInterval.desc": "Maximum number of pregenerated citizen-to-citizen greetings that may play in a single tick interval. Increase only if you have a very large colony and want more ambient chatter.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.voice_chat": "Voice Chat",
   "yacl3.config.mc_talking:config.citizenVoiceWhisper": "Citizen Voice Whisper",
   "yacl3.config.mc_talking:config.citizenVoiceWhisper.desc": "Marks the citizens voice channel as a whisper, which has a smaller default radius",
@@ -286,7 +252,6 @@
   "yacl3.config.mc_talking:config.speechFloorRadius.desc": "Citizens wait with greetings, mumbling, rumors and addon lines while a player within this many blocks already hears another citizen speaking or is in a conversation. Set to 0 to let everyone talk at once.",
   "yacl3.config.mc_talking:config.otherCitizensVolumeWhileTalking": "Other Citizens' Volume While Talking",
   "yacl3.config.mc_talking:config.otherCitizensVolumeWhileTalking.desc": "While you talk to a citizen, other citizens' voices fade to this volume for you (0 to 1). Only affects what you hear. Set to 1 to turn it off.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.rumor_mill": "Rumor Mill",
   "yacl3.config.mc_talking:config.enableRumorMill": "Enable Rumor Mill",
   "yacl3.config.mc_talking:config.enableRumorMill.desc": "If enabled, citizens share memories with each other as rumors, creating a living information ecosystem where news spreads through the colony.",
@@ -298,7 +263,6 @@
   "yacl3.config.mc_talking:config.rumorMillChancePerPair.desc": "Per-check chance that a rumor is shared between an eligible pair of nearby citizens.",
   "yacl3.config.mc_talking:config.rumorMillMaxPropagationsPerTick": "Rumor Max Propagations Per Tick",
   "yacl3.config.mc_talking:config.rumorMillMaxPropagationsPerTick.desc": "Maximum number of rumor propagations per tick to bound server cost.",
-
   "yacl3.config.mc_talking:config.enableRumorTalking": "Enable Rumor Talking",
   "yacl3.config.mc_talking:config.enableRumorTalking.desc": "If enabled, citizens voice rumors aloud when a player is nearby.",
   "yacl3.config.mc_talking:config.showGossipMoments": "Show Gossip",
@@ -307,12 +271,10 @@
   "yacl3.config.mc_talking:config.rumorTalkingChance.desc": "Per-propagation chance that a rumor is spoken aloud when a player is in range.",
   "yacl3.config.mc_talking:config.rumorTalkingRange": "Rumor Talking Range",
   "yacl3.config.mc_talking:config.rumorTalkingRange.desc": "Maximum distance in blocks from the source citizen for a player to witness a voiced rumor.",
-
   "yacl3.config.mc_talking:config.maxRumorsStored": "Max Rumors Stored",
   "yacl3.config.mc_talking:config.maxRumorsStored.desc": "Maximum rumors a citizen remembers. Oldest are discarded first.",
   "yacl3.config.mc_talking:config.maxRumorsInPrompt": "Max Rumors in Prompt",
   "yacl3.config.mc_talking:config.maxRumorsInPrompt.desc": "How many rumors appear in the citizen system prompt. Set to 0 to disable.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.broadcast": "Colony Broadcast System",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation": "Enable Broadcast Propagation",
   "yacl3.config.mc_talking:config.enableBroadcastPropagation.desc": "If enabled, players can ask citizens to broadcast messages across the colony. The message spreads from citizen to citizen over time.",
@@ -320,20 +282,16 @@
   "yacl3.config.mc_talking:config.broadcastPropagationIntervalTicks.desc": "How often the server checks for broadcast propagation. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.broadcastMaxPropagationsPerTick": "Broadcast Max Propagations Per Tick",
   "yacl3.config.mc_talking:config.broadcastMaxPropagationsPerTick.desc": "Maximum number of broadcast propagations per tick to bound server cost.",
-
   "yacl3.config.mc_talking:config.broadcastPropagationRange": "Broadcast Propagation Range",
   "yacl3.config.mc_talking:config.broadcastPropagationRange.desc": "Maximum distance in blocks between citizens for a broadcast to propagate. Broadcasts spread through proximity like rumors.",
   "yacl3.config.mc_talking:config.maxBroadcastsInPrompt": "Max Broadcasts In Prompt",
   "yacl3.config.mc_talking:config.maxBroadcastsInPrompt.desc": "How many recent broadcasts to include in a citizen's prompt. Set to 0 to disable.",
   "yacl3.config.mc_talking:config.maxBroadcastsStored": "Max Broadcasts Stored",
   "yacl3.config.mc_talking:config.maxBroadcastsStored.desc": "Maximum number of broadcasts stored per citizen. Oldest are discarded when limit is reached.",
-
   "yacl3.config.mc_talking:config.enableBroadcastYelling": "Enable Broadcast Yelling",
   "yacl3.config.mc_talking:config.enableBroadcastYelling.desc": "If enabled, citizens announce broadcasts aloud when a player is nearby.",
-
   "yacl3.config.mc_talking:config.broadcastYellingRange": "Broadcast Yelling Range",
   "yacl3.config.mc_talking:config.broadcastYellingRange.desc": "Maximum distance in blocks for a player to hear a citizen announce a broadcast aloud.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.memory": "Memory Compaction",
   "yacl3.config.mc_talking:config.configPreset": "Preset",
   "yacl3.config.mc_talking:config.configPreset.desc": "Sets the session limits and how often citizens talk on their own, all at once. Free Tier is the default and fits a free AI Studio key. Paid Key allows more sessions and more chatter. Quiet Colony keeps citizens silent unless a player talks to them. Changing one of those settings afterwards switches this to Custom.",
@@ -351,7 +309,6 @@
   "yacl3.config.mc_talking:config.memoryCompactionIntervalTicks.desc": "How often the server checks for memory compaction candidates. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.memoryCompactionThreshold": "Memory Compaction Threshold",
   "yacl3.config.mc_talking:config.memoryCompactionThreshold.desc": "Maximum number of individual events before compaction is triggered for a citizen.",
-
   "yacl3.config.mc_talking:config.category.citizens.group.ambient_speech_budget": "Ambient Speech Budget",
   "yacl3.config.mc_talking:config.enableAmbientSpeechBudget": "Enable Ambient Speech Budget",
   "yacl3.config.mc_talking:config.enableAmbientSpeechBudget.desc": "If enabled, limits how many ambient lines (greetings, mumbles, voiced rumors/broadcasts, random citizen-to-citizen conversations, addon ambient lines) each player can hear within the rolling window. When a nearby player is over budget the line is skipped entirely so a crowd of citizens cannot all talk over each other. Urgent contacts, player-started conversations, and controlled/meeting sessions are always exempt.",
@@ -361,7 +318,6 @@
   "yacl3.config.mc_talking:config.ambientSpeechBudgetWindowSeconds.desc": "Length in seconds of the rolling window used to count ambient lines heard by a player.",
   "yacl3.config.mc_talking:config.ambientSpeechBudgetHearingRange": "Ambient Speech Budget Hearing Range",
   "yacl3.config.mc_talking:config.ambientSpeechBudgetHearingRange.desc": "Distance in blocks within which a player is considered to hear an ambient line for budget purposes. An ambient line is skipped entirely if any player within this range of the speaking citizen is over budget.",
-
   "mc_talking.conversation_hint.talking": "Speaking",
   "mc_talking.conversation_hint.listening": "Listening for speech",
   "mc_talking.conversation_hint.thinking": "Thinking about a reply…",
@@ -387,31 +343,23 @@
   "yacl3.config.mc_talking:config.showConversationMouths": "Moving mouths",
   "yacl3.config.mc_talking:config.showConversationMouths.desc": "Animate built-in adult citizen mouths with received voice audio. Custom skins and helmets retain their original faces.",
   "mc_talking.conversation_hint.interrupt": "Speaking · Speak to interrupt",
-
   "mc_talking.conversation_creator.added_citizen": "Added %s to the conversation",
   "mc_talking.conversation_creator.c2c_disabled": "Citizen-to-citizen conversations are disabled in the config",
   "mc_talking.conversation_creator.started_conversation": "Started conversation with %s participants",
-
   "mc_talking.mumbling_trigger.started_mumbling": "Started mumbling for selected citizen",
-
   "mc_talking.talking_device.error.citizen_not_available": "This citizen can't speak right now. They are either already talking or sleeping",
   "mc_talking.talking_device.error.voice_chat_not_initialized": "Voice chat API is not initialized.",
   "mc_talking.talking_device.error.voice_chat_disabled": "Your voice chat is currently disabled. Please enable it to talk to citizens.",
   "mc_talking.talking_device.started_conversation": "Started conversation with %s",
-
   "mc_talking.error.gemini_ws_client": "An error occurred in GeminiWsClient: %s",
-
   "mc_talking.modality.text": "TEXT",
   "mc_talking.modality.audio": "AUDIO",
   "mc_talking.modality.text_and_audio": "TEXT and AUDIO",
-
   "mc_talking.conversation_mode.live_websockets": "LIVE_WEBSOCKETS",
   "mc_talking.conversation_mode.flash_tts": "FLASH_TTS",
   "mc_talking.conversation_mode.auto": "AUTO",
-
   "mc_talking.memory_mode.live": "LIVE",
   "mc_talking.memory_mode.flash": "FLASH",
-
   "mc_talking.available_ai.flash3": "Gemini 3.1 Flash",
   "mc_talking.available_ai.flash2_5": "Gemini 2.5 Flash",
   "mc_talking.speech_capture.listening": "● Listening… speak now",
@@ -431,5 +379,9 @@
   "mc_talking.chat_to_citizen.too_long": "That is too long for the citizen (at most %s characters).",
   "mc_talking.chat_to_citizen.empty": "Nothing to say.",
   "mc_talking.chat_to_citizen.all_on": "Every chat line now goes to the citizen you are talking to. Turn it off with /citizen_chat off.",
-  "mc_talking.chat_to_citizen.all_off": "Only chat lines starting with \"%s\" go to the citizen you are talking to."
+  "mc_talking.chat_to_citizen.all_off": "Only chat lines starting with \"%s\" go to the citizen you are talking to.",
+  "item.mc_talking.colony_handbook": "Colony Handbook",
+  "mc_talking.handbook.chapters": "Chapters",
+  "mc_talking.handbook.how_to_start": "How to start",
+  "mc_talking.handbook.good_to_know": "Good to know"
 }
