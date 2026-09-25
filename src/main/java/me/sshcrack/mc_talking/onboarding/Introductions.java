@@ -187,7 +187,7 @@ public final class Introductions {
     private static void arrive(MinecraftServer server, Walk walk, ServerPlayer player) {
         AbstractEntityCitizen citizen = walk.citizen;
         Introduction introduction = walk.introduction;
-        boolean welcome = introduction.id().equals(IntroductionServiceBackend.WELCOME.id());
+        boolean welcome = introduction.id().equals(IntroductionServiceBackend.WELCOME_ID);
         citizen.getNavigation().stop();
         citizen.getLookControl().setLookAt(player, 30, 30);
         if (welcome) {
@@ -220,7 +220,7 @@ public final class Introductions {
     }
 
     static String directive(ServerPlayer player, Introduction introduction, boolean mentionHandbook) {
-        boolean welcome = introduction.id().equals(IntroductionServiceBackend.WELCOME.id());
+        boolean welcome = introduction.id().equals(IntroductionServiceBackend.WELCOME_ID);
         return "You just walked up to " + player.getGameProfile().getName() + ", who belongs to your colony"
                 + (welcome ? ", and handed them a Colony Handbook. " : ". ")
                 + introduction.lineHint()
