@@ -6,11 +6,17 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintHistory;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintPrompts;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintTopic;
+import me.sshcrack.mc_talking.conversations.complaints.Complaints;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * The prompt for a citizen who walks up to a player with an urgent need: being stuck at work, sickness,
@@ -18,6 +24,31 @@ import java.util.List;
  */
 public final class UrgentContactPrompts {
     private UrgentContactPrompts() {
+    }
+
+    /**
+     * The prompt, with how often this citizen already raised the problem with the player. Counts as
+     * raising it: the citizen is about to say it.
+     */
+    public static String build(AbstractEntityCitizen citizen, String playerName, @Nullable UUID playerId) {
+        String text = build(citizen, playerName);
+        ICitizenData data = citizen.getCitizenData();
+        ComplaintTopic topic = topic(citizen);
+        if (data == null || topic == null || playerId == null) return text;
+        ComplaintHistory.Note note = Complaints.note(data, topic, playerId);
+        Complaints.recordRaised(data, topic, playerId);
+        return note == null ? text : text + ComplaintPrompts.urgent(note);
+    }
+
+    /** The problem {@link #build} would walk up about, or null for general misery, injury or no data. */
+    public static @Nullable ComplaintTopic topic(AbstractEntityCitizen citizen) {
+        ICitizenData data = citizen.getCitizenData();
+        if (data == null) return null;
+        if (data.getJobStatus() == JobStatus.STUCK) return ComplaintTopic.SUPPLIES;
+        if (data.getCitizenDiseaseHandler().isSick()) return ComplaintTopic.HEALTH;
+        if (data.getSaturation() <= 1) return ComplaintTopic.FOOD;
+        if (data.getHomeBuilding() == null && !CitizenHelper.isCitizenGuard(citizen)) return ComplaintTopic.HOUSING;
+        return null;
     }
 
     public static String build(AbstractEntityCitizen citizen, String playerName) {

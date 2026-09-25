@@ -33,6 +33,7 @@ import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
 import me.sshcrack.mc_talking.api.prompt.view.SkillLevelView;
 import me.sshcrack.mc_talking.config.PersonalityArchetype;
+import me.sshcrack.mc_talking.conversations.complaints.Complaints;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.manager.prompt.ColonyPromptViewFactory;
@@ -186,7 +187,8 @@ public final class CitizenPromptViewFactory {
                 activity,
                 verifiedFacts,
                 memorySnapshot,
-                null
+                null,
+                Complaints.context(data, contextPlayerId)
         );
     }
 
@@ -206,7 +208,7 @@ public final class CitizenPromptViewFactory {
             @Nullable VisitorPromptView visitor
     ) {
         return new CitizenPromptSnapshot(citizenId, playerId, identity, family, wellbeing, work, colony, conversation,
-                activity, verifiedFacts, memories, visitor);
+                activity, verifiedFacts, memories, visitor, null);
     }
 
     // ── Extracted helpers ────────────────────────────────────────────────

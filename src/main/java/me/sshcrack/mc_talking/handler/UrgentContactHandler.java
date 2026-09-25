@@ -6,9 +6,11 @@ import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.complaints.Complaints;
 import me.sshcrack.mc_talking.internal.session.UrgentContactLifecycleModule;
 import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
 import me.sshcrack.mc_talking.util.CitizenNeedAssessor;
+import me.sshcrack.mc_talking.util.UrgentContactPrompts;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -75,6 +77,8 @@ public class UrgentContactHandler {
             if (citizen.getCitizenData() == null) continue;
             if (lifecycle.isActive(citizen.getUUID())) continue;
             if (!cooldowns.citizenMayContact(citizen.getUUID(), config.citizenUrgentContactCooldownSeconds)) continue;
+            // Someone who gave up asking this player about their problem doesn't walk up about it anymore.
+            if (Complaints.hasGivenUp(citizen.getCitizenData(), UrgentContactPrompts.topic(citizen), player.getUUID())) continue;
             if (!contactedThisInterval.add(citizen.getUUID())) continue;
 
             double urgencyWeight = CitizenNeedAssessor.calculateUrgencyWeight(citizen);

@@ -14,6 +14,7 @@ import me.sshcrack.mc_talking.api.prompt.view.ObservationState;
 import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 import me.sshcrack.mc_talking.manager.prompt.HappinessPromptSection;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintPrompts;
 import me.sshcrack.mc_talking.manager.prompt.SkillsPromptSection;
 import me.sshcrack.mc_talking.util.MiscUtil;
 import org.jetbrains.annotations.NotNull;
@@ -28,15 +29,20 @@ import java.util.function.Supplier;
 public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     /** Config values the prompt text depends on. */
     public record PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds,
-                               ComplaintRamp.Settings complaints) {
+                               ComplaintRamp.Settings complaints, boolean complaintToolEnabled) {
         public PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds) {
             this(maxBroadcasts, maxRumors, raidTraumaDurationSeconds, ComplaintRamp.Settings.DEFAULTS);
+        }
+
+        public PromptLimits(int maxBroadcasts, int maxRumors, int raidTraumaDurationSeconds, ComplaintRamp.Settings complaints) {
+            this(maxBroadcasts, maxRumors, raidTraumaDurationSeconds, complaints, true);
         }
 
         static PromptLimits fromConfig() {
             var config = McTalkingConfig.INSTANCE.instance();
             return new PromptLimits(config.maxBroadcastsInPrompt, config.maxRumorsInPrompt,
-                    config.raidTraumaDurationSeconds, config.complaintRampSettings());
+                    config.raidTraumaDurationSeconds, config.complaintRampSettings(),
+                    !config.disabledTools.contains(ComplaintPrompts.TOOL_NAME));
         }
     }
 
@@ -289,7 +295,7 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
     private void addCurrentState(@NotNull CitizenPromptView view, StringBuilder prompt, boolean sick) {
         prompt.append("\n## CURRENT STATE\n");
 
-        HappinessPromptSection.append(view, prompt, limits.get().complaints());
+        HappinessPromptSection.append(view, prompt, limits.get().complaints(), limits.get().complaintToolEnabled());
 
         double saturation = view.wellbeing().saturation();
         ColonyFoodSituation foodSit = view.wellbeing().foodSituation();
@@ -501,8 +507,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         prompt.append("- Do not generate creative responses for information that functions can provide\n");
         prompt.append("- Speak in first person, keep responses brief\n");
         prompt.append("- YOUR MOOD AND CONCERNS SHOULD STRONGLY INFLUENCE YOUR TONE AND RESPONSES\n");
-        prompt.append("- You belong to a community the player leads. Even when unhappy, be honest but constructive: say what "
-                + "bothers you and what would help, but never insult, scold or guilt-trip them. Notice what has gone well, too.\n");
+        prompt.append("- You belong to a community the player leads. The first time you raise a problem with them, be honest but "
+                + "constructive: say what bothers you and what would help, and notice what has gone well, too. If your notes say "
+                + "you have raised it before and nothing changed, let that frustration show as the notes describe: impatient, "
+                + "blunt or sarcastic in your own way, but never slurs or threats.\n");
         prompt.append("- DO NOT start conversations with generic greetings if unhappy or in distress\n");
         prompt.append("- Do not use markdown, speak in plain text.\n");
 

@@ -1,5 +1,10 @@
 package me.sshcrack.mc_talking.conversations;
 
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintContext;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintHistory;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintStage;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintTopic;
+import me.sshcrack.mc_talking.testing.CitizenPromptViewFixture;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -25,6 +30,9 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -126,6 +134,79 @@ class PromptBehaviourLiveTest {
         }
         if (called == null) fail("expected a list_citizens call, got text:\n" + text(response));
         assertEquals("list_citizens", called);
+    }
+
+    /**
+     * A homeless citizen asked how they are: the first time constructive, after being ignored three
+     * times openly fed up. Both replies go to {@code build/prompt-behaviour-complaints.txt} to read.
+     */
+    @Test
+    void repeatedComplaintsSoundFedUp() throws IOException {
+        String first = complaintReply(ComplaintStage.FIRST_MENTION, 0, null);
+        String fedUp = complaintReply(ComplaintStage.FRUSTRATED, 3, null);
+        Files.writeString(Path.of("build", "prompt-behaviour-complaints.txt"),
+                "FIRST MENTION:\n" + first + "\n\nFRUSTRATED (raised 3 times, ignored):\n" + fedUp + "\n");
+
+        String lower = fedUp.toLowerCase(Locale.ROOT);
+        List<String> repetition = REPETITION.stream().filter(lower::contains).toList();
+        assertTrue(!repetition.isEmpty(), "the fed-up reply should refer to having asked before:\n" + fedUp);
+        String firstLower = first.toLowerCase(Locale.ROOT);
+        assertTrue(REPETITION_ONLY.stream().noneMatch(firstLower::contains),
+                "the first mention must not pretend it was said before:\n" + first);
+    }
+
+    /** Raising a problem is reported through raise_concern, so the history works in any language. */
+    @Test
+    void raisingAProblemCallsRaiseConcern() {
+        JsonArray declarations = new JsonArray();
+        JsonObject raise = function("raise_concern", "Call this silently whenever you bring up one of your problems "
+                + "with the player you're talking to, so you remember that you told them. Never mention that you call it.");
+        JsonObject parameters = new JsonObject();
+        parameters.addProperty("type", "OBJECT");
+        JsonObject properties = new JsonObject();
+        JsonObject topic = new JsonObject();
+        topic.addProperty("type", "STRING");
+        JsonArray topics = new JsonArray();
+        for (ComplaintTopic value : ComplaintTopic.values()) topics.add(value.id());
+        topic.add("enum", topics);
+        properties.add("topic", topic);
+        parameters.add("properties", properties);
+        raise.add("parameters", parameters);
+        declarations.add(raise);
+        JsonObject tools = new JsonObject();
+        tools.add("functionDeclarations", declarations);
+
+        JsonObject response = generate(request(complaintPrompt(ComplaintStage.FIRST_MENTION, 0),
+                "[Steve is now speaking to you] Hey, how are you holding up? Anything bothering you?", tools, 200));
+        String calledTopic = null;
+        for (JsonElement part : parts(response)) {
+            JsonObject call = part.getAsJsonObject().getAsJsonObject("functionCall");
+            if (call != null && "raise_concern".equals(call.get("name").getAsString())) {
+                calledTopic = call.getAsJsonObject("args").get("topic").getAsString();
+            }
+        }
+        if (calledTopic == null) fail("expected a raise_concern call, got text:\n" + text(response));
+        assertEquals("housing", calledTopic);
+    }
+
+    private static final List<String> REPETITION = List.of(
+            "again", "still", "already", "told you", "said", "times", "how many", "keep asking", "asked");
+    private static final List<String> REPETITION_ONLY = List.of("told you", "how many times", "keep asking", "again and again");
+
+    private static String complaintReply(ComplaintStage stage, int raised, JsonObject tools) {
+        return text(generate(request(complaintPrompt(stage, raised),
+                "[Steve is now speaking to you] Hey, how are you holding up?", tools, 200)));
+    }
+
+    private static String complaintPrompt(ComplaintStage stage, int raised) {
+        var view = citizen()
+                .happiness(3.5)
+                .happinessModifiers(new HappinessModifierView(HappinessModifierType.HOMELESSNESS, 0.4, 9),
+                        new HappinessModifierView(HappinessModifierType.FOOD, 1.0))
+                .build();
+        var note = new ComplaintHistory.Note(ComplaintTopic.HOUSING, stage, raised, 0, 2, false, false, false);
+        return MiscUtil.withFirstPicks(() -> PromptRuntime.generateCitizenRoleplayPrompt(
+                CitizenPromptViewFixture.withComplaints(view, new ComplaintContext(Map.of(ComplaintTopic.HOUSING, note), List.of()))));
     }
 
     /** A3: the real text runtime returns schema-valid JSON written in the configured language. */

@@ -1,6 +1,10 @@
 package me.sshcrack.mc_talking.manager.prompt;
 
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintContext;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintHistory;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintPrompts;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintTopic;
 import me.sshcrack.mc_talking.util.ComplaintRamp;
 import me.sshcrack.mc_talking.util.MiscUtil;
 
@@ -13,6 +17,15 @@ public final class HappinessPromptSection {
 
     /** Mood, and one line per happiness modifier that stands out. */
     public static void append(CitizenPromptView view, StringBuilder prompt, ComplaintRamp.Settings complaints) {
+        append(view, prompt, complaints, true);
+    }
+
+    /**
+     * @param complaintToolEnabled whether {@code raise_concern} is offered; without it the model would say
+     *                             the call out loud, so the hint is left out
+     */
+    public static void append(CitizenPromptView view, StringBuilder prompt, ComplaintRamp.Settings complaints,
+                              boolean complaintToolEnabled) {
         double happiness = view.wellbeing().happiness();
 
         if (happiness > 8.0) {
@@ -32,9 +45,11 @@ public final class HappinessPromptSection {
         // and nobody fears raids before one really happened.
         int age = view.colony().ageDays();
         boolean raided = view.colony().lastRaidEndTimeTicks() != null;
+        ComplaintContext history = view instanceof ComplaintContext.Holder holder ? holder.complaints() : null;
         for (var modifier : view.wellbeing().happinessModifiers()) {
             var modifierType = modifier.type();
             double factor = modifier.factor();
+            int lineStart = prompt.length();
 
             switch (modifierType) {
                 case HOMELESSNESS:
@@ -282,6 +297,18 @@ public final class HappinessPromptSection {
 
                 case QUEST, GREAT_FOOD, UNKNOWN:
                     break;
+            }
+            // How often this problem was raised with the player sets the tone of the next mention.
+            if (history != null && factor < 1.0 && prompt.length() > lineStart) {
+                ComplaintHistory.Note note = history.note(ComplaintTopic.of(modifierType));
+                if (note != null) prompt.append(ComplaintPrompts.note(note));
+            }
+        }
+        if (history != null) {
+            for (ComplaintHistory.Residue residue : history.residues()) prompt.append(ComplaintPrompts.residue(residue));
+            // Only while the tool is there: without it, the model would say the call out loud.
+            if (!history.notes().isEmpty() && complaintToolEnabled) {
+                prompt.append(ComplaintPrompts.TOOL_HINT);
             }
         }
     }

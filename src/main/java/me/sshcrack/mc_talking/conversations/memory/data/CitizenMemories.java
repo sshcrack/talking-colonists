@@ -9,6 +9,8 @@ import me.sshcrack.mc_talking.api.memory.MemoryEntryType;
 import me.sshcrack.mc_talking.api.memory.MemoryProvenance;
 import me.sshcrack.mc_talking.broadcast.ColonyBroadcast;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintHistory;
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintTopic;
 import me.sshcrack.mc_talking.rumor.Rumor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -40,6 +42,8 @@ public class CitizenMemories {
     private static final String TAG_BROADCASTS = "mc_talking_broadcasts";
     private static final String TAG_RUMORS = "mc_talking_rumors";
     private static final String TAG_VISITOR_SINCE_DAY = "visitor_since_day";
+    private static final String TAG_COMPLAINTS = "complaints";
+    private static final String TAG_COMPLAINT_RESIDUES = "complaint_residues";
 
     private final List<String> facts = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
@@ -55,6 +59,7 @@ public class CitizenMemories {
     private String summarizedMemory = "";
     private long compactionRevision;
     private int visitorSinceDay = -1;
+    private final ComplaintHistory complaints = new ComplaintHistory();
 
     public record CompactionSnapshot(long revision, String summary, List<String> facts,
                                      List<String> events, List<CitizenMemoryEntryView> entries) {
@@ -354,6 +359,7 @@ public class CitizenMemories {
         if (sessionToken != null && !sessionToken.isBlank()) tag.putString(TAG_SESSION_TOKEN, sessionToken);
         if (!summarizedMemory.isBlank()) tag.putString(TAG_SUMMARIZED_MEMORY, summarizedMemory);
         if (visitorSinceDay >= 0) tag.putInt(TAG_VISITOR_SINCE_DAY, visitorSinceDay);
+        serializeComplaints(tag);
         return tag;
     }
 
@@ -433,6 +439,7 @@ public class CitizenMemories {
         sessionToken = tag.contains(TAG_SESSION_TOKEN) ? tag.getString(TAG_SESSION_TOKEN) : "";
         summarizedMemory = tag.contains(TAG_SUMMARIZED_MEMORY) ? tag.getString(TAG_SUMMARIZED_MEMORY) : "";
         visitorSinceDay = tag.contains(TAG_VISITOR_SINCE_DAY) ? tag.getInt(TAG_VISITOR_SINCE_DAY) : -1;
+        deserializeComplaints(tag);
     }
 
     private static CompoundTag serializeEntry(CitizenMemoryEntryView entry) {
@@ -535,5 +542,60 @@ public class CitizenMemories {
 
     public void setSessionToken(String token) {
         sessionToken = token == null ? "" : token;
+    }
+
+    /** What this citizen has told which player about which problem. */
+    public ComplaintHistory complaints() {
+        return complaints;
+    }
+
+    private void serializeComplaints(CompoundTag tag) {
+        if (complaints.isEmpty()) return;
+        ListTag entriesTag = new ListTag();
+        for (ComplaintHistory.Entry entry : complaints.entries()) {
+            CompoundTag entryTag = new CompoundTag();
+            entryTag.putString("topic", entry.topic().id());
+            entryTag.putUUID("player", entry.player());
+            entryTag.putInt("raised", entry.raised());
+            entryTag.putInt("answered", entry.answered());
+            entryTag.putBoolean("answered_last", entry.answeredLast());
+            entryTag.putInt("first_day", entry.firstDay());
+            entryTag.putInt("last_day", entry.lastDay());
+            entriesTag.add(entryTag);
+        }
+        tag.put(TAG_COMPLAINTS, entriesTag);
+        ListTag residuesTag = new ListTag();
+        for (ComplaintHistory.Residue residue : complaints.allResidues()) {
+            CompoundTag residueTag = new CompoundTag();
+            residueTag.putString("topic", residue.topic().id());
+            residueTag.putUUID("player", residue.player());
+            residueTag.putInt("raised", residue.raised());
+            residueTag.putInt("fixed_day", residue.fixedDay());
+            residuesTag.add(residueTag);
+        }
+        tag.put(TAG_COMPLAINT_RESIDUES, residuesTag);
+    }
+
+    private void deserializeComplaints(CompoundTag tag) {
+        List<ComplaintHistory.Entry> entries = new ArrayList<>();
+        ListTag entriesTag = tag.getList(TAG_COMPLAINTS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < entriesTag.size(); i++) {
+            CompoundTag entryTag = entriesTag.getCompound(i);
+            ComplaintTopic topic = ComplaintTopic.byId(entryTag.getString("topic"));
+            if (topic == null || !entryTag.hasUUID("player")) continue;
+            entries.add(new ComplaintHistory.Entry(topic, entryTag.getUUID("player"), entryTag.getInt("raised"),
+                    entryTag.getInt("answered"), entryTag.getBoolean("answered_last"), entryTag.getInt("first_day"),
+                    entryTag.getInt("last_day")));
+        }
+        List<ComplaintHistory.Residue> residues = new ArrayList<>();
+        ListTag residuesTag = tag.getList(TAG_COMPLAINT_RESIDUES, Tag.TAG_COMPOUND);
+        for (int i = 0; i < residuesTag.size(); i++) {
+            CompoundTag residueTag = residuesTag.getCompound(i);
+            ComplaintTopic topic = ComplaintTopic.byId(residueTag.getString("topic"));
+            if (topic == null || !residueTag.hasUUID("player")) continue;
+            residues.add(new ComplaintHistory.Residue(topic, residueTag.getUUID("player"), residueTag.getInt("raised"),
+                    residueTag.getInt("fixed_day")));
+        }
+        complaints.load(entries, residues);
     }
 }
