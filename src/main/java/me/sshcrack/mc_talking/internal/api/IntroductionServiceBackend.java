@@ -35,7 +35,8 @@ public final class IntroductionServiceBackend implements IntroductionService {
         if (welcomeRegistered) return;
         welcomeRegistered = true;
         INTRODUCTIONS.register(WELCOME_ID, Integer.MIN_VALUE, new Introduction(WELCOME_ID, "the Colony Handbook",
-                "This is their first impression of the colony, so be kind and glad to meet them, whatever your mood today. "
+                "This is their first impression of the colony, so be kind and glad to meet them, whatever your mood today: "
+                        + "a sincere welcome, with no sarcasm and no complaints, even if that is usually your way. "
                         + "Welcome them and tell them the handbook explains how things work here.",
                 GuideServiceBackend.TALKING.id(), (player, colony) -> true));
     }

@@ -141,7 +141,9 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
 
         prompt.append("\n## EMOTIONAL PROFILE\n");
 
-        double happiness = view.wellbeing().happiness();
+        // A new colony lacks everything because nothing is built yet: the mood eases like the complaints do.
+        double happiness = ComplaintRamp.easedHappiness(view.wellbeing().happiness(), view.colony().ageDays(),
+                limits.get().complaints());
 
         if (happiness > 8.0) {
             prompt.append("- Generally cheerful and friendly\n");

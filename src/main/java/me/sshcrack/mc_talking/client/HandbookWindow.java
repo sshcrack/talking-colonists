@@ -22,6 +22,7 @@ import java.util.List;
 public final class HandbookWindow extends BOWindow {
     private static final int SELECTED_COLOR = 0x6B3A12;
     private static final int CHAPTER_COLOR = 0x000000;
+    private static final int HOVER_COLOR = 0x8A5A2B;
 
     private final List<AddonGuide> guides = GuideServiceBackend.registered();
     private final ScrollingList chapters;
@@ -45,6 +46,8 @@ public final class HandbookWindow extends BOWindow {
                 Button button = row.findPaneOfTypeByID("chapter", Button.class);
                 button.setText(Component.literal(guides.get(index).title()));
                 button.setTextColor(index == selected ? SELECTED_COLOR : CHAPTER_COLOR);
+                // BlockUI's default hover colour is white, unreadable on the light button texture.
+                button.setTextHoverColor(HOVER_COLOR);
                 button.setHandler(clicked -> select(index));
             }
         });
