@@ -25,6 +25,9 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
 import me.sshcrack.mc_talking.config.ConfigPreset;
 import me.sshcrack.mc_talking.config.ConfigPresets;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.construction.ConstructionContext;
+import me.sshcrack.mc_talking.conversations.construction.ConstructionPrompts;
+import me.sshcrack.mc_talking.conversations.construction.ConstructionSite;
 import me.sshcrack.mc_talking.duck.CitizenDataMemoryExtended;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -100,6 +103,39 @@ public final class TalkingColonistsGameTests {
                 String expectedJob = Component.translatable(ModJobs.builder.get().getTranslationKey()).getString();
                 helper.assertTrue(Objects.equals(after.work().jobName(), expectedJob),
                         "job name should be '" + expectedJob + "', was '" + after.work().jobName() + "'");
+            }
+        });
+        helper.succeed();
+    }
+
+    /** Every citizen's prompt knows the colony's building jobs: a residence upgrade taken on by the builder. */
+    @GameTest(template = FLOOR, batch = "mc_talking_construction", setupTicks = SETUP_TICKS, timeoutTicks = 100)
+    public static void promptKnowsTheColonysBuildingJobs(GameTestHelper helper) {
+        logFailures("promptKnowsTheColonysBuildingJobs", () -> {
+            try (var fixture = ColonyTestHarness.create(helper)) {
+                var builder = fixture.spawnCitizen(new BlockPos(4, 1, 4));
+                var neighbour = fixture.spawnCitizen(new BlockPos(5, 1, 4));
+                var residence = fixture.placeHut(ModBlocks.blockHutHome, new BlockPos(1, 1, 1), 1);
+                var builderHut = fixture.placeHut(ModBlocks.blockHutBuilder, new BlockPos(7, 1, 7), 5);
+                fixture.hireAsBuilder(builderHut, builder);
+
+                // Huts placed by the harness have no blueprint; MineColonies names the next level's after it.
+                residence.setBlueprintPath("/fundamentals/residence1.blueprint");
+                residence.requestUpgrade(fixture.owner(), builderHut.getPosition());
+                helper.assertTrue(!fixture.colony().getWorkManager().getWorkOrders().isEmpty(),
+                        "MineColonies placed no work order for the residence upgrade");
+
+                var view = CitizenContextService.snapshot(neighbour);
+                helper.assertTrue(view instanceof ConstructionContext.Holder holder && holder.construction() != null,
+                        "the prompt view carries no building jobs");
+                var sites = ((ConstructionContext.Holder) view).construction().sites();
+                helper.assertTrue(sites.size() == 1, "expected one building job, got " + sites);
+                var site = sites.get(0);
+                helper.assertTrue(site.kind() == ConstructionSite.Kind.UPGRADE && site.level() == 2,
+                        "expected an upgrade to level 2, got " + site);
+                helper.assertTrue(ColonyTestHarness.data(builder).getName().equals(site.builder()),
+                        "expected the builder to have taken it on, got " + site);
+                McTalking.LOGGER.info("Construction prompt line: {}", ConstructionPrompts.line(site, null));
             }
         });
         helper.succeed();

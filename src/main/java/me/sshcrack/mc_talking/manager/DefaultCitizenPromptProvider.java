@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
+import me.sshcrack.mc_talking.conversations.construction.ConstructionContext;
+import me.sshcrack.mc_talking.conversations.construction.ConstructionPrompts;
 import me.sshcrack.mc_talking.manager.prompt.GuidePromptSection;
 import me.sshcrack.mc_talking.internal.api.GuideServiceBackend;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
@@ -422,6 +424,10 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
             for (String event : view.colony().recentEvents()) {
                 prompt.append("- ").append(event).append("\n");
             }
+        }
+
+        if (view instanceof ConstructionContext.Holder holder && holder.construction() != null) {
+            prompt.append(ConstructionPrompts.section(holder.construction().sites(), view.citizenId()));
         }
     }
 
