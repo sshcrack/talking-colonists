@@ -8,6 +8,7 @@ import me.sshcrack.mc_talking.api.service.ProviderStatusService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.GuideService;
+import me.sshcrack.mc_talking.api.service.IntroductionService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
 import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
@@ -33,7 +34,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
             ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
             ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT,
-            ApiFeature.ADDON_GUIDES);
+            ApiFeature.ADDON_GUIDES, ApiFeature.INTRODUCTIONS);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();
@@ -47,6 +48,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private final MemoryService memory = new MemoryServiceBackend();
     private final PlayerSpeechService playerSpeech = new PlayerSpeechServiceBackend();
     private final GuideService guides = new GuideServiceBackend();
+    private final IntroductionService introductions = new IntroductionServiceBackend();
 
     private TalkingColonistsApiBackend() {
     }
@@ -66,6 +68,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     @Override public @NotNull MemoryService memory() { return memory; }
     @Override public @NotNull PlayerSpeechService playerSpeech() { return playerSpeech; }
     @Override public @NotNull GuideService guides() { return guides; }
+    @Override public @NotNull IntroductionService introductions() { return introductions; }
 
     public static void onPlayerLoggedOut(@NotNull java.util.UUID playerId) {
         ConversationServiceBackend.onPlayerLoggedOut(playerId);

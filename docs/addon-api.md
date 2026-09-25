@@ -105,6 +105,7 @@ example for each one is in `src/apiTest/.../Api21FeaturesExample.java`.
 | `PLAYER_SPEECH_CAPTURE` | A10 | `PlayerSpeechCapture.capture`, `cancel`, `isCapturing` | [Player speech capture](#player-speech-capture-api-21-apifeatureplayer_speech_capture) |
 | `BROADCAST_REACH` | — | `CitizenMemoryService.broadcastReach` | [Publishing colony broadcasts](#publishing-colony-broadcasts-api-21-apifeaturebroadcast_publishing) |
 | `ADDON_GUIDES` | — | `AddonGuideService.register`, `guides` | [Addon guides and the Colony Handbook](#addon-guides-and-the-colony-handbook-api-21-apifeatureaddon_guides) |
+| `INTRODUCTIONS` | — | `CitizenIntroductionService.register` | [Introductions](#introductions-api-21-apifeatureintroductions) |
 
 ### Why this exists
 
@@ -1148,6 +1149,37 @@ if (TalkingColonistsApi.supports(ApiFeature.ADDON_GUIDES)) {
 - **Older runtimes:** a Talking Colonists build without `ADDON_GUIDES` has no handbook. Guard with
   `supports`; a build that predates the constant itself throws `NoSuchFieldError`, so an addon that
   must run on early 2.1 pre-releases can catch `LinkageError` around the registration.
+
+## Introductions (API 2.1, `ApiFeature.INTRODUCTIONS`)
+
+Features should be introduced by the colony itself. When a player first stands in their colony, a
+citizen walks up, welcomes them and hands them the Colony Handbook. After that, citizens tell each
+player once about every registered `Introduction`, when its trigger says it is relevant:
+
+```java
+if (TalkingColonistsApi.supports(ApiFeature.INTRODUCTIONS)) {
+    CitizenIntroductionService.register(new Introduction("my_addon:market", "market day",
+            "Tell them that once a week citizens set up stalls in the square, and that they are welcome to come.",
+            "my_addon:market",
+            (player, colony) -> colony.getDay() >= 3));
+}
+```
+
+- **What happens:** the nearest free citizen within 48 blocks walks up to the player and says a
+  sentence or two in their own voice, following `lineHint`. When they cannot speak right now (quota,
+  capacity, no key), the player gets a chat line instead: "Anna tells you about market day. More in
+  the Colony Handbook: Market Day." `guideId` names the handbook chapter; it may be null.
+- **Once per player:** the ids a player heard are kept in the player's data, so an introduction never
+  repeats, even across restarts. Only a citizen who reached the player counts; a walk that fails is
+  tried again later.
+- **Pacing:** one introduction at a time, the welcome first, then in id order. Each one uses the
+  shared cooldown for unprompted lines to that player (`playerAddressCooldownSeconds`), and nothing
+  starts while the player is in a conversation. Players can switch introductions off
+  (`enableIntroductions`).
+- **Triggers:** `isDue(player, colony)` runs on the server thread every few seconds for each player
+  who stands in a colony they belong to, until it has happened. Keep it cheap: check colony state
+  (buildings, jobs, the day time), not the world block by block. Exceptions count as "not now".
+- **Server side only:** register in the mod constructor; the client ignores introductions.
 
 ## Pregenerated speech
 

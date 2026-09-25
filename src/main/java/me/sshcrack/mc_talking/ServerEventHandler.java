@@ -18,6 +18,7 @@ import me.sshcrack.mc_talking.handler.RandomConversationHandler;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import me.sshcrack.mc_talking.internal.api.TalkingColonistsApiBackend;
 import me.sshcrack.mc_talking.onboarding.MissingApiKeyLogger;
+import me.sshcrack.mc_talking.onboarding.Introductions;
 import me.sshcrack.mc_talking.interaction.TalkToCitizenHandler;
 import me.sshcrack.mc_talking.rumor.RumorMillService;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
@@ -135,6 +136,7 @@ public class ServerEventHandler {
         MinecraftServer server = event.getServer();
         TalkingColonistsApiBackend.onServerStopping(server);
         UrgentContactHandler.onServerStop(server);
+        Introductions.stopAll();
         ConversationManager.cleanup();
 
         CasualGreetingHandler.onServerStop();
@@ -202,6 +204,7 @@ public class ServerEventHandler {
         // interval fires or no players are online. This keeps lifecycle ownership in core.
         ConversationManager.tickMaintenance();
         UrgentContactHandler.tick(server);
+        Introductions.tick(server);
         if (tickCounter % 20 == 0) ProviderStatusServiceBackend.RUNTIME.poll();
 
         boolean doDistanceCheck = (tickCounter % 5 == 0);

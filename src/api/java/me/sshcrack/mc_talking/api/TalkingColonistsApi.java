@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
 import me.sshcrack.mc_talking.api.service.GuideService;
+import me.sshcrack.mc_talking.api.service.IntroductionService;
 import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
 import me.sshcrack.mc_talking.api.service.TextService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
@@ -190,6 +191,11 @@ public final class TalkingColonistsApi {
         /** Default for runtimes that predate addon guides; see {@link ApiFeature#ADDON_GUIDES}. */
         default @NotNull GuideService guides() {
             throw new UnsupportedOperationException("Addon guides are not implemented by this runtime");
+        }
+
+        /** Default for runtimes that predate introductions; see {@link ApiFeature#INTRODUCTIONS}. */
+        default @NotNull IntroductionService introductions() {
+            throw new UnsupportedOperationException("Introductions are not implemented by this runtime");
         }
     }
 }

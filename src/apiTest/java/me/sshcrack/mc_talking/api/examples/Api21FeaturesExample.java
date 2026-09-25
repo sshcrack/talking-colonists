@@ -17,6 +17,8 @@ import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.PlayerTextResult;
 import me.sshcrack.mc_talking.api.guide.AddonGuide;
 import me.sshcrack.mc_talking.api.guide.AddonGuideService;
+import me.sshcrack.mc_talking.api.intro.CitizenIntroductionService;
+import me.sshcrack.mc_talking.api.intro.Introduction;
 import me.sshcrack.mc_talking.api.memory.BroadcastPublishResult;
 import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
 import me.sshcrack.mc_talking.api.memory.BroadcastSource;
@@ -137,5 +139,13 @@ final class Api21FeaturesExample {
                 List.of("Craft a Market Stall and place it in the colony.",
                         "On market day, right-click a stall to see what is on offer."),
                 List.of("Operators: /market start opens the market now.")));
+    }
+
+    /** A citizen tells each player about market day once, from the colony's third day on. */
+    static AddonRegistration introduceTheMarket() {
+        if (!TalkingColonistsApi.supports(ApiFeature.INTRODUCTIONS)) return null;
+        return CitizenIntroductionService.register(new Introduction("market:stalls", "market day",
+                "Tell them that once a week citizens set up stalls in the square, and that they are welcome to come.",
+                "market:stalls", (player, colony) -> colony.getDay() >= 3));
     }
 }
