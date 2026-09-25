@@ -25,6 +25,7 @@ import me.sshcrack.mc_talking.internal.session.SpeechFloor;
 import me.sshcrack.mc_talking.handler.UrgentContactHandler;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
+import me.sshcrack.mc_talking.conversations.complaints.Complaints;
 import me.sshcrack.mc_talking.config.QuotaTracker;
 import me.sshcrack.mc_talking.item.CitizenTalkingDevice;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
@@ -553,13 +554,19 @@ public class ConversationManager {
 
     public static void emitClientUtterance(GeminiWsClient client, ConversationUtteranceEvent.Speaker speaker, String text,
                                            ConversationUtteranceEvent.Source source) {
-        if (!ConversationEventRuntime.hasUtteranceListeners()) return;
+        boolean listeners = ConversationEventRuntime.hasUtteranceListeners();
+        if (!listeners && speaker != ConversationUtteranceEvent.Speaker.PLAYER) return;
         AbstractEntityCitizen citizen = client.getEntity();
         if (foregroundSessions.client(citizen.getUUID()) != client) return;
         var snapshot = foregroundSessions.snapshot(citizen.getUUID()).orElse(null);
         if (snapshot == null) return;
         UUID playerId = snapshot.playerId();
         if (speaker == ConversationUtteranceEvent.Speaker.PLAYER && playerId == null) return;
+        // The player talking back counts as a reply to what the citizen raised with them today.
+        if (speaker == ConversationUtteranceEvent.Speaker.PLAYER) {
+            ConversationEventDispatch.runOnServerThread(citizen, () -> Complaints.recordAnswered(citizen, playerId));
+        }
+        if (!listeners) return;
         ConversationEventDispatch.utterance(citizen, snapshot.kind(), speaker, playerId, snapshot.sessionId(),
                 snapshot.turnId(), text, source);
     }

@@ -191,6 +191,16 @@ public final class AmbientSessions {
             String originPlayerName,
             Consumer<AmbientLineResult> completion
     ) {
+        return startUrgentAnnouncement(reservation, citizen, originPlayerName, null, completion);
+    }
+
+    public static boolean startUrgentAnnouncement(
+            ConversationManager.ForegroundReservation reservation,
+            AbstractEntityCitizen citizen,
+            String originPlayerName,
+            @Nullable UUID originPlayerId,
+            Consumer<AmbientLineResult> completion
+    ) {
         java.util.Objects.requireNonNull(reservation, "reservation");
         java.util.Objects.requireNonNull(citizen, "citizen");
         java.util.Objects.requireNonNull(originPlayerName, "originPlayerName");
@@ -234,7 +244,7 @@ public final class AmbientSessions {
 
             if (!reservation.activate()) return false;
             client.addPromptTextAfterTalkingComplete(
-                    UrgentContactPrompts.build(citizen, originPlayerName));
+                    UrgentContactPrompts.build(citizen, originPlayerName, originPlayerId));
 
             startupCommitted.set(true);
             AmbientLineResult early = earlyResult.getAndSet(null);

@@ -1,5 +1,6 @@
 package me.sshcrack.mc_talking.testing;
 
+import me.sshcrack.mc_talking.conversations.complaints.ComplaintContext;
 import me.sshcrack.mc_talking.api.memory.CitizenMemoryEntryView;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
@@ -37,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.lang.reflect.Proxy;
 import java.util.function.UnaryOperator;
 
 /**
@@ -251,6 +253,14 @@ public final class CitizenPromptViewFixture {
                 w.healthPercent(), w.happiness(), w.happinessModifiers(), w.hasSchool(),
                 w.blockingInteractionMessages(), w.foodSituation());
         return this;
+    }
+
+    /** {@code view} with a complaint history, the way core's own prompt snapshots carry one. */
+    public static CitizenPromptView withComplaints(CitizenPromptView view, ComplaintContext context) {
+        return (CitizenPromptView) Proxy.newProxyInstance(CitizenPromptViewFixture.class.getClassLoader(),
+                new Class<?>[]{CitizenPromptView.class, ComplaintContext.Holder.class},
+                (proxy, method, args) -> method.getDeclaringClass() == ComplaintContext.Holder.class
+                        ? context : method.invoke(view, args));
     }
 
     public CitizenPromptView build() {

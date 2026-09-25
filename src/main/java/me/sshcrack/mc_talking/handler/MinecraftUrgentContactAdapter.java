@@ -112,6 +112,7 @@ final class MinecraftUrgentContactAdapter implements UrgentContactLifecycleModul
                 owned.delegate,
                 citizen,
                 originPlayer.getName().getString(),
+                originPlayer.getUUID(),
                 result -> completion.accept(toLifecycleResult(result))
         );
     }
