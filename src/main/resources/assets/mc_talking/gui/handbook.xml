@@ -2,14 +2,14 @@
         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd">
     <image source="minecolonies:textures/gui/builderhut/builder_paper_wide2.png" size="400 244"/>
 
-    <button id="close" size="14 15" pos="375 10" source="minecolonies:textures/gui/button_x.png" textcolor="black"/>
+    <button id="close" size="14 15" pos="375 10" source="minecolonies:textures/gui/button_x.png" textcolor="black" texthovercolor="#8a5a2b"/>
 
     <text size="400 13" pos="0 13" color="black" textalign="MIDDLE" label="$(item.mc_talking.colony_handbook)"/>
 
     <text size="120 10" pos="22 32" color="#555555" textscale="0.8" label="$(mc_talking.handbook.chapters)"/>
     <list id="chapters" size="128 190" pos="18 44">
         <view size="100% 20">
-            <button id="chapter" size="122 18" pos="0 1" textscale="0.75" textcolor="black"
+            <button id="chapter" size="122 18" pos="0 1" textscale="0.75" textcolor="black" texthovercolor="#8a5a2b"
                     source="minecolonies:textures/gui/builderhut/builder_button_medium.png"/>
         </view>
     </list>

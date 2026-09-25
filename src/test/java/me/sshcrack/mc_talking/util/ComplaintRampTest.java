@@ -109,4 +109,13 @@ class ComplaintRampTest {
         assertTrue(ComplaintRamp.homelessUrgency(Tier.REMARK) < ComplaintRamp.homelessUrgency(Tier.COMPLAINT));
         assertTrue(ComplaintRamp.homelessUrgency(Tier.COMPLAINT) < ComplaintRamp.homelessUrgency(Tier.DEMAND));
     }
+
+    @Test
+    void aBrandNewColonyIsNotHostileYet() {
+        Settings settings = Settings.DEFAULTS;
+        // Day 0: homeless and jobless everywhere reads as "some concerns", not "deeply unhappy".
+        assertTrue(ComplaintRamp.easedHappiness(2.0, 0, settings) > 5.0);
+        assertEquals(2.0, ComplaintRamp.easedHappiness(2.0, settings.youngColonyDays(), settings), 1e-9);
+        assertEquals(9.0, ComplaintRamp.easedHappiness(9.0, 0, settings), 1e-9);
+    }
 }

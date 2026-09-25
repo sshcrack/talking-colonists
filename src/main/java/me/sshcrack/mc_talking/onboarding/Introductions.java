@@ -6,6 +6,8 @@ import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import me.sshcrack.mc_talking.ConversationManager;
 import me.sshcrack.mc_talking.McTalking;
+import me.sshcrack.mc_talking.config.PersonalityArchetype;
+import me.sshcrack.mc_talking.duck.CitizenDataPersonalityExtended;
 import me.sshcrack.mc_talking.api.conversation.CitizenActivityReservation;
 import me.sshcrack.mc_talking.api.conversation.CitizenConversationService;
 import me.sshcrack.mc_talking.api.conversation.ConversationKind;
@@ -112,7 +114,8 @@ public final class Introductions {
                 introduction -> isDue(introduction, player, colony));
         if (next.isEmpty()) return;
 
-        for (AbstractEntityCitizen citizen : candidates(colony, player)) {
+        boolean welcome = next.get().id().equals(IntroductionServiceBackend.WELCOME_ID);
+        for (AbstractEntityCitizen citizen : candidates(colony, player, welcome)) {
             CitizenActivityReservation reservation = CitizenConversationService
                     .reserveActivity(citizen, OWNER_ID, Duration.ofSeconds(TIMEOUT_TICKS / 20 + 30)).orElse(null);
             if (reservation == null) continue;
@@ -134,8 +137,11 @@ public final class Introductions {
         }
     }
 
-    /** Citizens of the colony near the player who are free, nearest first. */
-    private static List<AbstractEntityCitizen> candidates(IColony colony, ServerPlayer player) {
+    /**
+     * Citizens of the colony near the player who are free, nearest first. For the welcome the colony
+     * sends someone friendly: warm personalities first, sarcastic and grumpy ones last.
+     */
+    private static List<AbstractEntityCitizen> candidates(IColony colony, ServerPlayer player, boolean welcome) {
         List<AbstractEntityCitizen> citizens = new ArrayList<>();
         for (ICitizenData data : colony.getCitizenManager().getCitizens()) {
             AbstractEntityCitizen citizen = data.getEntity().orElse(null);
@@ -146,7 +152,8 @@ public final class Introductions {
                     || !ConversationManager.canCitizenSpeak(citizen, ConversationKind.ADDON_AMBIENT)) continue;
             citizens.add(citizen);
         }
-        citizens.sort(Comparator.comparingDouble(citizen -> citizen.distanceToSqr(player)));
+        Comparator<AbstractEntityCitizen> nearest = Comparator.comparingDouble(citizen -> citizen.distanceToSqr(player));
+        citizens.sort(welcome ? Comparator.comparingInt(Introductions::warmth).thenComparing(nearest) : nearest);
         return citizens;
     }
 
@@ -217,6 +224,18 @@ public final class Introductions {
         } catch (RuntimeException e) {
             player.sendSystemMessage(fallback);
         }
+    }
+
+    /** 0 for warm personalities, 2 for sarcastic or grumpy ones, 1 for everyone else. */
+    static int warmth(AbstractEntityCitizen citizen) {
+        if (!(citizen.getCitizenData() instanceof CitizenDataPersonalityExtended data)) return 1;
+        PersonalityArchetype personality = data.mc_talking$getPersonality();
+        if (personality == null) return 1;
+        return switch (personality) {
+            case OPTIMIST, NURTURING, CURIOUS -> 0;
+            case SARCASTIC, GRUMP, COMPETITIVE, BOASTFUL -> 2;
+            default -> 1;
+        };
     }
 
     static String directive(ServerPlayer player, Introduction introduction, boolean mentionHandbook) {

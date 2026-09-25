@@ -111,6 +111,19 @@ public final class ComplaintRamp {
         return 1.0 - (1.0 - factor) * severity(colonyAgeDays, settings);
     }
 
+    /** Happiness at or above this is not eased: it is where a settled citizen is content. */
+    public static final double CONTENT_HAPPINESS = 7.0;
+
+    /**
+     * Overall happiness (0–10) below {@link #CONTENT_HAPPINESS} pulled towards it by {@link #severity}, for
+     * the citizen's mood: in a brand-new colony everyone lacks a home and a job, which does not make
+     * them hostile yet.
+     */
+    public static double easedHappiness(double happiness, int colonyAgeDays, @NotNull Settings settings) {
+        if (happiness >= CONTENT_HAPPINESS) return happiness;
+        return CONTENT_HAPPINESS - (CONTENT_HAPPINESS - happiness) * severity(colonyAgeDays, settings);
+    }
+
     /**
      * Whether the colony is still in its founding days, when citizens are more hopeful than demanding:
      * what is missing has not been neglected yet, it just has not been built.
