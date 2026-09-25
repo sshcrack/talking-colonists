@@ -43,5 +43,7 @@ public enum ApiFeature {
     /** How far a published broadcast has spread: {@code CitizenMemoryService.broadcastReach}. */
     BROADCAST_REACH,
     /** Guides to addon features, shown in the Colony Handbook and known to citizens: {@code AddonGuideService}. */
-    ADDON_GUIDES
+    ADDON_GUIDES,
+    /** Citizens walk up and tell each player about addon features once: {@code CitizenIntroductionService}. */
+    INTRODUCTIONS
 }

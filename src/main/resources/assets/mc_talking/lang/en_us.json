@@ -159,6 +159,8 @@
   "yacl3.config.mc_talking:config.mumblingCheckIntervalTicks.desc": "How often the server scans for mumbling opportunities near players. 20 ticks = 1 second.",
   "yacl3.config.mc_talking:config.enableCitizenInitiatedContact": "Enable Citizen Initiated Contact",
   "yacl3.config.mc_talking:config.enableCitizenInitiatedContact.desc": "Allows urgent citizens to proactively call out to nearby players without being prompted first.",
+  "yacl3.config.mc_talking:config.enableIntroductions": "Enable Introductions",
+  "yacl3.config.mc_talking:config.enableIntroductions.desc": "A citizen walks up to welcome you to your colony and hands you the Colony Handbook. Later, citizens tell you once about each addon feature when it becomes relevant, such as the campfire at your first dusk. Uses the Player Address Cooldown.",
   "yacl3.config.mc_talking:config.citizenContactBaseChance": "Citizen Contact Base Chance",
   "yacl3.config.mc_talking:config.citizenContactBaseChance.desc": "Base per-check chance for urgent contact. Multiplied by an urgency score from happiness, sickness, hunger, health, and homelessness.",
   "yacl3.config.mc_talking:config.citizenContactCheckIntervalTicks": "Citizen Contact Check Interval (ticks)",
@@ -383,5 +385,8 @@
   "item.mc_talking.colony_handbook": "Colony Handbook",
   "mc_talking.handbook.chapters": "Chapters",
   "mc_talking.handbook.how_to_start": "How to start",
-  "mc_talking.handbook.good_to_know": "Good to know"
+  "mc_talking.handbook.good_to_know": "Good to know",
+  "mc_talking.introduction.welcome": "%s welcomes you to the colony and hands you the Colony Handbook.",
+  "mc_talking.introduction.topic": "%s tells you about %s.",
+  "mc_talking.introduction.handbook": "More in the Colony Handbook: %s."
 }

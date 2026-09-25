@@ -243,6 +243,11 @@ public class McTalkingConfig {
     public boolean enableCitizenInitiatedContact = true;
 
     @AutoGen(category = "citizens", group = "citizen_contact")
+    @TickBox
+    @SerialEntry(comment = "If true, a citizen welcomes each player to their colony with the Colony Handbook, and later tells them once about each addon feature as it becomes relevant.")
+    public boolean enableIntroductions = true;
+
+    @AutoGen(category = "citizens", group = "citizen_contact")
     @DoubleSlider(min = 0.0, max = 1.0, step = 0.01)
     @SerialEntry(comment = "Base chance (0.0-1.0) per check interval that an urgent citizen speaks to a nearby player. Multiplied by an urgency weight derived from the citizen's state (unhappiness, injury, hunger, etc.).")
     public double citizenContactBaseChance = 0.5;
