@@ -1,6 +1,7 @@
 package me.sshcrack.mc_talking.testing;
 
 import me.sshcrack.mc_talking.conversations.complaints.ComplaintContext;
+import me.sshcrack.mc_talking.conversations.construction.ConstructionContext;
 import me.sshcrack.mc_talking.api.memory.CitizenMemoryEntryView;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.api.memory.CitizenRelationshipDimension;
@@ -260,6 +261,14 @@ public final class CitizenPromptViewFixture {
         return (CitizenPromptView) Proxy.newProxyInstance(CitizenPromptViewFixture.class.getClassLoader(),
                 new Class<?>[]{CitizenPromptView.class, ComplaintContext.Holder.class},
                 (proxy, method, args) -> method.getDeclaringClass() == ComplaintContext.Holder.class
+                        ? context : method.invoke(view, args));
+    }
+
+    /** {@code view} with the colony's building jobs, the way core's own prompt snapshots carry them. */
+    public static CitizenPromptView withConstruction(CitizenPromptView view, ConstructionContext context) {
+        return (CitizenPromptView) Proxy.newProxyInstance(CitizenPromptViewFixture.class.getClassLoader(),
+                new Class<?>[]{CitizenPromptView.class, ConstructionContext.Holder.class},
+                (proxy, method, args) -> method.getDeclaringClass() == ConstructionContext.Holder.class
                         ? context : method.invoke(view, args));
     }
 
