@@ -15,6 +15,8 @@ import me.sshcrack.mc_talking.api.conversation.ConversationKind;
 import me.sshcrack.mc_talking.api.conversation.ConversationUtteranceEvent;
 import me.sshcrack.mc_talking.api.conversation.PlayerConversationOptions;
 import me.sshcrack.mc_talking.api.conversation.PlayerTextResult;
+import me.sshcrack.mc_talking.api.guide.AddonGuide;
+import me.sshcrack.mc_talking.api.guide.AddonGuideService;
 import me.sshcrack.mc_talking.api.memory.BroadcastPublishResult;
 import me.sshcrack.mc_talking.api.memory.BroadcastRequest;
 import me.sshcrack.mc_talking.api.memory.BroadcastSource;
@@ -125,5 +127,15 @@ final class Api21FeaturesExample {
         PlayerSpeechCapture.capture(player, Duration.ofSeconds(15)).thenAccept(result -> {
             if (result.status() == SpeechCaptureResult.Status.TRANSCRIBED) announce.accept(result.transcript());
         });
+    }
+
+    /** A market addon explains itself in the Colony Handbook, and citizens can explain it too. */
+    static AddonRegistration explainTheMarket() {
+        if (!TalkingColonistsApi.supports(ApiFeature.ADDON_GUIDES)) return null;
+        return AddonGuideService.register(new AddonGuide("market:stalls", "Market Day",
+                "Once a week citizens set up stalls and trade what they made.",
+                List.of("Craft a Market Stall and place it in the colony.",
+                        "On market day, right-click a stall to see what is on offer."),
+                List.of("Operators: /market start opens the market now.")));
     }
 }

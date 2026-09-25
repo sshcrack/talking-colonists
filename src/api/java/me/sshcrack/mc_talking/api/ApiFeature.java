@@ -41,5 +41,7 @@ public enum ApiFeature {
     /** Roadmap A10 — player speech capture. */
     PLAYER_SPEECH_CAPTURE,
     /** How far a published broadcast has spread: {@code CitizenMemoryService.broadcastReach}. */
-    BROADCAST_REACH
+    BROADCAST_REACH,
+    /** Guides to addon features, shown in the Colony Handbook and known to citizens: {@code AddonGuideService}. */
+    ADDON_GUIDES
 }

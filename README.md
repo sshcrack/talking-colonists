@@ -22,6 +22,8 @@ Then left-click on a citizen you want to talk to and something similar to this w
 
 Now the citizen will complain if they are unhappy or missing some resources, just talk right away!
 
+New to it, or playing with addons? Craft a **Colony Handbook** from a book and a paper: it has a chapter on talking to citizens and one per installed addon. Your citizens know those chapters too, so you can simply ask them how something works.
+
 No microphone, or a noisy room? While you talk to a citizen, start a chat line with `@` (for example `@ Could you bake some bread?`) and it goes to that citizen instead of server chat. Run `/citizen_chat on` to send every chat line to the citizen you are talking to, and `/citizen_chat off` to stop. The prefix can be changed in the config.
 
 ## Can I include this in my modpack?

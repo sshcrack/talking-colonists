@@ -240,7 +240,7 @@ dependencies {
     modImplementation("com.ldtteam:minecolonies:${prop("deps.minecolonies_version")}")
     modRuntimeOnly("com.ldtteam:domum_ornamentum:${prop("deps.domum_version")}:universal")
     modRuntimeOnly("com.ldtteam:structurize:${prop("deps.structurize_version")}")
-    modRuntimeOnly("com.ldtteam:blockui:${prop("deps.blockui_version")}")
+    modImplementation("com.ldtteam:blockui:${prop("deps.blockui_version")}")
 
     modImplementation("dev.isxander:yet-another-config-lib:${prop("deps.yacl_version")}+${prop("deps.minecraft")}-forge")
 }

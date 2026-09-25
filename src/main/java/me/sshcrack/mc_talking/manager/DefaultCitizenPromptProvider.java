@@ -1,5 +1,7 @@
 package me.sshcrack.mc_talking.manager;
 
+import me.sshcrack.mc_talking.manager.prompt.GuidePromptSection;
+import me.sshcrack.mc_talking.internal.api.GuideServiceBackend;
 import me.sshcrack.mc_talking.api.prompt.CitizenPromptProvider;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
@@ -487,6 +489,12 @@ public class DefaultCitizenPromptProvider implements CitizenPromptProvider {
         final StringBuilder prompt = new StringBuilder();
         prompt.append(getGeneralCitizenPrompt(view, true));
         appendGuardDuty(prompt, view.identity().guard());
+        // Visitors are new here; only the colony's own citizens know how things work. Someone already
+        // talking to a citizen knows how to talk to them, so the handbook's first chapter is left out.
+        if (view.visitor() == null) {
+            prompt.append(GuidePromptSection.render(GuideServiceBackend.registered().stream()
+                    .filter(guide -> guide != GuideServiceBackend.TALKING).toList()));
+        }
 
         prompt.append("\n## GUIDELINES\n");
         prompt.append("- HIGHEST PRIORITY: ALWAYS USE AVAILABLE FUNCTIONS FIRST\n");

@@ -7,6 +7,7 @@ import me.sshcrack.mc_talking.api.service.ContextService;
 import me.sshcrack.mc_talking.api.service.ProviderStatusService;
 import me.sshcrack.mc_talking.api.service.ConversationRuleService;
 import me.sshcrack.mc_talking.api.service.ConversationService;
+import me.sshcrack.mc_talking.api.service.GuideService;
 import me.sshcrack.mc_talking.api.service.MemoryService;
 import me.sshcrack.mc_talking.api.service.PlayerSpeechService;
 import me.sshcrack.mc_talking.api.service.PregenerationService;
@@ -31,7 +32,8 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private static final Set<ApiFeature> SUPPORTED_FEATURES = EnumSet.of(ApiFeature.BROADCAST_PUBLISHING, ApiFeature.BROADCAST_REACH,
             ApiFeature.TEXT_GENERATION, ApiFeature.COLONY_EVENTS, ApiFeature.PLAYER_CONVERSATION_OPTIONS,
             ApiFeature.CROSS_COLONY_SESSIONS, ApiFeature.VISITOR_SPEAKERS, ApiFeature.UTTERANCE_EVENTS,
-            ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT);
+            ApiFeature.PROVIDER_BUDGET, ApiFeature.PLAYER_SPEECH_CAPTURE, ApiFeature.PLAYER_TEXT_INPUT,
+            ApiFeature.ADDON_GUIDES);
 
     private final PromptService prompts = new PromptServiceBackend();
     private final TextService text = new TextServiceBackend();
@@ -44,6 +46,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     private final ConversationServiceBackend conversations = new ConversationServiceBackend();
     private final MemoryService memory = new MemoryServiceBackend();
     private final PlayerSpeechService playerSpeech = new PlayerSpeechServiceBackend();
+    private final GuideService guides = new GuideServiceBackend();
 
     private TalkingColonistsApiBackend() {
     }
@@ -62,6 +65,7 @@ public final class TalkingColonistsApiBackend implements TalkingColonistsApi.Ser
     @Override public @NotNull ConversationService conversations() { return conversations; }
     @Override public @NotNull MemoryService memory() { return memory; }
     @Override public @NotNull PlayerSpeechService playerSpeech() { return playerSpeech; }
+    @Override public @NotNull GuideService guides() { return guides; }
 
     public static void onPlayerLoggedOut(@NotNull java.util.UUID playerId) {
         ConversationServiceBackend.onPlayerLoggedOut(playerId);
