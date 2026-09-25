@@ -9,7 +9,6 @@ import com.minecolonies.api.colony.buildings.ModBuildings;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.BuildingView;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenActivityCategory;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenActivityView;
 import me.sshcrack.mc_talking.api.prompt.view.AIWorkerState;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusType;
@@ -20,7 +19,6 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenWorkView;
 import me.sshcrack.mc_talking.api.prompt.view.BuilderActivityStatus;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenEquipmentView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenHousingStatus;
-import me.sshcrack.mc_talking.api.prompt.view.CitizenRequestAvailabilityView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenVerifiedFactsView;
 import me.sshcrack.mc_talking.api.prompt.view.ObservedValue;
 import me.sshcrack.mc_talking.api.prompt.view.VisitorPromptView;
@@ -29,6 +27,7 @@ import me.sshcrack.mc_talking.api.prompt.view.CitizenPersonalityView;
 import me.sshcrack.mc_talking.api.memory.CitizenMemorySnapshot;
 import me.sshcrack.mc_talking.conversations.memory.MemorySnapshotFactory;
 import me.sshcrack.mc_talking.api.prompt.view.ColonyFoodSituation;
+import me.sshcrack.mc_talking.api.prompt.view.ColonyPromptView;
 import me.sshcrack.mc_talking.api.prompt.view.CitizenStatusView;
 import me.sshcrack.mc_talking.api.prompt.view.HappinessModifierView;
 import me.sshcrack.mc_talking.api.prompt.view.PlayerRelationView;
@@ -40,11 +39,10 @@ import me.sshcrack.mc_talking.manager.prompt.ColonyPromptViewFactory;
 import me.sshcrack.mc_talking.manager.prompt.CitizenFamilyViews;
 import me.sshcrack.mc_talking.manager.prompt.CitizenNeedsViews;
 import me.sshcrack.mc_talking.manager.prompt.CitizenWorkViews;
+import me.sshcrack.mc_talking.manager.prompt.PlayerStateViews;
+import me.sshcrack.mc_talking.manager.prompt.VisitorPromptViews;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -54,7 +52,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
-import me.sshcrack.mc_talking.McTalking;
 import me.sshcrack.mc_talking.config.McTalkingConfig;
 
 /**
@@ -76,7 +73,7 @@ public final class CitizenPromptViewFactory {
             @Nullable UUID contextPlayerId
     ) {
         if (data instanceof IVisitorData visitor) {
-            return createVisitor(visitor, interestedParties, speakingTo, contextPlayerId);
+            return VisitorPromptViews.create(visitor, interestedParties, speakingTo, contextPlayerId);
         }
         String jobName = CitizenWorkViews.extractJobName(data);
         long snapshotGameTime = data.getColony().getWorld() == null ? -1L : data.getColony().getWorld().getGameTime();
@@ -111,7 +108,7 @@ public final class CitizenPromptViewFactory {
         CitizenMemorySnapshot memorySnapshot = memory == null
                 ? null
                 : MemorySnapshotFactory.create(memory);
-        String playerState = extractPlayerState(speakingTo);
+        String playerState = PlayerStateViews.describe(speakingTo);
         CitizenWorkViews.RequestSnapshot requestSnapshot = CitizenWorkViews.extractRequestSnapshot(data, workBuilding, snapshotGameTime);
         CitizenWorkViews.CategorizedRequests categorizedRequests = requestSnapshot.categorized();
         List<String> activeQuests = CitizenWorkViews.extractActiveQuests(data);
@@ -193,83 +190,29 @@ public final class CitizenPromptViewFactory {
         );
     }
 
-    /**
-     * A visitor (tavern guest) has no job, home, family, requests or quests in the colony, so those
-     * stay empty; happiness modifiers such as homelessness do not apply to a guest either.
-     */
-    private static CitizenPromptView createVisitor(
-            IVisitorData data,
-            @NotNull Map<UUID, String> interestedParties,
-            @Nullable ServerPlayer speakingTo,
-            @Nullable UUID contextPlayerId
+    /** A prompt view from its parts, for the view factories in {@code manager.prompt}. */
+    public static CitizenPromptView snapshot(
+            @NotNull UUID citizenId,
+            @Nullable UUID playerId,
+            @NotNull CitizenIdentityView identity,
+            @NotNull CitizenFamilyView family,
+            @NotNull CitizenWellbeingView wellbeing,
+            @NotNull CitizenWorkView work,
+            @NotNull ColonyPromptView colony,
+            @NotNull ConversationPromptView conversation,
+            @NotNull CitizenActivityView activity,
+            @NotNull CitizenVerifiedFactsView verifiedFacts,
+            @Nullable CitizenMemorySnapshot memories,
+            @Nullable VisitorPromptView visitor
     ) {
-        long snapshotGameTime = data.getColony().getWorld() == null ? -1L : data.getColony().getWorld().getGameTime();
-        ObservedValue<Double> observedHealth = CitizenNeedsViews.extractObservedHealth(data, snapshotGameTime);
-        var personalityExt = (CitizenDataPersonalityExtended) data;
-        personalityExt.mc_talking$assignPersonality();
-        PersonalityArchetype personality = personalityExt.mc_talking$getPersonality();
-        CitizenPersonalityView personalityView = personality == null ? null : new CitizenPersonalityView(
-                personality.name().toLowerCase(Locale.ROOT), personality.getPromptLines(), false);
-        var memoryData = (CitizenDataMemoryExtended) data;
-        var memory = memoryData.mc_talking$getOrInitializeMemory();
-        int daysInColony = memory.visitorDays(data.getColony().getDay());
-
-        var equipment = CitizenNeedsViews.extractEquipment(data, snapshotGameTime);
-        var verifiedFacts = new CitizenVerifiedFactsView(
-                snapshotGameTime,
-                observedHealth,
-                equipment,
-                CitizenHousingStatus.UNKNOWN,
-                ObservedValue.current(new CitizenRequestAvailabilityView(List.of(), List.of()), snapshotGameTime),
-                BuilderActivityStatus.NOT_BUILDER
-        );
-        String nameTagDescription = extractNameTagDescription(data);
-        var activity = new CitizenActivityView(
-                CitizenActivityCategory.OTHER, null, null, null, null,
-                "visiting the colony's tavern", nameTagDescription, List.of());
-
-        return new CitizenPromptSnapshot(
-                data.getUUID(),
-                contextPlayerId,
-                new CitizenIdentityView(data.getName(), data.isChild(), data.isFemale(), false,
-                        personalityView, personalityExt.mc_talking$getCustomPersonality()),
-                new CitizenFamilyView(List.of(), false, List.of(), List.of()),
-                new CitizenWellbeingView(
-                        data.getCitizenDiseaseHandler().isSick(),
-                        false,
-                        data.getSaturation(),
-                        observedHealth.value(),
-                        data.getCitizenHappinessHandler().getHappiness(data.getColony(), data),
-                        List.of(),
-                        false,
-                        List.of(),
-                        null
-                ),
-                new CitizenWorkView(null, null, null, CitizenWorkViews.extractSkills(data), List.of(), List.of(), List.of()),
-                ColonyPromptViewFactory.createColonyView(data.getColony(), data.getEntity().map(entity -> entity.level()).orElse(null)),
-                new ConversationPromptView(
-                        getLanguageNameFromCode(McTalkingConfig.INSTANCE.instance().language),
-                        CitizenFamilyViews.extractPlayerRelation(data, speakingTo),
-                        extractPlayerState(speakingTo),
-                        interestedParties
-                ),
-                activity,
-                verifiedFacts,
-                MemorySnapshotFactory.create(memory),
-                new VisitorPromptView(describeRecruitCost(data.getRecruitCost()), daysInColony)
-        );
-    }
-
-    @Nullable
-    private static String describeRecruitCost(@Nullable ItemStack cost) {
-        if (cost == null || cost.isEmpty()) return null;
-        return cost.getCount() + " x " + cost.getHoverName().getString();
+        return new CitizenPromptSnapshot(citizenId, playerId, identity, family, wellbeing, work, colony, conversation,
+                activity, verifiedFacts, memories, visitor);
     }
 
     // ── Extracted helpers ────────────────────────────────────────────────
 
     @Nullable
-    private static String extractNameTagDescription(ICitizenData data) {
+    public static String extractNameTagDescription(ICitizenData data) {
         if (data.getJob() == null) return null;
         return data.getJob().getNameTagDescription();
     }
@@ -282,53 +225,6 @@ public final class CitizenPromptViewFactory {
             return displayName;
         }
         return Component.translatable(building.getBuildingType().getTranslationKey()).getString();
-    }
-
-    @Nullable
-    private static String extractPlayerState(@Nullable ServerPlayer speakingTo) {
-        if (speakingTo == null) {
-            return null;
-        }
-        float health = speakingTo.getHealth();
-        float maxHealth = speakingTo.getMaxHealth();
-        int armorValue = speakingTo.getArmorValue();
-        StringBuilder ps = new StringBuilder();
-        float healthPct = health / Math.max(1.0f, maxHealth);
-        if (healthPct > 0.75f) ps.append("healthy");
-        else if (healthPct > 0.50f) ps.append("lightly wounded");
-        else if (healthPct > 0.25f) ps.append("wounded");
-        else ps.append("severely injured");
-        ps.append(" (").append(Math.round(health)).append("/").append(Math.round(maxHealth)).append(" HP)");
-        if (armorValue > 0) {
-            int wornPieces = 0;
-            float bestToughness = 0;
-            String bestArmorName = "";
-            EquipmentSlot[] toCheck = {
-                    EquipmentSlot.HEAD,
-                    EquipmentSlot.CHEST,
-                    EquipmentSlot.LEGS,
-                    EquipmentSlot.FEET
-            };
-            for (EquipmentSlot slot : toCheck) {
-                ItemStack itemStack = speakingTo.getItemBySlot(slot);
-                if (itemStack.isEmpty())
-                    continue;
-                if (itemStack.getItem() instanceof ArmorItem armor) {
-                    float toughness = armor.getToughness();
-                    if (toughness > bestToughness) {
-                        bestToughness = toughness;
-                        bestArmorName = itemStack.getDisplayName().getString();
-                    }
-                    wornPieces++;
-                }
-            }
-            ps.append(", wearing ").append(wornPieces).append(" armor pieces");
-            if (!bestArmorName.isEmpty())
-                ps.append(String.format(" (best: %s)", bestArmorName));
-        } else {
-            ps.append(", no armor");
-        }
-        return ps.toString();
     }
 
     public static CitizenStatusView createStatusView(VisibleCitizenStatus status, ICitizenData data) {
