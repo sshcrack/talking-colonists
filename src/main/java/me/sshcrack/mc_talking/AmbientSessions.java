@@ -13,6 +13,7 @@ import me.sshcrack.mc_talking.internal.session.RecentAmbientLines;
 import me.sshcrack.mc_talking.manager.CitizenWsClient;
 import me.sshcrack.mc_talking.manager.audio.ControlledTurnAudioProvider;
 import me.sshcrack.mc_talking.util.MumblingTopicHelper;
+import me.sshcrack.mc_talking.util.UrgentContactPrompts;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
@@ -233,7 +234,7 @@ public final class AmbientSessions {
 
             if (!reservation.activate()) return false;
             client.addPromptTextAfterTalkingComplete(
-                    MumblingTopicHelper.buildUrgentContactPrompt(citizen, originPlayerName));
+                    UrgentContactPrompts.build(citizen, originPlayerName));
 
             startupCommitted.set(true);
             AmbientLineResult early = earlyResult.getAndSet(null);
